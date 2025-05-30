@@ -6,10 +6,24 @@ export class AppService implements OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   onModuleInit() {
-    console.log("=== 환경 변수 설정 ===");
-    console.log("API Key 1:", this.configService.get("API_KEY_1"));
-    console.log("API Key 2:", this.configService.get("API_KEY_2"));
-    console.log("API Key 3:", this.configService.get("API_KEY_3"));
+    console.log("=== 환경 변수 확인 ===");
+    console.log("AWS_REGION:", this.configService.get("AWS_REGION"));
+    console.log(
+      "AWS_ACCESS_KEY_ID:",
+      this.configService.get("AWS_ACCESS_KEY_ID")
+    );
+    console.log(
+      "AWS_SECRET_ACCESS_KEY:",
+      this.configService.get("AWS_SECRET_ACCESS_KEY")
+    );
+    console.log(
+      "COGNITO_USER_POOL_ID:",
+      this.configService.get("COGNITO_USER_POOL_ID")
+    );
+    console.log(
+      "COGNITO_CLIENT_ID:",
+      this.configService.get("COGNITO_CLIENT_ID")
+    );
     console.log("Database Host:", this.configService.get("DB_HOST"));
     console.log("Database Port:", this.configService.get("DB_PORT"));
     console.log("Node Environment:", this.configService.get("NODE_ENV"));
