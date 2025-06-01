@@ -6,6 +6,7 @@ import {
   InitiateAuthCommand,
   GlobalSignOutCommand,
   ConfirmSignUpCommand,
+  GetUserCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   SignUpDto,
@@ -242,6 +243,43 @@ export class AuthService {
           clientId: this.clientId,
           username: confirmSignUpDto.username,
           confirmationCode: confirmSignUpDto.confirmationCode,
+        },
+      });
+      const errorResponse = this.handleCognitoError(error);
+      throw new CognitoException(errorResponse.message, errorResponse.code);
+    }
+  }
+
+  async getUserInfo(accessToken: string) {
+    const command = new GetUserCommand({
+      AccessToken: accessToken,
+    });
+
+    try {
+      console.log("GetUserInfo Request:", {
+        accessToken: accessToken.substring(0, 10) + "...", // 토큰 일부만 로깅
+      });
+
+      const response = await this.cognitoClient.send(command);
+
+      // 사용자 정보 가공
+      const userInfo = {
+        username: response.Username,
+        attributes: response.UserAttributes.reduce((acc, attr) => {
+          acc[attr.Name] = attr.Value;
+          return acc;
+        }, {}),
+      };
+
+      return {
+        message: "사용자 정보를 성공적으로 가져왔습니다.",
+        user: userInfo,
+      };
+    } catch (error) {
+      console.error("GetUserInfo Error:", {
+        error,
+        request: {
+          accessToken: accessToken.substring(0, 10) + "...", // 토큰 일부만 로깅
         },
       });
       const errorResponse = this.handleCognitoError(error);
