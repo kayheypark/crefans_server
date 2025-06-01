@@ -19,7 +19,7 @@ export const setAuthCookies = (
 
   // ID Token 쿠키 설정 (1시간)
   res.cookie("id_token", tokens.idToken, {
-    httpOnly: true,
+    httpOnly: false,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     maxAge: 60 * 60 * 1000, // 1시간
