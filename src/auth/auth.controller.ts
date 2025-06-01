@@ -52,10 +52,15 @@ export class AuthController {
 
   @Post("signout")
   async signOut(
-    @Body() signOutDto: SignOutDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response
   ) {
-    await this.authService.signOut(signOutDto);
+    const accessToken = req.cookies.access_token;
+    if (!accessToken) {
+      throw new CognitoException("인증되지 않은 사용자입니다.", "Unauthorized");
+    }
+
+    await this.authService.signOut({ accessToken });
 
     // 쿠키 삭제
     clearAuthCookies(res);
