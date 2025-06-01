@@ -5,8 +5,14 @@ import {
   SignUpCommand,
   InitiateAuthCommand,
   GlobalSignOutCommand,
+  ConfirmSignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { SignUpDto, SignInDto, SignOutDto } from "./dto/auth.dto";
+import {
+  SignUpDto,
+  SignInDto,
+  SignOutDto,
+  ConfirmSignUpDto,
+} from "./dto/auth.dto";
 import * as crypto from "crypto";
 import { CognitoException } from "./exceptions/cognito.exception";
 
@@ -201,6 +207,39 @@ export class AuthService {
         error,
         request: {
           accessToken: signOutDto.accessToken,
+        },
+      });
+      const errorResponse = this.handleCognitoError(error);
+      throw new CognitoException(errorResponse.message, errorResponse.code);
+    }
+  }
+
+  async confirmSignUp(confirmSignUpDto: ConfirmSignUpDto) {
+    const command = new ConfirmSignUpCommand({
+      ClientId: this.clientId,
+      Username: confirmSignUpDto.userSub,
+      ConfirmationCode: confirmSignUpDto.confirmationCode,
+      SecretHash: this.computeSecretHash(confirmSignUpDto.userSub),
+    });
+
+    try {
+      console.log("ConfirmSignUp Request:", {
+        clientId: this.clientId,
+        userSub: confirmSignUpDto.userSub,
+        confirmationCode: confirmSignUpDto.confirmationCode,
+      });
+
+      await this.cognitoClient.send(command);
+      return {
+        message: "이메일 인증이 완료되었습니다. 이제 로그인이 가능합니다.",
+      };
+    } catch (error) {
+      console.error("ConfirmSignUp Error:", {
+        error,
+        request: {
+          clientId: this.clientId,
+          userSub: confirmSignUpDto.userSub,
+          confirmationCode: confirmSignUpDto.confirmationCode,
         },
       });
       const errorResponse = this.handleCognitoError(error);

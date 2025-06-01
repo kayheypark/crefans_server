@@ -1,6 +1,11 @@
 import { Controller, Post, Body, UseFilters } from "@nestjs/common";
 import { AuthService } from "./auth.service";
-import { SignUpDto, SignInDto, SignOutDto } from "./dto/auth.dto";
+import {
+  SignUpDto,
+  SignInDto,
+  SignOutDto,
+  ConfirmSignUpDto,
+} from "./dto/auth.dto";
 import { CognitoExceptionFilter } from "./filters/cognito-exception.filter";
 
 @Controller("auth")
@@ -21,5 +26,10 @@ export class AuthController {
   @Post("signout")
   async signOut(@Body() signOutDto: SignOutDto) {
     return this.authService.signOut(signOutDto);
+  }
+
+  @Post("confirm-signup")
+  async confirmSignUp(@Body() confirmSignUpDto: ConfirmSignUpDto) {
+    return this.authService.confirmSignUp(confirmSignUpDto);
   }
 }
