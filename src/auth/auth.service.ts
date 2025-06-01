@@ -40,10 +40,14 @@ export class AuthService {
   private generateUsername(email: string): string {
     const [id, domain] = email.split("@");
     const timestamp = Date.now();
-    return `${id}-${domain}:${timestamp}`;
+    return `${id}:${domain}:${timestamp}`;
   }
 
-  private handleCognitoError(error: any): { message: string; code?: string } {
+  private handleCognitoError(error: any): {
+    message: string;
+    code?: string;
+    details?: any;
+  } {
     // AWS Cognito 에러 메시지 추출
     const errorMessage = error.message || "알 수 없는 오류가 발생했습니다.";
 
@@ -64,20 +68,37 @@ export class AuthService {
       TooManyRequestsException: "너무 많은 요청이 발생했습니다.",
     };
 
+    // InvalidParameterException의 경우 추가 정보 제공
+    if (errorCode === "InvalidParameterException") {
+      console.error("InvalidParameterException Details:", {
+        error,
+        message: errorMessage,
+        stack: error.stack,
+      });
+    }
+
     return {
       message: errorMessages[errorCode] || errorMessage,
       code: errorCode,
+      details:
+        errorCode === "InvalidParameterException"
+          ? {
+              originalMessage: errorMessage,
+              stack: error.stack,
+            }
+          : undefined,
     };
   }
 
   async signUp(signUpDto: SignUpDto) {
     const username = this.generateUsername(signUpDto.email);
+    const secretHash = this.computeSecretHash(username);
 
     const command = new SignUpCommand({
       ClientId: this.clientId,
       Username: username,
       Password: signUpDto.password,
-      SecretHash: this.computeSecretHash(username),
+      SecretHash: secretHash,
       UserAttributes: [
         {
           Name: "name",
@@ -87,33 +108,40 @@ export class AuthService {
           Name: "email",
           Value: signUpDto.email,
         },
+        {
+          Name: "preferred_username",
+          Value: username,
+        },
       ],
     });
 
     try {
-      console.log({
+      console.log("SignUp Request:", {
         clientId: this.clientId,
         username: username,
-        password: signUpDto.password,
-        secretHash: this.computeSecretHash(username),
-        userAttributes: [
-          {
-            Name: "name",
-            Value: signUpDto.name,
-          },
-          {
-            Name: "email",
-            Value: signUpDto.email,
-          },
-        ],
+        secretHash: secretHash,
+        userAttributes: command.input.UserAttributes,
+        region: this.configService.get("AWS_REGION"),
+        userPoolId: this.userPoolId,
       });
+
       const response = await this.cognitoClient.send(command);
       return {
-        message: "회원가입이 완료되었습니다.",
+        message:
+          "임시 회원가입이 완료되었습니다. 이메일 인증 후 로그인 가능합니다.",
         userSub: response.UserSub,
         username: username,
       };
     } catch (error) {
+      console.error("SignUp Error:", {
+        error,
+        request: {
+          clientId: this.clientId,
+          username: username,
+          secretHash: secretHash,
+          userAttributes: command.input.UserAttributes,
+        },
+      });
       const errorResponse = this.handleCognitoError(error);
       throw new CognitoException(errorResponse.message, errorResponse.code);
     }
@@ -131,6 +159,13 @@ export class AuthService {
     });
 
     try {
+      console.log("SignIn Request:", {
+        clientId: this.clientId,
+        username: signInDto.email,
+        region: this.configService.get("AWS_REGION"),
+        userPoolId: this.userPoolId,
+      });
+
       const response = await this.cognitoClient.send(command);
       return {
         message: "로그인이 완료되었습니다.",
@@ -139,6 +174,13 @@ export class AuthService {
         idToken: response.AuthenticationResult.IdToken,
       };
     } catch (error) {
+      console.error("SignIn Error:", {
+        error,
+        request: {
+          clientId: this.clientId,
+          username: signInDto.email,
+        },
+      });
       const errorResponse = this.handleCognitoError(error);
       throw new CognitoException(errorResponse.message, errorResponse.code);
     }
@@ -155,6 +197,12 @@ export class AuthService {
         message: "로그아웃이 완료되었습니다.",
       };
     } catch (error) {
+      console.error("SignOut Error:", {
+        error,
+        request: {
+          accessToken: signOutDto.accessToken,
+        },
+      });
       const errorResponse = this.handleCognitoError(error);
       throw new CognitoException(errorResponse.message, errorResponse.code);
     }
