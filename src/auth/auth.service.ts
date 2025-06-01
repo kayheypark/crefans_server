@@ -217,15 +217,15 @@ export class AuthService {
   async confirmSignUp(confirmSignUpDto: ConfirmSignUpDto) {
     const command = new ConfirmSignUpCommand({
       ClientId: this.clientId,
-      Username: confirmSignUpDto.userSub,
+      Username: confirmSignUpDto.username,
       ConfirmationCode: confirmSignUpDto.confirmationCode,
-      SecretHash: this.computeSecretHash(confirmSignUpDto.userSub),
+      SecretHash: this.computeSecretHash(confirmSignUpDto.username),
     });
 
     try {
       console.log("ConfirmSignUp Request:", {
         clientId: this.clientId,
-        userSub: confirmSignUpDto.userSub,
+        username: confirmSignUpDto.username,
         confirmationCode: confirmSignUpDto.confirmationCode,
       });
 
@@ -238,7 +238,7 @@ export class AuthService {
         error,
         request: {
           clientId: this.clientId,
-          userSub: confirmSignUpDto.userSub,
+          username: confirmSignUpDto.username,
           confirmationCode: confirmSignUpDto.confirmationCode,
         },
       });
