@@ -98,13 +98,13 @@ export class AuthService {
 
   async signUp(signUpDto: SignUpDto) {
     const username = this.generateUsername(signUpDto.email);
-    const secretHash = this.computeSecretHash(username);
+    const timestamp = Date.now().toString();
 
     const command = new SignUpCommand({
       ClientId: this.clientId,
       Username: username,
       Password: signUpDto.password,
-      SecretHash: secretHash,
+      SecretHash: this.computeSecretHash(username),
       UserAttributes: [
         {
           Name: "name",
@@ -116,7 +116,11 @@ export class AuthService {
         },
         {
           Name: "preferred_username",
-          Value: username,
+          Value: timestamp,
+        },
+        {
+          Name: "nickname",
+          Value: signUpDto.nickname,
         },
       ],
     });
@@ -125,12 +129,10 @@ export class AuthService {
       console.log("SignUp Request:", {
         clientId: this.clientId,
         username: username,
-        secretHash: secretHash,
+        password: signUpDto.password,
+        secretHash: this.computeSecretHash(username),
         userAttributes: command.input.UserAttributes,
-        region: this.configService.get("AWS_REGION"),
-        userPoolId: this.userPoolId,
       });
-
       const response = await this.cognitoClient.send(command);
       return {
         message:
@@ -144,7 +146,7 @@ export class AuthService {
         request: {
           clientId: this.clientId,
           username: username,
-          secretHash: secretHash,
+          secretHash: this.computeSecretHash(username),
           userAttributes: command.input.UserAttributes,
         },
       });
