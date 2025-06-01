@@ -98,7 +98,8 @@ export class AuthService {
   }
 
   async signUp(signUpDto: SignUpDto) {
-    const username = this.generateUsername(signUpDto.email);
+    // const username = this.generateUsername(signUpDto.email);
+    const username = signUpDto.email;
     const timestamp = Date.now().toString();
 
     const command = new SignUpCommand({
@@ -220,15 +221,15 @@ export class AuthService {
   async confirmSignUp(confirmSignUpDto: ConfirmSignUpDto) {
     const command = new ConfirmSignUpCommand({
       ClientId: this.clientId,
-      Username: confirmSignUpDto.username,
+      Username: confirmSignUpDto.email,
       ConfirmationCode: confirmSignUpDto.confirmationCode,
-      SecretHash: this.computeSecretHash(confirmSignUpDto.username),
+      SecretHash: this.computeSecretHash(confirmSignUpDto.email),
     });
 
     try {
       console.log("ConfirmSignUp Request:", {
         clientId: this.clientId,
-        username: confirmSignUpDto.username,
+        username: confirmSignUpDto.email,
         confirmationCode: confirmSignUpDto.confirmationCode,
       });
 
@@ -241,7 +242,7 @@ export class AuthService {
         error,
         request: {
           clientId: this.clientId,
-          username: confirmSignUpDto.username,
+          username: confirmSignUpDto.email,
           confirmationCode: confirmSignUpDto.confirmationCode,
         },
       });

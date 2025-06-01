@@ -36,9 +36,9 @@ export class SignOutDto {
 }
 
 export class ConfirmSignUpDto {
-  @IsString()
+  @IsEmail()
   @IsNotEmpty()
-  username: string;
+  email: string;
 
   @IsString()
   @IsNotEmpty()
