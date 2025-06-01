@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Get,
   Req,
+  Query,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import {
@@ -82,5 +83,17 @@ export class AuthController {
       throw new CognitoException("인증되지 않은 사용자입니다.", "Unauthorized");
     }
     return this.authService.getUserInfo(accessToken);
+  }
+
+  @Get("check-email")
+  async checkEmailExists(@Query("email") email: string) {
+    if (!email) {
+      throw new CognitoException(
+        "이메일 주소를 입력해주세요.",
+        "InvalidParameterException"
+      );
+    }
+
+    return this.authService.checkEmailExists(email);
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   CognitoIdentityProviderClient,
@@ -7,6 +7,7 @@ import {
   GlobalSignOutCommand,
   ConfirmSignUpCommand,
   GetUserCommand,
+  ListUsersCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   SignUpDto,
@@ -16,6 +17,7 @@ import {
 } from "./dto/auth.dto";
 import * as crypto from "crypto";
 import { CognitoException } from "./exceptions/cognito.exception";
+import { IsEmail, IsNotEmpty } from "class-validator";
 
 @Injectable()
 export class AuthService {
@@ -281,6 +283,48 @@ export class AuthService {
         error,
         request: {
           accessToken: accessToken.substring(0, 10) + "...", // 토큰 일부만 로깅
+        },
+      });
+      const errorResponse = this.handleCognitoError(error);
+      throw new CognitoException(errorResponse.message, errorResponse.code);
+    }
+  }
+  //AWS IAM - email_exist_check 정책 추가로 인해 사용 가능
+  async checkEmailExists(email: string) {
+    // 이메일 형식 검증
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      throw new BadRequestException("올바른 이메일 형식이 아닙니다.");
+    }
+
+    try {
+      const command = new ListUsersCommand({
+        UserPoolId: this.userPoolId,
+        Filter: `email = "${email}"`,
+        Limit: 1, // 최소한의 데이터만 가져오기
+      });
+
+      console.log("CheckEmailExists Request:", {
+        userPoolId: this.userPoolId,
+        email: email,
+      });
+
+      const response = await this.cognitoClient.send(command);
+
+      const exists = response.Users && response.Users.length > 0;
+
+      return {
+        exists,
+        message: exists
+          ? "이미 사용 중인 이메일입니다."
+          : "사용 가능한 이메일입니다.",
+      };
+    } catch (error) {
+      console.error("CheckEmailExists Error:", {
+        error,
+        request: {
+          userPoolId: this.userPoolId,
+          email: email,
         },
       });
       const errorResponse = this.handleCognitoError(error);
