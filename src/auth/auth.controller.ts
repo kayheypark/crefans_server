@@ -96,4 +96,16 @@ export class AuthController {
 
     return this.authService.checkEmailExists(email);
   }
+
+  @Post("resend-confirmation-code")
+  async resendConfirmationCode(@Body("email") email: string) {
+    if (!email) {
+      throw new CognitoException(
+        "이메일 주소를 입력해주세요.",
+        "InvalidParameterException"
+      );
+    }
+
+    return this.authService.resendConfirmationCode(email);
+  }
 }

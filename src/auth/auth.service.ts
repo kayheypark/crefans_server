@@ -8,6 +8,7 @@ import {
   ConfirmSignUpCommand,
   GetUserCommand,
   ListUsersCommand,
+  ResendConfirmationCodeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   SignUpDto,
@@ -145,7 +146,7 @@ export class AuthService {
       return {
         message:
           "임시 회원가입이 완료되었습니다. 이메일 인증 후 로그인 가능합니다.",
-        userSub: response.UserSub,
+        userSub: response.UserSub, // TODO: 굳이 필요한 정보가 아니라면 제거
         username: username,
       };
     } catch (error) {
@@ -329,6 +330,36 @@ export class AuthService {
         request: {
           userPoolId: this.userPoolId,
           email: email,
+        },
+      });
+      const errorResponse = this.handleCognitoError(error);
+      throw new CognitoException(errorResponse.message, errorResponse.code);
+    }
+  }
+
+  async resendConfirmationCode(email: string) {
+    const command = new ResendConfirmationCodeCommand({
+      ClientId: this.clientId,
+      Username: email,
+      SecretHash: this.computeSecretHash(email),
+    });
+
+    try {
+      console.log("ResendConfirmationCode Request:", {
+        clientId: this.clientId,
+        username: email,
+      });
+
+      await this.cognitoClient.send(command);
+      return {
+        message: "인증 코드가 이메일로 재전송되었습니다.",
+      };
+    } catch (error) {
+      console.error("ResendConfirmationCode Error:", {
+        error,
+        request: {
+          clientId: this.clientId,
+          username: email,
         },
       });
       const errorResponse = this.handleCognitoError(error);
