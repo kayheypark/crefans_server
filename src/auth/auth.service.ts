@@ -126,6 +126,10 @@ export class AuthService {
           Name: "nickname",
           Value: signUpDto.nickname,
         },
+        {
+          Name: "phone_number",
+          Value: signUpDto.phoneNumber,
+        },
       ],
     });
 
