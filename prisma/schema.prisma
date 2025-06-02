@@ -1,0 +1,130 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// 토큰 타입 정의
+/// 시스템에서 사용되는 모든 토큰의 타입을 관리
+model TokenType {
+  /// 토큰 타입 고유 식별자
+  id          Int      @id @default(autoincrement())
+  /// 토큰 심볼 (예: POINT, CREDIT, COIN)
+  symbol      String   @unique
+  /// 토큰 표시명 (예: 포인트, 크레딧, 코인)
+  name        String
+  /// 토큰 타입에 대한 상세 설명
+  description String?
+  /// 생성 일시
+  created_at  DateTime @default(now())
+  /// 수정 일시
+  updated_at  DateTime @updatedAt
+
+  // 관계
+  wallets     Wallet[]
+  transfers   Transfer[]
+
+  @@map("token_types")
+}
+
+/// 토큰 지갑
+/// 실제 토큰이 보관되는 지갑
+model Wallet {
+  /// 지갑 고유 식별자
+  id             Int          @id @default(autoincrement())
+  /// 지갑 주소 (UUID)
+  address        String       @unique
+  /// 토큰 타입 ID
+  token_type_id  Int
+  /// 보유 수량
+  amount         Decimal      @default(0) @db.Decimal(18, 4)
+  /// 생성 일시
+  created_at     DateTime     @default(now())
+  /// 수정 일시
+  updated_at     DateTime     @updatedAt
+
+  // 관계
+  token_type     TokenType    @relation(fields: [token_type_id], references: [id])
+  ownerships     WalletOwnership[]
+  transfers_from Transfer[] @relation("FromWallet")
+  transfers_to   Transfer[] @relation("ToWallet")
+
+  @@map("wallets")
+}
+
+/// 지갑 소유권
+/// 지갑의 소유권 정보를 관리
+model WalletOwnership {
+  /// 소유권 고유 식별자
+  id             Int          @id @default(autoincrement())
+  /// 지갑 ID
+  wallet_id      Int
+  /// 소유자 주소 (Cognito의 userSub)
+  owner_address  String
+  /// 소유권 타입 (0: 단독소유, 1: 공동소유)
+  ownership_type Int          @db.TinyInt
+  /// 소유권 비율 (0-100)
+  share          Int          @default(100)
+  /// 소유권 시작 일시
+  started_at     DateTime     @default(now())
+  /// 소유권 종료 일시 (null인 경우 현재 소유 중)
+  ended_at       DateTime?
+  /// 생성 일시
+  created_at     DateTime     @default(now())
+  /// 수정 일시
+  updated_at     DateTime     @updatedAt
+
+  // 관계
+  wallet         Wallet       @relation(fields: [wallet_id], references: [id])
+
+  @@unique([wallet_id, owner_address, started_at])
+  @@map("wallet_ownerships")
+}
+
+/// 전송 로그
+/// 모든 토큰 전송 내역을 기록
+model Transfer {
+  /// 전송 고유 식별자
+  id                Int             @id @default(autoincrement())
+  /// 트랜잭션 해시 (UUID)
+  tx_hash           String          @unique
+  /// 송신 지갑 ID
+  from_wallet_id    Int
+  /// 수신 지갑 ID
+  to_wallet_id      Int
+  /// 토큰 타입 ID
+  token_type_id     Int
+  /// 전송 수량
+  amount            Decimal         @db.Decimal(18, 4)
+  /// 전송 전 잔액
+  balance_before    Decimal         @db.Decimal(18, 4)
+  /// 전송 후 잔액
+  balance_after     Decimal         @db.Decimal(18, 4)
+  /// 전송 사유 (0: 구매, 1: 보상, 2: 사용, 3: 환불, 4: 이체, 5: 시스템, 6: 기타)
+  reason            Int             @db.TinyInt
+  /// 관련 엔티티 ID (예: 주문 ID, 보상 ID)
+  reference_id      String?
+  /// 전송 상태 (0: 대기, 1: 완료, 2: 실패, 3: 취소, 4: 되돌림)
+  status            Int             @db.TinyInt
+  /// 생성 일시
+  created_at        DateTime        @default(now())
+  /// 수정 일시
+  updated_at        DateTime        @updatedAt
+
+  // 관계
+  token_type        TokenType       @relation(fields: [token_type_id], references: [id])
+  from_wallet       Wallet          @relation("FromWallet", fields: [from_wallet_id], references: [id])
+  to_wallet         Wallet          @relation("ToWallet", fields: [to_wallet_id], references: [id])
+
+  @@map("transfers")
+}
