@@ -19,6 +19,7 @@ import {
 import * as crypto from "crypto";
 import { CognitoException } from "./exceptions/cognito.exception";
 import { IsEmail, IsNotEmpty } from "class-validator";
+import { TokenService } from "../token/token.service";
 
 @Injectable()
 export class AuthService {
@@ -27,7 +28,10 @@ export class AuthService {
   private clientId: string;
   private clientSecret: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private tokenService: TokenService
+  ) {
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.configService.get("AWS_REGION"),
       credentials: {
@@ -101,7 +105,6 @@ export class AuthService {
   }
 
   async signUp(signUpDto: SignUpDto) {
-    // const username = this.generateUsername(signUpDto.email);
     const username = signUpDto.email;
     const timestamp = Date.now().toString();
 
@@ -147,10 +150,13 @@ export class AuthService {
         userAttributes: command.input.UserAttributes,
       });
       const response = await this.cognitoClient.send(command);
+
+      // 회원가입 성공 시 콩 지갑 생성 (토큰 타입 ID: 1)
+      await this.tokenService.createWallet(1, response.UserSub);
+
       return {
         message:
           "임시 회원가입이 완료되었습니다. 이메일 인증 후 로그인 가능합니다.",
-        userSub: response.UserSub, // TODO: 굳이 필요한 정보가 아니라면 제거
         username: username,
       };
     } catch (error) {
