@@ -137,12 +137,10 @@ model Transfer {
   TransferReason TransferReason[]
 }
 
-/// 전송사유타입 (0: 재화충전, 1: 재화환불, 2: 포스팅구매, 3: 포스팅언락, 4: 후원, 5: 구독, 6: 크리에이터정산요청)
+/// 전송사유타입(초기 데이터인 seed 있음)
 model TransferReason {
   /// 전송사유 고유 식별자
   id             Int          @id @default(autoincrement())
-  /// 전송사유 코드
-  code           Int
   /// 전송사유 이름
   name           String
   /// 전송사유 설명
@@ -155,6 +153,5 @@ model TransferReason {
   // 관계
   transfers     Transfer[]
 
-  @@unique([code])
   @@map("transfer_reasons")
 }
