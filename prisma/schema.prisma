@@ -277,4 +277,217 @@ model WalletCreationQueue {
   @@map("wallet_creation_queues")
 }
 
+/// 미디어 타입
+enum MediaType {
+  IMAGE   // 이미지
+  VIDEO   // 비디오
+  AUDIO   // 오디오
+  @@map("media_types")
+}
+
+/// 미디어
+/// 포스팅에 첨부되는 미디어 파일 정보
+model Media {
+  /// 미디어 고유 식별자
+  id              Int       @id @default(autoincrement())
+  /// 미디어 타입
+  type            MediaType
+  /// 원본 파일명
+  original_name   String
+  /// 저장된 파일명
+  file_name       String
+  /// 파일 경로
+  file_path       String
+  /// 파일 크기 (bytes)
+  file_size       Int
+  /// MIME 타입
+  mime_type       String
+  /// 썸네일 경로 (이미지/비디오의 경우)
+  thumbnail_path  String?
+  /// 메타데이터 (JSON)
+  metadata        Json?
+  /// 삭제 여부
+  is_deleted      Boolean   @default(false)
+  /// 삭제 일시
+  deleted_at      DateTime?
+  /// 생성 일시
+  created_at      DateTime  @default(now())
+  /// 수정 일시
+  updated_at      DateTime  @updatedAt
+
+  // 관계
+  postings        PostingMedia[]
+
+  @@map("medias")
+}
+
+/// 포스팅 상태
+enum PostingStatus {
+  DRAFT     // 임시저장
+  PUBLISHED // 발행됨
+  ARCHIVED  // 보관됨
+  @@map("posting_statuses")
+}
+
+/// 포스팅 조회 이력
+/// 포스팅의 조회 이력을 관리
+model PostingView {
+  /// 조회 이력 고유 식별자
+  id              Int       @id @default(autoincrement())
+  /// 포스팅 ID
+  posting_id      Int
+  /// 조회자 ID (Cognito의 userSub)
+  viewer_id       String?
+  /// 조회자 IP
+  viewer_ip       String?
+  /// 조회자 User Agent
+  viewer_ua       String?
+  /// 생성 일시
+  created_at      DateTime  @default(now())
+
+  // 관계
+  posting         Posting   @relation(fields: [posting_id], references: [id])
+
+  @@unique([posting_id, viewer_id, viewer_ip])
+  @@map("posting_views")
+}
+
+/// 포스팅
+/// 크리에이터가 작성하는 게시글
+model Posting {
+  /// 포스팅 고유 식별자
+  id              Int       @id @default(autoincrement())
+  /// 크리에이터 ID (Cognito의 userSub)
+  creator_id      String
+  /// 제목
+  title           String
+  /// 내용
+  content         String    @db.Text
+  /// 상태
+  status          PostingStatus @default(DRAFT)
+  /// 멤버십 전용 여부
+  is_membership   Boolean   @default(false)
+  /// 멤버십 레벨 (멤버십 전용인 경우)
+  membership_level Int?
+  /// 공개 시작 일시
+  publish_start_at DateTime?
+  /// 공개 종료 일시
+  publish_end_at   DateTime?
+  /// 전체 조회수
+  total_view_count Int      @default(0)
+  /// 고유 조회수
+  unique_view_count Int     @default(0)
+  /// 좋아요 수
+  like_count      Int       @default(0)
+  /// 댓글 수
+  comment_count   Int       @default(0)
+  /// 발행 일시
+  published_at    DateTime?
+  /// 보관 일시
+  archived_at     DateTime?
+  /// 삭제 여부
+  is_deleted      Boolean   @default(false)
+  /// 삭제 일시
+  deleted_at      DateTime?
+  /// 생성 일시
+  created_at      DateTime  @default(now())
+  /// 수정 일시
+  updated_at      DateTime  @updatedAt
+
+  // 관계
+  medias          PostingMedia[]
+  comments        Comment[]
+  likes           PostingLike[]
+  views           PostingView[]
+
+  @@map("postings")
+}
+
+/// 포스팅-미디어 관계
+/// 포스팅과 미디어의 다대다 관계를 관리
+model PostingMedia {
+  /// 관계 고유 식별자
+  id              Int       @id @default(autoincrement())
+  /// 포스팅 ID
+  posting_id      Int
+  /// 미디어 ID
+  media_id        Int
+  /// 정렬 순서
+  sort_order      Int       @default(0)
+  /// 무료 공개 여부
+  is_free_preview Boolean   @default(false)
+  /// 삭제 여부
+  is_deleted      Boolean   @default(false)
+  /// 삭제 일시
+  deleted_at      DateTime?
+  /// 생성 일시
+  created_at      DateTime  @default(now())
+  /// 수정 일시
+  updated_at      DateTime  @updatedAt
+
+  // 관계
+  posting         Posting   @relation(fields: [posting_id], references: [id])
+  media           Media     @relation(fields: [media_id], references: [id])
+
+  @@unique([posting_id, media_id])
+  @@map("posting_medias")
+}
+
+/// 댓글
+/// 포스팅에 달리는 댓글
+model Comment {
+  /// 댓글 고유 식별자
+  id              Int       @id @default(autoincrement())
+  /// 포스팅 ID
+  posting_id      Int
+  /// 작성자 ID (Cognito의 userSub)
+  author_id       String
+  /// 태그된 사용자 ID (Cognito의 userSub)
+  tagged_user_id  String?
+  /// 내용
+  content         String    @db.Text
+  /// 부모 댓글 ID (대댓글인 경우)
+  parent_id       Int?
+  /// 삭제 여부
+  is_deleted      Boolean   @default(false)
+  /// 삭제 일시
+  deleted_at      DateTime?
+  /// 생성 일시
+  created_at      DateTime  @default(now())
+  /// 수정 일시
+  updated_at      DateTime  @updatedAt
+
+  // 관계
+  posting         Posting   @relation(fields: [posting_id], references: [id])
+  parent          Comment?  @relation("CommentToComment", fields: [parent_id], references: [id])
+  children        Comment[] @relation("CommentToComment")
+
+  @@map("comments")
+}
+
+/// 포스팅 좋아요
+/// 포스팅에 대한 좋아요 정보
+model PostingLike {
+  /// 좋아요 고유 식별자
+  id              Int       @id @default(autoincrement())
+  /// 포스팅 ID
+  posting_id      Int
+  /// 사용자 ID (Cognito의 userSub)
+  user_id         String
+  /// 삭제 여부
+  is_deleted      Boolean   @default(false)
+  /// 삭제 일시
+  deleted_at      DateTime?
+  /// 생성 일시
+  created_at      DateTime  @default(now())
+  /// 수정 일시
+  updated_at      DateTime  @updatedAt
+
+  // 관계
+  posting         Posting   @relation(fields: [posting_id], references: [id])
+
+  @@unique([posting_id, user_id])
+  @@map("posting_likes")
+}
+
 
