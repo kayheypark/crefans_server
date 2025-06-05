@@ -70,11 +70,7 @@ model WalletOwnership {
   /// 지갑 ID
   wallet_id      Int
   /// 소유자 주소 (Cognito의 userSub)
-  owner_address  String
-  /// 소유권 타입 (0: 단독소유, 1: 공동소유)
-  ownership_type Int          @db.TinyInt
-  /// 소유권 비율 (0-100)
-  share          Int          @default(100)
+  owner_id  String
   /// 소유권 시작 일시
   started_at     DateTime     @default(now())
   /// 소유권 종료 일시 (null인 경우 현재 소유 중)
@@ -87,7 +83,7 @@ model WalletOwnership {
   // 관계
   wallet         Wallet       @relation(fields: [wallet_id], references: [id])
 
-  @@unique([wallet_id, owner_address, started_at])
+  @@unique([wallet_id, owner_id, started_at])
   @@map("wallet_ownerships")
 }
 
