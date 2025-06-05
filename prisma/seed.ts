@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PeriodUnit, PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
@@ -46,7 +46,13 @@ async function main() {
   // 토큰 타입
   await prisma.tokenType.createMany({
     data: [
-      { id: 1, name: "콩", symbol: "KNG", description: "기본 사이트 내 재화" },
+      {
+        id: 1,
+        name: "콩",
+        symbol: "KNG",
+        description: "기본 사이트 내 재화",
+        price: 100,
+      },
     ],
   });
 
@@ -58,6 +64,23 @@ async function main() {
       amount: 100000000, //1억개
       token_type_id: 1,
     },
+  });
+
+  //멤버십 상품 초기 데이터
+  await prisma.membershipItem.createMany({
+    data: [
+      {
+        id: 1,
+        name: "멤버십 1",
+        price: 10000,
+        level: 1,
+        creator_id: "502f09cb-9aed-4d16-93e6-b1dc35e98089",
+        billing_unit: PeriodUnit.MONTH,
+        billing_period: 1,
+        trial_unit: PeriodUnit.WEEK,
+        trial_period: 7,
+      },
+    ],
   });
 }
 

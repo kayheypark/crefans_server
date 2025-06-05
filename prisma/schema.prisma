@@ -27,6 +27,8 @@ model TokenType {
   id          Int      @id @default(autoincrement())
   /// 토큰 심볼 (예: POINT, CREDIT, COIN)
   symbol      String   @unique
+  ///1개당 가격(KRW)
+  price       Decimal  @db.Decimal(18, 4)
   /// 토큰 표시명 (예: 포인트, 크레딧, 코인)
   name        String
   /// 토큰 타입에 대한 상세 설명
@@ -158,6 +160,15 @@ model TransferReason {
   @@map("transfer_reasons")
 }
 
+
+enum PeriodUnit {
+  DAY
+  WEEK
+  MONTH
+  YEAR
+  @@map("period_units")
+}
+
 /// 멤버십 상품
 /// 크리에이터가 판매하는 멤버십 상품 정보를 관리
 model MembershipItem {
@@ -169,14 +180,14 @@ model MembershipItem {
   level                 Int       @default(1)
   /// 크리에이터 ID (Cognito의 userSub)
   creator_id            String
-  /// 가격
+  /// 가격 (KRW 기준)
   price                 Decimal   @db.Decimal(18, 4)
-  /// 반복 결제 단위 (DAY, MONTH, YEAR)
-  billing_unit          String    @default("MONTH")
+  /// 반복 결제 단위
+  billing_unit          PeriodUnit
   /// 반복 결제 주기 상수 (예: 1개월, 3개월, 1년)
   billing_period        Int       @default(1)
-  /// 무료 체험 기간 단위 (DAY, MONTH, YEAR)
-  trial_unit            String?   @default("MONTH")
+  /// 무료 체험 기간 단위
+  trial_unit            PeriodUnit
   /// 무료 체험 기간 상수 (예: 7일, 1개월)
   trial_period          Int?      @default(0)
   /// 생성 일시
@@ -194,7 +205,6 @@ model MembershipItem {
 enum SubscriptionStatus {
   ONGOING    // 진행 중
   EXPIRED    // 만료됨
-  CANCELLED  // 취소됨
   @@map("subscription_statuses")
 }
 
@@ -213,7 +223,7 @@ model Subscription {
   status          SubscriptionStatus @default(ONGOING)
   /// 구독 금액
   amount          Decimal   @db.Decimal(18, 4)
-  /// 자동 갱신 여부
+  /// 자동 갱신 여부 (유저가 구독 취소시 자동 갱신여부가 false로 업데이트됨)
   auto_renew      Boolean   @default(true)
   /// 생성 일시
   created_at      DateTime  @default(now())
