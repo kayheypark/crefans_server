@@ -131,6 +131,10 @@ export class AuthService {
           Name: "phone_number",
           Value: signUpDto.phoneNumber,
         },
+        {
+          Name: "custom:is_creator",
+          Value: "0",
+        },
       ],
     });
 
