@@ -132,6 +132,8 @@ model Transfer {
   token_type        TokenType       @relation(fields: [token_type_id], references: [id])
   from_wallet       Wallet          @relation("FromWallet", fields: [from_wallet_id], references: [id])
   to_wallet         Wallet          @relation("ToWallet", fields: [to_wallet_id], references: [id])
+  subscription      Subscription?   @relation(fields: [subscription_id], references: [id])
+  subscription_id   Int?
 
   @@map("transfers")
   TransferReason TransferReason[]
@@ -154,4 +156,75 @@ model TransferReason {
   transfers     Transfer[]
 
   @@map("transfer_reasons")
+}
+
+/// 멤버십 상품
+/// 크리에이터가 판매하는 멤버십 상품 정보를 관리
+model MembershipItem {
+  /// 멤버십 상품 고유 식별자
+  id                    Int       @id @default(autoincrement())
+  /// 멤버십 상품 이름
+  name                  String
+  /// 멤버십 레벨 (차등 열람을 위한 등급)
+  level                 Int       @default(1)
+  /// 크리에이터 ID (Cognito의 userSub)
+  creator_id            String
+  /// 가격
+  price                 Decimal   @db.Decimal(18, 4)
+  /// 반복 결제 단위 (DAY, MONTH, YEAR)
+  billing_unit          String    @default("MONTH")
+  /// 반복 결제 주기 상수 (예: 1개월, 3개월, 1년)
+  billing_period        Int       @default(1)
+  /// 무료 체험 기간 단위 (DAY, MONTH, YEAR)
+  trial_unit            String?   @default("MONTH")
+  /// 무료 체험 기간 상수 (예: 7일, 1개월)
+  trial_period          Int?      @default(0)
+  /// 생성 일시
+  created_at            DateTime  @default(now())
+  /// 수정 일시
+  updated_at            DateTime  @updatedAt
+
+  // 관계
+  subscriptions         Subscription[]
+
+  @@map("membership_items")
+}
+
+/// 구독 상태
+enum SubscriptionStatus {
+  ONGOING    // 진행 중
+  EXPIRED    // 만료됨
+  CANCELLED  // 취소됨
+  @@map("subscription_statuses")
+}
+
+/// 구독 정보
+/// 크리에이터와 구독자 간의 구독 관계를 관리
+model Subscription {
+  /// 구독 고유 식별자
+  id              Int       @id @default(autoincrement())
+  /// 구독자 ID (Cognito의 userSub)
+  subscriber_id   String
+  /// 구독 시작 일시
+  started_at      DateTime  @default(now())
+  /// 구독 종료 일시 (null인 경우 현재 구독 중)
+  ended_at        DateTime?
+  /// 구독 상태
+  status          SubscriptionStatus @default(ONGOING)
+  /// 구독 금액
+  amount          Decimal   @db.Decimal(18, 4)
+  /// 자동 갱신 여부
+  auto_renew      Boolean   @default(true)
+  /// 생성 일시
+  created_at      DateTime  @default(now())
+  /// 수정 일시
+  updated_at      DateTime  @updatedAt
+
+  // 관계
+  membership_item MembershipItem @relation(fields: [membership_item_id], references: [id])
+  membership_item_id Int
+  transfers       Transfer[]
+
+  @@unique([subscriber_id, membership_item_id, started_at])
+  @@map("subscriptions")
 }
