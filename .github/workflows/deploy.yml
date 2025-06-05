@@ -33,7 +33,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "dist/,package.json,package-lock.json"
+          source: "dist/,package.json,package-lock.json,prisma/"
           target: ~/crefans
 
       - name: Deploy on EC2
@@ -46,4 +46,5 @@ jobs:
             cd ~/crefans
             npm ci --omit=dev
             npx prisma generate
+            npx prisma migrate deploy
             pm2 restart crefans-server || pm2 start dist/main.js --name crefans-server
