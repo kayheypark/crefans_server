@@ -9,6 +9,7 @@ import {
   GetUserCommand,
   ListUsersCommand,
   ResendConfirmationCodeCommand,
+  AdminDeleteUserCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   SignUpDto,
@@ -20,6 +21,8 @@ import * as crypto from "crypto";
 import { CognitoException } from "./exceptions/cognito.exception";
 import { IsEmail, IsNotEmpty } from "class-validator";
 import { TokenService } from "../token/token.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { QueueStatus } from "@prisma/client";
 
 @Injectable()
 export class AuthService {
@@ -30,7 +33,8 @@ export class AuthService {
 
   constructor(
     private configService: ConfigService,
-    private tokenService: TokenService
+    private tokenService: TokenService,
+    private prisma: PrismaService
   ) {
     this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.configService.get("AWS_REGION"),
@@ -149,16 +153,38 @@ export class AuthService {
         secretHash: this.computeSecretHash(username),
         userAttributes: command.input.UserAttributes,
       });
+
+      // Cognito 회원가입
       const response = await this.cognitoClient.send(command);
+      const userSub = response.UserSub;
 
-      // 회원가입 성공 시 콩 지갑 생성 (토큰 타입 ID: 1)
-      await this.tokenService.createWallet(1, response.UserSub);
+      try {
+        // 지갑 생성
+        await this.tokenService.createWallet(1, userSub);
 
-      return {
-        message:
-          "임시 회원가입이 완료되었습니다. 이메일 인증 후 로그인 가능합니다.",
-        username: username,
-      };
+        return {
+          message:
+            "임시 회원가입이 완료되었습니다. 이메일 인증 후 로그인 가능합니다.",
+          username: username,
+        };
+      } catch (walletError) {
+        // 지갑 생성 실패 시 큐에 저장
+        console.error("Wallet Creation Error:", walletError);
+        await this.prisma.walletCreationQueue.create({
+          data: {
+            user_id: userSub,
+            token_type_id: 1,
+            failure_reason: walletError.message,
+            status: QueueStatus.PENDING,
+          },
+        });
+
+        return {
+          message:
+            "회원가입이 완료되었습니다. 지갑 생성은 잠시 후 자동으로 진행됩니다.",
+          username: username,
+        };
+      }
     } catch (error) {
       console.error("SignUp Error:", {
         error,

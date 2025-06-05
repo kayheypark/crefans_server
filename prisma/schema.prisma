@@ -24,23 +24,24 @@ enum CommonStatus {
 /// 시스템에서 사용되는 모든 토큰의 타입을 관리
 model TokenType {
   /// 토큰 타입 고유 식별자
-  id          Int      @id @default(autoincrement())
-  /// 토큰 심볼 (예: POINT, CREDIT, COIN)
-  symbol      String   @unique
-  ///1개당 가격(KRW)
-  price       Decimal  @db.Decimal(18, 4)
-  /// 토큰 표시명 (예: 포인트, 크레딧, 코인)
-  name        String
-  /// 토큰 타입에 대한 상세 설명
-  description String?
+  id              Int       @id @default(autoincrement())
+  /// 토큰 타입 이름
+  name            String
+  /// 토큰 심볼
+  symbol          String    @unique
+  /// 토큰 설명
+  description     String?
+  /// 토큰 가격 (KRW 기준)
+  price           Decimal   @db.Decimal(18, 4)
   /// 생성 일시
-  created_at  DateTime @default(now())
+  created_at      DateTime  @default(now())
   /// 수정 일시
-  updated_at  DateTime @updatedAt
+  updated_at      DateTime  @updatedAt
 
   // 관계
-  wallets     Wallet[]
-  transfers   Transfer[]
+  wallets         Wallet[]
+  transfers       Transfer[]
+  creation_queues WalletCreationQueue[]
 
   @@map("token_types")
 }
@@ -238,3 +239,42 @@ model Subscription {
   @@unique([subscriber_id, membership_item_id, started_at])
   @@map("subscriptions")
 }
+
+/// 큐 상태
+enum QueueStatus {
+  PENDING   // 대기 중
+  PROCESSING // 처리 중
+  CANCELLED // 취소됨
+  SUCCESS  // 완료
+  FAILED     // 실패
+  @@map("queue_statuses")
+}
+
+/// 지갑 생성 실패 큐
+model WalletCreationQueue {
+  /// 큐 고유 식별자
+  id              Int       @id @default(autoincrement())
+  /// 사용자 ID (Cognito의 userSub)
+  user_id         String
+  /// 토큰 타입 ID
+  token_type_id   Int
+  /// 실패 사유
+  failure_reason  String?
+  /// 재시도 횟수
+  retry_count     Int       @default(0)
+  /// 최대 재시도 횟수
+  max_retries     Int       @default(3)
+  /// 처리 상태
+  status          QueueStatus @default(PENDING)
+  /// 생성 일시
+  created_at      DateTime  @default(now())
+  /// 수정 일시
+  updated_at      DateTime  @updatedAt
+
+  // 관계
+  token_type      TokenType @relation(fields: [token_type_id], references: [id])
+
+  @@map("wallet_creation_queues")
+}
+
+
