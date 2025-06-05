@@ -16,7 +16,7 @@ async function bootstrap() {
       "http://crefans.com",
       "https://crefans.com",
     ],
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+    methods: ["GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS"],
     credentials: true,
   });
 
