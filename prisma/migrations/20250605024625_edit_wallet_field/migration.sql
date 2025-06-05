@@ -28,15 +28,13 @@ CREATE TABLE `wallets` (
 CREATE TABLE `wallet_ownerships` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `wallet_id` INTEGER NOT NULL,
-    `owner_address` VARCHAR(191) NOT NULL,
-    `ownership_type` TINYINT NOT NULL,
-    `share` INTEGER NOT NULL DEFAULT 100,
+    `owner_id` VARCHAR(191) NOT NULL,
     `started_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `ended_at` DATETIME(3) NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `wallet_ownerships_wallet_id_owner_address_started_at_key`(`wallet_id`, `owner_address`, `started_at`),
+    UNIQUE INDEX `wallet_ownerships_wallet_id_owner_id_started_at_key`(`wallet_id`, `owner_id`, `started_at`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

@@ -13,6 +13,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum CommonStatus {
+  PENDING // 대기
+  SUCCESS // 성공
+  FAILED // 실패
+	@@map("CommonStatus")
+}
+
 /// 토큰 타입 정의
 /// 시스템에서 사용되는 모든 토큰의 타입을 관리
 model TokenType {
@@ -68,7 +75,7 @@ model WalletOwnership {
   id             Int          @id @default(autoincrement())
   /// 지갑 ID
   wallet_id      Int
-  /// 소유자 주소 (Cognito의 userSub)
+  /// 소유자 아이디 (Cognito의 userSub)
   owner_id  String
   /// 소유권 시작 일시
   started_at     DateTime     @default(now())
@@ -88,6 +95,7 @@ model WalletOwnership {
 
 /// 전송 로그
 /// 모든 토큰 전송 내역을 기록
+
 model Transfer {
   /// 전송 고유 식별자
   id                Int             @id @default(autoincrement())
@@ -101,16 +109,20 @@ model Transfer {
   token_type_id     Int
   /// 전송 수량
   amount            Decimal         @db.Decimal(18, 4)
-  /// 전송 전 잔액
-  balance_before    Decimal         @db.Decimal(18, 4)
-  /// 전송 후 잔액
-  balance_after     Decimal         @db.Decimal(18, 4)
-  /// 전송 사유 (0: 구매, 1: 보상, 2: 사용, 3: 환불, 4: 이체, 5: 시스템, 6: 기타)
+  /// 전송 전 잔액 (송신자)
+  from_balance_before    Decimal         @db.Decimal(18, 4)
+  /// 전송 후 잔액 (송신자)
+  from_balance_after     Decimal         @db.Decimal(18, 4)
+  /// 전송 전 잔액 (수신자)
+  to_balance_before    Decimal         @db.Decimal(18, 4)
+  /// 전송 후 잔액 (수신자)
+  to_balance_after     Decimal         @db.Decimal(18, 4)
+  /// 전송 사유
   reason            Int             @db.TinyInt
-  /// 관련 엔티티 ID (예: 주문 ID, 보상 ID)
+  /// 관련 엔티티 ID (예: 상품 ID)
   reference_id      String?
-  /// 전송 상태 (0: 대기, 1: 완료, 2: 실패, 3: 취소, 4: 되돌림)
-  status            Int             @db.TinyInt
+  /// 전송 상태
+  status            CommonStatus @default(PENDING)
   /// 생성 일시
   created_at        DateTime        @default(now())
   /// 수정 일시
@@ -122,4 +134,27 @@ model Transfer {
   to_wallet         Wallet          @relation("ToWallet", fields: [to_wallet_id], references: [id])
 
   @@map("transfers")
+  TransferReason TransferReason[]
+}
+
+/// 전송사유타입 (0: 재화충전, 1: 재화환불, 2: 포스팅구매, 3: 포스팅언락, 4: 후원, 5: 구독, 6: 크리에이터정산요청)
+model TransferReason {
+  /// 전송사유 고유 식별자
+  id             Int          @id @default(autoincrement())
+  /// 전송사유 코드
+  code           Int
+  /// 전송사유 이름
+  name           String
+  /// 전송사유 설명
+  description    String?
+  /// 생성 일시
+  created_at     DateTime     @default(now())
+  /// 수정 일시
+  updated_at     DateTime     @updatedAt
+
+  // 관계
+  transfers     Transfer[]
+
+  @@unique([code])
+  @@map("transfer_reasons")
 }
