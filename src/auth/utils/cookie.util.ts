@@ -12,32 +12,44 @@ export const setAuthCookies = (
   res.cookie("access_token", tokens.accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production", // HTTPS에서만 전송
-    sameSite: "strict",
+    sameSite: "lax", // strict에서 lax로 변경 (크로스 사이트 요청 허용)
     maxAge: 60 * 60 * 1000, // 1시간
     path: "/",
+    domain: process.env.NODE_ENV === "production" ? ".crefans.com" : undefined, // 서브도메인 공유
   });
 
   // ID Token 쿠키 설정 (1시간)
   res.cookie("id_token", tokens.idToken, {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax", // strict에서 lax로 변경
     maxAge: 60 * 60 * 1000, // 1시간
     path: "/",
+    domain: process.env.NODE_ENV === "production" ? ".crefans.com" : undefined, // 서브도메인 공유
   });
 
   // Refresh Token 쿠키 설정 (30일)
   res.cookie("refresh_token", tokens.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax", // strict에서 lax로 변경
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30일
-    path: "/auth/refresh", // refresh 토큰은 refresh 엔드포인트에서만 사용
+    path: "/",
+    domain: process.env.NODE_ENV === "production" ? ".crefans.com" : undefined, // 서브도메인 공유
   });
 };
 
 export const clearAuthCookies = (res: Response) => {
-  res.clearCookie("access_token", { path: "/" });
-  res.clearCookie("id_token", { path: "/" });
-  res.clearCookie("refresh_token", { path: "/auth/refresh" });
+  res.clearCookie("access_token", {
+    path: "/",
+    domain: process.env.NODE_ENV === "production" ? ".crefans.com" : undefined,
+  });
+  res.clearCookie("id_token", {
+    path: "/",
+    domain: process.env.NODE_ENV === "production" ? ".crefans.com" : undefined,
+  });
+  res.clearCookie("refresh_token", {
+    path: "/",
+    domain: process.env.NODE_ENV === "production" ? ".crefans.com" : undefined,
+  });
 };
