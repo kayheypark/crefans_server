@@ -26,7 +26,15 @@ jobs:
       - name: Build
         run: npm run build
 
-      # 서버에 package.json, package-lock.json, dist 업로드
+      # EC2에서 기존 백엔드 파일을 삭제
+      - name: Clean before upload
+        uses: appleboy/ssh-action@master
+        with:
+          script: |
+            cd ~/crefans
+            rm -rf dist/
+
+      # EC2에 package.json, package-lock.json, dist 업로드
       - name: Upload build files to EC2
         uses: appleboy/scp-action@master
         with:
