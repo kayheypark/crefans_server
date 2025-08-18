@@ -37,6 +37,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response
   ) {
     const result = await this.authService.signIn(signInDto);
+    console.info(
+      "await this.authService.signIn(signInDto) -------------------------------- 결과"
+    );
+    console.info(result);
 
     // 토큰을 쿠키에 저장
     setAuthCookies(res, {
