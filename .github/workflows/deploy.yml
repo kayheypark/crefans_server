@@ -23,8 +23,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Build and verify
+        run: |
+          echo "=== TypeScript 빌드 시작 ==="
+          npm run build
+
+          echo "=== 빌드 결과 확인 ==="
+          if [ ! -f "dist/main.js" ]; then
+            echo "❌ 빌드 실패: dist/main.js 파일이 없습니다!"
+            exit 1
+          fi
+
+          echo "✅ 빌드 성공"
+          echo "빌드된 파일 목록:"
+          ls -la dist/
+          echo "main.js 파일 정보:"
+          stat dist/main.js
 
       # EC2에서 기존 백엔드 파일을 삭제
       - name: Clean before upload
@@ -35,9 +49,14 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/crefans
+            echo "=== 기존 파일 정리 ==="
             rm -rf dist/
+            rm -f package.json package-lock.json
+            rm -rf prisma/
+            echo "정리 완료"
+            ls -la
 
-      # EC2에 package.json, package-lock.json, dist 업로드
+      # EC2에 파일 업로드
       - name: Upload build files to EC2
         uses: appleboy/scp-action@master
         with:
@@ -47,6 +66,30 @@ jobs:
           source: "dist/,package.json,package-lock.json,prisma/"
           target: ~/crefans
           overwrite: true
+          verbose: true
+
+      # 업로드 검증
+      - name: Verify upload
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "=== 업로드 검증 ==="
+            cd ~/crefans
+
+            if [ ! -f "dist/main.js" ]; then
+              echo "❌ 업로드 실패: dist/main.js 파일이 없습니다!"
+              echo "현재 디렉토리 내용:"
+              ls -la
+              exit 1
+            fi
+
+            echo "✅ 업로드 성공"
+            echo "업로드된 파일:"
+            ls -la dist/
+            echo "main.js 파일 크기: $(wc -c < dist/main.js) bytes"
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@master
