@@ -9,10 +9,10 @@ async function bootstrap() {
   // CORS 설정 (Signout 포함 모든 요청 허용)
   app.enableCors({
     origin: [
+      "http://localhost:3001",
       "https://crefans.com",
       "https://www.crefans.com",
       "https://api.crefans.com",
-      "http://localhost:3001",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [
