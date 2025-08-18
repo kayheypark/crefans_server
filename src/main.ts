@@ -6,7 +6,7 @@ import * as cookieParser from "cookie-parser";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // CORS 설정 (중복 방지)
+  // CORS 설정 (Signout 포함 모든 요청 허용)
   app.enableCors({
     origin: [
       "https://crefans.com",
@@ -15,7 +15,16 @@ async function bootstrap() {
       "http://localhost:3001",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept", "Origin"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "Origin",
+      "X-Requested-With",
+      "Cookie", // 쿠키 헤더 추가
+      "Set-Cookie", // Set-Cookie 헤더 추가
+    ],
+    exposedHeaders: ["Set-Cookie", "Authorization"], // 클라이언트에 노출할 헤더
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204,
