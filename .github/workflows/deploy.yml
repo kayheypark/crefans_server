@@ -14,95 +14,67 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build and verify
-        run: |
-          echo "=== TypeScript 빌드 시작 ==="
-          npm run build
-
-          echo "=== 빌드 결과 확인 ==="
-          if [ ! -f "dist/main.js" ]; then
-            echo "❌ 빌드 실패: dist/main.js 파일이 없습니다!"
-            exit 1
-          fi
-
-          echo "✅ 빌드 성공"
-          echo "빌드된 파일 목록:"
-          ls -la dist/
-          echo "main.js 파일 정보:"
-          stat dist/main.js
-
-      # EC2에서 기존 백엔드 파일을 삭제
-      - name: Clean before upload
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd ~/crefans
-            echo "=== 기존 파일 정리 ==="
-            rm -rf dist/
-            rm -f package.json package-lock.json
-            rm -rf prisma/
-            echo "정리 완료"
-            ls -la
-
-      # EC2에 파일 업로드
-      - name: Upload build files to EC2
+      # EC2에 소스 코드만 업로드
+      - name: Upload source code to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "dist/,package.json,package-lock.json,prisma/"
+          source: "src/,package.json,package-lock.json,prisma/,tsconfig.json"
           target: ~/crefans
           overwrite: true
           verbose: true
 
-      # 업로드 검증
-      - name: Verify upload
+      # EC2에서 빌드 및 배포
+      - name: Build and deploy on EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "=== 업로드 검증 ==="
+            echo "=== EC2에서 빌드 및 배포 시작 ==="
             cd ~/crefans
 
+            # 환경변수 설정
+            echo "${{ secrets.ENV_FILE }}" > .env
+
+            # 의존성 설치
+            echo "=== 의존성 설치 ==="
+            npm ci
+
+            # TypeScript 빌드
+            echo "=== TypeScript 빌드 ==="
+            npm run build
+
+            # 빌드 결과 확인
+            echo "=== 빌드 결과 확인 ==="
             if [ ! -f "dist/main.js" ]; then
-              echo "❌ 업로드 실패: dist/main.js 파일이 없습니다!"
-              echo "현재 디렉토리 내용:"
-              ls -la
+              echo "❌ 빌드 실패: dist/main.js 파일이 없습니다!"
               exit 1
             fi
 
-            echo "✅ 업로드 성공"
-            echo "업로드된 파일:"
+            echo "✅ 빌드 성공"
+            echo "빌드된 파일:"
             ls -la dist/
-            echo "main.js 파일 크기: $(wc -c < dist/main.js) bytes"
 
-      - name: Deploy on EC2
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd ~/crefans
-            echo "${{ secrets.ENV_FILE }}" > .env
-            npm ci --omit=dev
+            # Prisma 설정
+            echo "=== Prisma 설정 ==="
             npx prisma generate
             npx prisma migrate deploy
-            pm2 stop crefans-server
-            pm2 delete crefans-server
+
+            # 기존 프로세스 중지
+            echo "=== 기존 프로세스 중지 ==="
+            pm2 stop crefans-server || echo "기존 프로세스가 없습니다."
+            pm2 delete crefans-server || echo "기존 프로세스가 없습니다."
+
+            # 새 프로세스 시작
+            echo "=== 새 프로세스 시작 ==="
             pm2 start dist/main.js --name crefans-server
+
+            # 프로세스 상태 확인
+            echo "=== 프로세스 상태 확인 ==="
+            pm2 status
+
+            echo "=== 배포 완료 ==="
