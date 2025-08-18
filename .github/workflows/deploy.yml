@@ -35,6 +35,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "dist/,package.json,package-lock.json,prisma/"
           target: ~/crefans
+          overwrite: true
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@master
