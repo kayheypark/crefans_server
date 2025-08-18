@@ -9,20 +9,16 @@ export const setAuthCookies = (
   }
 ) => {
   // 프로덕션 환경 감지 (여러 방법으로 확인)
-  const isProduction =
-    process.env.NODE_ENV === "prod" ||
-    process.env.NODE_ENV === "production" ||
-    process.env.HOSTNAME?.includes("crefans.com") ||
-    process.env.HOST?.includes("crefans.com");
+  const isProduction = process.env.NODE_ENV === "prod";
 
   // 환경 변수 디버깅
-  console.log("=== 쿠키 설정 디버깅 ===");
-  console.log("NODE_ENV:", process.env.NODE_ENV);
-  console.log("HOSTNAME:", process.env.HOSTNAME);
-  console.log("HOST:", process.env.HOST);
-  console.log("isProduction:", isProduction);
-  console.log("cookieDomain:", isProduction ? ".crefans.com" : undefined);
-  console.log("========================");
+  // console.log("=== 쿠키 설정 디버깅 ===");
+  // console.log("NODE_ENV:", process.env.NODE_ENV);
+  // console.log("HOSTNAME:", process.env.HOSTNAME);
+  // console.log("HOST:", process.env.HOST);
+  // console.log("isProduction:", isProduction);
+  // console.log("cookieDomain:", isProduction ? ".crefans.com" : undefined);
+  // console.log("========================");
 
   // Access Token 쿠키 설정 (1시간)
   res.cookie("access_token", tokens.accessToken, {
@@ -56,11 +52,7 @@ export const setAuthCookies = (
 };
 
 export const clearAuthCookies = (res: Response) => {
-  const isProduction =
-    process.env.NODE_ENV === "prod" ||
-    process.env.NODE_ENV === "production" ||
-    process.env.HOSTNAME?.includes("crefans.com") ||
-    process.env.HOST?.includes("crefans.com");
+  const isProduction = process.env.NODE_ENV === "prod";
 
   res.clearCookie("access_token", {
     path: "/",
