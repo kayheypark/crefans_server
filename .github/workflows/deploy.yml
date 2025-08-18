@@ -50,14 +50,14 @@ jobs:
 
             # 빌드 결과 확인
             echo "=== 빌드 결과 확인 ==="
-            if [ ! -f "dist/main.js" ]; then
-              echo "❌ 빌드 실패: dist/main.js 파일이 없습니다!"
+            if [ ! -f "dist/src/main.js" ]; then
+              echo "❌ 빌드 실패: dist/src/main.js 파일이 없습니다!"
               exit 1
             fi
 
             echo "✅ 빌드 성공"
             echo "빌드된 파일:"
-            ls -la dist/
+            ls -la dist/src/
 
             # Prisma 설정
             echo "=== Prisma 설정 ==="
@@ -71,7 +71,7 @@ jobs:
 
             # 새 프로세스 시작
             echo "=== 새 프로세스 시작 ==="
-            pm2 start dist/main.js --name crefans-server
+            pm2 start dist/src/main.js --name crefans-server
 
             # 프로세스 상태 확인
             echo "=== 프로세스 상태 확인 ==="
