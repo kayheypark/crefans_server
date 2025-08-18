@@ -48,4 +48,6 @@ jobs:
             npm ci --omit=dev
             npx prisma generate
             npx prisma migrate deploy
-            pm2 restart crefans-server || pm2 start dist/main.js --name crefans-server
+            pm2 stop crefans-server
+            pm2 delete crefans-server
+            pm2 start dist/main.js --name crefans-server
