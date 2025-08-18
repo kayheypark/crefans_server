@@ -212,7 +212,7 @@ export class AuthService {
     });
 
     try {
-      console.log("SignIn Request:", {
+      console.log("SignIn Request!:", {
         clientId: this.clientId,
         username: signInDto.email,
         region: this.configService.get("AWS_REGION"),
