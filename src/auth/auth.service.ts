@@ -219,7 +219,11 @@ export class AuthService {
         userPoolId: this.userPoolId,
       });
 
+      console.info("일");
+
       const response = await this.cognitoClient.send(command);
+
+      console.info("이");
       return {
         message: "로그인이 완료되었습니다.",
         accessToken: response.AuthenticationResult.AccessToken,
