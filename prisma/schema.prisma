@@ -131,6 +131,8 @@ model Transfer {
   /// 수정 일시
   updated_at        DateTime        @updatedAt
 
+  transfer_reason_id Int
+
   // 관계
   token_type        TokenType       @relation(fields: [token_type_id], references: [id])
   from_wallet       Wallet          @relation("FromWallet", fields: [from_wallet_id], references: [id])
@@ -139,7 +141,6 @@ model Transfer {
   subscription_id   Int?
 
   @@map("transfers")
-  TransferReason TransferReason[]
 }
 
 /// 전송사유타입(초기 데이터인 seed 있음)
@@ -154,9 +155,6 @@ model TransferReason {
   created_at     DateTime     @default(now())
   /// 수정 일시
   updated_at     DateTime     @updatedAt
-
-  // 관계
-  transfers     Transfer[]
 
   @@map("transfer_reasons")
 }
