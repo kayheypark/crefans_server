@@ -180,6 +180,7 @@ export class TokenService {
           to_balance_before: toWallet.amount,
           to_balance_after: updatedToWallet.amount,
           reason,
+          transfer_reason_id: reason,
           reference_id: referenceId,
           status: CommonStatus.SUCCESS,
         },

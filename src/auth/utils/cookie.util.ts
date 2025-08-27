@@ -1,4 +1,5 @@
 import { Response } from "express";
+import { ConfigService } from "@nestjs/config";
 
 export const setAuthCookies = (
   res: Response,
@@ -6,64 +7,73 @@ export const setAuthCookies = (
     accessToken: string;
     idToken: string;
     refreshToken: string;
-  }
+  },
+  configService?: ConfigService
 ) => {
-  // 프로덕션 환경 감지 (여러 방법으로 확인)
-  const isProduction = process.env.NODE_ENV === "prod";
+  // 설정 서비스가 있으면 사용, 없으면 환경변수로 판단
+  const isProduction = configService
+    ? configService.get("app.isProduction")
+    : process.env.NODE_ENV === "prod";
 
-  // 환경 변수 디버깅
-  // console.log("=== 쿠키 설정 디버깅 ===");
-  // console.log("NODE_ENV:", process.env.NODE_ENV);
-  // console.log("HOSTNAME:", process.env.HOSTNAME);
-  // console.log("HOST:", process.env.HOST);
-  // console.log("isProduction:", isProduction);
-  // console.log("cookieDomain:", isProduction ? ".crefans.com" : undefined);
-  // console.log("========================");
+  const cookieConfig = configService?.get("app.cookie") || {
+    domain: isProduction ? ".crefans.com" : undefined,
+    secure: isProduction,
+    sameSite: "lax" as const,
+  };
 
   // Access Token 쿠키 설정 (1시간)
   res.cookie("access_token", tokens.accessToken, {
     httpOnly: true,
-    secure: isProduction, // HTTPS에서만 전송
-    sameSite: "lax", // strict에서 lax로 변경 (크로스 사이트 요청 허용)
+    secure: cookieConfig.secure,
+    sameSite: cookieConfig.sameSite,
     maxAge: 60 * 60 * 1000, // 1시간
     path: "/",
-    domain: isProduction ? ".crefans.com" : undefined, // 프로덕션에서만 도메인 설정
+    domain: cookieConfig.domain,
   });
 
   // ID Token 쿠키 설정 (1시간)
   res.cookie("id_token", tokens.idToken, {
     httpOnly: false,
-    secure: isProduction,
-    sameSite: "lax", // strict에서 lax로 변경
+    secure: cookieConfig.secure,
+    sameSite: cookieConfig.sameSite,
     maxAge: 60 * 60 * 1000, // 1시간
     path: "/",
-    domain: isProduction ? ".crefans.com" : undefined, // 프로덕션에서만 도메인 설정
+    domain: cookieConfig.domain,
   });
 
   // Refresh Token 쿠키 설정 (30일)
   res.cookie("refresh_token", tokens.refreshToken, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: "lax", // strict에서 lax로 변경
+    secure: cookieConfig.secure,
+    sameSite: cookieConfig.sameSite,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30일
     path: "/",
-    domain: isProduction ? ".crefans.com" : undefined, // 프로덕션에서만 도메인 설정
+    domain: cookieConfig.domain,
   });
 };
 
-export const clearAuthCookies = (res: Response) => {
-  const isProduction = process.env.NODE_ENV === "prod";
+export const clearAuthCookies = (
+  res: Response,
+  configService?: ConfigService
+) => {
+  const isProduction = configService
+    ? configService.get("app.isProduction")
+    : process.env.NODE_ENV === "prod";
+
+  const cookieConfig = configService?.get("app.cookie") || {
+    domain: isProduction ? ".crefans.com" : undefined,
+  };
 
   res.clearCookie("access_token", {
     path: "/",
-    domain: isProduction ? ".crefans.com" : undefined,
+    domain: cookieConfig.domain,
   });
   res.clearCookie("id_token", {
     path: "/",
-    domain: isProduction ? ".crefans.com" : undefined,
+    domain: cookieConfig.domain,
   });
   res.clearCookie("refresh_token", {
     path: "/",
-    domain: isProduction ? ".crefans.com" : undefined,
+    domain: cookieConfig.domain,
   });
 };

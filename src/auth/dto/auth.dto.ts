@@ -57,7 +57,7 @@ export class ConfirmSignUpDto {
 }
 
 export class ResendConfirmationCodeDto {
-  @IsString()
+  @IsEmail()
   @IsNotEmpty()
-  userSub: string;
+  email: string;
 }

@@ -8,6 +8,7 @@ import {
   Get,
   Req,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import {
@@ -20,15 +21,31 @@ import { CognitoExceptionFilter } from "./filters/cognito-exception.filter";
 import { Response, Request } from "express";
 import { setAuthCookies, clearAuthCookies } from "./utils/cookie.util";
 import { CognitoException } from "./exceptions/cognito.exception";
+import { ConfigService } from "@nestjs/config";
+import { AuthGuard } from "../common/guards/auth.guard";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
 
 @Controller("auth")
 @UseFilters(CognitoExceptionFilter)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService
+  ) {}
 
   @Post("signup")
   async signUp(@Body() signUpDto: SignUpDto) {
-    return this.authService.signUp(signUpDto);
+    const result = await this.authService.signUp(signUpDto);
+    return {
+      success: true,
+      message: result.message,
+      data: {
+        user: {
+          email: signUpDto.email,
+          userSub: result.userSub,
+        },
+      },
+    };
   }
 
   @Post("signin")
@@ -37,21 +54,27 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response
   ) {
     const result = await this.authService.signIn(signInDto);
-    console.info(
-      "await this.authService.signIn(signInDto) -------------------------------- 결과"
-    );
-    console.info(result);
 
     // 토큰을 쿠키에 저장
-    setAuthCookies(res, {
-      accessToken: result.accessToken,
-      idToken: result.idToken,
-      refreshToken: result.refreshToken,
-    });
+    setAuthCookies(
+      res,
+      {
+        accessToken: result.accessToken,
+        idToken: result.idToken,
+        refreshToken: result.refreshToken,
+      },
+      this.configService
+    );
 
-    // 클라이언트에는 토큰을 제외한 메시지만 반환
+    // 클라이언트와 호환되는 응답 구조
     return {
+      success: true,
       message: result.message,
+      data: {
+        user: {
+          email: signInDto.email,
+        },
+      },
     };
   }
 
@@ -68,25 +91,40 @@ export class AuthController {
     await this.authService.signOut({ accessToken });
 
     // 쿠키 삭제
-    clearAuthCookies(res);
+    clearAuthCookies(res, this.configService);
 
     return {
+      success: true,
       message: "로그아웃이 완료되었습니다.",
+      data: {},
     };
   }
 
   @Post("confirm-signup")
   async confirmSignUp(@Body() confirmSignUpDto: ConfirmSignUpDto) {
-    return this.authService.confirmSignUp(confirmSignUpDto);
+    const result = await this.authService.confirmSignUp(confirmSignUpDto);
+    return {
+      success: true,
+      message: result.message,
+      data: {
+        user: {
+          email: confirmSignUpDto.email,
+        },
+      },
+    };
   }
 
   @Get("me")
-  async getCurrentUser(@Req() req: Request) {
-    const accessToken = req.cookies.access_token;
-    if (!accessToken) {
-      throw new CognitoException("인증되지 않은 사용자입니다.", "Unauthorized");
-    }
-    return this.authService.getUserInfo(accessToken);
+  @UseGuards(AuthGuard)
+  async getCurrentUser(@CurrentUser() user: any) {
+    const userInfo = await this.authService.getUserInfo(user.accessToken);
+    return {
+      success: true,
+      message: "사용자 정보를 성공적으로 가져왔습니다.",
+      data: {
+        user: userInfo,
+      },
+    };
   }
 
   @Get("check-email")
@@ -98,7 +136,14 @@ export class AuthController {
       );
     }
 
-    return this.authService.checkEmailExists(email);
+    const result = await this.authService.checkEmailExists(email);
+    return {
+      success: true,
+      message: result.message,
+      data: {
+        exists: result.exists,
+      },
+    };
   }
 
   @Post("resend-confirmation-code")
@@ -110,6 +155,11 @@ export class AuthController {
       );
     }
 
-    return this.authService.resendConfirmationCode(email);
+    const result = await this.authService.resendConfirmationCode({ email });
+    return {
+      success: true,
+      message: result.message,
+      data: {},
+    };
   }
 }
