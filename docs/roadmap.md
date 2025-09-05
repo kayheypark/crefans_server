@@ -8,13 +8,13 @@
   - SignUp/SignIn/SignOut API 구현
   - JWT 토큰 관리 및 쿠키 설정
 
-- [ ] 회원가입시 지갑 생성 (RabbitMQ Queue, Prisma)
+- [x] 회원가입시 지갑 생성 (Direct Implementation, Prisma)
 
-  - RabbitMQ 설치 및 설정
-  - 지갑 생성 큐 정의
-  - 회원가입 후 큐에 메시지 발행
-  - 큐 컨슈머 구현 (지갑 생성 로직)
-  - 실패 시 재시도 메커니즘
+  - [x] 회원가입 후 직접 지갑 생성 (큐 시스템 제거)
+  - [x] UUID 기반 지갑 주소 생성
+  - [x] 지갑-사용자 소유권 관계 설정
+  - [x] 기본 토큰(KNG) 타입 지갑 자동 생성
+  - [x] 트랜잭션 기반 원자적 지갑 생성
 
 - [x] 기본 데이터베이스 스키마 설계 (Prisma Schema)
 
@@ -276,14 +276,13 @@
 ### **Backend**
 
 - **Framework**: NestJS
-- **Database**: PostgreSQL + Prisma ORM
-- **Cache**: Redis
-- **Queue**: RabbitMQ
-- **Search**: Elasticsearch
-- **Real-time**: Socket.io
-- **File Storage**: AWS S3
-- **Media Processing**: AWS MediaConvert
-- **CDN**: CloudFront
+- **Database**: MySQL + Prisma ORM
+- **Cache**: Redis (예정)
+- **Search**: Elasticsearch (예정)
+- **Real-time**: Socket.io (예정)
+- **File Storage**: AWS S3 (예정)
+- **Media Processing**: AWS MediaConvert (예정)
+- **CDN**: CloudFront (예정)
 
 ### **Infrastructure**
 

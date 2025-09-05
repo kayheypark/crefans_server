@@ -12,7 +12,6 @@ import { TokenService } from "../token/token.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CognitoService } from "./cognito.service";
 import { LoggerService } from "../common/logger/logger.service";
-import { QueueStatus } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
 @Injectable()
@@ -34,8 +33,8 @@ export class AuthService {
       console.info("signUpDto!!!!!!!!!111", signUpDto);
       const cognitoResult = await this.cognitoService.signUp(signUpDto);
 
-      // 지갑 생성 큐에 추가
-      await this.addToWalletCreationQueue(cognitoResult.userSub);
+      // 직접 지갑 생성
+      await this.createWallet(cognitoResult.userSub);
 
       this.logger.logAuthEvent("SignUp completed", cognitoResult.userSub, {
         email: signUpDto.email,
@@ -231,7 +230,9 @@ export class AuthService {
     }
   }
 
-  async confirmEmailVerification(confirmEmailVerificationDto: ConfirmEmailVerificationDto) {
+  async confirmEmailVerification(
+    confirmEmailVerificationDto: ConfirmEmailVerificationDto
+  ) {
     const { email, code } = confirmEmailVerificationDto;
     try {
       this.logger.logAuthEvent("ConfirmEmailVerification started", undefined, {
@@ -243,17 +244,25 @@ export class AuthService {
         code,
       });
 
-      this.logger.logAuthEvent("ConfirmEmailVerification completed", undefined, {
-        email,
-      });
+      this.logger.logAuthEvent(
+        "ConfirmEmailVerification completed",
+        undefined,
+        {
+          email,
+        }
+      );
 
       return result;
     } catch (error) {
-      this.logger.error("ConfirmEmailVerification failed in AuthService", error.stack, {
-        service: "AuthService",
-        method: "confirmEmailVerification",
-        email,
-      });
+      this.logger.error(
+        "ConfirmEmailVerification failed in AuthService",
+        error.stack,
+        {
+          service: "AuthService",
+          method: "confirmEmailVerification",
+          email,
+        }
+      );
 
       if (error.code) {
         throw new CognitoException(error.message, error.code);
@@ -262,7 +271,77 @@ export class AuthService {
     }
   }
 
-  private async addToWalletCreationQueue(userSub: string) {
-    // TODO: 지갑 생성 큐 기능 구현
+  private async createWallet(userSub: string) {
+    try {
+      // 기본 토큰 타입(콩) 조회 - symbol이 'KNG'인 토큰 타입을 찾습니다
+      const defaultTokenType = await this.prisma.tokenType.findFirst({
+        where: {
+          symbol: "KNG",
+        },
+      });
+
+      if (!defaultTokenType) {
+        this.logger.error("Default token type (KNG) not found", undefined, {
+          service: "AuthService",
+          method: "createWallet",
+          userSub,
+        });
+        return;
+      }
+
+      // 이미 해당 토큰 타입의 지갑이 있는지 확인
+      const existingWallet = await this.prisma.wallet.findFirst({
+        where: {
+          token_type_id: defaultTokenType.id,
+          ownerships: {
+            some: {
+              owner_id: userSub,
+              ended_at: null,
+            },
+          },
+        },
+      });
+
+      if (existingWallet) {
+        this.logger.warn(
+          `Wallet already exists for user: ${userSub}, tokenType: ${defaultTokenType.id}`
+        );
+        return;
+      }
+
+      // 새 지갑 생성
+      const { v4: uuidv4 } = await import("uuid");
+      const walletAddress = uuidv4();
+
+      await this.prisma.$transaction(async (tx) => {
+        // 지갑 생성
+        const wallet = await tx.wallet.create({
+          data: {
+            address: walletAddress,
+            token_type_id: defaultTokenType.id,
+            amount: 0,
+          },
+        });
+
+        // 지갑 소유권 설정
+        await tx.walletOwnership.create({
+          data: {
+            wallet_id: wallet.id,
+            owner_id: userSub,
+          },
+        });
+      });
+
+      this.logger.log(
+        `✅ Wallet created successfully for user: ${userSub}, tokenType: ${defaultTokenType.symbol}, address: ${walletAddress}`
+      );
+    } catch (error) {
+      this.logger.error("Failed to create wallet", error.stack, {
+        service: "AuthService",
+        method: "createWallet",
+        userSub,
+      });
+      // 지갑 생성 실패는 회원가입을 차단하지 않도록 함
+    }
   }
 }

@@ -8,7 +8,6 @@ import { LoggerModule } from "./common/logger/logger.module";
 import awsConfig from "./config/aws.config";
 import databaseConfig from "./config/database.config";
 import appConfig from "./config/app.config";
-
 @Module({
   imports: [
     ConfigModule.forRoot({
