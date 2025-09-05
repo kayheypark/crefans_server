@@ -5,6 +5,7 @@ import * as cookieParser from "cookie-parser";
 import { ConfigService } from "@nestjs/config";
 import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 import { LoggerService } from "./common/logger/logger.service";
+import { GlobalExceptionFilter } from "./common/filters/global-exception.filter";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -30,6 +31,9 @@ async function bootstrap() {
 
   // 쿠키 파서 미들웨어 추가
   app.use(cookieParser());
+
+  // 글로벌 예외 필터 추가
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   // 글로벌 인터셉터 추가
   app.useGlobalInterceptors(new LoggingInterceptor(logger));

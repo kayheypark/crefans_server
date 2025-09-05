@@ -25,6 +25,7 @@ import { CognitoException } from "./exceptions/cognito.exception";
 import { ConfigService } from "@nestjs/config";
 import { AuthGuard } from "../common/guards/auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { ApiResponseDto } from "../common/dto/api-response.dto";
 
 @Controller("auth")
 @UseFilters(CognitoExceptionFilter)
@@ -35,25 +36,21 @@ export class AuthController {
   ) {}
 
   @Post("signup")
-  async signUp(@Body() signUpDto: SignUpDto) {
+  async signUp(@Body() signUpDto: SignUpDto): Promise<ApiResponseDto<{ user: { email: string; userSub: string } }>> {
     const result = await this.authService.signUp(signUpDto);
-    return {
-      success: true,
-      message: result.message,
-      data: {
-        user: {
-          email: signUpDto.email,
-          userSub: result.userSub,
-        },
+    return ApiResponseDto.success(result.message, {
+      user: {
+        email: signUpDto.email,
+        userSub: result.userSub,
       },
-    };
+    });
   }
 
   @Post("signin")
   async signIn(
     @Body() signInDto: SignInDto,
     @Res({ passthrough: true }) res: Response
-  ) {
+  ): Promise<ApiResponseDto<{ user: { email: string } }>> {
     const result = await this.authService.signIn(signInDto);
 
     // 토큰을 쿠키에 저장
@@ -68,22 +65,18 @@ export class AuthController {
     );
 
     // 클라이언트와 호환되는 응답 구조
-    return {
-      success: true,
-      message: result.message,
-      data: {
-        user: {
-          email: signInDto.email,
-        },
+    return ApiResponseDto.success(result.message, {
+      user: {
+        email: signInDto.email,
       },
-    };
+    });
   }
 
   @Post("signout")
   async signOut(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response
-  ) {
+  ): Promise<ApiResponseDto<{}>> {
     const accessToken = req.cookies.access_token;
     if (!accessToken) {
       throw new CognitoException("인증되지 않은 사용자입니다.", "Unauthorized");
@@ -94,42 +87,30 @@ export class AuthController {
     // 쿠키 삭제
     clearAuthCookies(res, this.configService);
 
-    return {
-      success: true,
-      message: "로그아웃이 완료되었습니다.",
-      data: {},
-    };
+    return ApiResponseDto.success("로그아웃이 완료되었습니다.", {});
   }
 
   @Post("confirm-signup")
-  async confirmSignUp(@Body() confirmSignUpDto: ConfirmSignUpDto) {
+  async confirmSignUp(@Body() confirmSignUpDto: ConfirmSignUpDto): Promise<ApiResponseDto<{ user: { email: string } }>> {
     const result = await this.authService.confirmSignUp(confirmSignUpDto);
-    return {
-      success: true,
-      message: result.message,
-      data: {
-        user: {
-          email: confirmSignUpDto.email,
-        },
+    return ApiResponseDto.success(result.message, {
+      user: {
+        email: confirmSignUpDto.email,
       },
-    };
+    });
   }
 
   @Get("me")
   @UseGuards(AuthGuard)
-  async getCurrentUser(@CurrentUser() user: any) {
+  async getCurrentUser(@CurrentUser() user: any): Promise<ApiResponseDto<{ user: any }>> {
     const userInfo = await this.authService.getUserInfo(user.accessToken);
-    return {
-      success: true,
-      message: "사용자 정보를 성공적으로 가져왔습니다.",
-      data: {
-        user: userInfo,
-      },
-    };
+    return ApiResponseDto.success("사용자 정보를 성공적으로 가져왔습니다.", {
+      user: userInfo,
+    });
   }
 
   @Get("check-email")
-  async checkEmailExists(@Query("email") email: string) {
+  async checkEmailExists(@Query("email") email: string): Promise<ApiResponseDto<{ exists: boolean }>> {
     if (!email) {
       throw new CognitoException(
         "이메일 주소를 입력해주세요.",
@@ -138,17 +119,13 @@ export class AuthController {
     }
 
     const result = await this.authService.checkEmailExists(email);
-    return {
-      success: true,
-      message: result.message,
-      data: {
-        exists: result.exists,
-      },
-    };
+    return ApiResponseDto.success(result.message, {
+      exists: result.exists,
+    });
   }
 
   @Post("resend-confirmation-code")
-  async resendConfirmationCode(@Body("email") email: string) {
+  async resendConfirmationCode(@Body("email") email: string): Promise<ApiResponseDto<{}>> {
     if (!email) {
       throw new CognitoException(
         "이메일 주소를 입력해주세요.",
@@ -157,15 +134,11 @@ export class AuthController {
     }
 
     const result = await this.authService.resendConfirmationCode({ email });
-    return {
-      success: true,
-      message: result.message,
-      data: {},
-    };
+    return ApiResponseDto.success(result.message, {});
   }
 
   @Get("confirm-email-verification")
-  async confirmEmailVerification(@Query() query: { email: string; code: string }) {
+  async confirmEmailVerification(@Query() query: { email: string; code: string }): Promise<ApiResponseDto<{ user: { email: string } }>> {
     const { email, code } = query;
     
     if (!email || !code) {
@@ -176,14 +149,10 @@ export class AuthController {
     }
 
     const result = await this.authService.confirmEmailVerification({ email, code });
-    return {
-      success: true,
-      message: result.message,
-      data: {
-        user: {
-          email: email,
-        },
+    return ApiResponseDto.success(result.message, {
+      user: {
+        email: email,
       },
-    };
+    });
   }
 }
