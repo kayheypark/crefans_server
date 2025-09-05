@@ -61,3 +61,13 @@ export class ResendConfirmationCodeDto {
   @IsNotEmpty()
   email: string;
 }
+
+export class ConfirmEmailVerificationDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+}

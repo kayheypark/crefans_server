@@ -5,6 +5,7 @@ import {
   SignOutDto,
   ConfirmSignUpDto,
   ResendConfirmationCodeDto,
+  ConfirmEmailVerificationDto,
 } from "./dto/auth.dto";
 import { CognitoException } from "./exceptions/cognito.exception";
 import { TokenService } from "../token/token.service";
@@ -222,6 +223,37 @@ export class AuthService {
           email,
         }
       );
+
+      if (error.code) {
+        throw new CognitoException(error.message, error.code);
+      }
+      throw error;
+    }
+  }
+
+  async confirmEmailVerification(confirmEmailVerificationDto: ConfirmEmailVerificationDto) {
+    const { email, code } = confirmEmailVerificationDto;
+    try {
+      this.logger.logAuthEvent("ConfirmEmailVerification started", undefined, {
+        email,
+      });
+
+      const result = await this.cognitoService.confirmEmailVerification({
+        email,
+        code,
+      });
+
+      this.logger.logAuthEvent("ConfirmEmailVerification completed", undefined, {
+        email,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error("ConfirmEmailVerification failed in AuthService", error.stack, {
+        service: "AuthService",
+        method: "confirmEmailVerification",
+        email,
+      });
 
       if (error.code) {
         throw new CognitoException(error.message, error.code);

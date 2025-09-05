@@ -16,6 +16,7 @@ import {
   SignInDto,
   SignOutDto,
   ConfirmSignUpDto,
+  ConfirmEmailVerificationDto,
 } from "./dto/auth.dto";
 import { CognitoExceptionFilter } from "./filters/cognito-exception.filter";
 import { Response, Request } from "express";
@@ -160,6 +161,29 @@ export class AuthController {
       success: true,
       message: result.message,
       data: {},
+    };
+  }
+
+  @Get("confirm-email-verification")
+  async confirmEmailVerification(@Query() query: { email: string; code: string }) {
+    const { email, code } = query;
+    
+    if (!email || !code) {
+      throw new CognitoException(
+        "이메일과 인증 코드가 필요합니다.",
+        "InvalidParameterException"
+      );
+    }
+
+    const result = await this.authService.confirmEmailVerification({ email, code });
+    return {
+      success: true,
+      message: result.message,
+      data: {
+        user: {
+          email: email,
+        },
+      },
     };
   }
 }

@@ -1,0 +1,16 @@
+{
+  "name": "crefans-cognito-lambda",
+  "version": "1.0.0",
+  "description": "AWS Cognito Lambda triggers for crefans",
+  "main": "custom-message.js",
+  "scripts": {
+    "build": "tsc",
+    "package": "zip -r custom-message.zip custom-message.js"
+  },
+  "dependencies": {
+    "@types/aws-lambda": "^8.10.130"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

@@ -19,6 +19,7 @@ import {
   SignOutDto,
   ConfirmSignUpDto,
   ResendConfirmationCodeDto,
+  ConfirmEmailVerificationDto,
 } from "./dto/auth.dto";
 
 @Injectable()
@@ -355,6 +356,43 @@ export class CognitoService {
       this.logger.error("ResendConfirmationCode failed", error.stack, {
         service: "CognitoService",
         method: "resendConfirmationCode",
+        email,
+      });
+      throw this.handleCognitoError(error);
+    }
+  }
+
+  async confirmEmailVerification(confirmEmailVerificationDto: ConfirmEmailVerificationDto) {
+    const { email, code } = confirmEmailVerificationDto;
+    const username = email;
+    const secretHash = this.computeSecretHash(username);
+
+    const command = new ConfirmSignUpCommand({
+      ClientId: this.clientId,
+      Username: username,
+      ConfirmationCode: code,
+      SecretHash: secretHash,
+    });
+
+    try {
+      this.logger.logAuthEvent("ConfirmEmailVerification initiated", undefined, {
+        email,
+        username,
+      });
+      await this.cognitoClient.send(command);
+
+      this.logger.logAuthEvent("ConfirmEmailVerification successful", undefined, {
+        email,
+        username,
+      });
+
+      return {
+        message: "이메일 인증이 완료되었습니다.",
+      };
+    } catch (error) {
+      this.logger.error("ConfirmEmailVerification failed", error.stack, {
+        service: "CognitoService",
+        method: "confirmEmailVerification",
         email,
       });
       throw this.handleCognitoError(error);
