@@ -73,7 +73,7 @@ export class AuthGuard implements CanActivate {
       this.logger.log("Token validation successful", {
         service: "AuthGuard",
         method: "validateToken",
-        userId: user.sub,
+        userSub: user.sub,
       });
 
       return user;

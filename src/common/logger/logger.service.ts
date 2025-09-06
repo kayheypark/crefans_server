@@ -3,7 +3,7 @@ import { Injectable, LoggerService as NestLoggerService } from "@nestjs/common";
 export interface LogContext {
   service?: string;
   method?: string;
-  userId?: string;
+  userSub?: string;
   requestId?: string;
   [key: string]: any;
 }
@@ -51,10 +51,10 @@ export class LoggerService implements NestLoggerService {
   }
 
   // 비즈니스 로직 전용 로깅 메서드들
-  logAuthEvent(event: string, userId?: string, details?: any) {
+  logAuthEvent(event: string, userSub?: string, details?: any) {
     this.log(`Auth Event: ${event}`, {
       service: "AuthService",
-      userId,
+      userSub,
       ...details,
     });
   }

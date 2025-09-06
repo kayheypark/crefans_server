@@ -9,14 +9,15 @@ import {
   Req,
   Query,
   UseGuards,
+  Put,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import {
   SignUpDto,
   SignInDto,
-  SignOutDto,
   ConfirmSignUpDto,
-  ConfirmEmailVerificationDto,
+  UpdateNicknameDto,
+  UpdateHandleDto,
 } from "./dto/auth.dto";
 import { CognitoExceptionFilter } from "./filters/cognito-exception.filter";
 import { Response, Request } from "express";
@@ -24,7 +25,10 @@ import { setAuthCookies, clearAuthCookies } from "./utils/cookie.util";
 import { CognitoException } from "./exceptions/cognito.exception";
 import { ConfigService } from "@nestjs/config";
 import { AuthGuard } from "../common/guards/auth.guard";
-import { CurrentUser } from "../common/decorators/current-user.decorator";
+import {
+  CurrentUser,
+  CurrentUser as CurrentUserType,
+} from "../common/decorators/current-user.decorator";
 import { ApiResponseDto } from "../common/dto/api-response.dto";
 
 @Controller("auth")
@@ -36,7 +40,9 @@ export class AuthController {
   ) {}
 
   @Post("signup")
-  async signUp(@Body() signUpDto: SignUpDto): Promise<ApiResponseDto<{ user: { email: string; userSub: string } }>> {
+  async signUp(
+    @Body() signUpDto: SignUpDto
+  ): Promise<ApiResponseDto<{ user: { email: string; userSub: string } }>> {
     const result = await this.authService.signUp(signUpDto);
     return ApiResponseDto.success(result.message, {
       user: {
@@ -91,7 +97,9 @@ export class AuthController {
   }
 
   @Post("confirm-signup")
-  async confirmSignUp(@Body() confirmSignUpDto: ConfirmSignUpDto): Promise<ApiResponseDto<{ user: { email: string } }>> {
+  async confirmSignUp(
+    @Body() confirmSignUpDto: ConfirmSignUpDto
+  ): Promise<ApiResponseDto<{ user: { email: string } }>> {
     const result = await this.authService.confirmSignUp(confirmSignUpDto);
     return ApiResponseDto.success(result.message, {
       user: {
@@ -102,15 +110,30 @@ export class AuthController {
 
   @Get("me")
   @UseGuards(AuthGuard)
-  async getCurrentUser(@CurrentUser() user: any): Promise<ApiResponseDto<{ user: any }>> {
+  async getCurrentUser(
+    @CurrentUser() user: CurrentUserType
+  ): Promise<ApiResponseDto<{ user: any }>> {
+    console.log('=== /auth/me Debug ===');
+    console.log('AccessToken (first 50 chars):', user.accessToken?.substring(0, 50));
+    
     const userInfo = await this.authService.getUserInfo(user.accessToken);
+    
+    console.log('Retrieved userInfo:', {
+      username: userInfo.username,
+      nickname: userInfo.attributes.nickname,
+      preferred_username: userInfo.attributes.preferred_username,
+    });
+    console.log('======================');
+    
     return ApiResponseDto.success("사용자 정보를 성공적으로 가져왔습니다.", {
       user: userInfo,
     });
   }
 
   @Get("check-email")
-  async checkEmailExists(@Query("email") email: string): Promise<ApiResponseDto<{ exists: boolean }>> {
+  async checkEmailExists(
+    @Query("email") email: string
+  ): Promise<ApiResponseDto<{ exists: boolean }>> {
     if (!email) {
       throw new CognitoException(
         "이메일 주소를 입력해주세요.",
@@ -125,7 +148,9 @@ export class AuthController {
   }
 
   @Post("resend-confirmation-code")
-  async resendConfirmationCode(@Body("email") email: string): Promise<ApiResponseDto<{}>> {
+  async resendConfirmationCode(
+    @Body("email") email: string
+  ): Promise<ApiResponseDto<{}>> {
     if (!email) {
       throw new CognitoException(
         "이메일 주소를 입력해주세요.",
@@ -138,9 +163,11 @@ export class AuthController {
   }
 
   @Get("confirm-email-verification")
-  async confirmEmailVerification(@Query() query: { email: string; code: string }): Promise<ApiResponseDto<{ user: { email: string } }>> {
+  async confirmEmailVerification(
+    @Query() query: { email: string; code: string }
+  ): Promise<ApiResponseDto<{ user: { email: string } }>> {
     const { email, code } = query;
-    
+
     if (!email || !code) {
       throw new CognitoException(
         "이메일과 인증 코드가 필요합니다.",
@@ -148,7 +175,10 @@ export class AuthController {
       );
     }
 
-    const result = await this.authService.confirmEmailVerification({ email, code });
+    const result = await this.authService.confirmEmailVerification({
+      email,
+      code,
+    });
     return ApiResponseDto.success(result.message, {
       user: {
         email: email,
@@ -156,4 +186,29 @@ export class AuthController {
     });
   }
 
+  @Put("nickname")
+  @UseGuards(AuthGuard)
+  async updateNickname(
+    @CurrentUser() user: CurrentUserType,
+    @Body() updateNicknameDto: UpdateNicknameDto
+  ): Promise<ApiResponseDto<{}>> {
+    const result = await this.authService.updateNickname(
+      user.username,
+      updateNicknameDto.nickname
+    );
+    return ApiResponseDto.success(result.message, {});
+  }
+
+  @Put("handle")
+  @UseGuards(AuthGuard)
+  async updateHandle(
+    @CurrentUser() user: CurrentUserType,
+    @Body() updateHandleDto: UpdateHandleDto
+  ): Promise<ApiResponseDto<{}>> {
+    const result = await this.authService.updateHandle(
+      user.username,
+      updateHandleDto.preferredUsername
+    );
+    return ApiResponseDto.success(result.message, {});
+  }
 }

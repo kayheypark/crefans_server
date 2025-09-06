@@ -10,6 +10,7 @@ import {
   ListUsersCommand,
   ResendConfirmationCodeCommand,
   AdminDeleteUserCommand,
+  AdminUpdateUserAttributesCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { LoggerService } from "../common/logger/logger.service";
 import * as crypto from "crypto";
@@ -58,12 +59,6 @@ export class CognitoService {
     const username = email;
     const timestamp = Date.now().toString();
 
-    // 디버깅을 위한 로그 추가
-    console.log("=== SignUp Debug Info ===");
-    console.log("Username:", username);
-    console.log("Preferred Username (timestamp):", timestamp);
-    console.log("Email:", email);
-    console.log("==========================");
     const command = new SignUpCommand({
       ClientId: this.clientId,
       Username: username,
@@ -245,18 +240,6 @@ export class CognitoService {
           return acc;
         }, {} as Record<string, string>) || {};
 
-      // 디버깅을 위한 로그 추가
-      console.log("=== GetUserInfo Debug Info ===");
-      console.log("Raw UserAttributes:", response.UserAttributes);
-      console.log("Parsed Attributes:", attributes);
-      console.log("Username from Cognito:", response.Username);
-      console.log(
-        "Preferred Username from attributes:",
-        attributes.preferred_username
-      );
-      console.log("Email from attributes:", attributes.email);
-      console.log("==================================");
-
       // 클라이언트가 기대하는 구조로 사용자 정보 변환
       const userInfo = {
         username:
@@ -362,7 +345,9 @@ export class CognitoService {
     }
   }
 
-  async confirmEmailVerification(confirmEmailVerificationDto: ConfirmEmailVerificationDto) {
+  async confirmEmailVerification(
+    confirmEmailVerificationDto: ConfirmEmailVerificationDto
+  ) {
     const { email, code } = confirmEmailVerificationDto;
     const username = email;
     const secretHash = this.computeSecretHash(username);
@@ -375,16 +360,24 @@ export class CognitoService {
     });
 
     try {
-      this.logger.logAuthEvent("ConfirmEmailVerification initiated", undefined, {
-        email,
-        username,
-      });
+      this.logger.logAuthEvent(
+        "ConfirmEmailVerification initiated",
+        undefined,
+        {
+          email,
+          username,
+        }
+      );
       await this.cognitoClient.send(command);
 
-      this.logger.logAuthEvent("ConfirmEmailVerification successful", undefined, {
-        email,
-        username,
-      });
+      this.logger.logAuthEvent(
+        "ConfirmEmailVerification successful",
+        undefined,
+        {
+          email,
+          username,
+        }
+      );
 
       return {
         message: "이메일 인증이 완료되었습니다.",
@@ -395,6 +388,76 @@ export class CognitoService {
         method: "confirmEmailVerification",
         email,
       });
+      throw this.handleCognitoError(error);
+    }
+  }
+
+  async updateUserAttribute(
+    userSub: string,
+    attributeName: string,
+    attributeValue: string
+  ) {
+    // 디버깅을 위한 로그 추가
+    this.logger.log(
+      `Received parameters - userSub: ${userSub}, attributeName: ${attributeName}, attributeValue: ${attributeValue}`,
+      {
+        service: "CognitoService",
+        method: "updateUserAttribute",
+      }
+    );
+
+    if (!userSub) {
+      throw new Error("userSub is required");
+    }
+
+    const command = new AdminUpdateUserAttributesCommand({
+      UserPoolId: this.userPoolId,
+      Username: userSub,
+      UserAttributes: [
+        {
+          Name: attributeName,
+          Value: attributeValue,
+        },
+      ],
+    });
+
+    try {
+      this.logger.log(
+        `Updating user attribute ${attributeName} for user: ${userSub}`,
+        {
+          service: "CognitoService",
+          method: "updateUserAttribute",
+          userSub,
+          attributeName,
+        }
+      );
+
+      await this.cognitoClient.send(command);
+
+      this.logger.log(
+        `✅ User attribute ${attributeName} updated successfully for user: ${userSub}`,
+        {
+          service: "CognitoService",
+          method: "updateUserAttribute",
+          userSub,
+          attributeName,
+        }
+      );
+
+      return {
+        message: `${attributeName} 정보가 성공적으로 업데이트되었습니다.`,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to update user attribute ${attributeName}`,
+        error.stack,
+        {
+          service: "CognitoService",
+          method: "updateUserAttribute",
+          userSub,
+          attributeName,
+        }
+      );
       throw this.handleCognitoError(error);
     }
   }

@@ -344,4 +344,60 @@ export class AuthService {
       // 지갑 생성 실패는 회원가입을 차단하지 않도록 함
     }
   }
+
+  async updateNickname(userSub: string, nickname: string) {
+    try {
+      this.logger.log(`Updating nickname for user: ${userSub}`, {
+        service: 'AuthService',
+        method: 'updateNickname',
+        userSub
+      });
+
+      const result = await this.cognitoService.updateUserAttribute(userSub, 'nickname', nickname);
+
+      this.logger.log(`✅ Nickname updated successfully for user: ${userSub}`, {
+        service: 'AuthService',
+        method: 'updateNickname',
+        userSub
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to update nickname', error.stack, {
+        service: 'AuthService',
+        method: 'updateNickname',
+        userSub,
+        nickname
+      });
+      throw error;
+    }
+  }
+
+  async updateHandle(userSub: string, preferredUsername: string) {
+    try {
+      this.logger.log(`Updating handle for user: ${userSub}`, {
+        service: 'AuthService',
+        method: 'updateHandle',
+        userSub
+      });
+
+      const result = await this.cognitoService.updateUserAttribute(userSub, 'preferred_username', preferredUsername);
+
+      this.logger.log(`✅ Handle updated successfully for user: ${userSub}`, {
+        service: 'AuthService',
+        method: 'updateHandle',
+        userSub
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to update handle', error.stack, {
+        service: 'AuthService',
+        method: 'updateHandle',
+        userSub,
+        preferredUsername
+      });
+      throw error;
+    }
+  }
 }

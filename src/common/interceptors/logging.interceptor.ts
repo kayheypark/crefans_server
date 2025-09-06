@@ -20,7 +20,7 @@ export class LoggingInterceptor implements NestInterceptor {
     this.logger.log(`Incoming Request: ${method} ${url}`, {
       service: "HTTP",
       method: "intercept",
-      userId: user?.sub,
+      userSub: user?.sub,
       body: method !== "GET" ? body : undefined,
     });
 
@@ -32,7 +32,7 @@ export class LoggingInterceptor implements NestInterceptor {
           {
             service: "HTTP",
             method: "intercept",
-            userId: user?.sub,
+            userSub: user?.sub,
             responseTime,
             statusCode: context.switchToHttp().getResponse().statusCode,
           }
