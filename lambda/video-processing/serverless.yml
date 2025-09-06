@@ -1,0 +1,96 @@
+service: crefans-video-processing
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-northeast-2
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 30
+  
+  environment:
+    AWS_REGION: ${self:provider.region}
+    MEDIACONVERT_ROLE_ARN: ${env:MEDIACONVERT_ROLE_ARN}
+    S3_PROCESSED_BUCKET: ${env:S3_PROCESSED_BUCKET}
+    BACKEND_WEBHOOK_URL: ${env:BACKEND_WEBHOOK_URL, ''}
+  
+  iamRoleStatements:
+    # MediaConvert 권한
+    - Effect: Allow
+      Action:
+        - mediaconvert:*
+      Resource: "*"
+    
+    # S3 권한
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+        - s3:PutObject
+        - s3:PutObjectAcl
+      Resource:
+        - "arn:aws:s3:::${env:S3_UPLOAD_BUCKET}/*"
+        - "arn:aws:s3:::${env:S3_PROCESSED_BUCKET}/*"
+    
+    # IAM PassRole 권한
+    - Effect: Allow
+      Action:
+        - iam:PassRole
+      Resource: ${env:MEDIACONVERT_ROLE_ARN}
+
+functions:
+  videoProcessing:
+    handler: dist/index.handler
+    description: Process uploaded video files using MediaConvert
+    events:
+      - s3:
+          bucket: ${env:S3_UPLOAD_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .mp4
+      - s3:
+          bucket: ${env:S3_UPLOAD_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .mov
+      - s3:
+          bucket: ${env:S3_UPLOAD_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .avi
+      - s3:
+          bucket: ${env:S3_UPLOAD_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .mkv
+      - s3:
+          bucket: ${env:S3_UPLOAD_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .webm
+
+  mediaConvertEventHandler:
+    handler: dist/index.mediaConvertEventHandler
+    description: Handle MediaConvert job state change events
+    events:
+      - cloudWatchEvent:
+          event:
+            source:
+              - aws.mediaconvert
+            detail-type:
+              - MediaConvert Job State Change
+            detail:
+              status:
+                - COMPLETE
+                - ERROR
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 4000
