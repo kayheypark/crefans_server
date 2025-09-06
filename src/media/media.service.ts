@@ -1,57 +1,82 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { S3Service } from './s3.service';
-import { MediaConvertService } from './media-convert.service';
-import { Media, MediaProcessingJob } from './entities/media.entity';
-import { CreateMediaDto, CompleteUploadDto } from './dto/media.dto';
-import { v4 as uuidv4 } from 'uuid';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { S3Service } from "./s3.service";
+import { ImageProcessingService } from "./image-processing.service";
+import { CreateMediaDto, CompleteUploadDto } from "./dto/media.dto";
+import { Media, ProcessingStatus } from "@prisma/client";
+import { v4 as uuidv4 } from "uuid";
 
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
-  
-  // 임시 메모리 저장소 (실제로는 DB 사용)
-  private readonly mediaStorage = new Map<string, Media>();
-  private readonly processingJobs = new Map<string, MediaProcessingJob>();
 
   constructor(
+    private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
-    private readonly mediaConvertService: MediaConvertService,
+    private readonly imageProcessingService: ImageProcessingService
   ) {}
 
-  async createMedia(userSub: string, createMediaDto: CreateMediaDto): Promise<{
+  async createMedia(
+    userSub: string,
+    createMediaDto: CreateMediaDto
+  ): Promise<{
     mediaId: string;
     uploadUrl: string;
     s3Key: string;
   }> {
     const mediaId = uuidv4();
-    
+
     try {
       // Presigned URL 생성
-      const { uploadUrl, s3Key } = await this.s3Service.generatePresignedUploadUrl(
-        userSub,
-        createMediaDto.fileName,
-        createMediaDto.contentType,
+      const { uploadUrl, s3Key } =
+        await this.s3Service.generatePresignedUploadUrl(
+          userSub,
+          createMediaDto.fileName,
+          createMediaDto.contentType
+        );
+
+      // 파일 타입 결정
+      const fileExtension = createMediaDto.fileName
+        .split(".")
+        .pop()
+        ?.toLowerCase();
+      const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(
+        fileExtension || ""
+      );
+      const isVideo = ["mp4", "mov", "avi", "mkv", "webm"].includes(
+        fileExtension || ""
       );
 
-      // 미디어 정보 생성
-      const media: Media = {
-        id: mediaId,
-        userSub,
-        originalUrl: this.s3Service.getPublicUrl(
-          process.env.S3_UPLOAD_BUCKET,
-          s3Key,
-        ),
-        status: 'uploading',
-        versions: {},
-        thumbnails: [],
-        metadata: {
-          fileSize: createMediaDto.fileSize,
-        },
-        createdAt: new Date(),
-      };
+      let mediaType: "IMAGE" | "VIDEO" | "AUDIO";
+      if (isImage) {
+        mediaType = "IMAGE";
+      } else if (isVideo) {
+        mediaType = "VIDEO";
+      } else {
+        mediaType = "AUDIO"; // 기타는 AUDIO로 분류
+      }
 
-      // 임시 저장 (실제로는 DB에 저장)
-      this.mediaStorage.set(mediaId, media);
+      // DB에 미디어 정보 저장
+      const media = await this.prisma.media.create({
+        data: {
+          id: mediaId,
+          user_sub: userSub,
+          type: mediaType,
+          original_name: createMediaDto.fileName,
+          file_name: createMediaDto.fileName,
+          s3_upload_key: s3Key,
+          original_url: this.s3Service.getPublicUrl(
+            process.env.S3_UPLOAD_BUCKET,
+            s3Key
+          ),
+          file_size: createMediaDto.fileSize,
+          mime_type: createMediaDto.contentType,
+          processing_status: ProcessingStatus.UPLOADING,
+          metadata: {
+            fileSize: createMediaDto.fileSize,
+          },
+        },
+      });
 
       this.logger.log(`Media created: ${mediaId} for user: ${userSub}`);
 
@@ -61,164 +86,292 @@ export class MediaService {
         s3Key,
       };
     } catch (error) {
-      this.logger.error(`Failed to create media for user: ${userSub}`, error.stack);
+      this.logger.error(
+        `Failed to create media for user: ${userSub}`,
+        error.stack
+      );
       throw error;
     }
   }
 
-  async completeUpload(userSub: string, completeUploadDto: CompleteUploadDto): Promise<Media> {
+  async completeUpload(
+    userSub: string,
+    completeUploadDto: CompleteUploadDto
+  ): Promise<Media> {
     const { mediaId, s3Key } = completeUploadDto;
-    
-    const media = this.mediaStorage.get(mediaId);
-    if (!media || media.userSub !== userSub) {
-      throw new NotFoundException('Media not found');
+
+    const media = await this.prisma.media.findFirst({
+      where: {
+        id: mediaId,
+        user_sub: userSub,
+      },
+    });
+
+    if (!media) {
+      throw new NotFoundException("Media not found");
     }
 
     try {
-      // 상태를 processing으로 변경
-      media.status = 'processing';
-      media.originalUrl = this.s3Service.getPublicUrl(
+      // S3 URL 업데이트
+      const originalUrl = this.s3Service.getPublicUrl(
         process.env.S3_UPLOAD_BUCKET,
-        s3Key,
+        s3Key
       );
 
-      this.mediaStorage.set(mediaId, media);
-
-      // MediaConvert 작업 시작
-      const inputS3Uri = `s3://${process.env.S3_UPLOAD_BUCKET}/${s3Key}`;
-      const outputPrefix = `processed/${userSub}/${mediaId}/`;
-
-      const jobId = await this.mediaConvertService.createTranscodingJob(
-        inputS3Uri,
-        outputPrefix,
-        mediaId,
+      // 파일 확장자로 미디어 타입 판단
+      const fileExtension = s3Key.split(".").pop()?.toLowerCase();
+      const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(
+        fileExtension || ""
+      );
+      const isVideo = ["mp4", "mov", "avi", "mkv", "webm"].includes(
+        fileExtension || ""
       );
 
-      // 처리 작업 정보 저장
-      const processingJob: MediaProcessingJob = {
-        jobId,
-        mediaId,
-        status: 'submitted',
-        progress: 0,
-      };
+      if (isImage) {
+        // 이미지는 processing 상태로 설정
+        const updatedMedia = await this.prisma.media.update({
+          where: { id: mediaId },
+          data: {
+            original_url: originalUrl,
+            processing_status: ProcessingStatus.PROCESSING,
+          },
+        });
 
-      this.processingJobs.set(jobId, processingJob);
+        this.logger.log(
+          `Image upload completed, starting processing: ${mediaId}`
+        );
 
-      this.logger.log(`Upload completed and processing started: ${mediaId}`);
+        // 비동기로 이미지 처리 시작
+        this.processImageAsync(userSub, mediaId, s3Key);
 
-      return media;
+        return updatedMedia;
+      } else if (isVideo) {
+        // 비디오는 S3 업로드만 완료, Lambda가 처리할 예정
+        const updatedMedia = await this.prisma.media.update({
+          where: { id: mediaId },
+          data: {
+            original_url: originalUrl,
+            processing_status: ProcessingStatus.COMPLETED,
+            processed_urls: {
+              original: originalUrl,
+            },
+            processed_at: new Date(),
+          },
+        });
+
+        this.logger.log(
+          `Video upload completed, Lambda will handle processing: ${mediaId}`
+        );
+        return updatedMedia;
+      } else {
+        // 기타 파일은 원본만 사용
+        const updatedMedia = await this.prisma.media.update({
+          where: { id: mediaId },
+          data: {
+            original_url: originalUrl,
+            processing_status: ProcessingStatus.COMPLETED,
+            processed_urls: {
+              original: originalUrl,
+            },
+            processed_at: new Date(),
+          },
+        });
+
+        this.logger.log(`File upload completed: ${mediaId}`);
+        return updatedMedia;
+      }
     } catch (error) {
       // 실패 시 상태 변경
-      media.status = 'failed';
-      this.mediaStorage.set(mediaId, media);
-      
-      this.logger.error(`Failed to complete upload for media: ${mediaId}`, error.stack);
+      await this.prisma.media.update({
+        where: { id: mediaId },
+        data: {
+          processing_status: ProcessingStatus.FAILED,
+        },
+      });
+
+      this.logger.error(
+        `Failed to complete upload for media: ${mediaId}`,
+        error.stack
+      );
       throw error;
     }
   }
 
-  async handleProcessingWebhook(jobId: string, status: string, progress?: number): Promise<void> {
-    const processingJob = this.processingJobs.get(jobId);
-    if (!processingJob) {
-      this.logger.warn(`Processing job not found: ${jobId}`);
-      return;
-    }
+  async handleProcessingWebhook(
+    jobId: string,
+    status: string,
+    progress?: number
+  ): Promise<void> {
+    const media = await this.prisma.media.findFirst({
+      where: {
+        processing_job_id: jobId,
+      },
+    });
 
-    const media = this.mediaStorage.get(processingJob.mediaId);
     if (!media) {
       this.logger.warn(`Media not found for job: ${jobId}`);
       return;
     }
 
     try {
-      // 처리 작업 상태 업데이트
-      processingJob.status = status as any;
-      processingJob.progress = progress;
-      this.processingJobs.set(jobId, processingJob);
-
-      if (status === 'complete') {
+      if (status === "complete") {
         // 처리 완료 시 미디어 정보 업데이트
-        const outputPrefix = `processed/${media.userSub}/${media.id}/`;
-        
-        media.status = 'completed';
-        media.processedAt = new Date();
-        
+        const outputPrefix = `processed/${media.user_sub}/${media.id}/`;
+
         // 처리된 비디오 URL들 생성
-        media.versions = {
-          '1080p': this.s3Service.getPublicUrl(
+        const processedUrls = {
+          "1080p": this.s3Service.getPublicUrl(
             process.env.S3_PROCESSED_BUCKET,
-            `${outputPrefix}${media.id}_1080p.mp4`,
+            `${outputPrefix}${media.id}_1080p.mp4`
           ),
-          '720p': this.s3Service.getPublicUrl(
+          "720p": this.s3Service.getPublicUrl(
             process.env.S3_PROCESSED_BUCKET,
-            `${outputPrefix}${media.id}_720p.mp4`,
+            `${outputPrefix}${media.id}_720p.mp4`
           ),
-          '480p': this.s3Service.getPublicUrl(
+          "480p": this.s3Service.getPublicUrl(
             process.env.S3_PROCESSED_BUCKET,
-            `${outputPrefix}${media.id}_480p.mp4`,
+            `${outputPrefix}${media.id}_480p.mp4`
           ),
         };
 
         // 썸네일 URL들 생성
-        media.thumbnails = Array.from({ length: 5 }, (_, i) =>
+        const thumbnailUrls = Array.from({ length: 5 }, (_, i) =>
           this.s3Service.getPublicUrl(
             process.env.S3_PROCESSED_BUCKET,
-            `${outputPrefix}thumbnails/${media.id}_thumbnail.${i.toString().padStart(5, '0')}.jpg`,
-          ),
+            `${outputPrefix}thumbnails/${media.id}_thumbnail.${i
+              .toString()
+              .padStart(5, "0")}.jpg`
+          )
         );
 
-        this.mediaStorage.set(media.id, media);
-        
+        await this.prisma.media.update({
+          where: { id: media.id },
+          data: {
+            processing_status: ProcessingStatus.COMPLETED,
+            processed_urls: processedUrls,
+            thumbnail_urls: thumbnailUrls,
+            processed_at: new Date(),
+          },
+        });
+
         this.logger.log(`Media processing completed: ${media.id}`);
-      } else if (status === 'error') {
-        media.status = 'failed';
-        this.mediaStorage.set(media.id, media);
-        
+      } else if (status === "error") {
+        await this.prisma.media.update({
+          where: { id: media.id },
+          data: {
+            processing_status: ProcessingStatus.FAILED,
+          },
+        });
+
         this.logger.error(`Media processing failed: ${media.id}`);
       }
     } catch (error) {
-      this.logger.error(`Failed to handle processing webhook for job: ${jobId}`, error.stack);
+      this.logger.error(
+        `Failed to handle processing webhook for job: ${jobId}`,
+        error.stack
+      );
     }
   }
 
   async getMedia(mediaId: string, userSub?: string): Promise<Media> {
-    const media = this.mediaStorage.get(mediaId);
-    if (!media) {
-      throw new NotFoundException('Media not found');
+    const whereCondition: any = { id: mediaId };
+    if (userSub) {
+      whereCondition.user_sub = userSub;
     }
 
-    if (userSub && media.userSub !== userSub) {
-      throw new NotFoundException('Media not found');
+    const media = await this.prisma.media.findFirst({
+      where: whereCondition,
+    });
+
+    if (!media) {
+      throw new NotFoundException("Media not found");
     }
 
     return media;
   }
 
-  async getUserMedia(userSub: string, limit: number = 20, offset: number = 0): Promise<Media[]> {
-    const userMedia = Array.from(this.mediaStorage.values())
-      .filter(media => media.userSub === userSub)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(offset, offset + limit);
-
-    return userMedia;
+  async getUserMedia(
+    userSub: string,
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<Media[]> {
+    return this.prisma.media.findMany({
+      where: {
+        user_sub: userSub,
+        is_deleted: false,
+      },
+      orderBy: {
+        created_at: "desc",
+      },
+      take: limit,
+      skip: offset,
+    });
   }
 
-  async getProcessingStatus(mediaId: string, userSub: string): Promise<{
+  async getProcessingStatus(
+    mediaId: string,
+    userSub: string
+  ): Promise<{
     status: string;
     progress?: number;
   }> {
-    const media = this.mediaStorage.get(mediaId);
-    if (!media || media.userSub !== userSub) {
-      throw new NotFoundException('Media not found');
+    const media = await this.prisma.media.findFirst({
+      where: {
+        id: mediaId,
+        user_sub: userSub,
+      },
+    });
+
+    if (!media) {
+      throw new NotFoundException("Media not found");
     }
 
-    // 처리 중인 작업 찾기
-    const processingJob = Array.from(this.processingJobs.values())
-      .find(job => job.mediaId === mediaId);
-
     return {
-      status: media.status,
-      progress: processingJob?.progress,
+      status: media.processing_status,
+      progress: undefined, // 진행률은 현재 Lambda에서 제공하지 않음
     };
+  }
+
+  /**
+   * 비동기 이미지 처리
+   */
+  private async processImageAsync(
+    userSub: string,
+    mediaId: string,
+    s3Key: string
+  ): Promise<void> {
+    try {
+      this.logger.log(`Starting async image processing for media: ${mediaId}`);
+
+      // 이미지 처리 실행
+      const { versions, thumbnails } =
+        await this.imageProcessingService.processImage(userSub, mediaId, s3Key);
+
+      // DB에서 미디어 정보 업데이트
+      await this.prisma.media.update({
+        where: { id: mediaId },
+        data: {
+          processing_status: ProcessingStatus.COMPLETED,
+          processed_urls: versions,
+          thumbnail_urls: thumbnails,
+          processed_at: new Date(),
+        },
+      });
+
+      this.logger.log(`Image processing completed for media: ${mediaId}`);
+    } catch (error) {
+      this.logger.error(
+        `Image processing failed for media: ${mediaId}`,
+        error.stack
+      );
+
+      // 실패 시 상태 업데이트
+      await this.prisma.media.update({
+        where: { id: mediaId },
+        data: {
+          processing_status: ProcessingStatus.FAILED,
+        },
+      });
+    }
   }
 }

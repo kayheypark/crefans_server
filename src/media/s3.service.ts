@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class S3Service {
   private readonly logger = new Logger(S3Service.name);
-  private readonly s3Client: S3Client;
+  public readonly s3Client: S3Client; // public으로 변경
   private readonly uploadBucket: string;
   private readonly processedBucket: string;
 
@@ -84,5 +84,27 @@ export class S3Service {
 
   generateThumbnailKey(userSub: string, mediaId: string, index: number = 0): string {
     return `thumbnails/${userSub}/${mediaId}/thumb_${index}.jpg`;
+  }
+
+  async uploadBuffer(
+    bucket: string,
+    key: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<void> {
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    });
+
+    try {
+      await this.s3Client.send(command);
+      this.logger.log(`Successfully uploaded buffer to s3://${bucket}/${key}`);
+    } catch (error) {
+      this.logger.error(`Failed to upload buffer to s3://${bucket}/${key}`, error.stack);
+      throw error;
+    }
   }
 }

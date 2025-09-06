@@ -16,7 +16,7 @@ import {
   CompleteUploadDto,
   MediaProcessingWebhookDto,
 } from "./dto/media.dto";
-import { AuthGuard } from "@nestjs/passport";
+import { AuthGuard } from "../common/guards/auth.guard";
 import { Logger } from "@nestjs/common";
 
 @Controller("media")
@@ -25,8 +25,7 @@ export class MediaController {
 
   constructor(private readonly mediaService: MediaService) {}
 
-  //TODO: 가드 JWT 개발 후 미디어 업로드 정상 작동 확인하기 (S3 버킷에 업로드되는지)
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard)
   @Post("prepare-upload")
   async prepareUpload(@Request() req, @Body() createMediaDto: CreateMediaDto) {
     const userSub = req.user.sub;
@@ -41,7 +40,7 @@ export class MediaController {
     };
   }
 
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard)
   @Post("complete-upload")
   async completeUpload(
     @Request() req,
@@ -64,7 +63,7 @@ export class MediaController {
     };
   }
 
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard)
   @Get("my-media")
   async getMyMedia(
     @Request() req,
@@ -87,7 +86,7 @@ export class MediaController {
     };
   }
 
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard)
   @Get(":mediaId")
   async getMedia(@Request() req, @Param("mediaId") mediaId: string) {
     const userSub = req.user.sub;
@@ -100,7 +99,7 @@ export class MediaController {
     };
   }
 
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard)
   @Get(":mediaId/status")
   async getProcessingStatus(@Request() req, @Param("mediaId") mediaId: string) {
     const userSub = req.user.sub;
@@ -139,7 +138,7 @@ export class MediaController {
     const media = await this.mediaService.getMedia(mediaId);
 
     // 완료된 미디어만 공개
-    if (media.status !== "completed") {
+    if (media.processing_status !== "COMPLETED") {
       return {
         success: false,
         error: "Media is not ready",
@@ -150,9 +149,9 @@ export class MediaController {
       success: true,
       data: {
         id: media.id,
-        status: media.status,
-        versions: media.versions,
-        thumbnails: media.thumbnails,
+        processing_status: media.processing_status,
+        processed_urls: media.processed_urls,
+        thumbnail_urls: media.thumbnail_urls,
         metadata: media.metadata,
       },
     };

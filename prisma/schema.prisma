@@ -202,32 +202,50 @@ model Subscription {
 /// 포스팅에 첨부되는 미디어 파일 정보
 model Media {
   /// 미디어 고유 식별자
-  id             Int            @id @default(autoincrement())
+  id                String              @id @default(uuid())
+  /// 소유자 ID (Cognito userSub)
+  user_sub          String
   /// 미디어 타입
-  type           MediaType
+  type              MediaType
   /// 원본 파일명
-  original_name  String
+  original_name     String
   /// 저장된 파일명
-  file_name      String
-  /// 파일 경로
-  file_path      String
+  file_name         String
+  /// 파일 경로 (legacy)
+  file_path         String?
+  /// S3 업로드 키
+  s3_upload_key     String
+  /// S3 처리된 키들 (JSON)
+  s3_processed_keys Json?
+  /// 원본 파일 URL
+  original_url      String
+  /// 처리된 파일 URL들 (JSON)
+  processed_urls    Json?
+  /// 썸네일 URL들 (JSON)
+  thumbnail_urls    Json?
   /// 파일 크기 (bytes)
-  file_size      Int
+  file_size         Int
   /// MIME 타입
-  mime_type      String
-  /// 썸네일 경로 (이미지/비디오의 경우)
-  thumbnail_path String?
+  mime_type         String
+  /// 처리 상태
+  processing_status ProcessingStatus    @default(UPLOADING)
+  /// 처리 작업 ID (MediaConvert Job ID)
+  processing_job_id String?
+  /// 썸네일 경로 (legacy)
+  thumbnail_path    String?
   /// 메타데이터 (JSON)
-  metadata       Json?
+  metadata          Json?
+  /// 처리 완료 일시
+  processed_at      DateTime?
   /// 삭제 여부
-  is_deleted     Boolean        @default(false)
+  is_deleted        Boolean             @default(false)
   /// 삭제 일시
-  deleted_at     DateTime?
+  deleted_at        DateTime?
   /// 생성 일시
-  created_at     DateTime       @default(now())
+  created_at        DateTime            @default(now())
   /// 수정 일시
-  updated_at     DateTime       @updatedAt
-  postings       PostingMedia[]
+  updated_at        DateTime            @updatedAt
+  postings          PostingMedia[]
 
   @@map("medias")
 }
@@ -310,7 +328,7 @@ model PostingMedia {
   /// 포스팅 ID
   posting_id      Int
   /// 미디어 ID
-  media_id        Int
+  media_id        String
   /// 정렬 순서
   sort_order      Int       @default(0)
   /// 무료 공개 여부
@@ -428,5 +446,15 @@ enum PostingStatus {
   ARCHIVED
 
   @@map("posting_statuses")
+}
+
+/// 미디어 처리 상태
+enum ProcessingStatus {
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  FAILED
+
+  @@map("processing_statuses")
 }
 

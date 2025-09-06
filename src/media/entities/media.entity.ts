@@ -1,31 +1,5 @@
-export interface Media {
-  id: string;
-  userSub: string;
-  originalUrl: string;
-  status: 'uploading' | 'processing' | 'completed' | 'failed';
-  
-  // 트랜스코딩된 버전들
-  versions: {
-    '1080p'?: string;
-    '720p'?: string;
-    '480p'?: string;
-  };
-  
-  // 썸네일들
-  thumbnails: string[];
-  
-  // 메타데이터
-  metadata: {
-    duration?: number;
-    width?: number;
-    height?: number;
-    fileSize?: number;
-    codec?: string;
-  };
-  
-  createdAt: Date;
-  processedAt?: Date;
-}
+// Prisma Media 모델을 그대로 사용하므로 별도의 인터페이스는 불필요
+// @prisma/client에서 Media 타입을 import하여 사용
 
 export interface MediaProcessingJob {
   jobId: string;
