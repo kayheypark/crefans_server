@@ -12,6 +12,14 @@ export class CreateMediaDto {
   @IsNumber()
   @IsOptional()
   fileSize?: number;
+
+  @IsNumber()
+  @IsOptional()
+  width?: number;
+
+  @IsNumber()
+  @IsOptional()
+  height?: number;
 }
 
 export class CompleteUploadDto {

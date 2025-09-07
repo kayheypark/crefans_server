@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { S3Service } from "./s3.service";
 import { ImageProcessingService } from "./image-processing.service";
@@ -27,6 +27,8 @@ export class MediaService {
     const mediaId = uuidv4();
 
     try {
+      // 크레팬스 업로드 정책 검증
+      await this.validateUploadPolicy(userSub, createMediaDto);
       // Presigned URL 생성
       const { uploadUrl, s3Key } =
         await this.s3Service.generatePresignedUploadUrl(
@@ -405,6 +407,85 @@ export class MediaService {
           processing_status: ProcessingStatus.FAILED,
         },
       });
+    }
+  }
+
+  /**
+   * 크레팬스 업로드 정책 검증
+   */
+  private async validateUploadPolicy(userSub: string, createMediaDto: CreateMediaDto): Promise<void> {
+    const { fileName, contentType, fileSize, width, height } = createMediaDto;
+    
+    // 파일 확장자 검증
+    const fileExtension = fileName.split('.').pop()?.toLowerCase();
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+    const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(fileExtension || '');
+    
+    if (!isImage && !isVideo) {
+      throw new BadRequestException('지원하지 않는 파일 형식입니다. (이미지: jpg, png, gif, webp / 동영상: mp4, mov, avi, mkv, webm)');
+    }
+
+    // 4K 비디오 업로드 제한 (크레팬스 정책)
+    if (isVideo && width && height) {
+      if (width > 1920 || height > 1080) {
+        throw new BadRequestException('동영상 최대 해상도는 1080p(1920x1080)입니다. 4K 업로드는 지원하지 않습니다.');
+      }
+    }
+
+    // 파일 크기 제한
+    if (fileSize) {
+      const maxImageSize = 50 * 1024 * 1024; // 50MB
+      const maxVideoSize = 500 * 1024 * 1024; // 500MB
+      
+      if (isImage && fileSize > maxImageSize) {
+        throw new BadRequestException('이미지 파일 크기는 50MB를 초과할 수 없습니다.');
+      }
+      
+      if (isVideo && fileSize > maxVideoSize) {
+        throw new BadRequestException('동영상 파일 크기는 500MB를 초과할 수 없습니다.');
+      }
+    }
+
+    // 사용자별 일일 업로드 제한 검증
+    await this.validateDailyUploadLimits(userSub, isVideo);
+  }
+
+  /**
+   * 일일 업로드 제한 검증
+   */
+  private async validateDailyUploadLimits(userSub: string, isVideo: boolean): Promise<void> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // 오늘 업로드된 미디어 개수 조회
+    const todayUploads = await this.prisma.media.findMany({
+      where: {
+        user_sub: userSub,
+        created_at: {
+          gte: today,
+          lt: tomorrow,
+        },
+        is_deleted: false,
+      },
+    });
+
+    const imageCount = todayUploads.filter(media => media.type === 'IMAGE').length;
+    const videoCount = todayUploads.filter(media => media.type === 'VIDEO').length;
+
+    // 크레팬스 정책: 한 포스팅당 최대 사진 10개, 동영상 1개
+    if (!isVideo && imageCount >= 10) {
+      throw new BadRequestException('일일 이미지 업로드 제한(10개)에 도달했습니다.');
+    }
+
+    if (isVideo && videoCount >= 1) {
+      throw new BadRequestException('일일 동영상 업로드 제한(1개)에 도달했습니다.');
+    }
+
+    // 총 업로드 제한 (구독자 0명 기준: 월 10개)
+    if (todayUploads.length >= 50) { // 일일 50개 = 월 1500개 (여유있게 설정)
+      throw new BadRequestException('일일 업로드 제한에 도달했습니다.');
     }
   }
 }
