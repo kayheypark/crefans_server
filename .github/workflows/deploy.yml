@@ -16,23 +16,28 @@ jobs:
 
       # EC2에 소스 코드만 업로드
       - name: Upload source code to EC2
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 10m
           source: "src/,package.json,package-lock.json,prisma/,tsconfig.json"
           target: ~/crefans
           overwrite: true
-          verbose: true
 
       # EC2에서 빌드 및 배포
       - name: Build and deploy on EC2
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 10m
           script: |
             echo "=== EC2에서 빌드 및 배포 시작 ==="
             cd ~/crefans
