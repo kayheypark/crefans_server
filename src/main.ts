@@ -55,3 +55,4 @@ async function bootstrap() {
   });
 }
 bootstrap();
+// Trigger deployment after EC2 restart
