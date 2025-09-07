@@ -39,4 +39,12 @@ export class MediaProcessingWebhookDto {
   @IsString()
   @IsOptional()
   errorMessage?: string;
+
+  @IsString()
+  @IsOptional()
+  mediaId?: string;
+
+  @IsString()
+  @IsOptional()
+  userSub?: string;
 }

@@ -126,7 +126,9 @@ export class MediaController {
     await this.mediaService.handleProcessingWebhook(
       webhookDto.jobId,
       webhookDto.status,
-      webhookDto.progress
+      webhookDto.progress,
+      webhookDto.mediaId,
+      webhookDto.userSub
     );
 
     return { success: true };

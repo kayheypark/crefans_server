@@ -151,16 +151,12 @@ export class MediaService {
           where: { id: mediaId },
           data: {
             original_url: originalUrl,
-            processing_status: ProcessingStatus.COMPLETED,
-            processed_urls: {
-              original: originalUrl,
-            },
-            processed_at: new Date(),
+            processing_status: ProcessingStatus.PROCESSING,
           },
         });
 
         this.logger.log(
-          `Video upload completed, Lambda will handle processing: ${mediaId}`
+          `Video upload completed, starting Lambda processing: ${mediaId}`
         );
         return updatedMedia;
       } else {
@@ -200,21 +196,45 @@ export class MediaService {
   async handleProcessingWebhook(
     jobId: string,
     status: string,
-    progress?: number
+    progress?: number,
+    mediaId?: string,
+    userSub?: string
   ): Promise<void> {
-    const media = await this.prisma.media.findFirst({
+    // 먼저 처리 중인 작업 ID로 미디어 찾기 시도
+    let media = await this.prisma.media.findFirst({
       where: {
         processing_job_id: jobId,
       },
     });
 
+    // 미디어를 찾지 못했고 mediaId와 userSub가 제공된 경우, 이들로 찾기
+    if (!media && mediaId && userSub) {
+      media = await this.prisma.media.findFirst({
+        where: {
+          id: mediaId,
+          user_sub: userSub,
+        },
+      });
+    }
+
     if (!media) {
-      this.logger.warn(`Media not found for job: ${jobId}`);
+      this.logger.warn(`Media not found for job: ${jobId}, mediaId: ${mediaId}, userSub: ${userSub}`);
       return;
     }
 
     try {
-      if (status === "complete") {
+      if (status === "progressing") {
+        // 처리 시작 시 job ID 저장
+        await this.prisma.media.update({
+          where: { id: media.id },
+          data: {
+            processing_job_id: jobId,
+            processing_status: ProcessingStatus.PROCESSING,
+          },
+        });
+
+        this.logger.log(`MediaConvert job started for media: ${media.id}, jobId: ${jobId}`);
+      } else if (status === "complete") {
         // 처리 완료 시 미디어 정보 업데이트
         const outputPrefix = `processed/${media.user_sub}/${media.id}/`;
 
@@ -234,6 +254,13 @@ export class MediaService {
           ),
         };
 
+        // 비디오 플레이어를 위한 해상도 정보
+        const videoResolutions = [
+          { quality: "1080p", width: 1920, height: 1080, bitrate: 5000000 },
+          { quality: "720p", width: 1280, height: 720, bitrate: 2500000 },
+          { quality: "480p", width: 640, height: 480, bitrate: 1000000 },
+        ];
+
         // 썸네일 URL들 생성
         const thumbnailUrls = Array.from({ length: 5 }, (_, i) =>
           this.s3Service.getPublicUrl(
@@ -251,6 +278,12 @@ export class MediaService {
             processed_urls: processedUrls,
             thumbnail_urls: thumbnailUrls,
             processed_at: new Date(),
+            metadata: {
+              ...((media.metadata as any) || {}),
+              videoResolutions,
+              availableQualities: ["1080p", "720p", "480p"],
+              thumbnailCount: 5,
+            },
           },
         });
 
