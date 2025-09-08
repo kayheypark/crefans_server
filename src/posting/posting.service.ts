@@ -16,20 +16,20 @@ export class PostingService {
   constructor(private prisma: PrismaService) {}
 
   async createPosting(
-    creatorId: string,
+    userId: string,
     createPostingDto: CreatePostingDto,
   ): Promise<CreatePostingResponse> {
     const { media_ids, ...postingData } = createPostingDto;
 
     // 크리에이터 전용 기능 확인
-    await this.validateCreatorOnlyFields(creatorId, postingData);
+    await this.validateCreatorOnlyFields(userId, postingData);
 
     // 미디어 ID들이 유효한지 확인
     if (media_ids && media_ids.length > 0) {
       const existingMedias = await this.prisma.media.findMany({
         where: {
           id: { in: media_ids },
-          user_sub: creatorId,
+          user_sub: userId,
           is_deleted: false,
         },
       });
@@ -45,17 +45,35 @@ export class PostingService {
     const posting = await this.prisma.posting.create({
       data: {
         ...postingData,
-        creator_id: creatorId,
+        creator_id: userId,
         published_at: publishedAt,
       },
     });
 
-    // 미디어 연결
+    // 미디어 연결 (미디어 타입과 순서 저장)
     if (media_ids && media_ids.length > 0) {
+      // 미디어 정보를 가져와서 타입과 함께 저장
+      const mediaList = await this.prisma.media.findMany({
+        where: {
+          id: { in: media_ids },
+          user_sub: userId,
+          is_deleted: false,
+        },
+        select: {
+          id: true,
+          type: true,
+        },
+      });
+
+      // media_ids 순서대로 정렬
+      const sortedMediaList = media_ids.map((id) => 
+        mediaList.find((media) => media.id === id)
+      ).filter(Boolean);
+
       await this.prisma.postingMedia.createMany({
-        data: media_ids.map((mediaId, index) => ({
+        data: sortedMediaList.map((media, index) => ({
           posting_id: posting.id,
-          media_id: mediaId,
+          media_id: media.id,
           sort_order: index,
         })),
       });
@@ -131,6 +149,7 @@ export class PostingService {
       allow_individual_purchase: posting.allow_individual_purchase,
       individual_purchase_price: posting.individual_purchase_price ? Number(posting.individual_purchase_price) : undefined,
       is_public: posting.is_public,
+      is_sensitive: posting.is_sensitive,
       total_view_count: posting.total_view_count,
       unique_view_count: posting.unique_view_count,
       like_count: posting.like_count,
@@ -201,6 +220,7 @@ export class PostingService {
       allow_individual_purchase: posting.allow_individual_purchase,
       individual_purchase_price: posting.individual_purchase_price ? Number(posting.individual_purchase_price) : undefined,
       is_public: posting.is_public,
+      is_sensitive: posting.is_sensitive,
       total_view_count: posting.total_view_count,
       unique_view_count: posting.unique_view_count,
       like_count: posting.like_count,
@@ -228,13 +248,13 @@ export class PostingService {
 
   async updatePosting(
     id: number,
-    creatorId: string,
+    userId: string,
     updatePostingDto: UpdatePostingDto,
   ): Promise<{ success: boolean; message: string }> {
     const existingPosting = await this.prisma.posting.findFirst({
       where: {
         id,
-        creator_id: creatorId,
+        creator_id: userId,
         is_deleted: false,
       },
     });
@@ -246,7 +266,7 @@ export class PostingService {
     const { media_ids, ...postingData } = updatePostingDto;
 
     // 크리에이터 전용 기능 확인
-    await this.validateCreatorOnlyFields(creatorId, postingData);
+    await this.validateCreatorOnlyFields(userId, postingData);
 
     // 발행 상태 변경 시 발행 일시 업데이트
     if (postingData.status === PostingStatus.PUBLISHED && !existingPosting.published_at) {
@@ -276,7 +296,7 @@ export class PostingService {
         const existingMedias = await this.prisma.media.findMany({
           where: {
             id: { in: media_ids },
-            user_sub: creatorId,
+            user_sub: userId,
             is_deleted: false,
           },
         });
@@ -285,10 +305,28 @@ export class PostingService {
           throw new BadRequestException('일부 미디어 파일을 찾을 수 없습니다.');
         }
 
+        // 미디어 정보를 가져와서 타입과 함께 저장
+        const mediaList = await this.prisma.media.findMany({
+          where: {
+            id: { in: media_ids },
+            user_sub: userId,
+            is_deleted: false,
+          },
+          select: {
+            id: true,
+            type: true,
+          },
+        });
+
+        // media_ids 순서대로 정렬
+        const sortedMediaList = media_ids.map((id) => 
+          mediaList.find((media) => media.id === id)
+        ).filter(Boolean);
+
         await this.prisma.postingMedia.createMany({
-          data: media_ids.map((mediaId, index) => ({
+          data: sortedMediaList.map((media, index) => ({
             posting_id: id,
-            media_id: mediaId,
+            media_id: media.id,
             sort_order: index,
           })),
         });
@@ -303,12 +341,12 @@ export class PostingService {
 
   async deletePosting(
     id: number,
-    creatorId: string,
+    userId: string,
   ): Promise<{ success: boolean; message: string }> {
     const existingPosting = await this.prisma.posting.findFirst({
       where: {
         id,
-        creator_id: creatorId,
+        creator_id: userId,
         is_deleted: false,
       },
     });
@@ -376,7 +414,10 @@ export class PostingService {
       postingData.is_membership ||
       postingData.membership_level ||
       postingData.allow_individual_purchase ||
-      postingData.individual_purchase_price !== undefined;
+      postingData.individual_purchase_price !== undefined ||
+      postingData.publish_start_at ||
+      postingData.publish_end_at ||
+      postingData.is_sensitive;
 
     if (hasCreatorOnlyFields) {
       // 사용자가 크리에이터인지 확인

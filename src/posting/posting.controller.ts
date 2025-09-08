@@ -18,6 +18,7 @@ import {
   PostingListResponse,
   PostingDetailResponse,
   CreatePostingResponse,
+  PostingStatus,
 } from './dto/posting.dto';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { CreatorGuard } from '../common/guards/creator.guard';
@@ -35,13 +36,14 @@ export class PostingController {
   constructor(private readonly postingService: PostingService) {}
 
   @Post()
-  @UseGuards(AuthGuard, CreatorGuard)
+  @UseGuards(AuthGuard)
   async createPosting(
     @CurrentUser() user: CurrentUserType,
     @Body() createPostingDto: CreatePostingDto,
   ): Promise<CreatePostingResponse> {
     return this.postingService.createPosting(user.userSub, createPostingDto);
   }
+
 
   @Get()
   async getPostings(@Query() query: PostingQueryDto): Promise<PostingListResponse> {
@@ -57,7 +59,7 @@ export class PostingController {
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard, CreatorGuard)
+  @UseGuards(AuthGuard)
   async updatePosting(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: CurrentUserType,
@@ -67,7 +69,7 @@ export class PostingController {
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard, CreatorGuard)
+  @UseGuards(AuthGuard)
   async deletePosting(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: CurrentUserType,
@@ -76,7 +78,7 @@ export class PostingController {
   }
 
   @Get('my/list')
-  @UseGuards(AuthGuard, CreatorGuard)
+  @UseGuards(AuthGuard)
   async getMyPostings(
     @CurrentUser() user: CurrentUserType,
     @Query() query: PostingQueryDto,

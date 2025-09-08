@@ -52,6 +52,10 @@ export class CreatePostingDto {
   @IsOptional()
   @IsBoolean()
   is_public?: boolean = true;
+
+  @IsOptional()
+  @IsBoolean()
+  is_sensitive?: boolean = false;
 }
 
 export class UpdatePostingDto {
@@ -101,6 +105,10 @@ export class UpdatePostingDto {
   @IsOptional()
   @IsBoolean()
   is_public?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  is_sensitive?: boolean;
 }
 
 export class PostingQueryDto {
@@ -157,6 +165,7 @@ export interface PostingResponse {
   allow_individual_purchase: boolean;
   individual_purchase_price?: number;
   is_public: boolean;
+  is_sensitive: boolean;
   total_view_count: number;
   unique_view_count: number;
   like_count: number;
