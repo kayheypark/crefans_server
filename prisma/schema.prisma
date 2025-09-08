@@ -7,6 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// 사용자 프로필
+/// 사용자의 추가 프로필 정보를 관리
+model UserProfile {
+  /// 사용자 ID (Cognito의 userSub)
+  user_id    String    @id
+  /// 소개글
+  bio        String?   @db.Text
+  /// 생성 일시
+  created_at DateTime  @default(now())
+  /// 수정 일시
+  updated_at DateTime  @updatedAt
+
+  @@map("user_profiles")
+}
+
 /// 토큰 타입 정의
 /// 시스템에서 사용되는 모든 토큰의 타입을 관리
 model TokenType {
@@ -486,4 +501,3 @@ enum ProcessingStatus {
 
   @@map("processing_statuses")
 }
-

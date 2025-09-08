@@ -144,6 +144,12 @@ export class AuthService {
 
       const userInfo = await this.cognitoService.getUserInfo(accessToken);
 
+      const userProfile = await this.prisma.userProfile.findUnique({
+        where: { user_id: userInfo.attributes.sub },
+      });
+
+      userInfo.profile = userProfile;
+
       this.logger.logAuthEvent(
         "GetUserInfo completed",
         userInfo.attributes.sub,

@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "../auth/auth.service";
+import { UpdateUserProfileDto } from "./dto/user.dto";
 
 @Injectable()
 export class UserService {
@@ -16,6 +17,11 @@ export class UserService {
     if (!cognitoUser) {
       throw new Error("사용자를 찾을 수 없습니다.");
     }
+
+    // 프로필 정보 조회
+    const userProfile = await this.prisma.userProfile.findUnique({
+      where: { user_id: cognitoUser.Username },
+    });
 
     // 크리에이터 정보 조회
     const creator = await this.prisma.creator.findUnique({
@@ -49,9 +55,7 @@ export class UserService {
       avatar:
         cognitoUser.Attributes.find((attr) => attr.Name === "picture")?.Value ||
         "/profile-90.png",
-      bio:
-        cognitoUser.Attributes.find((attr) => attr.Name === "custom:bio")
-          ?.Value || "",
+      bio: userProfile?.bio || "소개글을 준비중입니다",
       isCreator: !!creator,
       isVerified: false, // TODO: Creator 모델에 is_verified 필드 추가 필요
       followersCount,
@@ -59,6 +63,16 @@ export class UserService {
       postsCount,
       mediaCount,
     };
+  }
+
+  async updateUserProfile(user_id: string, updateUserProfileDto: UpdateUserProfileDto) {
+    const { bio } = updateUserProfileDto;
+
+    return this.prisma.userProfile.upsert({
+      where: { user_id },
+      update: { bio },
+      create: { user_id, bio },
+    });
   }
 
   async checkNicknameAvailability(nickname: string): Promise<boolean> {

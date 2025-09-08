@@ -258,6 +258,7 @@ export class CognitoService {
           phone_number: attributes.phone_number || "",
         },
         points: 0, // 기본값 설정
+        profile: null,
       };
 
       this.logger.logAuthEvent(

@@ -39,12 +39,12 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor(logger));
 
   // 글로벌 파이프 추가
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-    })
-  );
+  // app.useGlobalPipes(
+  //   new ValidationPipe({
+  //     whitelist: true,
+  //     transform: true,
+  //   })
+  // );
 
   const port = configService.get("app.port");
   await app.listen(port);

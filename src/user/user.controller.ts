@@ -4,10 +4,14 @@ import {
   Param,
   UseGuards,
   Query,
+  Put,
+  Req,
+  Body,
 } from "@nestjs/common";
 import { UserService } from "./user.service";
 import { ApiResponseDto } from "../common/dto/api-response.dto";
 import { AuthGuard } from "../common/guards/auth.guard";
+import { UpdateUserProfileDto } from "./dto/user.dto";
 
 @Controller("user")
 export class UserController {
@@ -19,6 +23,22 @@ export class UserController {
   ): Promise<ApiResponseDto<any>> {
     const profile = await this.userService.getUserProfileByHandle(handle);
     return ApiResponseDto.success("프로필을 성공적으로 가져왔습니다.", profile);
+  }
+
+  @UseGuards(AuthGuard)
+  @Put("profile")
+  async updateUserProfile(
+    @Req() req: any,
+    @Body() updateUserProfileDto: UpdateUserProfileDto
+  ): Promise<ApiResponseDto<any>> {
+    console.log("updateUserProfile request body:", updateUserProfileDto);
+    const { sub } = req.user; // AuthGuard를 통해 주입된 사용자 정보
+    console.log("updateUserProfile user sub:", sub);
+    const profile = await this.userService.updateUserProfile(
+      sub,
+      updateUserProfileDto
+    );
+    return ApiResponseDto.success("프로필이 성공적으로 업데이트되었습니다.", profile);
   }
 
   @Get("check-nickname")
