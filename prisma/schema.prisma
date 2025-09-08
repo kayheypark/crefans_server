@@ -122,6 +122,29 @@ model Transfer {
   @@map("transfers")
 }
 
+/// 크리에이터 정보
+/// 크리에이터로 전환한 사용자의 정보를 관리
+model Creator {
+  /// 크리에이터 고유 식별자
+  id          Int      @id @default(autoincrement())
+  /// 사용자 ID (Cognito의 userSub)
+  user_id     String   @unique
+  /// 크리에이터명
+  name        String?
+  /// 크리에이터 설명
+  description String?  @db.Text
+  /// 프로필 이미지 URL
+  profile_image_url String?
+  /// 활성 상태
+  is_active   Boolean  @default(true)
+  /// 크리에이터 전환 일시
+  created_at  DateTime @default(now())
+  /// 수정 일시
+  updated_at  DateTime @updatedAt
+
+  @@map("creators")
+}
+
 /// 전송사유타입(초기 데이터인 seed 있음)
 model TransferReason {
   /// 전송사유 고유 식별자
@@ -288,6 +311,12 @@ model Posting {
   is_membership     Boolean        @default(false)
   /// 멤버십 레벨 (멤버십 전용인 경우)
   membership_level  Int?
+  /// 개별 구매 허용 여부
+  allow_individual_purchase Boolean @default(false)
+  /// 개별 구매 가격 (원)
+  individual_purchase_price Decimal? @db.Decimal(10, 0)
+  /// 공개 여부
+  is_public         Boolean        @default(true)
   /// 공개 시작 일시
   publish_start_at  DateTime?
   /// 공개 종료 일시

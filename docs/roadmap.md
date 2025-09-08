@@ -4,9 +4,10 @@
 
 - [x] 회원가입/로그인/로그아웃 (AWS Cognito)
 
-  - AWS Cognito User Pool 설정
-  - SignUp/SignIn/SignOut API 구현
-  - JWT 토큰 관리 및 쿠키 설정
+  - [x] AWS Cognito User Pool 설정
+  - [x] SignUp/SignIn/SignOut API 구현
+  - [x] JWT 토큰 관리 및 쿠키 설정
+  - [x] 커스텀 이메일 전송을 위한 Lambda 함수 구현
 
 - [x] 회원가입시 지갑 생성 (Direct Implementation, Prisma)
 
@@ -23,18 +24,20 @@
   - [x] 인덱스 및 제약조건 설정
   - [x] 마이그레이션 파일 생성
 
-- [ ] AWS 인프라 설정 (S3, MediaConvert, CloudFront)
+- [x] AWS 인프라 설정 (S3, MediaConvert, CloudFront)
 
-  - S3 버킷 생성 및 권한 설정
-  - MediaConvert 작업 템플릿 생성
-  - CloudFront 배포 설정
-  - IAM 역할 및 정책 설정
+  - [x] S3 버킷 생성 및 권한 설정 (storage, processed)
+  - [x] MediaConvert 작업 템플릿 생성
+  - [x] Lambda 트리거 설정 (동영상 처리 자동화)
+  - [x] IAM 역할 및 정책 설정
+  - [ ] CloudFront 배포 설정
 
-- [ ] 기본 API 구조 및 인증 시스템 (NestJS Guards, Interceptors)
-  - AuthGuard 구현 (JWT 검증)
-  - LoggingInterceptor 구현
-  - Global Exception Filter 설정
-  - API 문서화 (Swagger)
+- [x] 기본 API 구조 및 인증 시스템 (NestJS Guards, Interceptors)
+  - [x] AuthGuard 구현 (JWT 검증)
+  - [x] LoggingInterceptor 구현
+  - [x] Global Exception Filter 설정
+  - [x] ApiResponseDto를 사용한 통일된 응답 구조
+  - [ ] API 문서화 (Swagger)
 
 ## Phase 2: 핵심 콘텐츠 (3-4주)
 
@@ -69,16 +72,18 @@
 
 ## Phase 3: 미디어 및 상호작용 (2-3주)
 
-- [ ] 포스팅 미디어 업로드 (AWS S3 Signed URL, MediaConvert, Sharp)
+- [x] 포스팅 미디어 업로드 (AWS S3 Signed URL, MediaConvert, Sharp)
 
   - [x] Media 모델 스키마 정의
   - [x] PostingMedia 관계 모델 정의
-  - [ ] S3 Signed URL 생성 API 구현
-  - [ ] 파일 업로드 완료 웹훅 처리
-  - [ ] 포스트 발행 시 MediaConvert 작업 생성 (동영상 썸네일)
-  - [ ] Sharp 라이브러리로 이미지 리사이징 및 최적화
+  - [x] S3 Signed URL 생성 API 구현
+  - [x] 파일 업로드 완료 웹훅 처리
+  - [x] MediaConvert 작업 자동 생성 (동영상 썸네일 5장)
+  - [x] Sharp 라이브러리로 이미지 리사이징 및 최적화
+  - [x] 화질별 동영상 변환 (1080p, 720p, 480p)
+  - [x] 미디어 업로드 정책 검증 (파일 형식, 크기, 일일 제한)
+  - [x] 미디어 메타데이터 저장
   - [ ] 워터마크 추가 기능 (크리에이터 브랜딩, 콘텐츠 보호)
-  - [ ] 미디어 메타데이터 저장
 
 - [ ] 댓글 시스템 (Prisma Nested Relations, WebSocket)
 
@@ -107,12 +112,16 @@
 
 ## Phase 4: 결제 시스템 (4-5주)
 
-- [ ] 사이트 내 재화 시스템 (콩) (Prisma, Decimal Type)
+- [x] 사이트 내 재화 시스템 (콩) (Prisma, Decimal Type)
 
   - [x] Wallet 모델 스키마 정의 (Decimal 타입)
   - [x] TokenType 모델 스키마 정의
   - [x] Transfer 모델 스키마 정의 (재화 이력)
-  - [ ] 재화 잔액 조회 API
+  - [x] WalletOwnership 모델 스키마 정의
+  - [x] TransferReason 모델 스키마 정의
+  - [x] 재화 잔액 조회 API 구현
+  - [x] 지갑 생성 및 소유권 관리 시스템
+  - [x] UUID 기반 지갑 주소 생성
   - [ ] 잔액 변경 로그 시스템
   - [ ] 재화 사용 내역 조회
 
@@ -271,6 +280,31 @@
 
 ---
 
+## 새로운 아키텍처 변경사항
+
+### 미디어 처리 파이프라인
+- **Lambda 기반 이벤트 드리븐 아키텍처**: S3 업로드 트리거 → Lambda → MediaConvert → 처리 완료 웹훅
+- **이미지 처리**: Sharp 라이브러리로 서버 내 실시간 리사이징
+- **동영상 처리**: MediaConvert로 화질별 변환 및 썸네일 생성
+- **비용 최적화**: 동영상 처리 비용 분석 문서 추가 (`docs/video-processing-cost-analysis.md`)
+
+### 인증 시스템 고도화
+- **커스텀 이메일**: AWS Cognito + Lambda 기반 커스텀 이메일 전송
+- **통일된 응답 구조**: ApiResponseDto를 통한 일관된 API 응답 형식
+- **글로벌 예외 처리**: 전역 예외 필터로 에러 응답 표준화
+
+### 지갑 시스템 구현 완료
+- **직접 지갑 생성**: 큐 시스템 제거 후 회원가입 시 즉시 지갑 생성
+- **소유권 관리**: WalletOwnership 모델로 지갑 소유 이력 관리
+- **트랜잭션 안전성**: 원자적 연산으로 지갑 생성 및 잔액 관리
+
+### 개발 및 배포 환경
+- **CI/CD 파이프라인**: GitHub Actions로 자동 배포
+- **Lambda 함수 관리**: 각 Lambda 함수별 독립적인 배포 스크립트
+- **환경 설정**: .env 기반 환경별 설정 관리
+
+---
+
 ## 주요 기술 스택
 
 ### **Backend**
@@ -280,16 +314,18 @@
 - **Cache**: Redis (예정)
 - **Search**: Elasticsearch (예정)
 - **Real-time**: Socket.io (예정)
-- **File Storage**: AWS S3 (예정)
-- **Media Processing**: AWS MediaConvert (예정)
+- **File Storage**: AWS S3 ✅
+- **Media Processing**: AWS MediaConvert ✅
+- **Image Processing**: Sharp ✅
 - **CDN**: CloudFront (예정)
 
 ### **Infrastructure**
 
 - **Cloud**: AWS
 - **Container**: Docker
-- **CI/CD**: GitHub Actions
+- **CI/CD**: GitHub Actions ✅
 - **Monitoring**: CloudWatch, Sentry
+- **Serverless**: AWS Lambda ✅
 
 ### **External Services**
 
