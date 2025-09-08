@@ -144,12 +144,6 @@ model Creator {
   id          Int      @id @default(autoincrement())
   /// 사용자 ID (Cognito의 userSub)
   user_id     String   @unique
-  /// 크리에이터명
-  name        String?
-  /// 크리에이터 설명
-  description String?  @db.Text
-  /// 프로필 이미지 URL
-  profile_image_url String?
   /// 활성 상태
   is_active   Boolean  @default(true)
   /// 크리에이터 전환 일시

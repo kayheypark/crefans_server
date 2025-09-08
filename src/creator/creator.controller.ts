@@ -10,8 +10,8 @@ export class CreatorController {
   @UseGuards(AuthGuard)
   @Post("onboard")
   async onboardCreator(@Req() req: any): Promise<ApiResponseDto<any>> {
-    const { sub, name } = req.user;
-    const creator = await this.creatorService.onboardCreator(sub, name);
+    const { sub } = req.user;
+    const creator = await this.creatorService.onboardCreator(sub);
     return ApiResponseDto.success(
       "크리에이터로 성공적으로 전환되었습니다.",
       creator

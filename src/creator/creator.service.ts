@@ -5,11 +5,10 @@ import { PrismaService } from "../prisma/prisma.service";
 export class CreatorService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async onboardCreator(user_id: string, name: string) {
+  async onboardCreator(user_id: string) {
     return this.prisma.creator.create({
       data: {
         user_id,
-        name,
         is_active: true,
       },
     });
