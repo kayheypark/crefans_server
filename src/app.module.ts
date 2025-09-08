@@ -6,6 +6,7 @@ import { AuthModule } from "./auth/auth.module";
 import { MediaModule } from "./media/media.module";
 import { WalletModule } from "./wallet/wallet.module";
 import { PostingModule } from "./posting/posting.module";
+import { UserModule } from "./user/user.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { LoggerModule } from "./common/logger/logger.module";
 import awsConfig from "./config/aws.config";
@@ -23,6 +24,7 @@ import appConfig from "./config/app.config";
     MediaModule,
     WalletModule,
     PostingModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],

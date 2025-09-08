@@ -400,4 +400,59 @@ export class AuthService {
       throw error;
     }
   }
+
+  async getUserByHandle(handle: string) {
+    try {
+      this.logger.log(`Getting user by handle: ${handle}`, {
+        service: 'AuthService',
+        method: 'getUserByHandle',
+        handle
+      });
+
+      const result = await this.cognitoService.getUserByHandle(handle);
+
+      this.logger.log(`✅ User found by handle: ${handle}`, {
+        service: 'AuthService',
+        method: 'getUserByHandle',
+        handle
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to get user by handle', error.stack, {
+        service: 'AuthService',
+        method: 'getUserByHandle',
+        handle
+      });
+      return null;
+    }
+  }
+
+  async checkNicknameAvailability(nickname: string): Promise<boolean> {
+    try {
+      this.logger.log(`Checking nickname availability: ${nickname}`, {
+        service: 'AuthService',
+        method: 'checkNicknameAvailability',
+        nickname
+      });
+
+      const result = await this.cognitoService.checkNicknameAvailability(nickname);
+
+      this.logger.log(`✅ Nickname availability checked: ${nickname}`, {
+        service: 'AuthService',
+        method: 'checkNicknameAvailability',
+        nickname,
+        available: result
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to check nickname availability', error.stack, {
+        service: 'AuthService',
+        method: 'checkNicknameAvailability',
+        nickname
+      });
+      return false;
+    }
+  }
 }

@@ -462,6 +462,85 @@ export class CognitoService {
     }
   }
 
+  async getUserByHandle(handle: string) {
+    const handleWithoutAt = handle.replace("@", "");
+    const command = new ListUsersCommand({
+      UserPoolId: this.userPoolId,
+      Filter: `preferred_username = "${handleWithoutAt}"`,
+    });
+
+    try {
+      this.logger.log(`Getting user by handle: ${handleWithoutAt}`, {
+        service: "CognitoService",
+        method: "getUserByHandle",
+        handleWithoutAt,
+      });
+
+      const response = await this.cognitoClient.send(command);
+
+      if (!response.Users || response.Users.length === 0) {
+        this.logger.log(`No user found with handle: ${handleWithoutAt}`, {
+          service: "CognitoService",
+          method: "getUserByHandle",
+          handleWithoutAt,
+        });
+        return null;
+      }
+
+      const user = response.Users[0];
+
+      this.logger.log(`✅ User found by handle: ${handleWithoutAt}`, {
+        service: "CognitoService",
+        method: "getUserByHandle",
+        handleWithoutAt,
+        username: user.Username,
+      });
+
+      return user;
+    } catch (error) {
+      this.logger.error("Failed to get user by handle", error.stack, {
+        service: "CognitoService",
+        method: "getUserByHandle",
+        handleWithoutAt,
+      });
+      return null;
+    }
+  }
+
+  async checkNicknameAvailability(nickname: string): Promise<boolean> {
+    const command = new ListUsersCommand({
+      UserPoolId: this.userPoolId,
+      Filter: `nickname = "${nickname}"`,
+    });
+
+    try {
+      this.logger.log(`Checking nickname availability: ${nickname}`, {
+        service: "CognitoService",
+        method: "checkNicknameAvailability",
+        nickname,
+      });
+
+      const response = await this.cognitoClient.send(command);
+      const available = !response.Users || response.Users.length === 0;
+
+      this.logger.log(`✅ Nickname availability checked: ${nickname}`, {
+        service: "CognitoService",
+        method: "checkNicknameAvailability",
+        nickname,
+        available,
+      });
+
+      return available;
+    } catch (error) {
+      this.logger.error("Failed to check nickname availability", error.stack, {
+        service: "CognitoService",
+        method: "checkNicknameAvailability",
+        nickname,
+      });
+      return false;
+    }
+  }
+
   private handleCognitoError(error: any): {
     message: string;
     code?: string;
