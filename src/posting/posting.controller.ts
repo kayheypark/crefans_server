@@ -20,6 +20,7 @@ import {
   CreatePostingResponse,
 } from './dto/posting.dto';
 import { AuthGuard } from '../common/guards/auth.guard';
+import { CreatorGuard } from '../common/guards/creator.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 type CurrentUserType = {
@@ -34,7 +35,7 @@ export class PostingController {
   constructor(private readonly postingService: PostingService) {}
 
   @Post()
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, CreatorGuard)
   async createPosting(
     @CurrentUser() user: CurrentUserType,
     @Body() createPostingDto: CreatePostingDto,
@@ -56,7 +57,7 @@ export class PostingController {
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, CreatorGuard)
   async updatePosting(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: CurrentUserType,
@@ -66,7 +67,7 @@ export class PostingController {
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, CreatorGuard)
   async deletePosting(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: CurrentUserType,
@@ -75,7 +76,7 @@ export class PostingController {
   }
 
   @Get('my/list')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, CreatorGuard)
   async getMyPostings(
     @CurrentUser() user: CurrentUserType,
     @Query() query: PostingQueryDto,

@@ -66,6 +66,8 @@ export class AuthGuard implements CanActivate {
           ?.Value,
         email: response.UserAttributes?.find((attr) => attr.Name === "email")
           ?.Value,
+        name: response.UserAttributes?.find((attr) => attr.Name === "name")
+          ?.Value,
         username: response.Username,
         accessToken: accessToken, // accessToken 추가
       };

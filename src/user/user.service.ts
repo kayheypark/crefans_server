@@ -166,4 +166,33 @@ export class UserService {
       limit,
     };
   }
+
+  async becomeCreator(user_id: string) {
+    // 이미 크리에이터인지 확인
+    const existingCreator = await this.prisma.creator.findUnique({
+      where: { user_id },
+    });
+
+    if (existingCreator) {
+      throw new Error("이미 크리에이터로 등록되어 있습니다.");
+    }
+
+    // Creator 테이블에 추가
+    const creator = await this.prisma.creator.create({
+      data: {
+        user_id,
+        // 다른 필드들이 있다면 기본값 설정
+      },
+    });
+
+    return creator;
+  }
+
+  async isCreator(user_id: string): Promise<boolean> {
+    const creator = await this.prisma.creator.findUnique({
+      where: { user_id },
+    });
+
+    return !!creator;
+  }
 }

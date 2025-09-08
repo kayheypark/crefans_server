@@ -7,6 +7,7 @@ import {
   Put,
   Req,
   Body,
+  Post,
 } from "@nestjs/common";
 import { UserService } from "./user.service";
 import { ApiResponseDto } from "../common/dto/api-response.dto";
@@ -63,5 +64,25 @@ export class UserController {
       parseInt(limit)
     );
     return ApiResponseDto.success("사용자의 포스트를 성공적으로 가져왔습니다.", posts);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post("become-creator")
+  async becomeCreator(
+    @Req() req: any
+  ): Promise<ApiResponseDto<any>> {
+    const { sub } = req.user;
+    const creator = await this.userService.becomeCreator(sub);
+    return ApiResponseDto.success("크리에이터로 전환되었습니다.", creator);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get("creator-status")
+  async getCreatorStatus(
+    @Req() req: any
+  ): Promise<ApiResponseDto<{ isCreator: boolean }>> {
+    const { sub } = req.user;
+    const isCreator = await this.userService.isCreator(sub);
+    return ApiResponseDto.success("크리에이터 상태를 조회했습니다.", { isCreator });
   }
 }
