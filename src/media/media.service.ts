@@ -425,10 +425,14 @@ export class MediaService {
       throw new BadRequestException('지원하지 않는 파일 형식입니다. (이미지: jpg, png, gif, webp / 동영상: mp4, mov, avi, mkv, webm)');
     }
 
-    // 4K 비디오 업로드 제한 (크레팬스 정책)
+    // 4K 비디오 업로드 제한 (크레팬스 정책) - 세로/가로 모두 지원
     if (isVideo && width && height) {
-      if (width > 1920 || height > 1080) {
-        throw new BadRequestException('동영상 최대 해상도는 1080p(1920x1080)입니다. 4K 업로드는 지원하지 않습니다.');
+      // 가로형(1920x1080) 또는 세로형(1080x1920) 모두 허용, 4K는 제한
+      const maxDimension = Math.max(width, height);
+      const minDimension = Math.min(width, height);
+      
+      if (maxDimension > 1920 || minDimension > 1080) {
+        throw new BadRequestException('동영상 최대 해상도는 1920x1080 또는 1080x1920입니다. 4K 업로드는 지원하지 않습니다.');
       }
     }
 
