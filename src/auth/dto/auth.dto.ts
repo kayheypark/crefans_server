@@ -6,6 +6,8 @@ import {
   MaxLength,
   IsPhoneNumber,
   Matches,
+  IsOptional,
+  IsBoolean,
 } from "class-validator";
 
 export class SignUpDto {
@@ -30,6 +32,10 @@ export class SignUpDto {
   @IsNotEmpty()
   @IsPhoneNumber("KR")
   phoneNumber: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isEarlybird?: boolean;
 }
 
 export class SignInDto {

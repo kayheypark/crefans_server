@@ -537,3 +537,24 @@ enum ProcessingStatus {
 
   @@map("processing_statuses")
 }
+
+/// 얼리버드 회원
+/// 얼리버드로 가입한 사용자들을 관리하여 추후 혜택을 제공
+model Earlybird {
+  /// 고유 식별자
+  id         Int      @id @default(autoincrement())
+  /// 사용자 ID (Cognito의 userSub)
+  user_sub   String   @unique
+  /// 가입 일시
+  joined_at  DateTime @default(now())
+  /// 혜택 지급 여부
+  rewarded   Boolean  @default(false)
+  /// 혜택 지급 일시
+  rewarded_at DateTime?
+  /// 생성 일시
+  created_at DateTime @default(now())
+  /// 수정 일시
+  updated_at DateTime @updatedAt
+
+  @@map("earlybirds")
+}

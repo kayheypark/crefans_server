@@ -11,6 +11,7 @@ import { CreatorModule } from "./creator/creator.module";
 import { MembershipModule } from "./membership/membership.module";
 import { CommentModule } from "./comment/comment.module";
 import { FeedModule } from "./feed/feed.module";
+import { EarlybirdModule } from "./earlybird/earlybird.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { LoggerModule } from "./common/logger/logger.module";
 import awsConfig from "./config/aws.config";
@@ -33,6 +34,7 @@ import appConfig from "./config/app.config";
     MembershipModule,
     CommentModule,
     FeedModule,
+    EarlybirdModule,
   ],
   controllers: [AppController],
   providers: [AppService],

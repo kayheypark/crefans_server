@@ -27,6 +27,7 @@ export class AuthService {
     try {
       this.logger.logAuthEvent("SignUp started", undefined, {
         email: signUpDto.email,
+        isEarlybird: signUpDto.isEarlybird,
       });
 
       // Cognito 회원가입
@@ -36,9 +37,29 @@ export class AuthService {
       // 직접 지갑 생성
       await this.createWallet(cognitoResult.userSub);
 
+      // 얼리버드인 경우 얼리버드 테이블에 저장
+      if (signUpDto.isEarlybird) {
+        try {
+          await this.prisma.earlybird.create({
+            data: {
+              user_sub: cognitoResult.userSub,
+            },
+          });
+          this.logger.log(`✅ Earlybird record created for user: ${cognitoResult.userSub}`);
+        } catch (earlybirdError) {
+          // 중복 가입 등의 경우 에러 처리하지만 회원가입은 계속 진행
+          this.logger.error("Failed to create earlybird record", earlybirdError.stack, {
+            service: "AuthService",
+            method: "signUp",
+            userSub: cognitoResult.userSub,
+          });
+        }
+      }
+
       this.logger.logAuthEvent("SignUp completed", cognitoResult.userSub, {
         email: signUpDto.email,
         userSub: cognitoResult.userSub,
+        isEarlybird: signUpDto.isEarlybird,
       });
 
       return cognitoResult;
@@ -47,6 +68,7 @@ export class AuthService {
         service: "AuthService",
         method: "signUp",
         email: signUpDto.email,
+        isEarlybird: signUpDto.isEarlybird,
       });
 
       if (error.code) {
