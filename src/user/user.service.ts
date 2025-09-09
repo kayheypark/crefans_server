@@ -81,7 +81,7 @@ export class UserService {
     return await this.authService.checkNicknameAvailability(nickname);
   }
 
-  async getUserPosts(handle: string, cursor?: string, limit: number = 20) {
+  async getUserPosts(handle: string, cursor?: string, limit: number = 20, viewerId?: string) {
     const cognitoUser = await this.authService.getUserByHandle(handle);
 
     if (!cognitoUser) {
@@ -146,12 +146,77 @@ export class UserService {
       where: { user_id: userId },
     });
 
-    // 미디어 URL들을 signed URL로 변환
+    // 구독 정보 조회 (viewerId가 있는 경우만)
+    const subscriptions = viewerId ? await this.prisma.subscription.findMany({
+      where: {
+        subscriber_id: viewerId,
+        status: 'ONGOING',
+        membership_item: {
+          creator_id: userId,
+          is_active: true,
+          is_deleted: false,
+        }
+      },
+      include: {
+        membership_item: true
+      }
+    }) : [];
+
+    // 미디어 URL들을 signed URL로 변환하고 접근 권한에 따라 데이터 필터링
     const postsWithSignedUrls = await Promise.all(
       actualPosts.map(async (post) => {
+        // 멤버십 게시물인지 확인
+        const isMembershipPost = post.is_membership;
+        
+        // 접근 권한 확인
+        let hasAccess = true;
+        if (isMembershipPost) {
+          // 작성자 본인인지 확인
+          const isOwner = viewerId === userId;
+          
+          // 구독 중인지 확인
+          const hasSubscription = subscriptions.some(sub => 
+            sub.membership_item.level <= (post.membership_level || 1)
+          );
+          
+          hasAccess = isOwner || hasSubscription;
+        }
+
+        // 접근 권한이 없는 경우 제한된 데이터만 반환
+        if (isMembershipPost && !hasAccess) {
+          return {
+            id: post.id,
+            title: post.title,
+            content: '', // 내용 숨김
+            created_at: post.created_at,
+            is_membership: true,
+            membership_level: post.membership_level,
+            allow_individual_purchase: post.allow_individual_purchase,
+            individual_purchase_price: post.individual_purchase_price ? Number(post.individual_purchase_price) : undefined,
+            media: [], // 미디어 숨김
+            textLength: post.content?.length || 0,
+            imageCount: post.medias?.filter(pm => pm.media.type === 'IMAGE').length || 0,
+            videoCount: post.medias?.filter(pm => pm.media.type === 'VIDEO').length || 0,
+            hasAccess: false, // 접근 권한 없음을 명시
+            creator: {
+              id: creator?.id || 0,
+              handle:
+                cognitoUser.Attributes.find(
+                  (attr) => attr.Name === "preferred_username"
+                )?.Value || handle,
+              name:
+                cognitoUser.Attributes.find((attr) => attr.Name === "nickname")
+                  ?.Value || handle,
+              avatar:
+                cognitoUser.Attributes.find((attr) => attr.Name === "picture")
+                  ?.Value || "/profile-90.png",
+            },
+          };
+        }
+
+        // 접근 권한이 있는 경우 전체 데이터 반환
         const mediaWithSignedUrls = await Promise.all(
           post.medias.map(async (pm) => {
-            // 공개 게시글의 미디어는 signed URL로 변환
             const signedUrl = await this.s3Service.getObjectUrl(
               process.env.S3_UPLOAD_BUCKET,
               pm.media.s3_upload_key
@@ -169,7 +234,15 @@ export class UserService {
           title: post.title,
           content: post.content,
           created_at: post.created_at,
+          is_membership: post.is_membership,
+          membership_level: post.membership_level,
+          allow_individual_purchase: post.allow_individual_purchase,
+          individual_purchase_price: post.individual_purchase_price ? Number(post.individual_purchase_price) : undefined,
           media: mediaWithSignedUrls,
+          textLength: post.content?.length || 0,
+          imageCount: post.medias?.filter(pm => pm.media.type === 'IMAGE').length || 0,
+          videoCount: post.medias?.filter(pm => pm.media.type === 'VIDEO').length || 0,
+          hasAccess: true, // 접근 권한 있음을 명시
           creator: {
             id: creator?.id || 0,
             handle:

@@ -56,12 +56,17 @@ export class UserController {
   async getUserPosts(
     @Param("handle") handle: string,
     @Query("cursor") cursor?: string,
-    @Query("limit") limit: string = "20"
+    @Query("limit") limit: string = "20",
+    @Req() req?: any
   ): Promise<ApiResponseDto<any>> {
+    // 선택적 인증 - 쿠키가 있으면 인증 정보를 사용, 없으면 null
+    const viewerId = req?.user?.sub || null;
+    
     const posts = await this.userService.getUserPosts(
       handle,
       cursor,
-      parseInt(limit)
+      parseInt(limit),
+      viewerId
     );
     return ApiResponseDto.success("사용자의 포스트를 성공적으로 가져왔습니다.", posts);
   }
