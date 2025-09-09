@@ -19,11 +19,14 @@ import { UpdateUserProfileDto } from "./dto/user.dto";
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  @UseGuards(OptionalAuthGuard)
   @Get("profile/:handle")
   async getUserProfileByHandle(
-    @Param("handle") handle: string
+    @Param("handle") handle: string,
+    @Req() req?: any
   ): Promise<ApiResponseDto<any>> {
-    const profile = await this.userService.getUserProfileByHandle(handle);
+    const viewerId = req?.user?.sub || null;
+    const profile = await this.userService.getUserProfileByHandle(handle, viewerId);
     return ApiResponseDto.success("프로필을 성공적으로 가져왔습니다.", profile);
   }
 

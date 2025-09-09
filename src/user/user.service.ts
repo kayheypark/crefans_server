@@ -12,7 +12,7 @@ export class UserService {
     private readonly s3Service: S3Service
   ) {}
 
-  async getUserProfileByHandle(handle: string) {
+  async getUserProfileByHandle(handle: string, viewerId?: string) {
     // Cognito에서 핸들로 사용자 찾기
     const cognitoUser = await this.authService.getUserByHandle(handle);
 
@@ -41,9 +41,29 @@ export class UserService {
     // 미디어 카운트 (향후 구현)
     const mediaCount = 0; // TODO: 실제 미디어 테이블에서 계산
 
-    // 팔로워/팔로잉 수 (향후 구현)
-    const followersCount = 0; // TODO: 팔로우 테이블에서 계산
-    const followingCount = 0; // TODO: 팔로우 테이블에서 계산
+    // 팔로워/팔로잉 수 및 팔로우 상태 계산
+    const [followersCount, followingCount, followStatus] = await Promise.all([
+      this.prisma.userFollow.count({
+        where: {
+          following_id: cognitoUser.Username,
+          deleted_at: null,
+        },
+      }),
+      this.prisma.userFollow.count({
+        where: {
+          follower_id: cognitoUser.Username,
+          deleted_at: null,
+        },
+      }),
+      // 뷰어의 팔로우 상태 확인 (로그인한 경우만)
+      viewerId ? this.prisma.userFollow.findFirst({
+        where: {
+          follower_id: viewerId,
+          following_id: cognitoUser.Username,
+          deleted_at: null,
+        },
+      }) : null,
+    ]);
 
     return {
       id: cognitoUser.Username,
@@ -64,6 +84,8 @@ export class UserService {
       followingCount,
       postsCount,
       mediaCount,
+      userSub: cognitoUser.Username, // 팔로우 API를 위한 userSub 추가
+      isFollowing: !!followStatus, // 뷰어의 팔로우 상태
     };
   }
 

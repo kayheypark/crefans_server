@@ -12,6 +12,7 @@ import { MembershipModule } from "./membership/membership.module";
 import { CommentModule } from "./comment/comment.module";
 import { FeedModule } from "./feed/feed.module";
 import { EarlybirdModule } from "./earlybird/earlybird.module";
+import { FollowModule } from "./follow/follow.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { LoggerModule } from "./common/logger/logger.module";
 import awsConfig from "./config/aws.config";
@@ -35,6 +36,7 @@ import appConfig from "./config/app.config";
     CommentModule,
     FeedModule,
     EarlybirdModule,
+    FollowModule,
   ],
   controllers: [AppController],
   providers: [AppService],
