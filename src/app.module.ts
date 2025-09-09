@@ -10,6 +10,7 @@ import { UserModule } from "./user/user.module";
 import { CreatorModule } from "./creator/creator.module";
 import { MembershipModule } from "./membership/membership.module";
 import { CommentModule } from "./comment/comment.module";
+import { FeedModule } from "./feed/feed.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { LoggerModule } from "./common/logger/logger.module";
 import awsConfig from "./config/aws.config";
@@ -31,6 +32,7 @@ import appConfig from "./config/app.config";
     CreatorModule,
     MembershipModule,
     CommentModule,
+    FeedModule,
   ],
   controllers: [AppController],
   providers: [AppService],
