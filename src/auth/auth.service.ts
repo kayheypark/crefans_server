@@ -442,6 +442,41 @@ export class AuthService {
     }
   }
 
+  async getUserBySub(userSub: string) {
+    try {
+      this.logger.log(`Getting user by sub: ${userSub}`, {
+        service: 'AuthService',
+        method: 'getUserBySub',
+        userSub
+      });
+
+      const result = await this.cognitoService.getUserBySub(userSub);
+
+      if (result) {
+        this.logger.log(`✅ User found by sub: ${userSub}`, {
+          service: 'AuthService',
+          method: 'getUserBySub',
+          userSub
+        });
+      } else {
+        this.logger.log(`❌ No user found by sub: ${userSub}`, {
+          service: 'AuthService',
+          method: 'getUserBySub',
+          userSub
+        });
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to get user by sub', error.stack, {
+        service: 'AuthService',
+        method: 'getUserBySub',
+        userSub
+      });
+      return null;
+    }
+  }
+
   async checkNicknameAvailability(nickname: string): Promise<boolean> {
     try {
       this.logger.log(`Checking nickname availability: ${nickname}`, {

@@ -342,6 +342,8 @@ model Posting {
   is_public         Boolean        @default(true)
   /// 민감한 콘텐츠 여부
   is_sensitive      Boolean        @default(false)
+  /// 댓글 허용 여부
+  allow_comments    Boolean        @default(true)
   /// 공개 시작 일시
   publish_start_at  DateTime?
   /// 공개 종료 일시

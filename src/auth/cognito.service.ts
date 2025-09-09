@@ -11,6 +11,7 @@ import {
   ResendConfirmationCodeCommand,
   AdminDeleteUserCommand,
   AdminUpdateUserAttributesCommand,
+  AdminGetUserCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { LoggerService } from "../common/logger/logger.service";
 import * as crypto from "crypto";
@@ -503,6 +504,31 @@ export class CognitoService {
         service: "CognitoService",
         method: "getUserByHandle",
         handleWithoutAt,
+      });
+      return null;
+    }
+  }
+
+  async getUserBySub(userSub: string) {
+    const command = new AdminGetUserCommand({
+      UserPoolId: this.userPoolId,
+      Username: userSub,
+    });
+
+    try {
+      this.logger.log(`Getting user by sub: ${userSub}`, {
+        service: "CognitoService",
+        method: "getUserBySub",
+        userSub
+      });
+
+      const user = await this.cognitoClient.send(command);
+      return user;
+    } catch (error) {
+      this.logger.error("Failed to get user by sub", error.stack, {
+        service: "CognitoService",
+        method: "getUserBySub",
+        userSub,
       });
       return null;
     }
