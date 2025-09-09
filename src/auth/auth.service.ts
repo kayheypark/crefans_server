@@ -417,11 +417,19 @@ export class AuthService {
 
       const result = await this.cognitoService.getUserByHandle(handle);
 
-      this.logger.log(`✅ User found by handle: ${handle}`, {
-        service: 'AuthService',
-        method: 'getUserByHandle',
-        handle
-      });
+      if (result) {
+        this.logger.log(`✅ User found by handle: ${handle}`, {
+          service: 'AuthService',
+          method: 'getUserByHandle',
+          handle
+        });
+      } else {
+        this.logger.log(`❌ No user found by handle: ${handle}`, {
+          service: 'AuthService',
+          method: 'getUserByHandle',
+          handle
+        });
+      }
 
       return result;
     } catch (error) {

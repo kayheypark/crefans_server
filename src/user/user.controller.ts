@@ -55,12 +55,12 @@ export class UserController {
   @Get("posts/:handle")
   async getUserPosts(
     @Param("handle") handle: string,
-    @Query("page") page: string = "1",
+    @Query("cursor") cursor?: string,
     @Query("limit") limit: string = "20"
   ): Promise<ApiResponseDto<any>> {
     const posts = await this.userService.getUserPosts(
       handle,
-      parseInt(page),
+      cursor,
       parseInt(limit)
     );
     return ApiResponseDto.success("사용자의 포스트를 성공적으로 가져왔습니다.", posts);

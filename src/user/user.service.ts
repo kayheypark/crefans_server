@@ -28,11 +28,11 @@ export class UserService {
       where: { user_id: cognitoUser.Username },
     });
 
-    // 통계 정보 계산
+    // 통계 정보 계산 - 직접 cognitoUser.Username으로 조회
     const postsCount = await this.prisma.posting.count({
       where: {
-        creator_id: creator?.user_id,
-        deleted_at: null,
+        creator_id: cognitoUser.Username,
+        is_deleted: false,
       },
     });
 
@@ -79,76 +79,79 @@ export class UserService {
     return await this.authService.checkNicknameAvailability(nickname);
   }
 
-  async getUserPosts(handle: string, page: number = 1, limit: number = 20) {
+  async getUserPosts(handle: string, cursor?: string, limit: number = 20) {
     const cognitoUser = await this.authService.getUserByHandle(handle);
 
     if (!cognitoUser) {
       return {
         posts: [],
-        total: 0,
-        page,
-        limit,
+        nextCursor: null,
+        hasMore: false,
       };
     }
 
-    const creator = await this.prisma.creator.findUnique({
-      where: { user_id: cognitoUser.Username },
-    });
+    const userId = cognitoUser.Username;
 
-    if (!creator) {
-      return {
-        posts: [],
-        total: 0,
-        page,
-        limit,
+    // Cursor 조건 설정 - Creator 테이블을 거치지 않고 직접 creator_id로 조회
+    const whereCondition: any = {
+      creator_id: userId,
+      is_deleted: false, // deleted_at 대신 is_deleted 사용
+    };
+
+    if (cursor) {
+      whereCondition.created_at = {
+        lt: new Date(cursor),
       };
     }
 
-    const [posts, total] = await Promise.all([
-      this.prisma.posting.findMany({
-        where: {
-          creator_id: creator.user_id,
-          deleted_at: null,
-        },
-        orderBy: { created_at: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          medias: {
-            where: { is_deleted: false },
-            orderBy: { sort_order: "asc" },
-            include: {
-              media: {
-                select: {
-                  id: true,
-                  file_name: true,
-                  original_url: true,
-                  type: true,
-                  processing_status: true,
-                  thumbnail_urls: true,
-                },
+    // limit + 1을 가져와서 다음 페이지가 있는지 확인
+    const posts = await this.prisma.posting.findMany({
+      where: whereCondition,
+      orderBy: { created_at: "desc" },
+      take: limit + 1,
+      include: {
+        medias: {
+          where: { is_deleted: false },
+          orderBy: { sort_order: "asc" },
+          include: {
+            media: {
+              select: {
+                id: true,
+                file_name: true,
+                original_url: true,
+                type: true,
+                processing_status: true,
+                thumbnail_urls: true,
               },
             },
           },
         },
-      }),
-      this.prisma.posting.count({
-        where: {
-          creator_id: creator.user_id,
-          deleted_at: null,
-        },
-      }),
-    ]);
+      },
+    });
+
+    // 다음 페이지가 있는지 확인
+    const hasMore = posts.length > limit;
+    const actualPosts = hasMore ? posts.slice(0, limit) : posts;
+
+    // 다음 cursor 설정 (마지막 포스트의 created_at)
+    const nextCursor = hasMore && actualPosts.length > 0 
+      ? actualPosts[actualPosts.length - 1].created_at.toISOString()
+      : null;
+
+    // Creator 정보 조회 (응답 데이터 구성용)
+    const creator = await this.prisma.creator.findUnique({
+      where: { user_id: userId },
+    });
 
     return {
-      posts: posts.map((post) => ({
+      posts: actualPosts.map((post) => ({
         id: post.id,
         title: post.title,
         content: post.content,
         created_at: post.created_at,
         media: post.medias.map((pm) => pm.media),
         creator: {
-          id: creator.id,
+          id: creator?.id || 0,
           handle:
             cognitoUser.Attributes.find(
               (attr) => attr.Name === "preferred_username"
@@ -161,9 +164,8 @@ export class UserService {
               ?.Value || "/profile-90.png",
         },
       })),
-      total,
-      page,
-      limit,
+      nextCursor,
+      hasMore,
     };
   }
 
