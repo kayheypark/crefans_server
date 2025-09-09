@@ -5,6 +5,7 @@ async function main() {
   // 기본 데이터 생성
   // 재화 전송 사유
   await prisma.transferReason.createMany({
+    skipDuplicates: true,
     data: [
       {
         id: 1,
@@ -45,6 +46,7 @@ async function main() {
 
   // 토큰 타입
   await prisma.tokenType.createMany({
+    skipDuplicates: true,
     data: [
       {
         id: 1,
@@ -57,17 +59,79 @@ async function main() {
   });
 
   // 시스템 지갑 (출발점)
-  await prisma.wallet.create({
-    data: {
-      id: 1,
-      address: "c5fd6ba5-5b21-4c3c-8f13-3f19e5fc9f58",
-      amount: 100000000, //1억개
-      token_type_id: 1,
-    },
+  const existingWallet = await prisma.wallet.findUnique({
+    where: { id: 1 },
+  });
+
+  if (!existingWallet) {
+    await prisma.wallet.create({
+      data: {
+        id: 1,
+        address: "c5fd6ba5-5b21-4c3c-8f13-3f19e5fc9f58",
+        amount: 100000000, //1억개
+        token_type_id: 1,
+      },
+    });
+  }
+
+  // 크리에이터 카테고리 초기 데이터
+  await prisma.creatorCategory.createMany({
+    skipDuplicates: true,
+    data: [
+      {
+        id: 1,
+        name: "ASMR",
+        description: "자율감각 쾌감반응 콘텐츠",
+        color_code: "#9C27B0",
+        icon: "🎧",
+        sort_order: 1,
+      },
+      {
+        id: 2,
+        name: "버튜버",
+        description: "가상 캐릭터 기반 콘텐츠 크리에이터",
+        color_code: "#E91E63",
+        icon: "🎭",
+        sort_order: 2,
+      },
+      {
+        id: 3,
+        name: "먹방",
+        description: "음식 관련 방송 및 콘텐츠",
+        color_code: "#FF5722",
+        icon: "🍽️",
+        sort_order: 3,
+      },
+      {
+        id: 4,
+        name: "운동",
+        description: "피트니스 및 헬스케어 콘텐츠",
+        color_code: "#4CAF50",
+        icon: "💪",
+        sort_order: 4,
+      },
+      {
+        id: 5,
+        name: "게임",
+        description: "게임 플레이 및 리뷰 콘텐츠",
+        color_code: "#2196F3",
+        icon: "🎮",
+        sort_order: 5,
+      },
+      {
+        id: 6,
+        name: "주식",
+        description: "투자 및 경제 관련 콘텐츠",
+        color_code: "#FF9800",
+        icon: "📈",
+        sort_order: 6,
+      },
+    ],
   });
 
   //멤버십 상품 초기 데이터
   await prisma.membershipItem.createMany({
+    skipDuplicates: true,
     data: [
       {
         id: 1,
@@ -83,6 +147,8 @@ async function main() {
       },
     ],
   });
+
+  console.log("All seed data completed successfully!");
 }
 
 main()

@@ -137,6 +137,38 @@ model Transfer {
   @@map("transfers")
 }
 
+/// 크리에이터 카테고리
+/// 크리에이터의 분류를 위한 카테고리 정보 (관리자 페이지에서 관리)
+model CreatorCategory {
+  /// 카테고리 고유 식별자
+  id             Int       @id @default(autoincrement())
+  /// 카테고리 이름
+  name           String    @unique
+  /// 카테고리 설명
+  description    String?   @db.Text
+  /// 카테고리 색상 코드 (예: #FF5722)
+  color_code     String?   @db.VarChar(7)
+  /// 카테고리 이모지/아이콘
+  icon           String?
+  /// 정렬 순서
+  sort_order     Int       @default(0)
+  /// 활성 상태
+  is_active      Boolean   @default(true)
+  /// 삭제 여부
+  is_deleted     Boolean   @default(false)
+  /// 삭제 일시
+  deleted_at     DateTime?
+  /// 생성 일시
+  created_at     DateTime  @default(now())
+  /// 수정 일시
+  updated_at     DateTime  @updatedAt
+  creators       Creator[]
+
+  @@index([sort_order])
+  @@index([is_active])
+  @@map("creator_categories")
+}
+
 /// 크리에이터 정보
 /// 크리에이터로 전환한 사용자의 정보를 관리
 model Creator {
@@ -144,14 +176,18 @@ model Creator {
   id          Int              @id @default(autoincrement())
   /// 사용자 ID (Cognito의 userSub)
   user_id     String           @unique
+  /// 카테고리 ID (선택사항)
+  category_id Int?
   /// 활성 상태
   is_active   Boolean          @default(true)
   /// 크리에이터 전환 일시
   created_at  DateTime         @default(now())
   /// 수정 일시
   updated_at  DateTime         @updatedAt
+  category    CreatorCategory? @relation(fields: [category_id], references: [id])
   // memberships MembershipItem[]
 
+  @@index([category_id])
   @@map("creators")
 }
 
