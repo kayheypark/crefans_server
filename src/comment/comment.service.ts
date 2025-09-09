@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
 import { LoggerService } from '../common/logger/logger.service';
+import { CommentLikeService } from './comment-like.service';
 
 @Injectable()
 export class CommentService {
@@ -10,6 +11,7 @@ export class CommentService {
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
     private readonly logger: LoggerService,
+    private readonly commentLikeService: CommentLikeService,
   ) {}
 
   async createComment(authorId: string, createCommentDto: CreateCommentDto) {
@@ -137,6 +139,18 @@ export class CommentService {
       orderBy: { created_at: 'desc' },
     });
 
+    // 모든 댓글 ID 수집 (부모 댓글 + 자식 댓글)
+    const allCommentIds: number[] = [];
+    comments.forEach(comment => {
+      allCommentIds.push(comment.id);
+      comment.children.forEach(child => {
+        allCommentIds.push(child.id);
+      });
+    });
+
+    // 좋아요 상태 조회
+    const likesStatus = await this.commentLikeService.getCommentLikesStatus(viewerId, allCommentIds);
+
     // 작성자 정보를 추가로 조회하여 포함
     const commentsWithAuthors = await Promise.all(
       comments.map(async (comment) => {
@@ -161,6 +175,8 @@ export class CommentService {
                 handle: taggedUser.UserAttributes?.find(attr => attr.Name === 'preferred_username')?.Value || '',
                 name: taggedUser.UserAttributes?.find(attr => attr.Name === 'nickname')?.Value || '',
               } : null,
+              like_count: likesStatus[child.id]?.likeCount || 0,
+              is_liked: likesStatus[child.id]?.isLiked || false,
             };
           })
         );
@@ -174,6 +190,8 @@ export class CommentService {
             avatar: author.UserAttributes?.find(attr => attr.Name === 'picture')?.Value || '/profile-90.png',
           } : null,
           children: childrenWithAuthors,
+          like_count: likesStatus[comment.id]?.likeCount || 0,
+          is_liked: likesStatus[comment.id]?.isLiked || false,
         };
       })
     );

@@ -409,7 +409,7 @@ model PostingMedia {
 /// 포스팅에 달리는 댓글
 model Comment {
   /// 댓글 고유 식별자
-  id             Int       @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   /// 포스팅 ID
   posting_id     Int
   /// 작성자 ID (Cognito의 userSub)
@@ -417,20 +417,21 @@ model Comment {
   /// 태그된 사용자 ID (Cognito의 userSub)
   tagged_user_id String?
   /// 내용
-  content        String    @db.Text
+  content        String        @db.Text
   /// 부모 댓글 ID (대댓글인 경우)
   parent_id      Int?
   /// 삭제 여부
-  is_deleted     Boolean   @default(false)
+  is_deleted     Boolean       @default(false)
   /// 삭제 일시
   deleted_at     DateTime?
   /// 생성 일시
-  created_at     DateTime  @default(now())
+  created_at     DateTime      @default(now())
   /// 수정 일시
-  updated_at     DateTime  @updatedAt
-  parent         Comment?  @relation("CommentToComment", fields: [parent_id], references: [id])
-  children       Comment[] @relation("CommentToComment")
-  posting        Posting   @relation(fields: [posting_id], references: [id])
+  updated_at     DateTime      @updatedAt
+  parent         Comment?      @relation("CommentToComment", fields: [parent_id], references: [id])
+  children       Comment[]     @relation("CommentToComment")
+  posting        Posting       @relation(fields: [posting_id], references: [id])
+  likes          CommentLike[]
 
   @@index([parent_id], map: "comments_parent_id_fkey")
   @@index([posting_id], map: "comments_posting_id_fkey")
@@ -458,6 +459,29 @@ model PostingLike {
 
   @@unique([posting_id, user_id])
   @@map("posting_likes")
+}
+
+/// 댓글 좋아요
+/// 댓글에 대한 좋아요 정보
+model CommentLike {
+  /// 좋아요 고유 식별자
+  id         Int       @id @default(autoincrement())
+  /// 댓글 ID
+  comment_id Int
+  /// 사용자 ID (Cognito의 userSub)
+  user_id    String
+  /// 삭제 여부
+  is_deleted Boolean   @default(false)
+  /// 삭제 일시
+  deleted_at DateTime?
+  /// 생성 일시
+  created_at DateTime  @default(now())
+  /// 수정 일시
+  updated_at DateTime  @updatedAt
+  comment    Comment   @relation(fields: [comment_id], references: [id])
+
+  @@unique([comment_id, user_id])
+  @@map("comment_likes")
 }
 
 
