@@ -23,6 +23,7 @@ import {
 import { AuthGuard } from '../common/guards/auth.guard';
 import { CreatorGuard } from '../common/guards/creator.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { OptionalAuthGuard } from '../common/guards/optional-auth.guard';
 
 type CurrentUserType = {
   userSub: string;
@@ -45,11 +46,16 @@ export class PostingController {
   }
 
 
+  @UseGuards(OptionalAuthGuard)
   @Get()
-  async getPostings(@Query() query: PostingQueryDto): Promise<PostingListResponse> {
-    return this.postingService.getPostings(query);
+  async getPostings(
+    @Query() query: PostingQueryDto,
+    @CurrentUser() user?: CurrentUserType,
+  ): Promise<PostingListResponse> {
+    return this.postingService.getPostings(query, user?.userSub);
   }
 
+  @UseGuards(OptionalAuthGuard)
   @Get(':id')
   async getPostingById(
     @Param('id', ParseIntPipe) id: number,
@@ -84,6 +90,6 @@ export class PostingController {
     @Query() query: PostingQueryDto,
   ): Promise<PostingListResponse> {
     const queryWithCreator = { ...query, user_sub: user.userSub };
-    return this.postingService.getPostings(queryWithCreator);
+    return this.postingService.getPostings(queryWithCreator, user.userSub);
   }
 }

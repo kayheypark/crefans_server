@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../media/s3.service';
+import { PostingLikeService } from './posting-like.service';
 import {
   CreatePostingDto,
   UpdatePostingDto,
@@ -17,6 +18,7 @@ export class PostingService {
   constructor(
     private prisma: PrismaService,
     private s3Service: S3Service,
+    private postingLikeService: PostingLikeService,
   ) {}
 
   async createPosting(
@@ -92,7 +94,7 @@ export class PostingService {
     };
   }
 
-  async getPostings(queryDto: PostingQueryDto): Promise<PostingListResponse> {
+  async getPostings(queryDto: PostingQueryDto, viewerId?: string): Promise<PostingListResponse> {
     const { page, limit, status, is_membership, user_sub, search } = queryDto;
     const skip = (page - 1) * limit;
 
@@ -151,6 +153,12 @@ export class PostingService {
       }),
     ]);
 
+    // 모든 포스팅 ID 수집
+    const postingIds = postings.map(posting => posting.id);
+
+    // 좋아요 상태 조회
+    const likesStatus = await this.postingLikeService.getPostingLikesStatus(viewerId, postingIds);
+
     const formattedPostings: PostingResponse[] = await Promise.all(
       postings.map(async (posting) => {
         // 미디어 URL들을 새로운 접근 제어 API로 변경
@@ -187,13 +195,14 @@ export class PostingService {
           is_sensitive: posting.is_sensitive,
           total_view_count: posting.total_view_count,
           unique_view_count: posting.unique_view_count,
-          like_count: posting.like_count,
+          like_count: likesStatus[posting.id]?.likeCount || posting.like_count,
           comment_count: posting.comment_count,
           published_at: posting.published_at?.toISOString(),
           archived_at: posting.archived_at?.toISOString(),
           created_at: posting.created_at.toISOString(),
           updated_at: posting.updated_at.toISOString(),
           medias: mediasWithUrls,
+          is_liked: likesStatus[posting.id]?.isLiked || false,
         };
       })
     );
@@ -247,6 +256,9 @@ export class PostingService {
       await this.incrementViewCount(id, viewerId);
     }
 
+    // 좋아요 상태 조회
+    const likesStatus = await this.postingLikeService.getPostingLikesStatus(viewerId, [id]);
+
     // 미디어 URL들을 새로운 접근 제어 API로 변경
     const mediasWithUrls = await Promise.all(
       posting.medias.map(async (pm) => {
@@ -281,13 +293,14 @@ export class PostingService {
       is_sensitive: posting.is_sensitive,
       total_view_count: posting.total_view_count,
       unique_view_count: posting.unique_view_count,
-      like_count: posting.like_count,
+      like_count: likesStatus[id]?.likeCount || posting.like_count,
       comment_count: posting.comment_count,
       published_at: posting.published_at?.toISOString(),
       archived_at: posting.archived_at?.toISOString(),
       created_at: posting.created_at.toISOString(),
       updated_at: posting.updated_at.toISOString(),
       medias: mediasWithUrls,
+      is_liked: likesStatus[id]?.isLiked || false,
     };
 
     return {

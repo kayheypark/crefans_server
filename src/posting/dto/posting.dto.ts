@@ -175,6 +175,7 @@ export interface PostingResponse {
   created_at: string;
   updated_at: string;
   medias: MediaResponse[];
+  is_liked: boolean;
 }
 
 export interface PostingListResponse {

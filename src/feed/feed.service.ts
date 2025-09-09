@@ -172,10 +172,12 @@ export class FeedService {
         this.logger.error('Failed to fetch user information', error);
       }
 
-      // 사용자별 멤버십 상태 확인 및 데이터 변환
+      // 사용자별 멤버십 상태 및 좋아요 상태 확인 및 데이터 변환
       const postsWithMembership = await Promise.all(
         postings.map(async (post) => {
           let isGotMembership = false;
+          let isLiked = false;
+          let likeCount = 0;
           
           // 로그인 사용자의 멤버십 상태 확인
           if (userId && post.is_membership) {
@@ -206,6 +208,42 @@ export class FeedService {
           }
           // 비로그인 사용자가 멤버십 포스트에 접근 시 isGotMembership = false (기본값)
 
+          // 좋아요 상태 확인
+          try {
+            // 총 좋아요 수 조회
+            likeCount = await this.prisma.postingLike.count({
+              where: {
+                posting_id: post.id,
+                is_deleted: false
+              }
+            });
+
+            // 현재 사용자의 좋아요 상태 확인 (로그인한 경우만)
+            if (userId) {
+              const userLike = await this.prisma.postingLike.findUnique({
+                where: {
+                  posting_id_user_id: {
+                    posting_id: post.id,
+                    user_id: userId
+                  },
+                  is_deleted: false
+                }
+              });
+              isLiked = !!userLike;
+            }
+          } catch (error) {
+            this.logger.warn('Failed to check like status', {
+              service: 'FeedService',
+              method: 'getFeed',
+              postId: post.id,
+              userId: userId || null,
+              error: error.message
+            });
+            // 좋아요 상태 확인 실패시 기본값 유지
+            likeCount = 0;
+            isLiked = false;
+          }
+
           // 이미지 URL 생성
           const images = post.medias
             .filter(media => media.media.type === 'IMAGE')
@@ -235,6 +273,8 @@ export class FeedService {
             imageCount: images.length,
             videoCount: post.medias.filter(media => media.media.type === 'VIDEO').length,
             commentCount: post.comments.length,
+            likeCount,
+            isLiked,
             creator: {
               id: post.user_sub,
               handle: creator.preferred_username || creator.nickname || `user_${post.user_sub.slice(-8)}`,
@@ -424,13 +464,36 @@ export class FeedService {
         this.logger.error('Failed to fetch user information in getPublicFeed', error);
       }
 
-      const transformedPosts = postings.map(post => {
+      const transformedPosts = await Promise.all(postings.map(async (post) => {
         const images = post.medias
           .filter(media => media.media.type === 'IMAGE')
           .map(media => ({
             url: this.generateMediaUrl(media.media.s3_upload_key, media.is_free_preview),
             isPublic: media.is_free_preview || false,
           }));
+
+        // 좋아요 상태 확인 (public feed는 userId가 없으므로 항상 false)
+        let likeCount = 0;
+        const isLiked = false; // 공개 피드는 비로그인 사용자도 볼 수 있으므로 항상 false
+
+        try {
+          // 총 좋아요 수만 조회
+          likeCount = await this.prisma.postingLike.count({
+            where: {
+              posting_id: post.id,
+              is_deleted: false
+            }
+          });
+        } catch (error) {
+          this.logger.warn('Failed to check like count in public feed', {
+            service: 'FeedService',
+            method: 'getPublicFeed',
+            postId: post.id,
+            error: error.message
+          });
+          // 좋아요 수 확인 실패시 기본값 유지
+          likeCount = 0;
+        }
 
         // 실제 사용자 정보 가져오기
         const creator = usersMap.get(post.user_sub) || {
@@ -453,6 +516,8 @@ export class FeedService {
           imageCount: images.length,
           videoCount: post.medias.filter(media => media.media.type === 'VIDEO').length,
           commentCount: post.comments.length,
+          likeCount,
+          isLiked,
           creator: {
             id: post.user_sub,
             handle: creator.preferred_username || creator.nickname || `user_${post.user_sub.slice(-8)}`,
@@ -460,7 +525,7 @@ export class FeedService {
             avatar: creator.avatar_url || '/profile-90.png',
           }
         };
-      });
+      }));
 
       const totalCount = await this.prisma.posting.count({
         where: { is_membership: false, status: 'PUBLISHED', is_deleted: false }
