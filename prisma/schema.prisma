@@ -309,7 +309,7 @@ model Posting {
   /// 포스팅 고유 식별자
   id                Int            @id @default(autoincrement())
   /// 크리에이터 ID (Cognito의 userSub)
-  creator_id        String
+  user_sub          String
   /// 제목
   title             String
   /// 내용

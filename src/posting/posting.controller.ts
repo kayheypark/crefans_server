@@ -83,7 +83,7 @@ export class PostingController {
     @CurrentUser() user: CurrentUserType,
     @Query() query: PostingQueryDto,
   ): Promise<PostingListResponse> {
-    const queryWithCreator = { ...query, creator_id: user.userSub };
+    const queryWithCreator = { ...query, user_sub: user.userSub };
     return this.postingService.getPostings(queryWithCreator);
   }
 }

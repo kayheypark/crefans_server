@@ -135,7 +135,7 @@ export class PostingQueryDto {
 
   @IsOptional()
   @IsString()
-  creator_id?: string;
+  user_sub?: string;
 
   @IsOptional()
   @IsString()
@@ -154,7 +154,7 @@ export interface MediaResponse {
 
 export interface PostingResponse {
   id: number;
-  creator_id: string;
+  user_sub: string;
   title: string;
   content: string;
   status: PostingStatus;

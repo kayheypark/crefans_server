@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { S3Service } from '../media/s3.service';
 import {
   CreatePostingDto,
   UpdatePostingDto,
@@ -13,7 +14,10 @@ import {
 
 @Injectable()
 export class PostingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private s3Service: S3Service,
+  ) {}
 
   async createPosting(
     userId: string,
@@ -45,7 +49,7 @@ export class PostingService {
     const posting = await this.prisma.posting.create({
       data: {
         ...postingData,
-        creator_id: userId,
+        user_sub: userId,
         published_at: publishedAt,
       },
     });
@@ -89,7 +93,7 @@ export class PostingService {
   }
 
   async getPostings(queryDto: PostingQueryDto): Promise<PostingListResponse> {
-    const { page, limit, status, is_membership, creator_id, search } = queryDto;
+    const { page, limit, status, is_membership, user_sub, search } = queryDto;
     const skip = (page - 1) * limit;
 
     const whereCondition: any = {
@@ -104,8 +108,8 @@ export class PostingService {
       whereCondition.is_membership = is_membership;
     }
 
-    if (creator_id) {
-      whereCondition.creator_id = creator_id;
+    if (user_sub) {
+      whereCondition.user_sub = user_sub;
     }
 
     if (search) {
@@ -122,7 +126,18 @@ export class PostingService {
           medias: {
             where: { is_deleted: false },
             include: {
-              media: true,
+              media: {
+                select: {
+                  id: true,
+                  type: true,
+                  original_name: true,
+                  original_url: true,
+                  s3_upload_key: true,
+                  processed_urls: true,
+                  thumbnail_urls: true,
+                  processing_status: true,
+                },
+              },
             },
             orderBy: { sort_order: 'asc' },
           },
@@ -136,38 +151,57 @@ export class PostingService {
       }),
     ]);
 
-    const formattedPostings: PostingResponse[] = postings.map((posting) => ({
-      id: posting.id,
-      creator_id: posting.creator_id,
-      title: posting.title,
-      content: posting.content,
-      status: posting.status as PostingStatus,
-      is_membership: posting.is_membership,
-      membership_level: posting.membership_level,
-      publish_start_at: posting.publish_start_at?.toISOString(),
-      publish_end_at: posting.publish_end_at?.toISOString(),
-      allow_individual_purchase: posting.allow_individual_purchase,
-      individual_purchase_price: posting.individual_purchase_price ? Number(posting.individual_purchase_price) : undefined,
-      is_public: posting.is_public,
-      is_sensitive: posting.is_sensitive,
-      total_view_count: posting.total_view_count,
-      unique_view_count: posting.unique_view_count,
-      like_count: posting.like_count,
-      comment_count: posting.comment_count,
-      published_at: posting.published_at?.toISOString(),
-      archived_at: posting.archived_at?.toISOString(),
-      created_at: posting.created_at.toISOString(),
-      updated_at: posting.updated_at.toISOString(),
-      medias: posting.medias.map((pm) => ({
-        id: pm.media.id,
-        type: pm.media.type,
-        original_name: pm.media.original_name,
-        original_url: pm.media.original_url,
-        processed_urls: pm.media.processed_urls,
-        thumbnail_urls: pm.media.thumbnail_urls,
-        processing_status: pm.media.processing_status,
-      })),
-    }));
+    const formattedPostings: PostingResponse[] = await Promise.all(
+      postings.map(async (posting) => {
+        // 미디어 URL들을 동적으로 생성
+        const mediasWithUrls = await Promise.all(
+          posting.medias.map(async (pm) => {
+            const signedUrl = await this.generateMediaUrl(
+              pm.media.original_url,
+              pm.media.s3_upload_key,
+              posting.is_public,
+              posting.is_membership,
+              true // 현재는 모든 공개 게시글의 미디어를 접근 가능하게 설정
+            );
+
+            return {
+              id: pm.media.id,
+              type: pm.media.type,
+              original_name: pm.media.original_name,
+              original_url: signedUrl,
+              processed_urls: pm.media.processed_urls,
+              thumbnail_urls: pm.media.thumbnail_urls,
+              processing_status: pm.media.processing_status,
+            };
+          })
+        );
+
+        return {
+          id: posting.id,
+          user_sub: posting.user_sub,
+          title: posting.title,
+          content: posting.content,
+          status: posting.status as PostingStatus,
+          is_membership: posting.is_membership,
+          membership_level: posting.membership_level,
+          publish_start_at: posting.publish_start_at?.toISOString(),
+          publish_end_at: posting.publish_end_at?.toISOString(),
+          allow_individual_purchase: posting.allow_individual_purchase,
+          individual_purchase_price: posting.individual_purchase_price ? Number(posting.individual_purchase_price) : undefined,
+          is_public: posting.is_public,
+          is_sensitive: posting.is_sensitive,
+          total_view_count: posting.total_view_count,
+          unique_view_count: posting.unique_view_count,
+          like_count: posting.like_count,
+          comment_count: posting.comment_count,
+          published_at: posting.published_at?.toISOString(),
+          archived_at: posting.archived_at?.toISOString(),
+          created_at: posting.created_at.toISOString(),
+          updated_at: posting.updated_at.toISOString(),
+          medias: mediasWithUrls,
+        };
+      })
+    );
 
     return {
       success: true,
@@ -191,7 +225,18 @@ export class PostingService {
         medias: {
           where: { is_deleted: false },
           include: {
-            media: true,
+            media: {
+              select: {
+                id: true,
+                type: true,
+                original_name: true,
+                original_url: true,
+                s3_upload_key: true,
+                processed_urls: true,
+                thumbnail_urls: true,
+                processing_status: true,
+              },
+            },
           },
           orderBy: { sort_order: 'asc' },
         },
@@ -203,13 +248,36 @@ export class PostingService {
     }
 
     // 조회수 증가 (viewerId가 있고, 작성자가 아닌 경우)
-    if (viewerId && viewerId !== posting.creator_id) {
+    if (viewerId && viewerId !== posting.user_sub) {
       await this.incrementViewCount(id, viewerId);
     }
 
+    // 미디어 URL들을 동적으로 생성
+    const mediasWithUrls = await Promise.all(
+      posting.medias.map(async (pm) => {
+        const signedUrl = await this.generateMediaUrl(
+          pm.media.original_url,
+          pm.media.s3_upload_key,
+          posting.is_public,
+          posting.is_membership,
+          true // 현재는 모든 공개 게시글의 미디어를 접근 가능하게 설정
+        );
+
+        return {
+          id: pm.media.id,
+          type: pm.media.type,
+          original_name: pm.media.original_name,
+          original_url: signedUrl,
+          processed_urls: pm.media.processed_urls,
+          thumbnail_urls: pm.media.thumbnail_urls,
+          processing_status: pm.media.processing_status,
+        };
+      })
+    );
+
     const formattedPosting: PostingResponse = {
       id: posting.id,
-      creator_id: posting.creator_id,
+      user_sub: posting.user_sub,
       title: posting.title,
       content: posting.content,
       status: posting.status as PostingStatus,
@@ -229,15 +297,7 @@ export class PostingService {
       archived_at: posting.archived_at?.toISOString(),
       created_at: posting.created_at.toISOString(),
       updated_at: posting.updated_at.toISOString(),
-      medias: posting.medias.map((pm) => ({
-        id: pm.media.id,
-        type: pm.media.type,
-        original_name: pm.media.original_name,
-        original_url: pm.media.original_url,
-        processed_urls: pm.media.processed_urls,
-        thumbnail_urls: pm.media.thumbnail_urls,
-        processing_status: pm.media.processing_status,
-      })),
+      medias: mediasWithUrls,
     };
 
     return {
@@ -254,7 +314,7 @@ export class PostingService {
     const existingPosting = await this.prisma.posting.findFirst({
       where: {
         id,
-        creator_id: userId,
+        user_sub: userId,
         is_deleted: false,
       },
     });
@@ -346,7 +406,7 @@ export class PostingService {
     const existingPosting = await this.prisma.posting.findFirst({
       where: {
         id,
-        creator_id: userId,
+        user_sub: userId,
         is_deleted: false,
       },
     });
@@ -432,5 +492,27 @@ export class PostingService {
         throw new ForbiddenException('크리에이터 전용 기능입니다. 크리에이터로 전환 후 이용해주세요.');
       }
     }
+  }
+
+  // 미디어 URL을 공개/비공개에 따라 적절히 생성
+  private async generateMediaUrl(
+    originalUrl: string,
+    s3Key: string,
+    isPublic: boolean,
+    isMembershipPosting: boolean,
+    hasAccess: boolean
+  ): Promise<string> {
+    // 공개 게시글이거나 멤버십 게시글이지만 접근 권한이 있는 경우
+    if (isPublic || (isMembershipPosting && hasAccess)) {
+      // S3 signed URL 생성 (7일간 유효)
+      return await this.s3Service.getObjectUrl(
+        process.env.S3_UPLOAD_BUCKET,
+        s3Key
+      );
+    }
+    
+    // 권한이 없는 경우 썸네일이나 블러 처리된 URL 반환
+    // 현재는 기존 URL 그대로 반환 (추후 썸네일 로직 구현)
+    return originalUrl;
   }
 }

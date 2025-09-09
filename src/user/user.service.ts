@@ -1,13 +1,15 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "../auth/auth.service";
+import { S3Service } from "../media/s3.service";
 import { UpdateUserProfileDto } from "./dto/user.dto";
 
 @Injectable()
 export class UserService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
+    private readonly s3Service: S3Service,
   ) {}
 
   async getUserProfileByHandle(handle: string) {
@@ -31,7 +33,7 @@ export class UserService {
     // 통계 정보 계산 - 직접 cognitoUser.Username으로 조회
     const postsCount = await this.prisma.posting.count({
       where: {
-        creator_id: cognitoUser.Username,
+        user_sub: cognitoUser.Username,
         is_deleted: false,
       },
     });
@@ -92,9 +94,9 @@ export class UserService {
 
     const userId = cognitoUser.Username;
 
-    // Cursor 조건 설정 - Creator 테이블을 거치지 않고 직접 creator_id로 조회
+    // Cursor 조건 설정 - Creator 테이블을 거치지 않고 직접 user_sub으로 조회
     const whereCondition: any = {
-      creator_id: userId,
+      user_sub: userId,
       is_deleted: false, // deleted_at 대신 is_deleted 사용
     };
 
@@ -119,6 +121,7 @@ export class UserService {
                 id: true,
                 file_name: true,
                 original_url: true,
+                s3_upload_key: true,
                 type: true,
                 processing_status: true,
                 thumbnail_urls: true,
@@ -143,27 +146,49 @@ export class UserService {
       where: { user_id: userId },
     });
 
+    // 미디어 URL들을 signed URL로 변환
+    const postsWithSignedUrls = await Promise.all(
+      actualPosts.map(async (post) => {
+        const mediaWithSignedUrls = await Promise.all(
+          post.medias.map(async (pm) => {
+            // 공개 게시글의 미디어는 signed URL로 변환
+            const signedUrl = await this.s3Service.getObjectUrl(
+              process.env.S3_UPLOAD_BUCKET,
+              pm.media.s3_upload_key
+            );
+
+            return {
+              ...pm.media,
+              original_url: signedUrl,
+            };
+          })
+        );
+
+        return {
+          id: post.id,
+          title: post.title,
+          content: post.content,
+          created_at: post.created_at,
+          media: mediaWithSignedUrls,
+          creator: {
+            id: creator?.id || 0,
+            handle:
+              cognitoUser.Attributes.find(
+                (attr) => attr.Name === "preferred_username"
+              )?.Value || handle,
+            name:
+              cognitoUser.Attributes.find((attr) => attr.Name === "nickname")
+                ?.Value || handle,
+            avatar:
+              cognitoUser.Attributes.find((attr) => attr.Name === "picture")
+                ?.Value || "/profile-90.png",
+          },
+        };
+      })
+    );
+
     return {
-      posts: actualPosts.map((post) => ({
-        id: post.id,
-        title: post.title,
-        content: post.content,
-        created_at: post.created_at,
-        media: post.medias.map((pm) => pm.media),
-        creator: {
-          id: creator?.id || 0,
-          handle:
-            cognitoUser.Attributes.find(
-              (attr) => attr.Name === "preferred_username"
-            )?.Value || handle,
-          name:
-            cognitoUser.Attributes.find((attr) => attr.Name === "nickname")
-              ?.Value || handle,
-          avatar:
-            cognitoUser.Attributes.find((attr) => attr.Name === "picture")
-              ?.Value || "/profile-90.png",
-        },
-      })),
+      posts: postsWithSignedUrls,
       nextCursor,
       hasMore,
     };
