@@ -141,15 +141,16 @@ model Transfer {
 /// 크리에이터로 전환한 사용자의 정보를 관리
 model Creator {
   /// 크리에이터 고유 식별자
-  id          Int      @id @default(autoincrement())
+  id          Int              @id @default(autoincrement())
   /// 사용자 ID (Cognito의 userSub)
-  user_id     String   @unique
+  user_id     String           @unique
   /// 활성 상태
-  is_active   Boolean  @default(true)
+  is_active   Boolean          @default(true)
   /// 크리에이터 전환 일시
-  created_at  DateTime @default(now())
+  created_at  DateTime         @default(now())
   /// 수정 일시
-  updated_at  DateTime @updatedAt
+  updated_at  DateTime         @updatedAt
+  // memberships MembershipItem[]
 
   @@map("creators")
 }
@@ -174,29 +175,42 @@ model TransferReason {
 /// 크리에이터가 판매하는 멤버십 상품 정보를 관리
 model MembershipItem {
   /// 멤버십 상품 고유 식별자
-  id             Int            @id @default(autoincrement())
+  id             Int                @id @default(autoincrement())
   /// 멤버십 상품 이름
   name           String
+  /// 멤버십 설명
+  description    String?            @db.Text
+  /// 멤버십 혜택 (콤마로 구분된 문자열)
+  benefits       String             @db.Text
   /// 멤버십 레벨 (차등 열람을 위한 등급)
-  level          Int            @default(1)
+  level          Int                @default(1)
   /// 크리에이터 ID (Cognito의 userSub)
   creator_id     String
   /// 가격 (KRW 기준)
-  price          Decimal        @db.Decimal(18, 4)
+  price          Decimal            @db.Decimal(18, 4)
   /// 반복 결제 단위
   billing_unit   PeriodUnit
   /// 반복 결제 주기 상수 (예: 1개월, 3개월, 1년)
-  billing_period Int            @default(1)
+  billing_period Int                @default(1)
   /// 무료 체험 기간 단위
-  trial_unit     PeriodUnit
+  trial_unit     PeriodUnit         @default(DAY)
   /// 무료 체험 기간 상수 (예: 7일, 1개월)
-  trial_period   Int?           @default(0)
+  trial_period   Int?               @default(0)
+  /// 활성 상태
+  is_active      Boolean            @default(true)
+  /// 삭제 여부
+  is_deleted     Boolean            @default(false)
+  /// 삭제 일시
+  deleted_at     DateTime?
   /// 생성 일시
-  created_at     DateTime       @default(now())
+  created_at     DateTime           @default(now())
   /// 수정 일시
-  updated_at     DateTime       @updatedAt
+  updated_at     DateTime           @updatedAt
   subscriptions  Subscription[]
+  // creator        Creator            @relation(fields: [creator_id], references: [user_id])
 
+  @@index([creator_id], map: "membership_items_creator_id_idx")
+  @@index([creator_id, level], map: "membership_items_creator_level_idx")
   @@map("membership_items")
 }
 

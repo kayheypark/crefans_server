@@ -7,6 +7,8 @@ import { MediaModule } from "./media/media.module";
 import { WalletModule } from "./wallet/wallet.module";
 import { PostingModule } from "./posting/posting.module";
 import { UserModule } from "./user/user.module";
+import { CreatorModule } from "./creator/creator.module";
+import { MembershipModule } from "./membership/membership.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { LoggerModule } from "./common/logger/logger.module";
 import awsConfig from "./config/aws.config";
@@ -25,6 +27,8 @@ import appConfig from "./config/app.config";
     WalletModule,
     PostingModule,
     UserModule,
+    CreatorModule,
+    MembershipModule,
   ],
   controllers: [AppController],
   providers: [AppService],

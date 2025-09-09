@@ -74,6 +74,24 @@ export class S3Service {
     }
   }
 
+  async getSignedUrl(key: string, expiresIn: number): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.uploadBucket,
+      Key: key,
+    });
+
+    try {
+      const url = await getSignedUrl(this.s3Client, command, {
+        expiresIn: expiresIn,
+      });
+
+      return url;
+    } catch (error) {
+      this.logger.error(`Failed to generate signed URL: ${key}`, error.stack);
+      throw new Error('Failed to generate signed URL');
+    }
+  }
+
   getPublicUrl(bucket: string, key: string): string {
     return `https://${bucket}.s3.${this.configService.get('AWS_REGION')}.amazonaws.com/${key}`;
   }

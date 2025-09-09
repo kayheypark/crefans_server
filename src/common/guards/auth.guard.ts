@@ -30,12 +30,24 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const accessToken = request.cookies?.access_token;
+    
+    // 1. 쿠키에서 토큰 확인 (우선 방식)
+    let accessToken = request.cookies?.access_token;
+    
+    // 2. Authorization 헤더에서 토큰 확인 (Bearer token)
+    if (!accessToken) {
+      accessToken = this.extractTokenFromHeader(request);
+    }
 
     if (!accessToken) {
-      this.logger.warn("Access token not found in cookies", {
+      this.logger.warn("Access token not found in header or cookies", {
         service: "AuthGuard",
         method: "canActivate",
+        hasAuthHeader: !!request.headers.authorization,
+        authHeaderValue: request.headers.authorization?.substring(0, 30) + "...",
+        hasCookie: !!request.cookies?.access_token,
+        cookieValue: request.cookies?.access_token?.substring(0, 30) + "...",
+        allHeaders: Object.keys(request.headers),
       });
       throw new UnauthorizedException("인증 토큰이 없습니다.");
     }
@@ -51,6 +63,26 @@ export class AuthGuard implements CanActivate {
       });
       throw new UnauthorizedException("유효하지 않은 토큰입니다.");
     }
+  }
+
+  private extractTokenFromHeader(request: any): string | null {
+    const authorization = request.headers.authorization;
+    if (!authorization) {
+      return null;
+    }
+
+    // Bearer token 형식 확인
+    const parts = authorization.split(' ');
+    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+      this.logger.warn("Invalid authorization header format", {
+        service: "AuthGuard",
+        method: "extractTokenFromHeader",
+        authorization: authorization.substring(0, 20) + "...", // 보안상 일부만 로그
+      });
+      return null;
+    }
+
+    return parts[1];
   }
 
   private async validateToken(accessToken: string) {

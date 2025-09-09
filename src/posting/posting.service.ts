@@ -153,22 +153,17 @@ export class PostingService {
 
     const formattedPostings: PostingResponse[] = await Promise.all(
       postings.map(async (posting) => {
-        // 미디어 URL들을 동적으로 생성
+        // 미디어 URL들을 새로운 접근 제어 API로 변경
         const mediasWithUrls = await Promise.all(
           posting.medias.map(async (pm) => {
-            const signedUrl = await this.generateMediaUrl(
-              pm.media.original_url,
-              pm.media.s3_upload_key,
-              posting.is_public,
-              posting.is_membership,
-              true // 현재는 모든 공개 게시글의 미디어를 접근 가능하게 설정
-            );
+            // 새로운 미디어 접근 API URL 사용
+            const accessUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/access/${pm.media.id}`;
 
             return {
               id: pm.media.id,
               type: pm.media.type,
               original_name: pm.media.original_name,
-              original_url: signedUrl,
+              original_url: accessUrl,
               processed_urls: pm.media.processed_urls,
               thumbnail_urls: pm.media.thumbnail_urls,
               processing_status: pm.media.processing_status,
@@ -252,22 +247,17 @@ export class PostingService {
       await this.incrementViewCount(id, viewerId);
     }
 
-    // 미디어 URL들을 동적으로 생성
+    // 미디어 URL들을 새로운 접근 제어 API로 변경
     const mediasWithUrls = await Promise.all(
       posting.medias.map(async (pm) => {
-        const signedUrl = await this.generateMediaUrl(
-          pm.media.original_url,
-          pm.media.s3_upload_key,
-          posting.is_public,
-          posting.is_membership,
-          true // 현재는 모든 공개 게시글의 미디어를 접근 가능하게 설정
-        );
+        // 새로운 미디어 접근 API URL 사용
+        const accessUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/access/${pm.media.id}`;
 
         return {
           id: pm.media.id,
           type: pm.media.type,
           original_name: pm.media.original_name,
-          original_url: signedUrl,
+          original_url: accessUrl,
           processed_urls: pm.media.processed_urls,
           thumbnail_urls: pm.media.thumbnail_urls,
           processing_status: pm.media.processing_status,

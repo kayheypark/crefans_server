@@ -72,6 +72,7 @@ async function main() {
       {
         id: 1,
         name: "멤버십 1",
+        benefits: "월 1회 전용 콘텐츠 제공,우선 댓글 답변,전용 커뮤니티 접근",
         price: 10000,
         level: 1,
         creator_id: "502f09cb-9aed-4d16-93e6-b1dc35e98089",
