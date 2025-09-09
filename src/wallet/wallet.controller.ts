@@ -19,12 +19,4 @@ export class WalletController {
     return this.walletService.getUserWallet(user.userSub);
   }
 
-  // 테스트용 엔드포인트 (인증 없음)
-  @Get("test")
-  async getTestWallet(): Promise<GetUserWalletResponse> {
-    // 테스트용으로 하드코딩된 userSub 사용
-    return this.walletService.getUserWallet(
-      "44a8ed1c-9021-709d-b3f7-dacec1fd90b5"
-    );
-  }
 }

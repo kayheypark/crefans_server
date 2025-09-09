@@ -7,11 +7,9 @@ import { MediaModule } from "./media/media.module";
 import { WalletModule } from "./wallet/wallet.module";
 import { PostingModule } from "./posting/posting.module";
 import { UserModule } from "./user/user.module";
-import { CreatorModule } from "./creator/creator.module";
 import { MembershipModule } from "./membership/membership.module";
 import { CommentModule } from "./comment/comment.module";
 import { FeedModule } from "./feed/feed.module";
-import { EarlybirdModule } from "./earlybird/earlybird.module";
 import { FollowModule } from "./follow/follow.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { LoggerModule } from "./common/logger/logger.module";
@@ -31,11 +29,9 @@ import appConfig from "./config/app.config";
     WalletModule,
     PostingModule,
     UserModule,
-    CreatorModule,
     MembershipModule,
     CommentModule,
     FeedModule,
-    EarlybirdModule,
     FollowModule,
   ],
   controllers: [AppController],
