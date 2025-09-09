@@ -12,6 +12,7 @@ import {
 import { UserService } from "./user.service";
 import { ApiResponseDto } from "../common/dto/api-response.dto";
 import { AuthGuard } from "../common/guards/auth.guard";
+import { OptionalAuthGuard } from "../common/guards/optional-auth.guard";
 import { UpdateUserProfileDto } from "./dto/user.dto";
 
 @Controller("user")
@@ -39,19 +40,25 @@ export class UserController {
       sub,
       updateUserProfileDto
     );
-    return ApiResponseDto.success("프로필이 성공적으로 업데이트되었습니다.", profile);
+    return ApiResponseDto.success(
+      "프로필이 성공적으로 업데이트되었습니다.",
+      profile
+    );
   }
 
   @Get("check-nickname")
   async checkNickname(
     @Query("nickname") nickname: string
   ): Promise<ApiResponseDto<{ available: boolean }>> {
-    const available = await this.userService.checkNicknameAvailability(nickname);
+    const available = await this.userService.checkNicknameAvailability(
+      nickname
+    );
     return ApiResponseDto.success("닉네임 중복 확인이 완료되었습니다.", {
       available,
     });
   }
 
+  @UseGuards(OptionalAuthGuard)
   @Get("posts/:handle")
   async getUserPosts(
     @Param("handle") handle: string,
@@ -59,23 +66,25 @@ export class UserController {
     @Query("limit") limit: string = "20",
     @Req() req?: any
   ): Promise<ApiResponseDto<any>> {
-    // 선택적 인증 - 쿠키가 있으면 인증 정보를 사용, 없으면 null
-    const viewerId = req?.user?.sub || null;
-    
+    // 디버깅 로그
+
+    const viewerId = req?.user?.userSub || null;
+
     const posts = await this.userService.getUserPosts(
       handle,
       cursor,
       parseInt(limit),
       viewerId
     );
-    return ApiResponseDto.success("사용자의 포스트를 성공적으로 가져왔습니다.", posts);
+    return ApiResponseDto.success(
+      "사용자의 포스트를 성공적으로 가져왔습니다.",
+      posts
+    );
   }
 
   @UseGuards(AuthGuard)
   @Post("become-creator")
-  async becomeCreator(
-    @Req() req: any
-  ): Promise<ApiResponseDto<any>> {
+  async becomeCreator(@Req() req: any): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;
     const creator = await this.userService.becomeCreator(sub);
     return ApiResponseDto.success("크리에이터로 전환되었습니다.", creator);
@@ -88,6 +97,8 @@ export class UserController {
   ): Promise<ApiResponseDto<{ isCreator: boolean }>> {
     const { sub } = req.user;
     const isCreator = await this.userService.isCreator(sub);
-    return ApiResponseDto.success("크리에이터 상태를 조회했습니다.", { isCreator });
+    return ApiResponseDto.success("크리에이터 상태를 조회했습니다.", {
+      isCreator,
+    });
   }
 }

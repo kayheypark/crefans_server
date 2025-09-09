@@ -9,7 +9,7 @@ export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
-    private readonly s3Service: S3Service,
+    private readonly s3Service: S3Service
   ) {}
 
   async getUserProfileByHandle(handle: string) {
@@ -67,7 +67,10 @@ export class UserService {
     };
   }
 
-  async updateUserProfile(user_id: string, updateUserProfileDto: UpdateUserProfileDto) {
+  async updateUserProfile(
+    user_id: string,
+    updateUserProfileDto: UpdateUserProfileDto
+  ) {
     const { bio } = updateUserProfileDto;
 
     return this.prisma.userProfile.upsert({
@@ -81,7 +84,12 @@ export class UserService {
     return await this.authService.checkNicknameAvailability(nickname);
   }
 
-  async getUserPosts(handle: string, cursor?: string, limit: number = 20, viewerId?: string) {
+  async getUserPosts(
+    handle: string,
+    cursor?: string,
+    limit: number = 20,
+    viewerId?: string
+  ) {
     const cognitoUser = await this.authService.getUserByHandle(handle);
 
     if (!cognitoUser) {
@@ -137,9 +145,10 @@ export class UserService {
     const actualPosts = hasMore ? posts.slice(0, limit) : posts;
 
     // 다음 cursor 설정 (마지막 포스트의 created_at)
-    const nextCursor = hasMore && actualPosts.length > 0 
-      ? actualPosts[actualPosts.length - 1].created_at.toISOString()
-      : null;
+    const nextCursor =
+      hasMore && actualPosts.length > 0
+        ? actualPosts[actualPosts.length - 1].created_at.toISOString()
+        : null;
 
     // Creator 정보 조회 (응답 데이터 구성용)
     const creator = await this.prisma.creator.findUnique({
@@ -147,38 +156,40 @@ export class UserService {
     });
 
     // 구독 정보 조회 (viewerId가 있는 경우만)
-    const subscriptions = viewerId ? await this.prisma.subscription.findMany({
-      where: {
-        subscriber_id: viewerId,
-        status: 'ONGOING',
-        membership_item: {
-          creator_id: userId,
-          is_active: true,
-          is_deleted: false,
-        }
-      },
-      include: {
-        membership_item: true
-      }
-    }) : [];
+    const subscriptions = viewerId
+      ? await this.prisma.subscription.findMany({
+          where: {
+            subscriber_id: viewerId,
+            status: "ONGOING",
+            membership_item: {
+              creator_id: userId,
+              is_active: true,
+              is_deleted: false,
+            },
+          },
+          include: {
+            membership_item: true,
+          },
+        })
+      : [];
 
     // 미디어 URL들을 signed URL로 변환하고 접근 권한에 따라 데이터 필터링
     const postsWithSignedUrls = await Promise.all(
       actualPosts.map(async (post) => {
         // 멤버십 게시물인지 확인
         const isMembershipPost = post.is_membership;
-        
+
         // 접근 권한 확인
         let hasAccess = true;
         if (isMembershipPost) {
           // 작성자 본인인지 확인
           const isOwner = viewerId === userId;
-          
+
           // 구독 중인지 확인
-          const hasSubscription = subscriptions.some(sub => 
-            sub.membership_item.level <= (post.membership_level || 1)
+          const hasSubscription = subscriptions.some(
+            (sub) => sub.membership_item.level <= (post.membership_level || 1)
           );
-          
+
           hasAccess = isOwner || hasSubscription;
         }
 
@@ -187,16 +198,22 @@ export class UserService {
           return {
             id: post.id,
             title: post.title,
-            content: '', // 내용 숨김
+            content: "", // 내용 숨김
             created_at: post.created_at,
             is_membership: true,
             membership_level: post.membership_level,
             allow_individual_purchase: post.allow_individual_purchase,
-            individual_purchase_price: post.individual_purchase_price ? Number(post.individual_purchase_price) : undefined,
+            individual_purchase_price: post.individual_purchase_price
+              ? Number(post.individual_purchase_price)
+              : undefined,
             media: [], // 미디어 숨김
             textLength: post.content?.length || 0,
-            imageCount: post.medias?.filter(pm => pm.media.type === 'IMAGE').length || 0,
-            videoCount: post.medias?.filter(pm => pm.media.type === 'VIDEO').length || 0,
+            imageCount:
+              post.medias?.filter((pm) => pm.media.type === "IMAGE").length ||
+              0,
+            videoCount:
+              post.medias?.filter((pm) => pm.media.type === "VIDEO").length ||
+              0,
             hasAccess: false, // 접근 권한 없음을 명시
             creator: {
               id: creator?.id || 0,
@@ -237,11 +254,15 @@ export class UserService {
           is_membership: post.is_membership,
           membership_level: post.membership_level,
           allow_individual_purchase: post.allow_individual_purchase,
-          individual_purchase_price: post.individual_purchase_price ? Number(post.individual_purchase_price) : undefined,
+          individual_purchase_price: post.individual_purchase_price
+            ? Number(post.individual_purchase_price)
+            : undefined,
           media: mediaWithSignedUrls,
           textLength: post.content?.length || 0,
-          imageCount: post.medias?.filter(pm => pm.media.type === 'IMAGE').length || 0,
-          videoCount: post.medias?.filter(pm => pm.media.type === 'VIDEO').length || 0,
+          imageCount:
+            post.medias?.filter((pm) => pm.media.type === "IMAGE").length || 0,
+          videoCount:
+            post.medias?.filter((pm) => pm.media.type === "VIDEO").length || 0,
           hasAccess: true, // 접근 권한 있음을 명시
           creator: {
             id: creator?.id || 0,
