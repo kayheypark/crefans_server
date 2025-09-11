@@ -280,15 +280,15 @@ export class FeedService {
           const media = await Promise.all(
             post.medias.map(async (mediaItem) => ({
               id: mediaItem.media.id.toString(),
-              file_name: mediaItem.media.file_name,
-              original_url: await this.generateMediaUrl(
+              fileName: mediaItem.media.file_name,
+              originalUrl: await this.generateMediaUrl(
                 mediaItem.media.s3_upload_key,
                 mediaItem.is_free_preview
               ),
-              s3_upload_key: mediaItem.media.s3_upload_key,
+              s3UploadKey: mediaItem.media.s3_upload_key,
               type: mediaItem.media.type,
-              processing_status: mediaItem.media.processing_status,
-              thumbnail_urls: mediaItem.media.thumbnail_urls,
+              processingStatus: mediaItem.media.processing_status,
+              thumbnailUrls: mediaItem.media.thumbnail_urls,
             }))
           );
 
@@ -553,15 +553,15 @@ export class FeedService {
           const media = await Promise.all(
             post.medias.map(async (mediaItem) => ({
               id: mediaItem.media.id.toString(),
-              file_name: mediaItem.media.file_name,
-              original_url: await this.generateMediaUrl(
+              fileName: mediaItem.media.file_name,
+              originalUrl: await this.generateMediaUrl(
                 mediaItem.media.s3_upload_key,
                 mediaItem.is_free_preview
               ),
-              s3_upload_key: mediaItem.media.s3_upload_key,
+              s3UploadKey: mediaItem.media.s3_upload_key,
               type: mediaItem.media.type,
-              processing_status: mediaItem.media.processing_status,
-              thumbnail_urls: mediaItem.media.thumbnail_urls,
+              processingStatus: mediaItem.media.processing_status,
+              thumbnailUrls: mediaItem.media.thumbnail_urls,
             }))
           );
 
