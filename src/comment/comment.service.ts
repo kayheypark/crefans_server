@@ -123,16 +123,24 @@ export class CommentService {
       }
     }
 
-    // 최상위 댓글들과 대댓글들을 함께 조회
+    // 최상위 댓글들과 대댓글들을 함께 조회 
+    // (삭제되지 않은 댓글 + 답글이 있는 삭제된 댓글만 포함)
     const comments = await this.prisma.comment.findMany({
       where: {
         posting_id: postingId,
         parent_id: null, // 최상위 댓글만
-        is_deleted: false,
+        OR: [
+          { is_deleted: false }, // 삭제되지 않은 댓글
+          { 
+            is_deleted: true,
+            children: { 
+              some: {} // 답글이 하나라도 있는 삭제된 댓글
+            }
+          }
+        ]
       },
       include: {
         children: {
-          where: { is_deleted: false },
           orderBy: { created_at: 'asc' },
         },
       },
@@ -164,17 +172,18 @@ export class CommentService {
             }
             return {
               ...child,
-              author: childAuthor ? {
+              content: child.is_deleted ? null : child.content,
+              author: child.is_deleted ? null : (childAuthor ? {
                 userId: childAuthor.Username,
                 handle: childAuthor.UserAttributes?.find(attr => attr.Name === 'preferred_username')?.Value || '',
                 name: childAuthor.UserAttributes?.find(attr => attr.Name === 'nickname')?.Value || '',
                 avatar: childAuthor.UserAttributes?.find(attr => attr.Name === 'picture')?.Value || '/profile-90.png',
-              } : null,
-              taggedUser: taggedUser ? {
+              } : null),
+              taggedUser: child.is_deleted ? null : (taggedUser ? {
                 userId: taggedUser.Username,
                 handle: taggedUser.UserAttributes?.find(attr => attr.Name === 'preferred_username')?.Value || '',
                 name: taggedUser.UserAttributes?.find(attr => attr.Name === 'nickname')?.Value || '',
-              } : null,
+              } : null),
               likeCount: likesStatus[child.id]?.likeCount || 0,
               isLiked: likesStatus[child.id]?.isLiked || false,
             };
@@ -183,12 +192,13 @@ export class CommentService {
 
         return {
           ...comment,
-          author: author ? {
+          content: comment.is_deleted ? null : comment.content,
+          author: comment.is_deleted ? null : (author ? {
             userId: author.Username,
             handle: author.UserAttributes?.find(attr => attr.Name === 'preferred_username')?.Value || '',
             name: author.UserAttributes?.find(attr => attr.Name === 'nickname')?.Value || '',
             avatar: author.UserAttributes?.find(attr => attr.Name === 'picture')?.Value || '/profile-90.png',
-          } : null,
+          } : null),
           children: childrenWithAuthors,
           likeCount: likesStatus[comment.id]?.likeCount || 0,
           isLiked: likesStatus[comment.id]?.isLiked || false,
@@ -264,21 +274,7 @@ export class CommentService {
       throw new BadRequestException('이미 삭제된 댓글입니다.');
     }
 
-    // 대댓글이 있는 경우 함께 삭제
-    if (comment.children.length > 0) {
-      await this.prisma.comment.updateMany({
-        where: {
-          parent_id: commentId,
-          is_deleted: false,
-        },
-        data: {
-          is_deleted: true,
-          deleted_at: new Date(),
-        },
-      });
-    }
-
-    // 댓글 삭제 (소프트 삭제)
+    // 댓글 삭제 (소프트 삭제) - 대댓글은 유지
     await this.prisma.comment.update({
       where: { id: commentId },
       data: {
@@ -287,8 +283,8 @@ export class CommentService {
       },
     });
 
-    // 포스팅의 댓글 수 업데이트 (대댓글 개수도 포함)
-    const deletedCount = 1 + comment.children.length;
+    // 포스팅의 댓글 수 업데이트 (삭제된 댓글만 차감)
+    const deletedCount = 1;
     await this.prisma.posting.update({
       where: { id: comment.posting_id },
       data: {
