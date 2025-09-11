@@ -252,6 +252,17 @@ export class FeedService {
               isPublic: media.is_free_preview || false,
             }));
 
+          // 미디어 데이터 생성 (프로필 API와 동일한 구조)
+          const media = post.medias.map(mediaItem => ({
+            id: mediaItem.media.id.toString(),
+            file_name: mediaItem.media.file_name,
+            original_url: this.generateMediaUrl(mediaItem.media.s3_upload_key, mediaItem.is_free_preview),
+            s3_upload_key: mediaItem.media.s3_upload_key,
+            type: mediaItem.media.type,
+            processing_status: mediaItem.media.processing_status,
+            thumbnail_urls: mediaItem.media.thumbnail_urls,
+          }));
+
           // 실제 사용자 정보 가져오기
           const creator = usersMap.get(post.user_sub) || {
             name: `User ${post.user_sub.slice(-4)}`,
@@ -268,13 +279,18 @@ export class FeedService {
             isMembershipOnly: post.is_membership,
             isGotMembership,
             allowComments: post.allow_comments,
+            membershipLevel: post.membership_level || 1, // 프로필 API와 통일
+            allowIndividualPurchase: post.allow_individual_purchase || false, // 프로필 API와 통일
+            individualPurchasePrice: post.individual_purchase_price ? Number(post.individual_purchase_price) : undefined, // 프로필 API와 통일
             images,
+            media, // media 필드 추가
             textLength: post.content?.length || 0,
             imageCount: images.length,
             videoCount: post.medias.filter(media => media.media.type === 'VIDEO').length,
             commentCount: post.comments.length,
             likeCount,
             isLiked,
+            hasAccess: isGotMembership, // 프로필 API와 통일
             creator: {
               id: post.user_sub,
               handle: creator.preferred_username || creator.nickname || `user_${post.user_sub.slice(-8)}`,
@@ -472,6 +488,17 @@ export class FeedService {
             isPublic: media.is_free_preview || false,
           }));
 
+        // 미디어 데이터 생성 (getFeed와 동일한 구조)
+        const media = post.medias.map(mediaItem => ({
+          id: mediaItem.media.id.toString(),
+          file_name: mediaItem.media.file_name,
+          original_url: this.generateMediaUrl(mediaItem.media.s3_upload_key, mediaItem.is_free_preview),
+          s3_upload_key: mediaItem.media.s3_upload_key,
+          type: mediaItem.media.type,
+          processing_status: mediaItem.media.processing_status,
+          thumbnail_urls: mediaItem.media.thumbnail_urls,
+        }));
+
         // 좋아요 상태 확인 (public feed는 userId가 없으므로 항상 false)
         let likeCount = 0;
         const isLiked = false; // 공개 피드는 비로그인 사용자도 볼 수 있으므로 항상 false
@@ -511,13 +538,18 @@ export class FeedService {
           isMembershipOnly: false,
           isGotMembership: true, // 공개 포스트는 항상 접근 가능
           allowComments: post.allow_comments,
+          membershipLevel: post.membership_level || 1, // 프로필 API와 통일
+          allowIndividualPurchase: post.allow_individual_purchase || false, // 프로필 API와 통일
+          individualPurchasePrice: post.individual_purchase_price ? Number(post.individual_purchase_price) : undefined, // 프로필 API와 통일
           images,
+          media, // media 필드 추가
           textLength: post.content?.length || 0,
           imageCount: images.length,
           videoCount: post.medias.filter(media => media.media.type === 'VIDEO').length,
           commentCount: post.comments.length,
           likeCount,
           isLiked,
+          hasAccess: true, // 프로필 API와 통일 (공개 포스트는 항상 접근 가능)
           creator: {
             id: post.user_sub,
             handle: creator.preferred_username || creator.nickname || `user_${post.user_sub.slice(-8)}`,

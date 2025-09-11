@@ -165,18 +165,18 @@ export class CommentService {
             return {
               ...child,
               author: childAuthor ? {
-                user_id: childAuthor.Username,
+                userId: childAuthor.Username,
                 handle: childAuthor.UserAttributes?.find(attr => attr.Name === 'preferred_username')?.Value || '',
                 name: childAuthor.UserAttributes?.find(attr => attr.Name === 'nickname')?.Value || '',
                 avatar: childAuthor.UserAttributes?.find(attr => attr.Name === 'picture')?.Value || '/profile-90.png',
               } : null,
-              tagged_user: taggedUser ? {
-                user_id: taggedUser.Username,
+              taggedUser: taggedUser ? {
+                userId: taggedUser.Username,
                 handle: taggedUser.UserAttributes?.find(attr => attr.Name === 'preferred_username')?.Value || '',
                 name: taggedUser.UserAttributes?.find(attr => attr.Name === 'nickname')?.Value || '',
               } : null,
-              like_count: likesStatus[child.id]?.likeCount || 0,
-              is_liked: likesStatus[child.id]?.isLiked || false,
+              likeCount: likesStatus[child.id]?.likeCount || 0,
+              isLiked: likesStatus[child.id]?.isLiked || false,
             };
           })
         );
@@ -184,14 +184,14 @@ export class CommentService {
         return {
           ...comment,
           author: author ? {
-            user_id: author.Username,
+            userId: author.Username,
             handle: author.UserAttributes?.find(attr => attr.Name === 'preferred_username')?.Value || '',
             name: author.UserAttributes?.find(attr => attr.Name === 'nickname')?.Value || '',
             avatar: author.UserAttributes?.find(attr => attr.Name === 'picture')?.Value || '/profile-90.png',
           } : null,
           children: childrenWithAuthors,
-          like_count: likesStatus[comment.id]?.likeCount || 0,
-          is_liked: likesStatus[comment.id]?.isLiked || false,
+          likeCount: likesStatus[comment.id]?.likeCount || 0,
+          isLiked: likesStatus[comment.id]?.isLiked || false,
         };
       })
     );

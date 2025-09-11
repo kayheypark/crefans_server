@@ -145,37 +145,37 @@ export class PostingQueryDto {
 export interface MediaResponse {
   id: string;
   type: string;
-  original_name: string;
-  original_url: string;
-  processed_urls?: any;
-  thumbnail_urls?: any;
-  processing_status: string;
+  originalName: string;
+  originalUrl: string;
+  processedUrls?: any;
+  thumbnailUrls?: any;
+  processingStatus: string;
 }
 
 export interface PostingResponse {
   id: number;
-  user_sub: string;
+  userSub: string;
   title: string;
   content: string;
   status: PostingStatus;
-  is_membership: boolean;
-  membership_level?: number;
-  publish_start_at?: string;
-  publish_end_at?: string;
-  allow_individual_purchase: boolean;
-  individual_purchase_price?: number;
-  is_public: boolean;
-  is_sensitive: boolean;
-  total_view_count: number;
-  unique_view_count: number;
-  like_count: number;
-  comment_count: number;
-  published_at?: string;
-  archived_at?: string;
-  created_at: string;
-  updated_at: string;
+  isMembership: boolean;
+  membershipLevel?: number;
+  publishStartAt?: string;
+  publishEndAt?: string;
+  allowIndividualPurchase: boolean;
+  individualPurchasePrice?: number;
+  isPublic: boolean;
+  isSensitive: boolean;
+  totalViewCount: number;
+  uniqueViewCount: number;
+  likeCount: number;
+  commentCount: number;
+  publishedAt?: string;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
   medias: MediaResponse[];
-  is_liked: boolean;
+  isLiked: boolean;
 }
 
 export interface PostingListResponse {

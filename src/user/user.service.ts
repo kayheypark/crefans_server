@@ -221,13 +221,16 @@ export class UserService {
             id: post.id,
             title: post.title,
             content: "", // 내용 숨김
-            created_at: post.created_at,
-            is_membership: true,
-            membership_level: post.membership_level,
-            allow_individual_purchase: post.allow_individual_purchase,
-            individual_purchase_price: post.individual_purchase_price
+            createdAt: post.created_at.toISOString(), // camelCase로 변경
+            isMembershipOnly: true, // camelCase로 변경
+            isGotMembership: false, // 피드 API와 통일
+            allowComments: post.allow_comments ?? true, // 피드 API와 통일
+            membershipLevel: post.membership_level,
+            allowIndividualPurchase: post.allow_individual_purchase,
+            individualPurchasePrice: post.individual_purchase_price
               ? Number(post.individual_purchase_price)
               : undefined,
+            images: [], // 피드 API와 통일
             media: [], // 미디어 숨김
             textLength: post.content?.length || 0,
             imageCount:
@@ -236,9 +239,12 @@ export class UserService {
             videoCount:
               post.medias?.filter((pm) => pm.media.type === "VIDEO").length ||
               0,
+            commentCount: 0, // 피드 API와 통일
+            likeCount: 0, // 피드 API와 통일
+            isLiked: false, // 피드 API와 통일
             hasAccess: false, // 접근 권한 없음을 명시
             creator: {
-              id: creator?.id || 0,
+              id: cognitoUser.Username, // 피드 API와 통일
               handle:
                 cognitoUser.Attributes.find(
                   (attr) => attr.Name === "preferred_username"
@@ -262,8 +268,12 @@ export class UserService {
             );
 
             return {
-              ...pm.media,
-              original_url: signedUrl,
+              id: pm.media.id,
+              type: pm.media.type,
+              fileName: pm.media.file_name,
+              originalUrl: signedUrl,
+              processingStatus: pm.media.processing_status,
+              thumbnailUrls: pm.media.thumbnail_urls,
             };
           })
         );
@@ -272,22 +282,28 @@ export class UserService {
           id: post.id,
           title: post.title,
           content: post.content,
-          created_at: post.created_at,
-          is_membership: post.is_membership,
-          membership_level: post.membership_level,
-          allow_individual_purchase: post.allow_individual_purchase,
-          individual_purchase_price: post.individual_purchase_price
+          createdAt: post.created_at.toISOString(), // camelCase로 변경
+          isMembershipOnly: post.is_membership, // camelCase로 변경
+          isGotMembership: true, // 피드 API와 통일
+          allowComments: post.allow_comments ?? true, // 피드 API와 통일
+          membershipLevel: post.membership_level,
+          allowIndividualPurchase: post.allow_individual_purchase,
+          individualPurchasePrice: post.individual_purchase_price
             ? Number(post.individual_purchase_price)
             : undefined,
+          images: [], // 피드 API와 통일 (빈 배열로 초기화)
           media: mediaWithSignedUrls,
           textLength: post.content?.length || 0,
           imageCount:
             post.medias?.filter((pm) => pm.media.type === "IMAGE").length || 0,
           videoCount:
             post.medias?.filter((pm) => pm.media.type === "VIDEO").length || 0,
+          commentCount: 0, // 피드 API와 통일 (향후 구현)
+          likeCount: 0, // 피드 API와 통일 (향후 구현)
+          isLiked: false, // 피드 API와 통일 (향후 구현)
           hasAccess: true, // 접근 권한 있음을 명시
           creator: {
-            id: creator?.id || 0,
+            id: cognitoUser.Username, // 피드 API와 통일
             handle:
               cognitoUser.Attributes.find(
                 (attr) => attr.Name === "preferred_username"
