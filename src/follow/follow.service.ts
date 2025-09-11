@@ -1,5 +1,7 @@
 import { Injectable, ConflictException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaginationUtil } from '../common/utils/pagination.util';
+import { ApiResponseUtil } from '../common/dto/api-response.dto';
 
 @Injectable()
 export class FollowService {
@@ -161,7 +163,8 @@ export class FollowService {
   // 팔로워 목록 조회
   async getFollowers(userId: string, page: number = 1, limit: number = 20) {
     try {
-      const skip = (page - 1) * limit;
+      const { page: normalizedPage, limit: normalizedLimit } = PaginationUtil.validateAndNormalize(page, limit);
+      const { skip, take } = PaginationUtil.getPrismaParams(normalizedPage, normalizedLimit);
 
       const followers = await this.prisma.userFollow.findMany({
         where: {
@@ -174,7 +177,7 @@ export class FollowService {
         },
         orderBy: { followed_at: 'desc' },
         skip,
-        take: limit,
+        take,
       });
 
       const totalCount = await this.prisma.userFollow.count({
@@ -184,21 +187,17 @@ export class FollowService {
         },
       });
 
-      return {
-        success: true,
-        data: {
-          followers: followers.map(f => ({
-            userId: f.follower_id,
-            followedAt: f.followed_at,
-          })),
-          pagination: {
-            page,
-            limit,
-            totalCount,
-            totalPages: Math.ceil(totalCount / limit),
-          },
-        },
-      };
+      const followerItems = followers.map(f => ({
+        userId: f.follower_id,
+        followedAt: f.followed_at,
+      }));
+
+      return ApiResponseUtil.paginated(
+        followerItems,
+        normalizedPage,
+        normalizedLimit,
+        totalCount
+      );
     } catch (error) {
       this.logger.error('Failed to get followers', {
         userId,
@@ -214,7 +213,8 @@ export class FollowService {
   // 팔로잉 목록 조회
   async getFollowing(userId: string, page: number = 1, limit: number = 20) {
     try {
-      const skip = (page - 1) * limit;
+      const { page: normalizedPage, limit: normalizedLimit } = PaginationUtil.validateAndNormalize(page, limit);
+      const { skip, take } = PaginationUtil.getPrismaParams(normalizedPage, normalizedLimit);
 
       const following = await this.prisma.userFollow.findMany({
         where: {
@@ -227,7 +227,7 @@ export class FollowService {
         },
         orderBy: { followed_at: 'desc' },
         skip,
-        take: limit,
+        take,
       });
 
       const totalCount = await this.prisma.userFollow.count({
@@ -237,21 +237,17 @@ export class FollowService {
         },
       });
 
-      return {
-        success: true,
-        data: {
-          following: following.map(f => ({
-            userId: f.following_id,
-            followedAt: f.followed_at,
-          })),
-          pagination: {
-            page,
-            limit,
-            totalCount,
-            totalPages: Math.ceil(totalCount / limit),
-          },
-        },
-      };
+      const followingItems = following.map(f => ({
+        userId: f.following_id,
+        followedAt: f.followed_at,
+      }));
+
+      return ApiResponseUtil.paginated(
+        followingItems,
+        normalizedPage,
+        normalizedLimit,
+        totalCount
+      );
     } catch (error) {
       this.logger.error('Failed to get following', {
         userId,

@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "../auth/auth.service";
 import { S3Service } from "../media/s3.service";
+import { UserTransformationUtil } from "../common/utils/user-transformation.util";
 
 export interface FeedFilter {
   type: "all" | "membership" | "public";
@@ -118,49 +119,14 @@ export class FeedService {
           uniqueUserIds.map(async (userSub) => {
             try {
               const cognitoUser = await this.authService.getUserBySub(userSub);
+              const user = UserTransformationUtil.transformCognitoUser(cognitoUser, userSub);
 
-              // Cognito 응답 파싱
-              let user = {
-                name: `User ${userSub.slice(-4)}`,
-                nickname: `user_${userSub.slice(-8)}`,
-                preferred_username: `user_${userSub.slice(-8)}`,
-                avatar_url: "/profile-90.png",
-              };
-
-              if (cognitoUser && cognitoUser.UserAttributes) {
-                const attributes = cognitoUser.UserAttributes;
-
-                // Cognito attributes에서 실제 값 추출
-                const name = attributes.find(
-                  (attr) => attr.Name === "name"
-                )?.Value;
-                const nickname = attributes.find(
-                  (attr) => attr.Name === "nickname"
-                )?.Value;
-                const preferredUsername = attributes.find(
-                  (attr) => attr.Name === "preferred_username"
-                )?.Value;
-                const picture = attributes.find(
-                  (attr) => attr.Name === "picture"
-                )?.Value;
-
-                user = {
-                  name: name || `User ${userSub.slice(-4)}`,
-                  nickname: nickname || `user_${userSub.slice(-8)}`,
-                  preferred_username:
-                    preferredUsername ||
-                    nickname ||
-                    `user_${userSub.slice(-8)}`,
-                  avatar_url: picture || "/profile-90.png",
-                };
-
-                this.logger.log(`Parsed user data for ${userSub}`, {
-                  service: "FeedService",
-                  method: "getFeed",
-                  userSub,
-                  parsedUser: user,
-                });
-              }
+              this.logger.log(`Parsed user data for ${userSub} in getFeed`, {
+                service: "FeedService",
+                method: "getFeed",
+                userSub,
+                parsedUser: user,
+              });
 
               return { userSub, user };
             } catch (error) {
@@ -173,12 +139,7 @@ export class FeedService {
               // 실패한 경우 기본값 반환
               return {
                 userSub,
-                user: {
-                  name: `User ${userSub.slice(-4)}`,
-                  nickname: `user_${userSub.slice(-8)}`,
-                  preferred_username: `user_${userSub.slice(-8)}`,
-                  avatar_url: "/profile-90.png",
-                },
+                user: UserTransformationUtil.getDefaultUserData(userSub),
               };
             }
           })
@@ -456,52 +417,14 @@ export class FeedService {
           uniqueUserIds.map(async (userSub) => {
             try {
               const cognitoUser = await this.authService.getUserBySub(userSub);
+              const user = UserTransformationUtil.transformCognitoUser(cognitoUser, userSub);
 
-              // Cognito 응답 파싱
-              let user = {
-                name: `User ${userSub.slice(-4)}`,
-                nickname: `user_${userSub.slice(-8)}`,
-                preferred_username: `user_${userSub.slice(-8)}`,
-                avatar_url: "/profile-90.png",
-              };
-
-              if (cognitoUser && cognitoUser.UserAttributes) {
-                const attributes = cognitoUser.UserAttributes;
-
-                // Cognito attributes에서 실제 값 추출
-                const name = attributes.find(
-                  (attr) => attr.Name === "name"
-                )?.Value;
-                const nickname = attributes.find(
-                  (attr) => attr.Name === "nickname"
-                )?.Value;
-                const preferredUsername = attributes.find(
-                  (attr) => attr.Name === "preferred_username"
-                )?.Value;
-                const picture = attributes.find(
-                  (attr) => attr.Name === "picture"
-                )?.Value;
-
-                user = {
-                  name: name || `User ${userSub.slice(-4)}`,
-                  nickname: nickname || `user_${userSub.slice(-8)}`,
-                  preferred_username:
-                    preferredUsername ||
-                    nickname ||
-                    `user_${userSub.slice(-8)}`,
-                  avatar_url: picture || "/profile-90.png",
-                };
-
-                this.logger.log(
-                  `Parsed user data for ${userSub} in getPublicFeed`,
-                  {
-                    service: "FeedService",
-                    method: "getPublicFeed",
-                    userSub,
-                    parsedUser: user,
-                  }
-                );
-              }
+              this.logger.log(`Parsed user data for ${userSub} in getPublicFeed`, {
+                service: "FeedService",
+                method: "getPublicFeed",
+                userSub,
+                parsedUser: user,
+              });
 
               return { userSub, user };
             } catch (error) {
@@ -514,12 +437,7 @@ export class FeedService {
               // 실패한 경우 기본값 반환
               return {
                 userSub,
-                user: {
-                  name: `User ${userSub.slice(-4)}`,
-                  nickname: `user_${userSub.slice(-8)}`,
-                  preferred_username: `user_${userSub.slice(-8)}`,
-                  avatar_url: "/profile-90.png",
-                },
+                user: UserTransformationUtil.getDefaultUserData(userSub),
               };
             }
           })
