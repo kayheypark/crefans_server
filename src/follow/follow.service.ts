@@ -1,20 +1,30 @@
-import { Injectable, ConflictException, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { PaginationUtil } from '../common/utils/pagination.util';
-import { ApiResponseUtil } from '../common/dto/api-response.dto';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { PaginationUtil } from "../common/utils/pagination.util";
+import { ApiResponseUtil } from "../common/dto/api-response.dto";
+import { CognitoService } from "../auth/cognito.service";
+import { UserTransformationUtil } from "../common/utils/user-transformation.util";
 
 @Injectable()
 export class FollowService {
   private readonly logger = new Logger(FollowService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cognitoService: CognitoService
+  ) {}
 
   // 팔로우하기
   async followUser(followerId: string, followingId: string) {
     try {
       // 자기 자신을 팔로우하는 것 방지
       if (followerId === followingId) {
-        throw new ConflictException('자기 자신을 팔로우할 수 없습니다.');
+        throw new ConflictException("자기 자신을 팔로우할 수 없습니다.");
       }
 
       // 이미 팔로우 중인지 확인
@@ -28,7 +38,7 @@ export class FollowService {
       });
 
       if (existingFollow && !existingFollow.deleted_at) {
-        throw new ConflictException('이미 팔로우 중인 사용자입니다.');
+        throw new ConflictException("이미 팔로우 중인 사용자입니다.");
       }
 
       // 이전에 언팔로우한 기록이 있으면 재활성화, 없으면 새로 생성
@@ -42,10 +52,10 @@ export class FollowService {
         });
 
         this.logger.log(`User ${followerId} re-followed user ${followingId}`);
-        
+
         return {
           success: true,
-          message: '팔로우가 완료되었습니다.',
+          message: "팔로우가 완료되었습니다.",
           data: { followId: follow.id, followedAt: follow.followed_at },
         };
       } else {
@@ -60,7 +70,7 @@ export class FollowService {
 
         return {
           success: true,
-          message: '팔로우가 완료되었습니다.',
+          message: "팔로우가 완료되었습니다.",
           data: { followId: follow.id, followedAt: follow.followed_at },
         };
       }
@@ -69,14 +79,14 @@ export class FollowService {
         throw error;
       }
 
-      this.logger.error('Failed to follow user', {
+      this.logger.error("Failed to follow user", {
         followerId,
         followingId,
         error: error.message,
         stack: error.stack,
       });
 
-      throw new Error('팔로우 처리 중 오류가 발생했습니다.');
+      throw new Error("팔로우 처리 중 오류가 발생했습니다.");
     }
   }
 
@@ -93,7 +103,7 @@ export class FollowService {
       });
 
       if (!follow || follow.deleted_at) {
-        throw new NotFoundException('팔로우 관계를 찾을 수 없습니다.');
+        throw new NotFoundException("팔로우 관계를 찾을 수 없습니다.");
       }
 
       await this.prisma.userFollow.update({
@@ -105,116 +115,33 @@ export class FollowService {
 
       return {
         success: true,
-        message: '언팔로우가 완료되었습니다.',
+        message: "언팔로우가 완료되었습니다.",
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
 
-      this.logger.error('Failed to unfollow user', {
+      this.logger.error("Failed to unfollow user", {
         followerId,
         followingId,
         error: error.message,
         stack: error.stack,
       });
 
-      throw new Error('언팔로우 처리 중 오류가 발생했습니다.');
-    }
-  }
-
-  // 팔로우 상태 확인
-  async checkFollowStatus(followerId: string, followingId: string) {
-    try {
-      const follow = await this.prisma.userFollow.findUnique({
-        where: {
-          follower_id_following_id: {
-            follower_id: followerId,
-            following_id: followingId,
-          },
-        },
-      });
-
-      return {
-        success: true,
-        data: {
-          isFollowing: !!follow && !follow.deleted_at,
-          followedAt: follow?.followed_at || null,
-        },
-      };
-    } catch (error) {
-      this.logger.error('Failed to check follow status', {
-        followerId,
-        followingId,
-        error: error.message,
-      });
-
-      return {
-        success: false,
-        message: '팔로우 상태 확인 중 오류가 발생했습니다.',
-        data: {
-          isFollowing: false,
-          followedAt: null,
-        },
-      };
-    }
-  }
-
-  // 팔로워 목록 조회
-  async getFollowers(userId: string, page: number = 1, limit: number = 20) {
-    try {
-      const { page: normalizedPage, limit: normalizedLimit } = PaginationUtil.validateAndNormalize(page, limit);
-      const { skip, take } = PaginationUtil.getPrismaParams(normalizedPage, normalizedLimit);
-
-      const followers = await this.prisma.userFollow.findMany({
-        where: {
-          following_id: userId,
-          deleted_at: null,
-        },
-        select: {
-          follower_id: true,
-          followed_at: true,
-        },
-        orderBy: { followed_at: 'desc' },
-        skip,
-        take,
-      });
-
-      const totalCount = await this.prisma.userFollow.count({
-        where: {
-          following_id: userId,
-          deleted_at: null,
-        },
-      });
-
-      const followerItems = followers.map(f => ({
-        userId: f.follower_id,
-        followedAt: f.followed_at,
-      }));
-
-      return ApiResponseUtil.paginated(
-        followerItems,
-        normalizedPage,
-        normalizedLimit,
-        totalCount
-      );
-    } catch (error) {
-      this.logger.error('Failed to get followers', {
-        userId,
-        page,
-        limit,
-        error: error.message,
-      });
-
-      throw new Error('팔로워 목록 조회 중 오류가 발생했습니다.');
+      throw new Error("언팔로우 처리 중 오류가 발생했습니다.");
     }
   }
 
   // 팔로잉 목록 조회
   async getFollowing(userId: string, page: number = 1, limit: number = 20) {
     try {
-      const { page: normalizedPage, limit: normalizedLimit } = PaginationUtil.validateAndNormalize(page, limit);
-      const { skip, take } = PaginationUtil.getPrismaParams(normalizedPage, normalizedLimit);
+      const { page: normalizedPage, limit: normalizedLimit } =
+        PaginationUtil.validateAndNormalize(page, limit);
+      const { skip, take } = PaginationUtil.getPrismaParams(
+        normalizedPage,
+        normalizedLimit
+      );
 
       const following = await this.prisma.userFollow.findMany({
         where: {
@@ -225,7 +152,7 @@ export class FollowService {
           following_id: true,
           followed_at: true,
         },
-        orderBy: { followed_at: 'desc' },
+        orderBy: { followed_at: "desc" },
         skip,
         take,
       });
@@ -237,61 +164,42 @@ export class FollowService {
         },
       });
 
-      const followingItems = following.map(f => ({
-        userId: f.following_id,
-        followedAt: f.followed_at,
-      }));
+      // 사용자 프로필 정보 가져오기
+      const userProfiles = await Promise.all(
+        following.map(async (f) => {
+          const cognitoUser = await this.cognitoService.getUserBySub(
+            f.following_id
+          );
+          const userInfo = UserTransformationUtil.transformCognitoUser(
+            cognitoUser,
+            f.following_id
+          );
+
+          return {
+            userId: f.following_id,
+            nickname: userInfo.nickname,
+            handle: userInfo.preferred_username,
+            avatar: userInfo.avatar_url,
+            followedAt: f.followed_at,
+          };
+        })
+      );
 
       return ApiResponseUtil.paginated(
-        followingItems,
+        userProfiles,
         normalizedPage,
         normalizedLimit,
         totalCount
       );
     } catch (error) {
-      this.logger.error('Failed to get following', {
+      this.logger.error("Failed to get following", {
         userId,
         page,
         limit,
         error: error.message,
       });
 
-      throw new Error('팔로잉 목록 조회 중 오류가 발생했습니다.');
-    }
-  }
-
-  // 팔로워/팔로잉 수 통계
-  async getFollowStats(userId: string) {
-    try {
-      const [followerCount, followingCount] = await Promise.all([
-        this.prisma.userFollow.count({
-          where: {
-            following_id: userId,
-            deleted_at: null,
-          },
-        }),
-        this.prisma.userFollow.count({
-          where: {
-            follower_id: userId,
-            deleted_at: null,
-          },
-        }),
-      ]);
-
-      return {
-        success: true,
-        data: {
-          followerCount,
-          followingCount,
-        },
-      };
-    } catch (error) {
-      this.logger.error('Failed to get follow stats', {
-        userId,
-        error: error.message,
-      });
-
-      throw new Error('팔로우 통계 조회 중 오류가 발생했습니다.');
+      throw new Error("팔로잉 목록 조회 중 오류가 발생했습니다.");
     }
   }
 }

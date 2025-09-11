@@ -8,6 +8,7 @@ import { WalletModule } from "./wallet/wallet.module";
 import { PostingModule } from "./posting/posting.module";
 import { UserModule } from "./user/user.module";
 import { MembershipModule } from "./membership/membership.module";
+import { SubscriptionModule } from "./subscription/subscription.module";
 import { CommentModule } from "./comment/comment.module";
 import { FeedModule } from "./feed/feed.module";
 import { FollowModule } from "./follow/follow.module";
@@ -30,6 +31,7 @@ import appConfig from "./config/app.config";
     PostingModule,
     UserModule,
     MembershipModule,
+    SubscriptionModule,
     CommentModule,
     FeedModule,
     FollowModule,
