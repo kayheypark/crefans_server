@@ -8,7 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseIntPipe,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { PostingService } from './posting.service';
 import {
@@ -58,7 +58,7 @@ export class PostingController {
   @UseGuards(OptionalAuthGuard)
   @Get(':id')
   async getPostingById(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user?: CurrentUserType,
   ): Promise<PostingDetailResponse> {
     return this.postingService.getPostingById(id, user?.userSub);
@@ -67,7 +67,7 @@ export class PostingController {
   @Patch(':id')
   @UseGuards(AuthGuard)
   async updatePosting(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: CurrentUserType,
     @Body() updatePostingDto: UpdatePostingDto,
   ): Promise<{ success: boolean; message: string }> {
@@ -77,7 +77,7 @@ export class PostingController {
   @Delete(':id')
   @UseGuards(AuthGuard)
   async deletePosting(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: CurrentUserType,
   ): Promise<{ success: boolean; message: string }> {
     return this.postingService.deletePosting(id, user.userSub);

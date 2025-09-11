@@ -5,7 +5,7 @@ import {
   Param,
   UseGuards,
   Req,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Body,
 } from '@nestjs/common';
 import { CommentLikeService } from './comment-like.service';
@@ -20,7 +20,7 @@ export class CommentLikeController {
   @UseGuards(AuthGuard)
   @Post(':id/like')
   async likeComment(
-    @Param('id', ParseIntPipe) commentId: number,
+    @Param('id', ParseUUIDPipe) commentId: string,
     @Req() req: any,
   ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;
@@ -31,7 +31,7 @@ export class CommentLikeController {
   @UseGuards(AuthGuard)
   @Delete(':id/like')
   async unlikeComment(
-    @Param('id', ParseIntPipe) commentId: number,
+    @Param('id', ParseUUIDPipe) commentId: string,
     @Req() req: any,
   ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;

@@ -11,13 +11,13 @@ datasource db {
 /// 사용자의 추가 프로필 정보를 관리
 model UserProfile {
   /// 사용자 ID (Cognito의 userSub)
-  user_id    String    @id
+  user_id    String   @id
   /// 소개글
-  bio        String?   @db.Text
+  bio        String?  @db.Text
   /// 생성 일시
-  created_at DateTime  @default(now())
+  created_at DateTime @default(now())
   /// 수정 일시
-  updated_at DateTime  @updatedAt
+  updated_at DateTime @updatedAt
 
   @@map("user_profiles")
 }
@@ -26,21 +26,21 @@ model UserProfile {
 /// 시스템에서 사용되는 모든 토큰의 타입을 관리
 model TokenType {
   /// 토큰 타입 고유 식별자
-  id                     Int                      @id @default(autoincrement())
+  id          String     @id @default(uuid())
   /// 토큰 심볼
-  symbol                 String                   @unique
+  symbol      String     @unique
   /// 토큰 타입 이름
-  name                   String
+  name        String
   /// 토큰 설명
-  description            String?
+  description String?
   /// 생성 일시
-  created_at             DateTime                 @default(now())
+  created_at  DateTime   @default(now())
   /// 수정 일시
-  updated_at             DateTime                 @updatedAt
+  updated_at  DateTime   @updatedAt
   /// 토큰 가격 (KRW 기준)
-  price                  Decimal                  @db.Decimal(18, 4)
-  transfers              Transfer[]
-  wallets                Wallet[]
+  price       Decimal    @db.Decimal(18, 4)
+  transfers   Transfer[]
+  wallets     Wallet[]
 
   @@map("token_types")
 }
@@ -49,11 +49,11 @@ model TokenType {
 /// 실제 토큰이 보관되는 지갑
 model Wallet {
   /// 지갑 고유 식별자
-  id             Int               @id @default(autoincrement())
+  id             String            @id @default(uuid())
   /// 지갑 주소 (UUID)
   address        String            @unique
   /// 토큰 타입 ID
-  token_type_id  Int
+  token_type_id  String
   /// 보유 수량
   amount         Decimal           @default(0.0000) @db.Decimal(18, 4)
   /// 생성 일시
@@ -73,9 +73,9 @@ model Wallet {
 /// 지갑의 소유권 정보를 관리
 model WalletOwnership {
   /// 소유권 고유 식별자
-  id         Int       @id @default(autoincrement())
+  id         String    @id @default(uuid())
   /// 지갑 ID
-  wallet_id  Int
+  wallet_id  String
   /// 소유자 아이디 (Cognito의 userSub)
   owner_id   String
   /// 소유권 시작 일시
@@ -94,15 +94,15 @@ model WalletOwnership {
 
 model Transfer {
   /// 전송 고유 식별자
-  id                  Int           @id @default(autoincrement())
+  id                  String        @id @default(uuid())
   /// 트랜잭션 해시 (UUID)
   tx_hash             String        @unique
-  /// 송신 지갑 ID
-  from_wallet_id      Int
-  /// 수신 지갑 ID
-  to_wallet_id        Int
+  /// 송신 지갑 주소
+  from_wallet_address String
+  /// 수신 지갑 주소
+  to_wallet_address   String
   /// 토큰 타입 ID
-  token_type_id       Int
+  token_type_id       String
   /// 전송 수량
   amount              Decimal       @db.Decimal(18, 4)
   /// 전송 사유
@@ -123,16 +123,16 @@ model Transfer {
   to_balance_after    Decimal       @db.Decimal(18, 4)
   /// 전송 전 잔액 (수신자)
   to_balance_before   Decimal       @db.Decimal(18, 4)
-  subscription_id     Int?
-  transfer_reason_id  Int
-  from_wallet         Wallet        @relation("FromWallet", fields: [from_wallet_id], references: [id])
+  subscription_id     String?
+  transfer_reason_id  String
+  from_wallet         Wallet        @relation("FromWallet", fields: [from_wallet_address], references: [address])
   subscription        Subscription? @relation(fields: [subscription_id], references: [id])
-  to_wallet           Wallet        @relation("ToWallet", fields: [to_wallet_id], references: [id])
+  to_wallet           Wallet        @relation("ToWallet", fields: [to_wallet_address], references: [address])
   token_type          TokenType     @relation(fields: [token_type_id], references: [id])
 
-  @@index([from_wallet_id], map: "transfers_from_wallet_id_fkey")
+  @@index([from_wallet_address], map: "transfers_from_wallet_address_fkey")
   @@index([subscription_id], map: "transfers_subscription_id_fkey")
-  @@index([to_wallet_id], map: "transfers_to_wallet_id_fkey")
+  @@index([to_wallet_address], map: "transfers_to_wallet_address_fkey")
   @@index([token_type_id], map: "transfers_token_type_id_fkey")
   @@map("transfers")
 }
@@ -141,28 +141,28 @@ model Transfer {
 /// 크리에이터의 분류를 위한 카테고리 정보 (관리자 페이지에서 관리)
 model CreatorCategory {
   /// 카테고리 고유 식별자
-  id             Int       @id @default(autoincrement())
+  id          String    @id @default(uuid())
   /// 카테고리 이름
-  name           String    @unique
+  name        String    @unique
   /// 카테고리 설명
-  description    String?   @db.Text
+  description String?   @db.Text
   /// 카테고리 색상 코드 (예: #FF5722)
-  color_code     String?   @db.VarChar(7)
+  color_code  String?   @db.VarChar(7)
   /// 카테고리 이모지/아이콘
-  icon           String?
+  icon        String?
   /// 정렬 순서
-  sort_order     Int       @default(0)
+  sort_order  Int       @default(0)
   /// 활성 상태
-  is_active      Boolean   @default(true)
+  is_active   Boolean   @default(true)
   /// 삭제 여부
-  is_deleted     Boolean   @default(false)
+  is_deleted  Boolean   @default(false)
   /// 삭제 일시
-  deleted_at     DateTime?
+  deleted_at  DateTime?
   /// 생성 일시
-  created_at     DateTime  @default(now())
+  created_at  DateTime  @default(now())
   /// 수정 일시
-  updated_at     DateTime  @updatedAt
-  creators       Creator[]
+  updated_at  DateTime  @updatedAt
+  creators    Creator[]
 
   @@index([sort_order])
   @@index([is_active])
@@ -173,19 +173,18 @@ model CreatorCategory {
 /// 크리에이터로 전환한 사용자의 정보를 관리
 model Creator {
   /// 크리에이터 고유 식별자
-  id          Int              @id @default(autoincrement())
+  id          String           @id @default(uuid())
   /// 사용자 ID (Cognito의 userSub)
   user_id     String           @unique
-  /// 카테고리 ID (선택사항)
-  category_id Int?
   /// 활성 상태
   is_active   Boolean          @default(true)
   /// 크리에이터 전환 일시
   created_at  DateTime         @default(now())
   /// 수정 일시
   updated_at  DateTime         @updatedAt
+  /// 카테고리 ID (선택사항)
+  category_id String?
   category    CreatorCategory? @relation(fields: [category_id], references: [id])
-  // memberships MembershipItem[]
 
   @@index([category_id])
   @@map("creators")
@@ -194,7 +193,7 @@ model Creator {
 /// 전송사유타입(초기 데이터인 seed 있음)
 model TransferReason {
   /// 전송사유 고유 식별자
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(uuid())
   /// 전송사유 이름
   name        String
   /// 전송사유 설명
@@ -211,41 +210,40 @@ model TransferReason {
 /// 크리에이터가 판매하는 멤버십 상품 정보를 관리
 model MembershipItem {
   /// 멤버십 상품 고유 식별자
-  id             Int                @id @default(autoincrement())
+  id             String         @id @default(uuid())
   /// 멤버십 상품 이름
   name           String
-  /// 멤버십 설명
-  description    String?            @db.Text
-  /// 멤버십 혜택 (콤마로 구분된 문자열)
-  benefits       String             @db.Text
   /// 멤버십 레벨 (차등 열람을 위한 등급)
-  level          Int                @default(1)
+  level          Int            @default(1)
   /// 크리에이터 ID (Cognito의 userSub)
   creator_id     String
   /// 가격 (KRW 기준)
-  price          Decimal            @db.Decimal(18, 4)
+  price          Decimal        @db.Decimal(18, 4)
   /// 반복 결제 단위
   billing_unit   PeriodUnit
   /// 반복 결제 주기 상수 (예: 1개월, 3개월, 1년)
-  billing_period Int                @default(1)
+  billing_period Int            @default(1)
   /// 무료 체험 기간 단위
-  trial_unit     PeriodUnit         @default(DAY)
+  trial_unit     PeriodUnit     @default(DAY)
   /// 무료 체험 기간 상수 (예: 7일, 1개월)
-  trial_period   Int?               @default(0)
-  /// 활성 상태
-  is_active      Boolean            @default(true)
-  /// 삭제 여부
-  is_deleted     Boolean            @default(false)
+  trial_period   Int?           @default(0)
+  /// 생성 일시
+  created_at     DateTime       @default(now())
+  /// 수정 일시
+  updated_at     DateTime       @updatedAt
+  /// 멤버십 혜택 (콤마로 구분된 문자열)
+  benefits       String         @db.Text
   /// 삭제 일시
   deleted_at     DateTime?
-  /// 생성 일시
-  created_at     DateTime           @default(now())
-  /// 수정 일시
-  updated_at     DateTime           @updatedAt
+  /// 멤버십 설명
+  description    String?        @db.Text
+  /// 활성 상태
+  is_active      Boolean        @default(true)
+  /// 삭제 여부
+  is_deleted     Boolean        @default(false)
   subscriptions  Subscription[]
-  // creator        Creator            @relation(fields: [creator_id], references: [user_id])
 
-  @@index([creator_id], map: "membership_items_creator_id_idx")
+  @@index([creator_id])
   @@index([creator_id, level], map: "membership_items_creator_level_idx")
   @@map("membership_items")
 }
@@ -254,7 +252,7 @@ model MembershipItem {
 /// 크리에이터와 구독자 간의 구독 관계를 관리
 model Subscription {
   /// 구독 고유 식별자
-  id                 Int                @id @default(autoincrement())
+  id                 String             @id @default(uuid())
   /// 구독자 ID (Cognito의 userSub)
   subscriber_id      String
   /// 구독 시작 일시
@@ -271,7 +269,7 @@ model Subscription {
   created_at         DateTime           @default(now())
   /// 수정 일시
   updated_at         DateTime           @updatedAt
-  membership_item_id Int
+  membership_item_id String
   membership_item    MembershipItem     @relation(fields: [membership_item_id], references: [id])
   transfers          Transfer[]
 
@@ -284,9 +282,7 @@ model Subscription {
 /// 포스팅에 첨부되는 미디어 파일 정보
 model Media {
   /// 미디어 고유 식별자
-  id                String              @id @default(uuid())
-  /// 소유자 ID (Cognito userSub)
-  user_sub          String
+  id                String           @id @default(uuid())
   /// 미디어 타입
   type              MediaType
   /// 원본 파일명
@@ -295,38 +291,40 @@ model Media {
   file_name         String
   /// 파일 경로 (legacy)
   file_path         String?
-  /// S3 업로드 키
-  s3_upload_key     String
-  /// S3 처리된 키들 (JSON)
-  s3_processed_keys Json?
-  /// 원본 파일 URL
-  original_url      String
-  /// 처리된 파일 URL들 (JSON)
-  processed_urls    Json?
-  /// 썸네일 URL들 (JSON)
-  thumbnail_urls    Json?
   /// 파일 크기 (bytes)
   file_size         Int
   /// MIME 타입
   mime_type         String
-  /// 처리 상태
-  processing_status ProcessingStatus    @default(UPLOADING)
-  /// 처리 작업 ID (MediaConvert Job ID)
-  processing_job_id String?
   /// 썸네일 경로 (legacy)
   thumbnail_path    String?
   /// 메타데이터 (JSON)
   metadata          Json?
-  /// 처리 완료 일시
-  processed_at      DateTime?
   /// 삭제 여부
-  is_deleted        Boolean             @default(false)
+  is_deleted        Boolean          @default(false)
   /// 삭제 일시
   deleted_at        DateTime?
   /// 생성 일시
-  created_at        DateTime            @default(now())
+  created_at        DateTime         @default(now())
   /// 수정 일시
-  updated_at        DateTime            @updatedAt
+  updated_at        DateTime         @updatedAt
+  /// 원본 파일 URL
+  original_url      String
+  /// 처리 완료 일시
+  processed_at      DateTime?
+  /// 처리된 파일 URL들 (JSON)
+  processed_urls    Json?
+  /// 처리 작업 ID (MediaConvert Job ID)
+  processing_job_id String?
+  /// 처리 상태
+  processing_status ProcessingStatus @default(UPLOADING)
+  /// S3 처리된 키들 (JSON)
+  s3_processed_keys Json?
+  /// S3 업로드 키
+  s3_upload_key     String
+  /// 썸네일 URL들 (JSON)
+  thumbnail_urls    Json?
+  /// 소유자 ID (Cognito userSub)
+  user_sub          String
   postings          PostingMedia[]
 
   @@map("medias")
@@ -336,9 +334,9 @@ model Media {
 /// 포스팅의 조회 이력을 관리
 model PostingView {
   /// 조회 이력 고유 식별자
-  id         Int      @id @default(autoincrement())
+  id         String   @id @default(uuid())
   /// 포스팅 ID
-  posting_id Int
+  posting_id String
   /// 조회자 ID (Cognito의 userSub)
   viewer_id  String?
   /// 조회자 IP
@@ -357,57 +355,57 @@ model PostingView {
 /// 크리에이터가 작성하는 게시글
 model Posting {
   /// 포스팅 고유 식별자
-  id                Int            @id @default(autoincrement())
-  /// 크리에이터 ID (Cognito의 userSub)
-  user_sub          String
+  id                        String         @id @default(uuid())
   /// 제목
-  title             String
+  title                     String
   /// 내용
-  content           String         @db.Text
+  content                   String         @db.Text
   /// 상태
-  status            PostingStatus  @default(DRAFT)
+  status                    PostingStatus  @default(DRAFT)
   /// 멤버십 전용 여부
-  is_membership     Boolean        @default(false)
+  is_membership             Boolean        @default(false)
   /// 멤버십 레벨 (멤버십 전용인 경우)
-  membership_level  Int?
-  /// 개별 구매 허용 여부
-  allow_individual_purchase Boolean @default(false)
-  /// 개별 구매 가격 (원)
-  individual_purchase_price Decimal? @db.Decimal(10, 0)
-  /// 공개 여부
-  is_public         Boolean        @default(true)
-  /// 민감한 콘텐츠 여부
-  is_sensitive      Boolean        @default(false)
-  /// 댓글 허용 여부
-  allow_comments    Boolean        @default(true)
+  membership_level          Int?
   /// 공개 시작 일시
-  publish_start_at  DateTime?
+  publish_start_at          DateTime?
   /// 공개 종료 일시
-  publish_end_at    DateTime?
+  publish_end_at            DateTime?
   /// 전체 조회수
-  total_view_count  Int            @default(0)
+  total_view_count          Int            @default(0)
   /// 고유 조회수
-  unique_view_count Int            @default(0)
+  unique_view_count         Int            @default(0)
   /// 좋아요 수
-  like_count        Int            @default(0)
+  like_count                Int            @default(0)
   /// 댓글 수
-  comment_count     Int            @default(0)
+  comment_count             Int            @default(0)
   /// 발행 일시
-  published_at      DateTime?
+  published_at              DateTime?
   /// 보관 일시
-  archived_at       DateTime?
+  archived_at               DateTime?
   /// 삭제 여부
-  is_deleted        Boolean        @default(false)
+  is_deleted                Boolean        @default(false)
   /// 삭제 일시
-  deleted_at        DateTime?
+  deleted_at                DateTime?
   /// 생성 일시
-  created_at        DateTime       @default(now())
+  created_at                DateTime       @default(now())
   /// 수정 일시
-  updated_at        DateTime       @updatedAt
-  comments          Comment[]
-  likes             PostingLike[]
-  medias            PostingMedia[]
-  views             PostingView[]
+  updated_at                DateTime       @updatedAt
+  /// 개별 구매 허용 여부
+  allow_individual_purchase Boolean        @default(false)
+  /// 개별 구매 가격 (원)
+  individual_purchase_price Decimal?       @db.Decimal(10, 0)
+  /// 공개 여부
+  is_public                 Boolean        @default(true)
+  /// 민감한 콘텐츠 여부
+  is_sensitive              Boolean        @default(false)
+  /// 크리에이터 ID (Cognito의 userSub)
+  user_sub                  String
+  /// 댓글 허용 여부
+  allow_comments            Boolean        @default(true)
+  comments                  Comment[]
+  likes                     PostingLike[]
+  medias                    PostingMedia[]
+  views                     PostingView[]
 
   @@map("postings")
 }
@@ -416,9 +414,9 @@ model Posting {
 /// 포스팅과 미디어의 다대다 관계를 관리
 model PostingMedia {
   /// 관계 고유 식별자
-  id              Int       @id @default(autoincrement())
+  id              String    @id @default(uuid())
   /// 포스팅 ID
-  posting_id      Int
+  posting_id      String
   /// 미디어 ID
   media_id        String
   /// 정렬 순서
@@ -445,9 +443,9 @@ model PostingMedia {
 /// 포스팅에 달리는 댓글
 model Comment {
   /// 댓글 고유 식별자
-  id             Int           @id @default(autoincrement())
+  id             String        @id @default(uuid())
   /// 포스팅 ID
-  posting_id     Int
+  posting_id     String
   /// 작성자 ID (Cognito의 userSub)
   author_id      String
   /// 태그된 사용자 ID (Cognito의 userSub)
@@ -455,7 +453,7 @@ model Comment {
   /// 내용
   content        String        @db.Text
   /// 부모 댓글 ID (대댓글인 경우)
-  parent_id      Int?
+  parent_id      String?
   /// 삭제 여부
   is_deleted     Boolean       @default(false)
   /// 삭제 일시
@@ -464,10 +462,10 @@ model Comment {
   created_at     DateTime      @default(now())
   /// 수정 일시
   updated_at     DateTime      @updatedAt
+  likes          CommentLike[]
   parent         Comment?      @relation("CommentToComment", fields: [parent_id], references: [id])
   children       Comment[]     @relation("CommentToComment")
   posting        Posting       @relation(fields: [posting_id], references: [id])
-  likes          CommentLike[]
 
   @@index([parent_id], map: "comments_parent_id_fkey")
   @@index([posting_id], map: "comments_posting_id_fkey")
@@ -478,16 +476,16 @@ model Comment {
 /// 포스팅에 대한 좋아요 정보
 model PostingLike {
   /// 좋아요 고유 식별자
-  id         Int       @id @default(autoincrement())
+  id         String    @id @default(uuid())
   /// 포스팅 ID
-  posting_id Int
+  posting_id String
   /// 사용자 ID (Cognito의 userSub)
   user_id    String
   /// 삭제 여부
   is_deleted Boolean   @default(false)
   /// 삭제 일시
   deleted_at DateTime?
-  /// 생성 일시
+  /// 생��� 일시
   created_at DateTime  @default(now())
   /// 수정 일시
   updated_at DateTime  @updatedAt
@@ -501,9 +499,9 @@ model PostingLike {
 /// 댓글에 대한 좋아요 정보
 model CommentLike {
   /// 좋아요 고유 식별자
-  id         Int       @id @default(autoincrement())
+  id         String    @id @default(uuid())
   /// 댓글 ID
-  comment_id Int
+  comment_id String
   /// 사용자 ID (Cognito의 userSub)
   user_id    String
   /// 삭제 여부
@@ -520,6 +518,52 @@ model CommentLike {
   @@map("comment_likes")
 }
 
+/// 얼리버드 회원
+/// 얼리버드로 가입한 사용자들을 관리하여 추후 혜택을 제공
+model Earlybird {
+  /// 고유 식별자
+  id          String    @id @default(uuid())
+  /// 사용자 ID (Cognito의 userSub)
+  user_sub    String    @unique
+  /// 가입 일시
+  joined_at   DateTime  @default(now())
+  /// 혜택 지급 여부
+  rewarded    Boolean   @default(false)
+  /// 혜택 지급 일시
+  rewarded_at DateTime?
+  /// 생성 일시
+  created_at  DateTime  @default(now())
+  /// 수정 일시
+  updated_at  DateTime  @updatedAt
+
+  @@map("earlybirds")
+}
+
+/// 사용자 팔로우 관계
+/// 사용자 간의 팔로우/팔로잉 관계를 관리
+model UserFollow {
+  /// 고유 식별자
+  id           String    @id @default(uuid())
+  /// 팔로우를 하는 사용자 ID (Cognito의 userSub)
+  follower_id  String
+  /// 팔로우를 받는 사용자 ID (Cognito의 userSub)
+  following_id String
+  /// 팔로우 시작 일시
+  followed_at  DateTime  @default(now())
+  /// 삭제 일시 (언팔로우 시점)
+  deleted_at   DateTime?
+  /// 생성 일시
+  created_at   DateTime  @default(now())
+  /// 수정 일시
+  updated_at   DateTime  @updatedAt
+
+  @@unique([follower_id, following_id])
+  @@index([follower_id])
+  @@index([following_id])
+  @@index([followed_at])
+  @@index([deleted_at])
+  @@map("user_follows")
+}
 
 enum CommonStatus {
   PENDING
@@ -572,52 +616,4 @@ enum ProcessingStatus {
   FAILED
 
   @@map("processing_statuses")
-}
-
-/// 얼리버드 회원
-/// 얼리버드로 가입한 사용자들을 관리하여 추후 혜택을 제공
-model Earlybird {
-  /// 고유 식별자
-  id         Int      @id @default(autoincrement())
-  /// 사용자 ID (Cognito의 userSub)
-  user_sub   String   @unique
-  /// 가입 일시
-  joined_at  DateTime @default(now())
-  /// 혜택 지급 여부
-  rewarded   Boolean  @default(false)
-  /// 혜택 지급 일시
-  rewarded_at DateTime?
-  /// 생성 일시
-  created_at DateTime @default(now())
-  /// 수정 일시
-  updated_at DateTime @updatedAt
-
-  @@map("earlybirds")
-}
-
-/// 사용자 팔로우 관계
-/// 사용자 간의 팔로우/팔로잉 관계를 관리
-model UserFollow {
-  /// 고유 식별자
-  id           Int       @id @default(autoincrement())
-  /// 팔로우를 하는 사용자 ID (Cognito의 userSub)
-  follower_id  String
-  /// 팔로우를 받는 사용자 ID (Cognito의 userSub)
-  following_id String
-  /// 팔로우 시작 일시
-  followed_at  DateTime  @default(now())
-  /// 삭제 일시 (언팔로우 시점)
-  deleted_at   DateTime?
-  /// 생성 일시
-  created_at   DateTime  @default(now())
-  /// 수정 일시
-  updated_at   DateTime  @updatedAt
-
-  /// 팔로워와 팔로잉 사용자가 같을 수 없음 (자기 자신을 팔로우할 수 없음)
-  @@unique([follower_id, following_id])
-  @@index([follower_id])
-  @@index([following_id])
-  @@index([followed_at])
-  @@index([deleted_at])
-  @@map("user_follows")
 }

@@ -4,7 +4,7 @@ import {
   Delete,
   Param,
   UseGuards,
-  ParseIntPipe,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { PostingLikeService } from './posting-like.service';
 import { AuthGuard } from '../common/guards/auth.guard';
@@ -25,7 +25,7 @@ export class PostingLikeController {
   @UseGuards(AuthGuard)
   @Post(':id/like')
   async likePosting(
-    @Param('id', ParseIntPipe) postingId: number,
+    @Param('id', ParseUUIDPipe) postingId: string,
     @CurrentUser() user: CurrentUserType,
   ): Promise<ApiResponseDto<any>> {
     const result = await this.postingLikeService.likePosting(user.userSub, postingId);
@@ -35,7 +35,7 @@ export class PostingLikeController {
   @UseGuards(AuthGuard)
   @Delete(':id/like')
   async unlikePosting(
-    @Param('id', ParseIntPipe) postingId: number,
+    @Param('id', ParseUUIDPipe) postingId: string,
     @CurrentUser() user: CurrentUserType,
   ): Promise<ApiResponseDto<any>> {
     const result = await this.postingLikeService.unlikePosting(user.userSub, postingId);

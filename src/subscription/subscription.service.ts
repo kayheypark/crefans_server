@@ -47,7 +47,7 @@ export class SubscriptionService {
     }
   }
 
-  async subscribeToMembership(userId: string, membershipItemId: number) {
+  async subscribeToMembership(userId: string, membershipItemId: string) {
     try {
       this.logger.log(`User ${userId} subscribing to membership ${membershipItemId}`, {
         service: 'SubscriptionService',
@@ -116,7 +116,7 @@ export class SubscriptionService {
     }
   }
 
-  async unsubscribeFromMembership(userId: string, membershipItemId: number) {
+  async unsubscribeFromMembership(userId: string, membershipItemId: string) {
     try {
       this.logger.log(`User ${userId} unsubscribing from membership ${membershipItemId}`, {
         service: 'SubscriptionService',

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, ParseIntPipe, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, ParseUUIDPipe, Patch } from '@nestjs/common';
 import { MembershipService } from './membership.service';
 import { CreateMembershipDto } from './dto/create-membership.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
@@ -36,7 +36,7 @@ export class MembershipController {
   @UseGuards(AuthGuard, CreatorGuard)
   async getMembership(
     @Req() req: any,
-    @Param('id', ParseIntPipe) id: number
+    @Param('id', ParseUUIDPipe) id: string
   ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;
     const membership = await this.membershipService.getMembershipById(id, sub);
@@ -47,7 +47,7 @@ export class MembershipController {
   @UseGuards(AuthGuard, CreatorGuard)
   async updateMembership(
     @Req() req: any,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateMembershipDto: UpdateMembershipDto
   ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;
@@ -59,7 +59,7 @@ export class MembershipController {
   @UseGuards(AuthGuard, CreatorGuard)
   async deleteMembership(
     @Req() req: any,
-    @Param('id', ParseIntPipe) id: number
+    @Param('id', ParseUUIDPipe) id: string
   ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;
     await this.membershipService.deleteMembership(id, sub);
@@ -70,7 +70,7 @@ export class MembershipController {
   @UseGuards(AuthGuard, CreatorGuard)
   async toggleMembershipActive(
     @Req() req: any,
-    @Param('id', ParseIntPipe) id: number
+    @Param('id', ParseUUIDPipe) id: string
   ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;
     const membership = await this.membershipService.toggleMembershipActive(id, sub);

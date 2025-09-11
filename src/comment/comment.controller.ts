@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
   Req,
-  ParseIntPipe,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { CommentService } from './comment.service';
 import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
@@ -35,7 +35,7 @@ export class CommentController {
   @UseGuards(OptionalAuthGuard)
   @Get('posting/:postingId')
   async getCommentsByPostingId(
-    @Param('postingId', ParseIntPipe) postingId: number,
+    @Param('postingId', ParseUUIDPipe) postingId: string,
     @Req() req?: any,
   ): Promise<ApiResponseDto<any>> {
     const viewerId = req?.user?.sub || null;
@@ -46,7 +46,7 @@ export class CommentController {
   @UseGuards(AuthGuard)
   @Put(':id')
   async updateComment(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Req() req: any,
     @Body() updateCommentDto: UpdateCommentDto,
   ): Promise<ApiResponseDto<any>> {
@@ -58,7 +58,7 @@ export class CommentController {
   @UseGuards(AuthGuard)
   @Delete(':id')
   async deleteComment(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Req() req: any,
   ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;

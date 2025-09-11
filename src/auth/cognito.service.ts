@@ -578,6 +578,7 @@ export class CognitoService {
 
     const errorMessages: { [key: string]: string } = {
       UsernameExistsException: "이미 존재하는 사용자입니다.",
+      AliasExistsException: "이미 사용 중인 핸들입니다.",
       InvalidPasswordException: "비밀번호가 정책에 맞지 않습니다.",
       InvalidParameterException: "잘못된 입력값이 있습니다.",
       CodeMismatchException: "인증 코드가 일치하지 않습니다.",

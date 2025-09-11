@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, UseGuards, Req, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, UseGuards, Req, Query, ParseUUIDPipe } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
@@ -26,7 +26,7 @@ export class SubscriptionController {
   @UseGuards(AuthGuard)
   async subscribeToMembership(
     @Req() req: any,
-    @Param('membershipItemId', ParseIntPipe) membershipItemId: number
+    @Param('membershipItemId', ParseUUIDPipe) membershipItemId: string
   ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;
     const subscription = await this.subscriptionService.subscribeToMembership(sub, membershipItemId);
@@ -38,7 +38,7 @@ export class SubscriptionController {
   @UseGuards(AuthGuard)
   async unsubscribeFromMembership(
     @Req() req: any,
-    @Param('membershipItemId', ParseIntPipe) membershipItemId: number
+    @Param('membershipItemId', ParseUUIDPipe) membershipItemId: string
   ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;
     await this.subscriptionService.unsubscribeFromMembership(sub, membershipItemId);

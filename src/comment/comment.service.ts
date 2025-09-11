@@ -105,7 +105,7 @@ export class CommentService {
     return comment;
   }
 
-  async getCommentsByPostingId(postingId: number, viewerId?: string) {
+  async getCommentsByPostingId(postingId: string, viewerId?: string) {
     // 포스팅 존재 여부 확인
     const posting = await this.prisma.posting.findUnique({
       where: { id: postingId },
@@ -148,7 +148,7 @@ export class CommentService {
     });
 
     // 모든 댓글 ID 수집 (부모 댓글 + 자식 댓글)
-    const allCommentIds: number[] = [];
+    const allCommentIds: string[] = [];
     comments.forEach(comment => {
       allCommentIds.push(comment.id);
       comment.children.forEach(child => {
@@ -209,7 +209,7 @@ export class CommentService {
     return commentsWithAuthors;
   }
 
-  async updateComment(commentId: number, authorId: string, updateCommentDto: UpdateCommentDto) {
+  async updateComment(commentId: string, authorId: string, updateCommentDto: UpdateCommentDto) {
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
     });
@@ -252,7 +252,7 @@ export class CommentService {
     return updatedComment;
   }
 
-  async deleteComment(commentId: number, authorId: string) {
+  async deleteComment(commentId: string, authorId: string) {
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
       include: {

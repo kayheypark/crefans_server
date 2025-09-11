@@ -9,7 +9,7 @@ export class PostingLikeService {
     private readonly logger: LoggerService,
   ) {}
 
-  async likePosting(userId: string, postingId: number) {
+  async likePosting(userId: string, postingId: string) {
     // 포스팅 존재 여부 확인
     const posting = await this.prisma.posting.findUnique({
       where: { 
@@ -79,7 +79,7 @@ export class PostingLikeService {
     return postingLike;
   }
 
-  async unlikePosting(userId: string, postingId: number) {
+  async unlikePosting(userId: string, postingId: string) {
     // 포스팅 존재 여부 확인
     const posting = await this.prisma.posting.findUnique({
       where: { 
@@ -129,7 +129,7 @@ export class PostingLikeService {
     return { message: '포스팅 좋아요가 취소되었습니다.' };
   }
 
-  async getPostingLikeCount(postingId: number): Promise<number> {
+  async getPostingLikeCount(postingId: string): Promise<number> {
     return this.prisma.postingLike.count({
       where: {
         posting_id: postingId,
@@ -138,7 +138,7 @@ export class PostingLikeService {
     });
   }
 
-  async isUserLikedPosting(userId: string, postingId: number): Promise<boolean> {
+  async isUserLikedPosting(userId: string, postingId: string): Promise<boolean> {
     const like = await this.prisma.postingLike.findUnique({
       where: {
         posting_id_user_id: {
@@ -152,7 +152,7 @@ export class PostingLikeService {
     return !!like;
   }
 
-  async getPostingLikesStatus(userId: string | null, postingIds: number[]): Promise<Record<number, { likeCount: number; isLiked: boolean }>> {
+  async getPostingLikesStatus(userId: string | null, postingIds: string[]): Promise<Record<string, { likeCount: number; isLiked: boolean }>> {
     // 모든 포스팅의 좋아요 수 조회
     const likeCounts = await this.prisma.postingLike.groupBy({
       by: ['posting_id'],
@@ -194,7 +194,7 @@ export class PostingLikeService {
     return result;
   }
 
-  private async updatePostingLikeCount(postingId: number): Promise<void> {
+  private async updatePostingLikeCount(postingId: string): Promise<void> {
     const likeCount = await this.getPostingLikeCount(postingId);
     await this.prisma.posting.update({
       where: { id: postingId },

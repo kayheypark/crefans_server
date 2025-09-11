@@ -9,7 +9,7 @@ export class CommentLikeService {
     private readonly logger: LoggerService,
   ) {}
 
-  async likeComment(userId: string, commentId: number) {
+  async likeComment(userId: string, commentId: string) {
     // 댓글 존재 여부 확인
     const comment = await this.prisma.comment.findUnique({
       where: { 
@@ -76,7 +76,7 @@ export class CommentLikeService {
     return commentLike;
   }
 
-  async unlikeComment(userId: string, commentId: number) {
+  async unlikeComment(userId: string, commentId: string) {
     // 댓글 존재 여부 확인
     const comment = await this.prisma.comment.findUnique({
       where: { 
@@ -123,7 +123,7 @@ export class CommentLikeService {
     return { message: '댓글 좋아요가 취소되었습니다.' };
   }
 
-  async getCommentLikeCount(commentId: number): Promise<number> {
+  async getCommentLikeCount(commentId: string): Promise<number> {
     return this.prisma.commentLike.count({
       where: {
         comment_id: commentId,
@@ -132,7 +132,7 @@ export class CommentLikeService {
     });
   }
 
-  async isUserLikedComment(userId: string, commentId: number): Promise<boolean> {
+  async isUserLikedComment(userId: string, commentId: string): Promise<boolean> {
     const like = await this.prisma.commentLike.findUnique({
       where: {
         comment_id_user_id: {
@@ -146,7 +146,7 @@ export class CommentLikeService {
     return !!like;
   }
 
-  async getCommentLikesStatus(userId: string | null, commentIds: number[]): Promise<Record<number, { likeCount: number; isLiked: boolean }>> {
+  async getCommentLikesStatus(userId: string | null, commentIds: string[]): Promise<Record<string, { likeCount: number; isLiked: boolean }>> {
     // 모든 댓글의 좋아요 수 조회
     const likeCounts = await this.prisma.commentLike.groupBy({
       by: ['comment_id'],
@@ -175,7 +175,7 @@ export class CommentLikeService {
     }
 
     const userLikeSet = new Set(userLikes.map(like => like.comment_id));
-    const result: Record<number, { likeCount: number; isLiked: boolean }> = {};
+    const result: Record<string, { likeCount: number; isLiked: boolean }> = {};
 
     commentIds.forEach(commentId => {
       const likeCountData = likeCounts.find(item => item.comment_id === commentId);

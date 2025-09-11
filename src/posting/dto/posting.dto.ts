@@ -153,7 +153,7 @@ export interface MediaResponse {
 }
 
 export interface PostingResponse {
-  id: number;
+  id: string;
   userSub: string;
   title: string;
   content: string;
@@ -197,7 +197,7 @@ export interface PostingDetailResponse {
 export interface CreatePostingResponse {
   success: boolean;
   data: {
-    id: number;
+    id: string;
     message: string;
   };
 }

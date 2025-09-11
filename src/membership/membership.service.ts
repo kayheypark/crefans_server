@@ -53,7 +53,7 @@ export class MembershipService {
     });
   }
 
-  async getMembershipById(id: number, creatorId: string) {
+  async getMembershipById(id: string, creatorId: string) {
     const membership = await this.prisma.membershipItem.findFirst({
       where: {
         id,
@@ -69,7 +69,7 @@ export class MembershipService {
     return membership;
   }
 
-  async updateMembership(id: number, creatorId: string, updateMembershipDto: UpdateMembershipDto) {
+  async updateMembership(id: string, creatorId: string, updateMembershipDto: UpdateMembershipDto) {
     // 멤버십 존재 및 소유권 확인
     const existingMembership = await this.getMembershipById(id, creatorId);
 
@@ -95,7 +95,7 @@ export class MembershipService {
     });
   }
 
-  async deleteMembership(id: number, creatorId: string) {
+  async deleteMembership(id: string, creatorId: string) {
     // 멤버십 존재 및 소유권 확인
     await this.getMembershipById(id, creatorId);
 
@@ -122,7 +122,7 @@ export class MembershipService {
     });
   }
 
-  async toggleMembershipActive(id: number, creatorId: string) {
+  async toggleMembershipActive(id: string, creatorId: string) {
     const membership = await this.getMembershipById(id, creatorId);
 
     return this.prisma.membershipItem.update({

@@ -84,15 +84,17 @@ export class UpdateNicknameDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(2, { message: '닉네임은 최소 2자 이상이어야 합니다.' })
-  @MaxLength(20, { message: '닉네임은 최대 20자까지 가능합니다.' })
+  @MaxLength(10, { message: '닉네임은 최대 10자까지 가능합니다.' })
+  @Matches(/^[가-힣a-zA-Z0-9]+$/, { message: '닉네임은 한글, 영문, 숫자만 사용 가능합니다.' })
   nickname: string;
 }
 
 export class UpdateHandleDto {
   @IsString()
   @IsNotEmpty()
-  @MinLength(3, { message: '핸들은 최소 3자 이상이어야 합니다.' })
-  @MaxLength(30, { message: '핸들은 최대 30자까지 가능합니다.' })
-  @Matches(/^[a-zA-Z0-9_]+$/, { message: '핸들은 영문, 숫자, 언더스코어만 사용 가능합니다.' })
+  @MinLength(2, { message: '핸들은 최소 2자 이상이어야 합니다.' })
+  @MaxLength(15, { message: '핸들은 최대 15자까지 가능합니다.' })
+  @Matches(/^[가-힣a-zA-Z0-9_]+$/, { message: '핸들은 한글, 영문, 숫자, 언더스코어만 사용 가능합니다.' })
+  @Matches(/^(?!_+$).*[가-힣a-zA-Z0-9].*$/, { message: '핸들은 언더스코어만으로 구성될 수 없습니다.' })
   preferredUsername: string;
 }

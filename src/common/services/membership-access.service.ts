@@ -79,7 +79,7 @@ export class MembershipAccessService {
 
   async checkPostingAccess(
     userId: string | null,
-    postingId: number
+    postingId: string
   ): Promise<MembershipAccess> {
     try {
       const posting = await this.prisma.posting.findUnique({
@@ -114,7 +114,7 @@ export class MembershipAccessService {
 
   async validatePostingAccess(
     userId: string | null,
-    postingId: number
+    postingId: string
   ): Promise<void> {
     const access = await this.checkPostingAccess(userId, postingId);
     

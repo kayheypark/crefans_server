@@ -156,7 +156,7 @@ export class PostingService {
     // 모든 포스팅 ID 수집
     const postingIds = postings.map(posting => posting.id);
 
-    // 좋아요 상태 조회
+    // 좋아요 상태 조회 - TODO: PostingLikeService should be updated to handle string IDs
     const likesStatus = await this.postingLikeService.getPostingLikesStatus(viewerId, postingIds);
 
     const formattedPostings: PostingResponse[] = await Promise.all(
@@ -219,7 +219,7 @@ export class PostingService {
     };
   }
 
-  async getPostingById(id: number, viewerId?: string): Promise<PostingDetailResponse> {
+  async getPostingById(id: string, viewerId?: string): Promise<PostingDetailResponse> {
     const posting = await this.prisma.posting.findFirst({
       where: {
         id,
@@ -256,8 +256,8 @@ export class PostingService {
       await this.incrementViewCount(id, viewerId);
     }
 
-    // 좋아요 상태 조회
-    const likesStatus = await this.postingLikeService.getPostingLikesStatus(viewerId, [id]);
+    // 좋아요 상태 조회 - TODO: PostingLikeService should be updated to handle string IDs
+    const likesStatus = await this.postingLikeService.getPostingLikesStatus(viewerId, [id] as any);
 
     // 미디어 URL들을 새로운 접근 제어 API로 변경
     const mediasWithUrls = await Promise.all(
@@ -310,7 +310,7 @@ export class PostingService {
   }
 
   async updatePosting(
-    id: number,
+    id: string,
     userId: string,
     updatePostingDto: UpdatePostingDto,
   ): Promise<{ success: boolean; message: string }> {
@@ -403,7 +403,7 @@ export class PostingService {
   }
 
   async deletePosting(
-    id: number,
+    id: string,
     userId: string,
   ): Promise<{ success: boolean; message: string }> {
     const existingPosting = await this.prisma.posting.findFirst({
@@ -432,7 +432,7 @@ export class PostingService {
     };
   }
 
-  private async incrementViewCount(postingId: number, viewerId: string): Promise<void> {
+  private async incrementViewCount(postingId: string, viewerId: string): Promise<void> {
     // 이미 조회한 기록이 있는지 확인
     const existingView = await this.prisma.postingView.findFirst({
       where: {

@@ -25,7 +25,7 @@ export class TokenService {
     fromWalletAddress: string,
     toWalletAddress: string,
     amount: Decimal,
-    reason: number,
+    reason: string,
     timestamp: Date
   ): string {
     const data = `${fromWalletAddress}:${toWalletAddress}:${amount.toString()}:${reason}:${timestamp.getTime()}`;
@@ -37,7 +37,7 @@ export class TokenService {
    * @param tokenTypeId 토큰 타입 ID
    * @param ownerId 소유자 ID (Cognito userSub)
    */
-  async createWallet(tokenTypeId: number, ownerId: string) {
+  async createWallet(tokenTypeId: string, ownerId: string) {
     // 1. 토큰 타입 존재 여부 확인
     const tokenType = await this.prisma.tokenType.findUnique({
       where: { id: tokenTypeId },
@@ -96,10 +96,10 @@ export class TokenService {
    * @param referenceId 참조 ID (선택)
    */
   async transferToken(
-    fromWalletId: number,
-    toWalletId: number,
+    fromWalletId: string,
+    toWalletId: string,
     amount: number,
-    reason: number,
+    reason: string,
     referenceId?: string
   ) {
     // 1. 송신 지갑 확인
@@ -171,15 +171,21 @@ export class TokenService {
       const transfer = await tx.transfer.create({
         data: {
           tx_hash: txHash,
-          from_wallet_id: fromWalletId,
-          to_wallet_id: toWalletId,
-          token_type_id: fromWallet.token_type_id,
+          from_wallet: {
+            connect: { id: fromWalletId }
+          },
+          to_wallet: {
+            connect: { id: toWalletId }
+          },
+          token_type: {
+            connect: { id: fromWallet.token_type_id }
+          },
           amount: amountDecimal,
           from_balance_before: fromWallet.amount,
           from_balance_after: updatedFromWallet.amount,
           to_balance_before: toWallet.amount,
           to_balance_after: updatedToWallet.amount,
-          reason,
+          reason: 1, // Default reason code
           transfer_reason_id: reason,
           reference_id: referenceId,
           status: CommonStatus.SUCCESS,
