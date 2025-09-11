@@ -202,4 +202,74 @@ export class FollowService {
       throw new Error("팔로잉 목록 조회 중 오류가 발생했습니다.");
     }
   }
+
+  // 팔로워 목록 조회
+  async getFollowers(userId: string, page: number = 1, limit: number = 20) {
+    try {
+      const { page: normalizedPage, limit: normalizedLimit } =
+        PaginationUtil.validateAndNormalize(page, limit);
+      const { skip, take } = PaginationUtil.getPrismaParams(
+        normalizedPage,
+        normalizedLimit
+      );
+
+      const followers = await this.prisma.userFollow.findMany({
+        where: {
+          following_id: userId,
+          deleted_at: null,
+        },
+        select: {
+          follower_id: true,
+          followed_at: true,
+        },
+        orderBy: { followed_at: "desc" },
+        skip,
+        take,
+      });
+
+      const totalCount = await this.prisma.userFollow.count({
+        where: {
+          following_id: userId,
+          deleted_at: null,
+        },
+      });
+
+      // 사용자 프로필 정보 가져오기
+      const userProfiles = await Promise.all(
+        followers.map(async (f) => {
+          const cognitoUser = await this.cognitoService.getUserBySub(
+            f.follower_id
+          );
+          const userInfo = UserTransformationUtil.transformCognitoUser(
+            cognitoUser,
+            f.follower_id
+          );
+
+          return {
+            userId: f.follower_id,
+            nickname: userInfo.nickname,
+            handle: userInfo.preferred_username,
+            avatar: userInfo.avatar_url,
+            followedAt: f.followed_at,
+          };
+        })
+      );
+
+      return ApiResponseUtil.paginated(
+        userProfiles,
+        normalizedPage,
+        normalizedLimit,
+        totalCount
+      );
+    } catch (error) {
+      this.logger.error("Failed to get followers", {
+        userId,
+        page,
+        limit,
+        error: error.message,
+      });
+
+      throw new Error("팔로워 목록 조회 중 오류가 발생했습니다.");
+    }
+  }
 }
