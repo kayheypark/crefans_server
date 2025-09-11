@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "../auth/auth.service";
 import { S3Service } from "../media/s3.service";
 import { UpdateUserProfileDto } from "./dto/user.dto";
+import { CreatorApplicationDto } from "./dto/creator-application.dto";
 
 @Injectable()
 export class UserService {
@@ -326,7 +327,27 @@ export class UserService {
     };
   }
 
-  async becomeCreator(user_id: string) {
+  async getCreatorCategories() {
+    return await this.prisma.creatorCategory.findMany({
+      where: {
+        is_active: true,
+        is_deleted: false,
+      },
+      orderBy: {
+        sort_order: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        color_code: true,
+        icon: true,
+        sort_order: true,
+      },
+    });
+  }
+
+  async becomeCreator(user_id: string, creatorApplicationDto: CreatorApplicationDto) {
     // 이미 크리에이터인지 확인
     const existingCreator = await this.prisma.creator.findUnique({
       where: { user_id },
@@ -336,11 +357,25 @@ export class UserService {
       throw new Error("이미 크리에이터로 등록되어 있습니다.");
     }
 
+    // 카테고리 유효성 검사
+    const category = await this.prisma.creatorCategory.findUnique({
+      where: { 
+        id: creatorApplicationDto.category_id,
+      },
+    });
+
+    if (!category || !category.is_active || category.is_deleted) {
+      throw new Error("유효하지 않은 카테고리입니다.");
+    }
+
     // Creator 테이블에 추가
     const creator = await this.prisma.creator.create({
       data: {
         user_id,
-        // 다른 필드들이 있다면 기본값 설정
+        category_id: creatorApplicationDto.category_id,
+      },
+      include: {
+        category: true,
       },
     });
 

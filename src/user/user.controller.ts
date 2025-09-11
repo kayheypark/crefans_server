@@ -14,6 +14,7 @@ import { ApiResponseDto } from "../common/dto/api-response.dto";
 import { AuthGuard } from "../common/guards/auth.guard";
 import { OptionalAuthGuard } from "../common/guards/optional-auth.guard";
 import { UpdateUserProfileDto } from "./dto/user.dto";
+import { CreatorApplicationDto } from "./dto/creator-application.dto";
 
 @Controller("user")
 export class UserController {
@@ -85,11 +86,20 @@ export class UserController {
     );
   }
 
+  @Get("creator-categories")
+  async getCreatorCategories(): Promise<ApiResponseDto<any>> {
+    const categories = await this.userService.getCreatorCategories();
+    return ApiResponseDto.success("크리에이터 카테고리를 조회했습니다.", categories);
+  }
+
   @UseGuards(AuthGuard)
   @Post("become-creator")
-  async becomeCreator(@Req() req: any): Promise<ApiResponseDto<any>> {
+  async becomeCreator(
+    @Req() req: any,
+    @Body() creatorApplicationDto: CreatorApplicationDto
+  ): Promise<ApiResponseDto<any>> {
     const { sub } = req.user;
-    const creator = await this.userService.becomeCreator(sub);
+    const creator = await this.userService.becomeCreator(sub, creatorApplicationDto);
     return ApiResponseDto.success("크리에이터로 전환되었습니다.", creator);
   }
 
