@@ -134,7 +134,7 @@ export class FollowService {
   }
 
   // 팔로잉 목록 조회
-  async getFollowing(userId: string, page: number = 1, limit: number = 20) {
+  async getFollowing(userId: string, page: number = 1, limit: number = 20, requesterId?: string) {
     try {
       const { page: normalizedPage, limit: normalizedLimit } =
         PaginationUtil.validateAndNormalize(page, limit);
@@ -175,12 +175,27 @@ export class FollowService {
             f.following_id
           );
 
+          // 요청자가 있는 경우, 요청자가 이 사용자를 팔로우하고 있는지 확인
+          let isFollowedByRequester = false;
+          if (requesterId && requesterId !== f.following_id) {
+            const requesterFollow = await this.prisma.userFollow.findUnique({
+              where: {
+                follower_id_following_id: {
+                  follower_id: requesterId,
+                  following_id: f.following_id,
+                },
+              },
+            });
+            isFollowedByRequester = !!(requesterFollow && !requesterFollow.deleted_at);
+          }
+
           return {
             userId: f.following_id,
             nickname: userInfo.nickname,
             handle: userInfo.preferred_username,
             avatar: userInfo.avatar_url,
             followedAt: f.followed_at,
+            isFollowedByRequester, // 요청자가 이 사용자를 팔로우하고 있는지
           };
         })
       );
@@ -204,7 +219,7 @@ export class FollowService {
   }
 
   // 팔로워 목록 조회
-  async getFollowers(userId: string, page: number = 1, limit: number = 20) {
+  async getFollowers(userId: string, page: number = 1, limit: number = 20, requesterId?: string) {
     try {
       const { page: normalizedPage, limit: normalizedLimit } =
         PaginationUtil.validateAndNormalize(page, limit);
@@ -245,12 +260,27 @@ export class FollowService {
             f.follower_id
           );
 
+          // 요청자가 있는 경우, 요청자가 이 팔로워를 역으로 팔로우하고 있는지 확인
+          let isFollowedByRequester = false;
+          if (requesterId && requesterId !== f.follower_id) {
+            const requesterFollow = await this.prisma.userFollow.findUnique({
+              where: {
+                follower_id_following_id: {
+                  follower_id: requesterId,
+                  following_id: f.follower_id,
+                },
+              },
+            });
+            isFollowedByRequester = !!(requesterFollow && !requesterFollow.deleted_at);
+          }
+
           return {
             userId: f.follower_id,
             nickname: userInfo.nickname,
             handle: userInfo.preferred_username,
             avatar: userInfo.avatar_url,
             followedAt: f.followed_at,
+            isFollowedByRequester, // 요청자가 이 팔로워를 역으로 팔로우하고 있는지
           };
         })
       );
