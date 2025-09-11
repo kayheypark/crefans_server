@@ -38,13 +38,17 @@ async function bootstrap() {
   // 글로벌 인터셉터 추가
   app.useGlobalInterceptors(new LoggingInterceptor(logger));
 
-  // 글로벌 파이프 추가
-  // app.useGlobalPipes(
-  //   new ValidationPipe({
-  //     whitelist: true,
-  //     transform: true,
-  //   })
-  // );
+  // 글로벌 파이프 추가 - 보안 강화를 위한 입력 검증
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,           // DTO에 정의되지 않은 속성 제거
+      forbidNonWhitelisted: true, // 화이트리스트에 없는 속성 발견 시 에러 발생
+      transform: true,           // 자동 타입 변환
+      disableErrorMessages: process.env.NODE_ENV === 'production', // 프로덕션에서 상세 에러 메시지 숨김
+      validateCustomDecorators: true, // 커스텀 검증 데코레이터 활성화
+      stopAtFirstError: true,    // 첫 번째 검증 실패 시 중단 (성능 향상)
+    })
+  );
 
   const port = configService.get("app.port");
   await app.listen(port);
