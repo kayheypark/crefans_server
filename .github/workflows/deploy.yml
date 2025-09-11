@@ -45,9 +45,28 @@ jobs:
             # 환경변수 설정
             echo "${{ secrets.ENV_FILE }}" > .env
 
+            # 기존 빌드 파일 정리
+            echo "=== 기존 빌드 파일 정리 ==="
+            rm -rf dist node_modules/.prisma
+
             # 의존성 설치
             echo "=== 의존성 설치 ==="
             npm ci
+
+            # Prisma 클라이언트 생성 (빌드 전에 실행)
+            echo "=== Prisma 클라이언트 생성 ==="
+            npx prisma generate
+
+            # Prisma 클라이언트 생성 확인
+            if [ ! -d "node_modules/.prisma/client" ]; then
+              echo "❌ Prisma 클라이언트 생성 실패!"
+              exit 1
+            fi
+            echo "✅ Prisma 클라이언트 생성 완료"
+
+            # 데이터베이스 마이그레이션
+            echo "=== 데이터베이스 마이그레이션 ==="
+            npx prisma migrate deploy
 
             # TypeScript 빌드
             echo "=== TypeScript 빌드 ==="
@@ -63,11 +82,6 @@ jobs:
             echo "✅ 빌드 성공"
             echo "빌드된 파일:"
             ls -la dist/src/
-
-            # Prisma 설정
-            echo "=== Prisma 설정 ==="
-            npx prisma generate
-            npx prisma migrate deploy
 
             # 기존 프로세스 중지
             echo "=== 기존 프로세스 중지 ==="
