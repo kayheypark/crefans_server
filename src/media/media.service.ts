@@ -1,10 +1,12 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException, BadRequestException, UnauthorizedException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { S3Service } from "./s3.service";
 import { ImageProcessingService } from "./image-processing.service";
 import { CreateMediaDto, CompleteUploadDto } from "./dto/media.dto";
 import { Media, ProcessingStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
+import { Response } from "express";
+import { Readable } from "stream";
 
 @Injectable()
 export class MediaService {
@@ -490,6 +492,227 @@ export class MediaService {
     // 총 업로드 제한 (구독자 0명 기준: 월 10개)
     if (todayUploads.length >= 50) { // 일일 50개 = 월 1500개 (여유있게 설정)
       throw new BadRequestException('일일 업로드 제한에 도달했습니다.');
+    }
+  }
+
+  /**
+   * Option 3: 동적 미디어 스트리밍 with 접근 제어
+   */
+  async streamMedia(
+    mediaId: string,
+    quality?: string,
+    userSub?: string,
+    res?: Response
+  ): Promise<void> {
+    // 1. 미디어 조회
+    const media = await this.prisma.media.findUnique({
+      where: { id: mediaId },
+      include: {
+        postings: {
+          include: {
+            posting: true
+          }
+        }
+      }
+    });
+
+    if (!media) {
+      throw new NotFoundException('미디어를 찾을 수 없습니다');
+    }
+
+    // 2. 접근 권한 확인
+    const isPublic = await this.checkMediaAccess(media, userSub);
+    if (!isPublic) {
+      throw new UnauthorizedException('접근 권한이 없습니다');
+    }
+
+    // 3. 미디어 준비 상태 확인
+    if (media.processing_status !== ProcessingStatus.COMPLETED) {
+      throw new BadRequestException('미디어가 아직 처리 중입니다');
+    }
+
+    // 4. 적절한 S3 키와 버킷 결정
+    const { bucket, key } = this.getMediaStreamInfo(media, quality);
+
+    // 5. S3에서 스트리밍
+    const { stream, contentType, contentLength } = await this.s3Service.getObjectStream(bucket, key);
+
+    // 6. 응답 헤더 설정
+    if (!res) {
+      throw new BadRequestException('Response object is required for streaming');
+    }
+
+    res.setHeader('Content-Type', contentType || media.mime_type);
+    if (contentLength) {
+      res.setHeader('Content-Length', contentLength.toString());
+    }
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1년 캐시
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    // 스트림을 응답에 파이프
+    (stream as Readable).pipe(res);
+  }
+
+  /**
+   * 미디어 접근 권한 확인
+   */
+  private async checkMediaAccess(media: any, userSub?: string): Promise<boolean> {
+    // 미디어가 게시물에 포함되어 있는지 확인
+    if (media.postings && media.postings.length > 0) {
+      for (const postingMedia of media.postings) {
+        const posting = postingMedia.posting;
+        
+        // 공개 게시물이면 접근 허용
+        if (!posting.is_membership) {
+          return true;
+        }
+
+        // 멤버십 게시물인 경우 사용자 확인 필요
+        if (userSub) {
+          // 작성자 본인이면 접근 허용
+          if (posting.user_sub === userSub) {
+            return true;
+          }
+
+          // 멤버십 구독 확인 로직
+          const hasSubscription = await this.checkMembershipAccess(userSub, posting.user_sub, posting.membership_level);
+          if (hasSubscription) return true;
+        }
+      }
+      // 게시물이 있지만 접근 권한이 없음
+      return false;
+    }
+
+    // 게시물에 포함되지 않은 미디어 (업로드 중이거나 개인 미디어)
+    // 소유자만 접근 가능
+    return userSub === media.user_sub;
+  }
+
+  /**
+   * 품질별 미디어 스트림 정보 반환
+   */
+  private getMediaStreamInfo(media: any, quality?: string): { bucket: string; key: string } {
+    // 원본 또는 품질 지정이 없으면 원본 사용
+    if (!quality || quality === 'original') {
+      return {
+        bucket: this.s3Service.getBucketName(false), // upload bucket
+        key: media.s3_upload_key
+      };
+    }
+
+    // 처리된 파일 사용
+    const processedBucket = this.s3Service.getBucketName(true); // processed bucket
+    
+    if (quality === 'thumbnail' && media.thumbnail_urls) {
+      const thumbnailUrls = media.thumbnail_urls as any;
+      if (thumbnailUrls.thumb_0) {
+        // S3 URL에서 키 추출
+        const thumbnailKey = this.extractS3KeyFromUrl(thumbnailUrls.thumb_0);
+        return { bucket: processedBucket, key: thumbnailKey };
+      }
+    }
+
+    if (media.s3_processed_keys) {
+      const processedKeys = media.s3_processed_keys as any;
+      
+      // 품질별 키 매핑
+      const qualityKeyMap: { [key: string]: string } = {
+        'high': processedKeys['1080p'] || processedKeys['720p'],
+        'medium': processedKeys['720p'] || processedKeys['480p'],
+        'low': processedKeys['480p'] || processedKeys['360p'],
+        '1080p': processedKeys['1080p'],
+        '720p': processedKeys['720p'],
+        '480p': processedKeys['480p'],
+        '360p': processedKeys['360p']
+      };
+
+      const key = qualityKeyMap[quality];
+      if (key) {
+        return { bucket: processedBucket, key };
+      }
+    }
+
+    // 요청된 품질이 없으면 원본 반환
+    return {
+      bucket: this.s3Service.getBucketName(false),
+      key: media.s3_upload_key
+    };
+  }
+
+  /**
+   * S3 URL에서 키 추출
+   */
+  private extractS3KeyFromUrl(url: string): string {
+    const match = url.match(/amazonaws\.com\/(.+)$/);
+    return match ? match[1] : url;
+  }
+
+  /**
+   * 멤버십 구독 확인
+   */
+  private async checkMembershipAccess(
+    subscriberId: string,
+    creatorId: string,
+    requiredLevel?: number
+  ): Promise<boolean> {
+    try {
+      // 해당 크리에이터의 멤버십 상품들 조회
+      const membershipItems = await this.prisma.membershipItem.findMany({
+        where: {
+          creator_id: creatorId,
+          ...(requiredLevel && { level: { gte: requiredLevel } }) // 요구 레벨 이상의 멤버십만
+        },
+        select: {
+          id: true,
+          level: true
+        }
+      });
+
+      if (membershipItems.length === 0) {
+        return false;
+      }
+
+      // 구독자의 해당 크리에이터에 대한 활성 구독 확인
+      const activeSubscriptions = await this.prisma.subscription.findMany({
+        where: {
+          subscriber_id: subscriberId,
+          membership_item_id: {
+            in: membershipItems.map(item => item.id)
+          },
+          status: 'ONGOING',
+          OR: [
+            { ended_at: null },
+            { ended_at: { gt: new Date() } }
+          ]
+        },
+        include: {
+          membership_item: {
+            select: {
+              level: true
+            }
+          }
+        }
+      });
+
+      // 활성 구독이 있으면서, 요구 레벨을 만족하는 구독이 있는지 확인
+      if (activeSubscriptions.length > 0) {
+        if (!requiredLevel) {
+          // 레벨 요구사항이 없으면 구독만 있으면 됨
+          return true;
+        }
+
+        // 구독 중인 멤버십 레벨 중 요구 레벨 이상이 있는지 확인
+        const hasRequiredLevel = activeSubscriptions.some(
+          sub => sub.membership_item.level >= requiredLevel
+        );
+
+        return hasRequiredLevel;
+      }
+
+      return false;
+    } catch (error) {
+      this.logger.error('멤버십 접근 권한 확인 중 오류 발생:', error);
+      return false;
     }
   }
 }

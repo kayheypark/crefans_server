@@ -9,6 +9,8 @@ import {
   Request,
   HttpStatus,
   HttpCode,
+  Res,
+  StreamableFile,
 } from "@nestjs/common";
 import { MediaService } from "./media.service";
 import {
@@ -17,7 +19,17 @@ import {
   MediaProcessingWebhookDto,
 } from "./dto/media.dto";
 import { AuthGuard } from "../common/guards/auth.guard";
+import { OptionalAuthGuard } from "../common/guards/optional-auth.guard";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { Logger } from "@nestjs/common";
+import { Response } from "express";
+
+type CurrentUserType = {
+  userSub: string;
+  email: string;
+  username?: string;
+  accessToken?: string;
+};
 
 @Controller("media")
 export class MediaController {
@@ -134,7 +146,19 @@ export class MediaController {
     return { success: true };
   }
 
-  // 공개 미디어 조회 (게시글에서 사용)
+  // 동적 미디어 프록시 - Option 3 구현
+  @UseGuards(OptionalAuthGuard)
+  @Get("stream/:mediaId")
+  async streamMedia(
+    @Param("mediaId") mediaId: string,
+    @Query("quality") quality?: string,
+    @CurrentUser() user?: CurrentUserType,
+    @Res() res?: Response
+  ) {
+    return this.mediaService.streamMedia(mediaId, quality, user?.userSub, res);
+  }
+
+  // 공개 미디어 조회 (게시글에서 사용) - 레거시 호환성
   @Get("public/:mediaId")
   async getPublicMedia(@Param("mediaId") mediaId: string) {
     const media = await this.mediaService.getMedia(mediaId);

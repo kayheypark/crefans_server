@@ -161,17 +161,17 @@ export class PostingService {
 
     const formattedPostings: PostingResponse[] = await Promise.all(
       postings.map(async (posting) => {
-        // 미디어 URL들을 새로운 접근 제어 API로 변경
+        // Option 3: 동적 미디어 프록시 URL 사용
         const mediasWithUrls = await Promise.all(
           posting.medias.map(async (pm) => {
-            // 새로운 미디어 접근 API URL 사용
-            const accessUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/access/${pm.media.id}`;
+            // 새로운 미디어 스트리밍 API URL 사용
+            const streamUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${pm.media.id}`;
 
             return {
               id: pm.media.id,
               type: pm.media.type,
               originalName: pm.media.original_name,
-              originalUrl: accessUrl,
+              originalUrl: streamUrl,
               processedUrls: pm.media.processed_urls,
               thumbnailUrls: pm.media.thumbnail_urls,
               processingStatus: pm.media.processing_status,
@@ -259,17 +259,17 @@ export class PostingService {
     // 좋아요 상태 조회 - TODO: PostingLikeService should be updated to handle string IDs
     const likesStatus = await this.postingLikeService.getPostingLikesStatus(viewerId, [id] as any);
 
-    // 미디어 URL들을 새로운 접근 제어 API로 변경
+    // Option 3: 동적 미디어 프록시 URL 사용 
     const mediasWithUrls = await Promise.all(
       posting.medias.map(async (pm) => {
-        // 새로운 미디어 접근 API URL 사용
-        const accessUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/access/${pm.media.id}`;
+        // 새로운 미디어 스트리밍 API URL 사용
+        const streamUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${pm.media.id}`;
 
         return {
           id: pm.media.id,
           type: pm.media.type,
           originalName: pm.media.original_name,
-          originalUrl: accessUrl,
+          originalUrl: streamUrl,
           processedUrls: pm.media.processed_urls,
           thumbnailUrls: pm.media.thumbnail_urls,
           processingStatus: pm.media.processing_status,

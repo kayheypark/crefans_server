@@ -97,10 +97,6 @@ model Transfer {
   id                  String        @id @default(uuid())
   /// 트랜잭션 해시 (UUID)
   tx_hash             String        @unique
-  /// 송신 지갑 주소
-  from_wallet_address String
-  /// 수신 지갑 주소
-  to_wallet_address   String
   /// 토큰 타입 ID
   token_type_id       String
   /// 전송 수량
@@ -125,6 +121,10 @@ model Transfer {
   to_balance_before   Decimal       @db.Decimal(18, 4)
   subscription_id     String?
   transfer_reason_id  String
+  /// 송신 지갑 주소
+  from_wallet_address String
+  /// 수신 지갑 주소
+  to_wallet_address   String
   from_wallet         Wallet        @relation("FromWallet", fields: [from_wallet_address], references: [address])
   subscription        Subscription? @relation(fields: [subscription_id], references: [id])
   to_wallet           Wallet        @relation("ToWallet", fields: [to_wallet_address], references: [address])

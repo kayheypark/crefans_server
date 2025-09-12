@@ -125,4 +125,27 @@ export class S3Service {
       throw error;
     }
   }
+
+  async getObjectStream(bucket: string, key: string): Promise<{ stream: any; contentType?: string; contentLength?: number }> {
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    });
+
+    try {
+      const response = await this.s3Client.send(command);
+      return {
+        stream: response.Body,
+        contentType: response.ContentType,
+        contentLength: response.ContentLength
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get object stream: ${bucket}/${key}`, error.stack);
+      throw error;
+    }
+  }
+
+  getBucketName(isProcessed: boolean = false): string {
+    return isProcessed ? this.processedBucket : this.uploadBucket;
+  }
 }
