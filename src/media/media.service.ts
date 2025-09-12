@@ -206,6 +206,11 @@ export class MediaService {
     userSub?: string,
     duration?: number
   ): Promise<void> {
+    // 상태값 정규화 (대소문자 처리)
+    const normalizedStatus = status?.toLowerCase()?.trim();
+    
+    this.logger.log(`Processing webhook: jobId=${jobId}, status=${normalizedStatus}, mediaId=${mediaId}, userSub=${userSub}, duration=${duration}`);
+
     // 먼저 처리 중인 작업 ID로 미디어 찾기 시도
     let media = await this.prisma.media.findFirst({
       where: {
@@ -224,12 +229,13 @@ export class MediaService {
     }
 
     if (!media) {
-      this.logger.warn(`Media not found for job: ${jobId}, mediaId: ${mediaId}, userSub: ${userSub}`);
-      return;
+      const errorMsg = `Media not found for job: ${jobId}, mediaId: ${mediaId}, userSub: ${userSub}`;
+      this.logger.error(errorMsg);
+      throw new Error(errorMsg);
     }
 
     try {
-      if (status === "progressing") {
+      if (normalizedStatus === "progressing") {
         // 처리 시작 시 job ID 저장
         await this.prisma.media.update({
           where: { id: media.id },
@@ -240,7 +246,7 @@ export class MediaService {
         });
 
         this.logger.log(`MediaConvert job started for media: ${media.id}, jobId: ${jobId}`);
-      } else if (status === "complete") {
+      } else if (normalizedStatus === "complete") {
         // 처리 완료 시 미디어 정보 업데이트
         const outputPrefix = `processed/${media.user_sub}/${media.id}/`;
 
@@ -301,8 +307,8 @@ export class MediaService {
           data: updateData,
         });
 
-        this.logger.log(`Media processing completed: ${media.id}`);
-      } else if (status === "error") {
+        this.logger.log(`Media processing completed: ${media.id}, duration: ${duration}s`);
+      } else if (normalizedStatus === "error") {
         await this.prisma.media.update({
           where: { id: media.id },
           data: {
@@ -311,12 +317,36 @@ export class MediaService {
         });
 
         this.logger.error(`Media processing failed: ${media.id}`);
+      } else {
+        this.logger.warn(`Unknown status received: ${normalizedStatus} for media: ${media.id}`);
       }
     } catch (error) {
       this.logger.error(
-        `Failed to handle processing webhook for job: ${jobId}`,
+        `Failed to handle processing webhook for job: ${jobId}, mediaId: ${mediaId}, status: ${normalizedStatus}`,
         error.stack
       );
+      
+      // DB 업데이트 실패시에도 미디어 상태를 실패로 업데이트 시도
+      try {
+        if (media) {
+          await this.prisma.media.update({
+            where: { id: media.id },
+            data: {
+              processing_status: ProcessingStatus.FAILED,
+              processing_job_id: jobId, // job ID가 없었다면 저장
+            },
+          });
+          this.logger.log(`Media status updated to FAILED due to webhook processing error: ${media.id}`);
+        }
+      } catch (updateError) {
+        this.logger.error(
+          `Failed to update media status to FAILED for media: ${media?.id}`,
+          updateError.stack
+        );
+      }
+      
+      // 웹훅 처리 실패는 Lambda 측에서 재시도할 수 있도록 에러를 던짐
+      throw error;
     }
   }
 

@@ -169,7 +169,7 @@ export const mediaConvertEventHandler = async (event: any, context: Context) => 
       }
       
       // MediaConvert 출력에서 duration 추출 (fallback)
-      if (!duration && status === 'COMPLETE') {
+      if (!duration && status.toUpperCase() === 'COMPLETE') {
         try {
           // 방법 1: outputGroupDetails에서 추출
           if (detail.outputGroupDetails && detail.outputGroupDetails.length > 0) {
@@ -189,8 +189,8 @@ export const mediaConvertEventHandler = async (event: any, context: Context) => 
         status: status.toLowerCase(),
         mediaId: userMetadata.mediaId,
         userSub: userMetadata.userSub,
-        progress: status === 'COMPLETE' ? 100 : undefined,
-        errorMessage: status === 'ERROR' ? detail.errorMessage : undefined,
+        progress: status.toUpperCase() === 'COMPLETE' ? 100 : undefined,
+        errorMessage: status.toUpperCase() === 'ERROR' ? detail.errorMessage : undefined,
         duration,
       });
     }
