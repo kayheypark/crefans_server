@@ -31,12 +31,13 @@ export class MediaService {
     try {
       // 크레팬스 업로드 정책 검증
       await this.validateUploadPolicy(userSub, createMediaDto);
-      // Presigned URL 생성
+      // Presigned URL 생성 (mediaId를 S3 key에 사용)
       const { uploadUrl, s3Key } =
         await this.s3Service.generatePresignedUploadUrl(
           userSub,
           createMediaDto.fileName,
-          createMediaDto.contentType
+          createMediaDto.contentType,
+          mediaId
         );
 
       // 파일 타입 결정
@@ -229,9 +230,10 @@ export class MediaService {
     }
 
     if (!media) {
-      const errorMsg = `Media not found for job: ${jobId}, mediaId: ${mediaId}, userSub: ${userSub}`;
-      this.logger.error(errorMsg);
-      throw new Error(errorMsg);
+      const warningMsg = `Media not found for job: ${jobId}, mediaId: ${mediaId}, userSub: ${userSub}. This might be a timing issue - webhook arrived before media creation.`;
+      this.logger.warn(warningMsg);
+      // 미디어를 찾을 수 없는 경우 경고 로그만 남기고 성공 처리 (Lambda 재시도 방지)
+      return;
     }
 
     try {

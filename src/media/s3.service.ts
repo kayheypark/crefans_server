@@ -28,9 +28,11 @@ export class S3Service {
     userSub: string,
     fileName: string,
     contentType: string,
+    mediaId?: string,
   ): Promise<{ uploadUrl: string; s3Key: string }> {
     const fileExtension = fileName.split('.').pop();
-    const s3Key = `uploads/${userSub}/${uuidv4()}.${fileExtension}`;
+    const fileId = mediaId || uuidv4();
+    const s3Key = `uploads/${userSub}/${fileId}.${fileExtension}`;
 
     const command = new PutObjectCommand({
       Bucket: this.uploadBucket,
