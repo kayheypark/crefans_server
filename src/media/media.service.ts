@@ -239,14 +239,17 @@ export class MediaService {
     try {
       if (normalizedStatus === "progressing") {
         // 처리 시작 시 job ID 저장
-        await this.prisma.media.update({
+        this.logger.log(`Before update: media.id=${media.id}, jobId=${jobId}, current_status=${media.processing_status}`);
+        
+        const updatedMedia = await this.prisma.media.update({
           where: { id: media.id },
           data: {
             processing_job_id: jobId,
             processing_status: ProcessingStatus.PROCESSING,
           },
         });
-
+        
+        this.logger.log(`After update: media.id=${media.id}, jobId=${jobId}, new_status=${updatedMedia.processing_status}`);
         this.logger.log(`MediaConvert job started for media: ${media.id}, jobId: ${jobId}`);
       } else if (normalizedStatus === "complete") {
         // 처리 완료 시 미디어 정보 업데이트
