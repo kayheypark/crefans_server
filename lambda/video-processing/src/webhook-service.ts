@@ -5,6 +5,7 @@ export interface WebhookPayload {
   mediaId?: string;
   userSub?: string;
   errorMessage?: string;
+  duration?: number;
 }
 
 export class WebhookService {

@@ -55,4 +55,8 @@ export class MediaProcessingWebhookDto {
   @IsString()
   @IsOptional()
   userSub?: string;
+
+  @IsNumber()
+  @IsOptional()
+  duration?: number;
 }

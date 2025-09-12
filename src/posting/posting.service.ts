@@ -138,6 +138,7 @@ export class PostingService {
                   processed_urls: true,
                   thumbnail_urls: true,
                   processing_status: true,
+                  duration: true,
                 },
               },
             },
@@ -175,6 +176,7 @@ export class PostingService {
               processedUrls: pm.media.processed_urls,
               thumbnailUrls: pm.media.thumbnail_urls,
               processingStatus: pm.media.processing_status,
+              duration: pm.media.duration,
             };
           })
         );
@@ -239,6 +241,7 @@ export class PostingService {
                 processed_urls: true,
                 thumbnail_urls: true,
                 processing_status: true,
+                duration: true,
               },
             },
           },
@@ -273,6 +276,7 @@ export class PostingService {
           processedUrls: pm.media.processed_urls,
           thumbnailUrls: pm.media.thumbnail_urls,
           processingStatus: pm.media.processing_status,
+          duration: pm.media.duration,
         };
       })
     );

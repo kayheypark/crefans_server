@@ -150,6 +150,7 @@ export interface MediaResponse {
   processedUrls?: any;
   thumbnailUrls?: any;
   processingStatus: string;
+  duration?: number;
 }
 
 export interface PostingResponse {

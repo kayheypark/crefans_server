@@ -51,7 +51,8 @@ export class MediaConvertService {
     inputS3Uri: string,
     outputPrefix: string,
     mediaId: string,
-    userSub: string
+    userSub: string,
+    duration?: number
   ): Promise<string> {
     const jobInput: CreateJobCommandInput = {
       Role: this.config.roleArn,
@@ -250,6 +251,7 @@ export class MediaConvertService {
         mediaId: mediaId,
         userSub: userSub,
         backendWebhookUrl: this.config.backendWebhookUrl || "",
+        duration: duration ? duration.toString() : "",
       },
     };
 

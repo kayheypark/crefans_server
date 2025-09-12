@@ -323,6 +323,8 @@ model Media {
   s3_upload_key     String
   /// 썸네일 URL들 (JSON)
   thumbnail_urls    Json?
+  /// 재생 길이 (초 단위, 비디오만 해당)
+  duration          Float?
   /// 소유자 ID (Cognito userSub)
   user_sub          String
   postings          PostingMedia[]

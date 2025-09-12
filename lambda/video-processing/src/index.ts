@@ -1,6 +1,7 @@
 import { S3Event, S3Handler, Context } from 'aws-lambda';
 import { MediaConvertService, MediaConvertConfig } from './mediaconvert-service';
 import { WebhookService } from './webhook-service';
+import { DurationService } from './duration-service';
 
 // 환경변수에서 설정 로드
 const config: MediaConvertConfig = {
@@ -13,6 +14,7 @@ const config: MediaConvertConfig = {
 // 전역 인스턴스 (Lambda 컨테이너 재사용을 위해)
 let mediaConvertService: MediaConvertService | null = null;
 let webhookService: WebhookService | null = null;
+let durationService: DurationService | null = null;
 
 async function initializeServices(): Promise<void> {
   if (!mediaConvertService) {
@@ -22,6 +24,10 @@ async function initializeServices(): Promise<void> {
   
   if (!webhookService && config.backendWebhookUrl) {
     webhookService = new WebhookService(config.backendWebhookUrl);
+  }
+
+  if (!durationService) {
+    durationService = new DurationService();
   }
 }
 
@@ -82,6 +88,17 @@ export const handler: S3Handler = async (event: S3Event, context: Context) => {
         
         console.log(`Processing video for user: ${userSub}, media: ${mediaId}`);
         
+        // 비디오 duration 추출 (선택적, 실패해도 계속 진행)
+        let duration: number | undefined;
+        if (durationService) {
+          try {
+            duration = await durationService.extractDuration(bucketName, objectKey);
+            console.log(`Duration extracted: ${duration} seconds`);
+          } catch (durationError) {
+            console.warn('Duration extraction failed, proceeding without duration:', durationError);
+          }
+        }
+        
         // MediaConvert 작업 생성
         const inputS3Uri = `s3://${bucketName}/${objectKey}`;
         const outputPrefix = `processed/${userSub}/${mediaId}/`;
@@ -90,7 +107,8 @@ export const handler: S3Handler = async (event: S3Event, context: Context) => {
           inputS3Uri,
           outputPrefix,
           mediaId,
-          userSub
+          userSub,
+          duration // duration을 userMetadata에 포함
         );
         
         console.log(`MediaConvert job created: ${jobId}`);
@@ -138,6 +156,34 @@ export const mediaConvertEventHandler = async (event: any, context: Context) => 
     }
     
     if (webhookService) {
+      // UserMetadata에서 duration 추출 (S3 트리거 시 추출된 값)
+      let duration: number | undefined;
+      
+      if (userMetadata.duration && userMetadata.duration !== "") {
+        try {
+          duration = parseFloat(userMetadata.duration);
+          console.log(`Using duration from userMetadata: ${duration} seconds`);
+        } catch (parseError) {
+          console.warn('Failed to parse duration from userMetadata:', parseError);
+        }
+      }
+      
+      // MediaConvert 출력에서 duration 추출 (fallback)
+      if (!duration && status === 'COMPLETE') {
+        try {
+          // 방법 1: outputGroupDetails에서 추출
+          if (detail.outputGroupDetails && detail.outputGroupDetails.length > 0) {
+            const firstOutput = detail.outputGroupDetails[0]?.outputDetails?.[0];
+            if (firstOutput?.durationInMs) {
+              duration = Math.round(firstOutput.durationInMs / 1000 * 100) / 100;
+              console.log(`Using duration from MediaConvert output: ${duration} seconds`);
+            }
+          }
+        } catch (durationError) {
+          console.warn('Failed to extract duration from MediaConvert output:', durationError);
+        }
+      }
+
       await webhookService.sendWebhook({
         jobId,
         status: status.toLowerCase(),
@@ -145,6 +191,7 @@ export const mediaConvertEventHandler = async (event: any, context: Context) => 
         userSub: userMetadata.userSub,
         progress: status === 'COMPLETE' ? 100 : undefined,
         errorMessage: status === 'ERROR' ? detail.errorMessage : undefined,
+        duration,
       });
     }
     

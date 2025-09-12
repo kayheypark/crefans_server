@@ -150,7 +150,7 @@ export class MediaService {
 
         return updatedMedia;
       } else if (isVideo) {
-        // 비디오는 S3 업로드만 완료, Lambda가 처리할 예정
+        // 비디오 처리: duration 추출 후 Lambda 처리 시작
         const updatedMedia = await this.prisma.media.update({
           where: { id: mediaId },
           data: {
@@ -160,8 +160,9 @@ export class MediaService {
         });
 
         this.logger.log(
-          `Video upload completed, starting Lambda processing: ${mediaId}`
+          `Video upload completed, Lambda will process duration: ${mediaId}`
         );
+
         return updatedMedia;
       } else {
         // 기타 파일은 원본만 사용
@@ -202,7 +203,8 @@ export class MediaService {
     status: string,
     progress?: number,
     mediaId?: string,
-    userSub?: string
+    userSub?: string,
+    duration?: number
   ): Promise<void> {
     // 먼저 처리 중인 작업 ID로 미디어 찾기 시도
     let media = await this.prisma.media.findFirst({
@@ -275,20 +277,28 @@ export class MediaService {
           )
         );
 
+        const updateData: any = {
+          processing_status: ProcessingStatus.COMPLETED,
+          processed_urls: processedUrls,
+          thumbnail_urls: thumbnailUrls,
+          processed_at: new Date(),
+          metadata: {
+            ...((media.metadata as any) || {}),
+            videoResolutions,
+            availableQualities: ["1080p", "720p", "480p"],
+            thumbnailCount: 5,
+          },
+        };
+
+        // Lambda에서 duration을 제공한 경우 저장
+        if (duration !== undefined) {
+          updateData.duration = duration;
+          updateData.metadata.duration = duration;
+        }
+
         await this.prisma.media.update({
           where: { id: media.id },
-          data: {
-            processing_status: ProcessingStatus.COMPLETED,
-            processed_urls: processedUrls,
-            thumbnail_urls: thumbnailUrls,
-            processed_at: new Date(),
-            metadata: {
-              ...((media.metadata as any) || {}),
-              videoResolutions,
-              availableQualities: ["1080p", "720p", "480p"],
-              thumbnailCount: 5,
-            },
-          },
+          data: updateData,
         });
 
         this.logger.log(`Media processing completed: ${media.id}`);
@@ -368,6 +378,7 @@ export class MediaService {
       progress: undefined, // 진행률은 현재 Lambda에서 제공하지 않음
     };
   }
+
 
   /**
    * 비동기 이미지 처리

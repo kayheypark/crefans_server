@@ -140,7 +140,8 @@ export class MediaController {
       webhookDto.status,
       webhookDto.progress,
       webhookDto.mediaId,
-      webhookDto.userSub
+      webhookDto.userSub,
+      webhookDto.duration
     );
 
     return { success: true };
