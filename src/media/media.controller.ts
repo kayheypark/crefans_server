@@ -11,6 +11,7 @@ import {
   HttpCode,
   Res,
   StreamableFile,
+  BadRequestException,
 } from "@nestjs/common";
 import { MediaService } from "./media.service";
 import {
@@ -148,51 +149,30 @@ export class MediaController {
     return { success: true };
   }
 
-  // 동적 미디어 프록시 - Option 3 구현
+
+  // 비디오 전용 스트리밍 엔드포인트
   @UseGuards(OptionalAuthGuard)
-  @Get("stream/:mediaId")
-  async streamMedia(
+  @Get("video/:mediaId")
+  async streamVideo(
     @Param("mediaId") mediaId: string,
-    @Query("quality") quality?: string,
+    @Query("quality") quality?: "480p" | "720p" | "1080p",
     @CurrentUser() user?: CurrentUserType,
     @Res() res?: Response
   ) {
-    return this.mediaService.streamMedia(mediaId, quality, user?.userSub, res);
+    return this.mediaService.streamVideoMedia(mediaId, quality, user?.userSub, res);
   }
 
-  // 공개 미디어 조회 (게시글에서 사용) - 레거시 호환성
-  @Get("public/:mediaId")
-  async getPublicMedia(@Param("mediaId") mediaId: string) {
-    const media = await this.mediaService.getMedia(mediaId);
-
-    // 완료된 미디어만 공개
-    if (media.processing_status !== "COMPLETED") {
-      return {
-        success: false,
-        error: "Media is not ready",
-      };
-    }
-
-    // processedUrls와 thumbnailUrls를 /media/stream 프록시로 변환
-    const processedUrls = MediaStreamUtil.convertProcessedUrlsToStreamProxy(
-      mediaId,
-      media.processed_urls
-    );
-    const thumbnailUrls = MediaStreamUtil.convertThumbnailUrlsToStreamProxy(
-      mediaId,
-      media.thumbnail_urls
-    );
-
-    return {
-      success: true,
-      data: {
-        id: media.id,
-        processing_status: media.processing_status,
-        processed_urls: processedUrls,
-        thumbnail_urls: thumbnailUrls,
-        metadata: media.metadata,
-      },
-    };
+  // 이미지 전용 스트리밍 엔드포인트
+  @UseGuards(OptionalAuthGuard)
+  @Get("image/:mediaId")
+  async streamImage(
+    @Param("mediaId") mediaId: string,
+    @Query("quality") quality?: "high" | "medium" | "low" | "thumbnail",
+    @CurrentUser() user?: CurrentUserType,
+    @Res() res?: Response
+  ) {
+    return this.mediaService.streamImageMedia(mediaId, quality, user?.userSub, res);
   }
+
 
 }

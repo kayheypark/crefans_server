@@ -232,7 +232,10 @@ export class FeedService {
           const images = post.medias
             .filter((media) => media.media.type === "IMAGE")
             .map((media) => ({
-              url: MediaStreamUtil.getMediaStreamUrl(media.media.id),
+              url: MediaStreamUtil.getTypedStreamUrl(
+                media.media.id,
+                media.media.type === 'VIDEO' ? 'video' : 'image'
+              ),
               isPublic: media.is_free_preview || false,
             }));
 
@@ -240,7 +243,10 @@ export class FeedService {
           const media = await Promise.all(
             post.medias.map(async (mediaItem) => {
               // /media/stream 프록시 URL 사용 (권한 체크 포함)
-              const streamUrl = MediaStreamUtil.getMediaStreamUrl(mediaItem.media.id);
+              const streamUrl = MediaStreamUtil.getTypedStreamUrl(
+                mediaItem.media.id,
+                mediaItem.media.type === 'VIDEO' ? 'video' : 'image'
+              );
 
               return {
                 id: mediaItem.media.id.toString(),
@@ -465,7 +471,10 @@ export class FeedService {
           const images = post.medias
             .filter((media) => media.media.type === "IMAGE")
             .map((media) => ({
-              url: MediaStreamUtil.getMediaStreamUrl(media.media.id),
+              url: MediaStreamUtil.getTypedStreamUrl(
+                media.media.id,
+                media.media.type === 'VIDEO' ? 'video' : 'image'
+              ),
               isPublic: media.is_free_preview || false,
             }));
 
@@ -473,7 +482,10 @@ export class FeedService {
           const media = await Promise.all(
             post.medias.map(async (mediaItem) => {
               // /media/stream 프록시 URL 사용 (권한 체크 포함)
-              const streamUrl = MediaStreamUtil.getMediaStreamUrl(mediaItem.media.id);
+              const streamUrl = MediaStreamUtil.getTypedStreamUrl(
+                mediaItem.media.id,
+                mediaItem.media.type === 'VIDEO' ? 'video' : 'image'
+              );
 
               return {
                 id: mediaItem.media.id.toString(),

@@ -485,7 +485,7 @@ model PostingLike {
   user_id    String
   /// 삭제 여부
   is_deleted Boolean   @default(false)
-  /// 삭제 일시
+  /// ��제 일시
   deleted_at DateTime?
   /// 생��� 일시
   created_at DateTime  @default(now())

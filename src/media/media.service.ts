@@ -542,18 +542,18 @@ export class MediaService {
     }
   }
 
+
   /**
-   * Option 3: 동적 미디어 스트리밍 with 접근 제어
+   * 비디오 전용 스트리밍 메서드
    */
-  async streamMedia(
+  async streamVideoMedia(
     mediaId: string,
-    quality?: string,
+    quality?: "480p" | "720p" | "1080p",
     userSub?: string,
     res?: Response
   ): Promise<void> {
-    // 1. 미디어 조회
     const media = await this.prisma.media.findUnique({
-      where: { id: mediaId },
+      where: { id: mediaId, type: 'VIDEO' },
       include: {
         postings: {
           include: {
@@ -564,39 +564,94 @@ export class MediaService {
     });
 
     if (!media) {
-      throw new NotFoundException('미디어를 찾을 수 없습니다');
+      throw new NotFoundException('비디오를 찾을 수 없습니다');
     }
 
-    // 2. 접근 권한 확인
-    const isPublic = await this.checkMediaAccess(media, userSub);
-    if (!isPublic) {
+    // 접근 권한 확인
+    const hasAccess = await this.checkMediaAccess(media, userSub);
+    if (!hasAccess) {
       throw new UnauthorizedException('접근 권한이 없습니다');
     }
 
-    // 3. 미디어 준비 상태 확인
+    // 처리 상태 확인
     if (media.processing_status !== ProcessingStatus.COMPLETED) {
-      throw new BadRequestException('미디어가 아직 처리 중입니다');
+      throw new BadRequestException('비디오가 아직 처리 중입니다');
     }
 
-    // 4. 적절한 S3 키와 버킷 결정
-    const { bucket, key } = this.getMediaStreamInfo(media, quality);
+    // 비디오 품질별 스트림 정보 획득
+    const { bucket, key } = this.getVideoStreamInfo(media, quality);
 
-    // 5. S3에서 스트리밍
+    // S3에서 스트리밍
     const { stream, contentType, contentLength } = await this.s3Service.getObjectStream(bucket, key);
 
-    // 6. 응답 헤더 설정
     if (!res) {
       throw new BadRequestException('Response object is required for streaming');
     }
 
-    res.setHeader('Content-Type', contentType || media.mime_type);
+    // 비디오 전용 헤더 설정
+    res.setHeader('Content-Type', contentType || 'video/mp4');
     if (contentLength) {
       res.setHeader('Content-Length', contentLength.toString());
     }
-    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1년 캐시
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
     res.setHeader('Accept-Ranges', 'bytes');
 
-    // 스트림을 응답에 파이프
+    (stream as Readable).pipe(res);
+  }
+
+  /**
+   * 이미지 전용 스트리밍 메서드
+   */
+  async streamImageMedia(
+    mediaId: string,
+    quality?: "high" | "medium" | "low" | "thumbnail",
+    userSub?: string,
+    res?: Response
+  ): Promise<void> {
+    const media = await this.prisma.media.findUnique({
+      where: { id: mediaId, type: 'IMAGE' },
+      include: {
+        postings: {
+          include: {
+            posting: true
+          }
+        }
+      }
+    });
+
+    if (!media) {
+      throw new NotFoundException('이미지를 찾을 수 없습니다');
+    }
+
+    // 접근 권한 확인
+    const hasAccess = await this.checkMediaAccess(media, userSub);
+    if (!hasAccess) {
+      throw new UnauthorizedException('접근 권한이 없습니다');
+    }
+
+    // 처리 상태 확인
+    if (media.processing_status !== ProcessingStatus.COMPLETED) {
+      throw new BadRequestException('이미지가 아직 처리 중입니다');
+    }
+
+    // 이미지 품질별 스트림 정보 획득
+    const { bucket, key } = this.getImageStreamInfo(media, quality);
+
+    // S3에서 스트리밍
+    const { stream, contentType, contentLength } = await this.s3Service.getObjectStream(bucket, key);
+
+    if (!res) {
+      throw new BadRequestException('Response object is required for streaming');
+    }
+
+    // 이미지 전용 헤더 설정
+    res.setHeader('Content-Type', contentType || 'image/webp');
+    if (contentLength) {
+      res.setHeader('Content-Length', contentLength.toString());
+    }
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.setHeader('Accept-Ranges', 'bytes');
+
     (stream as Readable).pipe(res);
   }
 
@@ -635,51 +690,130 @@ export class MediaService {
     return userSub === media.user_sub;
   }
 
+
   /**
-   * 품질별 미디어 스트림 정보 반환
+   * 비디오 품질별 스트림 정보 반환
    */
-  private getMediaStreamInfo(media: any, quality?: string): { bucket: string; key: string } {
-    // 원본 또는 품질 지정이 없으면 원본 사용
-    if (!quality || quality === 'original') {
+  private getVideoStreamInfo(media: any, quality?: "480p" | "720p" | "1080p"): { bucket: string; key: string } {
+    // 품질 지정이 없으면 원본 사용
+    if (!quality) {
       return {
         bucket: this.s3Service.getBucketName(false), // upload bucket
         key: media.s3_upload_key
       };
     }
 
-    // 처리된 파일 사용
     const processedBucket = this.s3Service.getBucketName(true); // processed bucket
-    
+
+    if (!media.processed_urls) {
+      this.logger.warn(`No processed URLs found for video ${media.id}, falling back to original`);
+      return {
+        bucket: this.s3Service.getBucketName(false),
+        key: media.s3_upload_key
+      };
+    }
+
+    const processedUrls = media.processed_urls as any;
+    let targetUrl: string | null = null;
+
+    // 비디오 품질 직접 매핑
+    switch (quality) {
+      case '1080p':
+        targetUrl = processedUrls['1080p'];
+        break;
+      case '720p':
+        targetUrl = processedUrls['720p'];
+        break;
+      case '480p':
+        targetUrl = processedUrls['480p'];
+        break;
+      default:
+        this.logger.warn(`Unsupported video quality '${quality}' for media ${media.id}`);
+        break;
+    }
+
+    if (targetUrl) {
+      const key = this.extractS3KeyFromUrl(targetUrl);
+      return { bucket: processedBucket, key };
+    }
+
+    // 요청된 품질이 없으면 원본 반환
+    this.logger.warn(`Video quality '${quality}' not available for media ${media.id}, falling back to original`);
+    return {
+      bucket: this.s3Service.getBucketName(false),
+      key: media.s3_upload_key
+    };
+  }
+
+  /**
+   * 이미지 품질별 스트림 정보 반환
+   */
+  private getImageStreamInfo(media: any, quality?: "high" | "medium" | "low" | "thumbnail"): { bucket: string; key: string } {
+    // 품질 지정이 없으면 원본 사용
+    if (!quality) {
+      return {
+        bucket: this.s3Service.getBucketName(false), // upload bucket
+        key: media.s3_upload_key
+      };
+    }
+
+    const processedBucket = this.s3Service.getBucketName(true); // processed bucket
+
+    // 썸네일 특별 처리
     if (quality === 'thumbnail' && media.thumbnail_urls) {
-      const thumbnailUrls = media.thumbnail_urls as any;
-      if (thumbnailUrls.thumb_0) {
-        // S3 URL에서 키 추출
-        const thumbnailKey = this.extractS3KeyFromUrl(thumbnailUrls.thumb_0);
+      const thumbnailUrls = media.thumbnail_urls;
+
+      if (Array.isArray(thumbnailUrls) && thumbnailUrls.length > 0) {
+        // 배열 형태인 경우 첫 번째 썸네일 사용
+        const thumbnailKey = this.extractS3KeyFromUrl(thumbnailUrls[0]);
         return { bucket: processedBucket, key: thumbnailKey };
       }
     }
 
-    if (media.s3_processed_keys) {
-      const processedKeys = media.s3_processed_keys as any;
-      
-      // 품질별 키 매핑
-      const qualityKeyMap: { [key: string]: string } = {
-        'high': processedKeys['1080p'] || processedKeys['720p'],
-        'medium': processedKeys['720p'] || processedKeys['480p'],
-        'low': processedKeys['480p'] || processedKeys['360p'],
-        '1080p': processedKeys['1080p'],
-        '720p': processedKeys['720p'],
-        '480p': processedKeys['480p'],
-        '360p': processedKeys['360p']
+    if (!media.processed_urls) {
+      this.logger.warn(`No processed URLs found for image ${media.id}, falling back to original`);
+      return {
+        bucket: this.s3Service.getBucketName(false),
+        key: media.s3_upload_key
       };
+    }
 
-      const key = qualityKeyMap[quality];
-      if (key) {
-        return { bucket: processedBucket, key };
-      }
+    const processedUrls = media.processed_urls as any;
+    let targetUrl: string | null = null;
+
+    // 이미지 품질 매핑 (실제 데이터베이스 구조에 맞춘 명확한 매핑)
+    switch (quality) {
+      case 'high':
+        // large가 있으면 large, 없으면 원본으로 폴백
+        targetUrl = processedUrls['large'];
+        if (!targetUrl) {
+          return {
+            bucket: this.s3Service.getBucketName(false),
+            key: media.s3_upload_key
+          };
+        }
+        break;
+      case 'medium':
+        targetUrl = processedUrls['small'];
+        break;
+      case 'low':
+        targetUrl = processedUrls['thumb'];
+        break;
+      case 'thumbnail':
+        targetUrl = processedUrls['thumb'];
+        break;
+      default:
+        this.logger.warn(`Unsupported image quality '${quality}' for media ${media.id}`);
+        break;
+    }
+
+    if (targetUrl) {
+      const key = this.extractS3KeyFromUrl(targetUrl);
+      return { bucket: processedBucket, key };
     }
 
     // 요청된 품질이 없으면 원본 반환
+    this.logger.warn(`Image quality '${quality}' not available for media ${media.id}, falling back to original`);
     return {
       bucket: this.s3Service.getBucketName(false),
       key: media.s3_upload_key

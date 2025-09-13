@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "../auth/auth.service";
 import { S3Service } from "../media/s3.service";
@@ -262,15 +262,30 @@ export class UserService {
           };
         }
 
-        // 접근 권한이 있는 경우 전체 데이터 반환 - /media/stream 프록시 사용
+        // 접근 권한이 있는 경우 전체 데이터 반환 - 타입별 프록시 사용
         const mediaWithStreamUrls = post.medias.map((pm) => {
-          const streamUrl = MediaStreamUtil.getMediaStreamUrl(pm.media.id);
-
-          // thumbnailUrls를 /media/stream 프록시로 변환
-          const thumbnailUrls = MediaStreamUtil.convertThumbnailUrlsToStreamProxy(
+          const streamUrl = MediaStreamUtil.getTypedStreamUrl(
             pm.media.id,
-            pm.media.thumbnail_urls
+            pm.media.type === 'VIDEO' ? 'video' : 'image'
           );
+
+          // 미디어 타입에 따라 적절한 썸네일 프록시 변환
+          let thumbnailUrls;
+
+          if (pm.media.type === 'VIDEO') {
+            thumbnailUrls = MediaStreamUtil.convertVideoThumbnailsToStreamProxy(
+              pm.media.id,
+              pm.media.thumbnail_urls
+            );
+          } else if (pm.media.type === 'IMAGE') {
+            thumbnailUrls = MediaStreamUtil.convertImageThumbnailsToStreamProxy(
+              pm.media.id,
+              pm.media.thumbnail_urls
+            );
+          } else {
+            // 지원하지 않는 미디어 타입
+            throw new BadRequestException(`Unsupported media type: ${pm.media.type}`);
+          }
 
           return {
             id: pm.media.id,

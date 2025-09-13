@@ -177,20 +177,37 @@ export class PostingService {
         // Option 3: 동적 미디어 프록시 URL 사용
         const mediasWithUrls = await Promise.all(
           posting.medias.map(async (pm) => {
-            // 새로운 미디어 스트리밍 API URL 사용
-            const streamUrl = MediaStreamUtil.getMediaStreamUrl(pm.media.id);
-
-            // processedUrls를 /media/stream 프록시를 통하도록 변환
-            const processedUrls = MediaStreamUtil.convertProcessedUrlsToStreamProxy(
+            // 미디어 타입에 따라 적절한 스트림 URL 사용
+            const streamUrl = MediaStreamUtil.getTypedStreamUrl(
               pm.media.id,
-              pm.media.processed_urls
+              pm.media.type === 'VIDEO' ? 'video' : 'image'
             );
 
-            // thumbnailUrls를 /media/stream 프록시를 통하도록 변환
-            const thumbnailUrls = MediaStreamUtil.convertThumbnailUrlsToStreamProxy(
-              pm.media.id,
-              pm.media.thumbnail_urls
-            );
+            // 미디어 타입에 따라 적절한 프록시 URL 변환
+            let processedUrls, thumbnailUrls;
+
+            if (pm.media.type === 'VIDEO') {
+              processedUrls = MediaStreamUtil.convertVideoUrlsToStreamProxy(
+                pm.media.id,
+                pm.media.processed_urls
+              );
+              thumbnailUrls = MediaStreamUtil.convertVideoThumbnailsToStreamProxy(
+                pm.media.id,
+                pm.media.thumbnail_urls
+              );
+            } else if (pm.media.type === 'IMAGE') {
+              processedUrls = MediaStreamUtil.convertImageUrlsToStreamProxy(
+                pm.media.id,
+                pm.media.processed_urls
+              );
+              thumbnailUrls = MediaStreamUtil.convertImageThumbnailsToStreamProxy(
+                pm.media.id,
+                pm.media.thumbnail_urls
+              );
+            } else {
+              // 지원하지 않는 미디어 타입
+              throw new BadRequestException(`Unsupported media type: ${pm.media.type}`);
+            }
 
             return {
               id: pm.media.id,
@@ -296,20 +313,37 @@ export class PostingService {
     // Option 3: 동적 미디어 프록시 URL 사용
     const mediasWithUrls = await Promise.all(
       posting.medias.map(async (pm) => {
-        // 새로운 미디어 스트리밍 API URL 사용
-        const streamUrl = MediaStreamUtil.getMediaStreamUrl(pm.media.id);
-
-        // processedUrls를 /media/stream 프록시를 통하도록 변환
-        const processedUrls = MediaStreamUtil.convertProcessedUrlsToStreamProxy(
+        // 미디어 타입에 따라 적절한 스트림 URL 사용
+        const streamUrl = MediaStreamUtil.getTypedStreamUrl(
           pm.media.id,
-          pm.media.processed_urls
+          pm.media.type === 'VIDEO' ? 'video' : 'image'
         );
 
-        // thumbnailUrls를 /media/stream 프록시를 통하도록 변환
-        const thumbnailUrls = MediaStreamUtil.convertThumbnailUrlsToStreamProxy(
-          pm.media.id,
-          pm.media.thumbnail_urls
-        );
+        // 미디어 타입에 따라 적절한 프록시 URL 변환
+        let processedUrls, thumbnailUrls;
+
+        if (pm.media.type === 'VIDEO') {
+          processedUrls = MediaStreamUtil.convertVideoUrlsToStreamProxy(
+            pm.media.id,
+            pm.media.processed_urls
+          );
+          thumbnailUrls = MediaStreamUtil.convertVideoThumbnailsToStreamProxy(
+            pm.media.id,
+            pm.media.thumbnail_urls
+          );
+        } else if (pm.media.type === 'IMAGE') {
+          processedUrls = MediaStreamUtil.convertImageUrlsToStreamProxy(
+            pm.media.id,
+            pm.media.processed_urls
+          );
+          thumbnailUrls = MediaStreamUtil.convertImageThumbnailsToStreamProxy(
+            pm.media.id,
+            pm.media.thumbnail_urls
+          );
+        } else {
+          // 지원하지 않는 미디어 타입
+          throw new BadRequestException(`Unsupported media type: ${pm.media.type}`);
+        }
 
         return {
           id: pm.media.id,
