@@ -119,7 +119,10 @@ export class FeedService {
           uniqueUserIds.map(async (userSub) => {
             try {
               const cognitoUser = await this.authService.getUserBySub(userSub);
-              const user = UserTransformationUtil.transformCognitoUser(cognitoUser, userSub);
+              const user = UserTransformationUtil.transformCognitoUser(
+                cognitoUser,
+                userSub
+              );
 
               this.logger.log(`Parsed user data for ${userSub} in getFeed`, {
                 service: "FeedService",
@@ -228,7 +231,7 @@ export class FeedService {
           const images = post.medias
             .filter((media) => media.media.type === "IMAGE")
             .map((media) => ({
-              url: `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${media.media.id}`,
+              url: `${process.env.API_BASE_URL}/media/stream/${media.media.id}`,
               isPublic: media.is_free_preview || false,
             }));
 
@@ -236,8 +239,8 @@ export class FeedService {
           const media = await Promise.all(
             post.medias.map(async (mediaItem) => {
               // /media/stream 프록시 URL 사용 (권한 체크 포함)
-              const streamUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${mediaItem.media.id}`;
-              
+              const streamUrl = `${process.env.API_BASE_URL}/media/stream/${mediaItem.media.id}`;
+
               return {
                 id: mediaItem.media.id.toString(),
                 fileName: mediaItem.media.file_name,
@@ -413,14 +416,20 @@ export class FeedService {
           uniqueUserIds.map(async (userSub) => {
             try {
               const cognitoUser = await this.authService.getUserBySub(userSub);
-              const user = UserTransformationUtil.transformCognitoUser(cognitoUser, userSub);
+              const user = UserTransformationUtil.transformCognitoUser(
+                cognitoUser,
+                userSub
+              );
 
-              this.logger.log(`Parsed user data for ${userSub} in getPublicFeed`, {
-                service: "FeedService",
-                method: "getPublicFeed",
-                userSub,
-                parsedUser: user,
-              });
+              this.logger.log(
+                `Parsed user data for ${userSub} in getPublicFeed`,
+                {
+                  service: "FeedService",
+                  method: "getPublicFeed",
+                  userSub,
+                  parsedUser: user,
+                }
+              );
 
               return { userSub, user };
             } catch (error) {
@@ -455,7 +464,7 @@ export class FeedService {
           const images = post.medias
             .filter((media) => media.media.type === "IMAGE")
             .map((media) => ({
-              url: `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${media.media.id}`,
+              url: `${process.env.API_BASE_URL}/media/stream/${media.media.id}`,
               isPublic: media.is_free_preview || false,
             }));
 
@@ -463,8 +472,8 @@ export class FeedService {
           const media = await Promise.all(
             post.medias.map(async (mediaItem) => {
               // /media/stream 프록시 URL 사용 (권한 체크 포함)
-              const streamUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${mediaItem.media.id}`;
-              
+              const streamUrl = `${process.env.API_BASE_URL}/media/stream/${mediaItem.media.id}`;
+
               return {
                 id: mediaItem.media.id.toString(),
                 fileName: mediaItem.media.file_name,
@@ -583,5 +592,4 @@ export class FeedService {
       };
     }
   }
-
 }

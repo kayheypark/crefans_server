@@ -57,13 +57,15 @@ export class UserService {
         },
       }),
       // 뷰어의 팔로우 상태 확인 (로그인한 경우만)
-      viewerId ? this.prisma.userFollow.findFirst({
-        where: {
-          follower_id: viewerId,
-          following_id: cognitoUser.Username,
-          deleted_at: null,
-        },
-      }) : null,
+      viewerId
+        ? this.prisma.userFollow.findFirst({
+            where: {
+              follower_id: viewerId,
+              following_id: cognitoUser.Username,
+              deleted_at: null,
+            },
+          })
+        : null,
     ]);
 
     return {
@@ -261,11 +263,15 @@ export class UserService {
 
         // 접근 권한이 있는 경우 전체 데이터 반환 - /media/stream 프록시 사용
         const mediaWithStreamUrls = post.medias.map((pm) => {
-          const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+          const baseUrl = process.env.API_BASE_URL;
           const streamUrl = `${baseUrl}/media/stream/${pm.media.id}`;
-          
+
           // thumbnailUrls를 /media/stream 프록시로 변환
-          const thumbnailUrls = this.convertThumbnailUrlsToStreamProxy(pm.media.id, pm.media.thumbnail_urls, baseUrl);
+          const thumbnailUrls = this.convertThumbnailUrlsToStreamProxy(
+            pm.media.id,
+            pm.media.thumbnail_urls,
+            baseUrl
+          );
 
           return {
             id: pm.media.id,
@@ -332,7 +338,7 @@ export class UserService {
         is_deleted: false,
       },
       orderBy: {
-        sort_order: 'asc',
+        sort_order: "asc",
       },
       select: {
         id: true,
@@ -345,7 +351,10 @@ export class UserService {
     });
   }
 
-  async becomeCreator(user_id: string, creatorApplicationDto: CreatorApplicationDto) {
+  async becomeCreator(
+    user_id: string,
+    creatorApplicationDto: CreatorApplicationDto
+  ) {
     // 이미 크리에이터인지 확인
     const existingCreator = await this.prisma.creator.findUnique({
       where: { user_id },
@@ -357,7 +366,7 @@ export class UserService {
 
     // 카테고리 유효성 검사
     const category = await this.prisma.creatorCategory.findUnique({
-      where: { 
+      where: {
         id: creatorApplicationDto.category_id,
       },
     });
@@ -391,20 +400,28 @@ export class UserService {
   /**
    * thumbnailUrls를 /media/stream 프록시 URL로 변환
    */
-  private convertThumbnailUrlsToStreamProxy(mediaId: string, thumbnailUrls: any, baseUrl: string): any {
-    if (!thumbnailUrls || typeof thumbnailUrls !== 'object') {
+  private convertThumbnailUrlsToStreamProxy(
+    mediaId: string,
+    thumbnailUrls: any,
+    baseUrl: string
+  ): any {
+    if (!thumbnailUrls || typeof thumbnailUrls !== "object") {
       return thumbnailUrls;
     }
 
     const convertedUrls: any = {};
 
     // 썸네일 인덱스별 URL 변환 (thumb_0, thumb_1, ...)
-    Object.keys(thumbnailUrls).forEach(key => {
-      if (key.startsWith('thumb_')) {
-        convertedUrls[key] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
+    Object.keys(thumbnailUrls).forEach((key) => {
+      if (key.startsWith("thumb_")) {
+        convertedUrls[
+          key
+        ] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
       } else {
         // 기타 썸네일 관련 필드
-        convertedUrls[key] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
+        convertedUrls[
+          key
+        ] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
       }
     });
 
