@@ -133,7 +133,6 @@ export class PostingService {
                   id: true,
                   type: true,
                   original_name: true,
-                  original_url: true,
                   s3_upload_key: true,
                   processed_urls: true,
                   thumbnail_urls: true,
@@ -167,14 +166,20 @@ export class PostingService {
           posting.medias.map(async (pm) => {
             // 새로운 미디어 스트리밍 API URL 사용
             const streamUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${pm.media.id}`;
+            
+            // processedUrls를 /media/stream 프록시를 통하도록 변환
+            const processedUrls = this.convertUrlsToStreamProxy(pm.media.id, pm.media.processed_urls);
+            
+            // thumbnailUrls를 /media/stream 프록시를 통하도록 변환
+            const thumbnailUrls = this.convertThumbnailUrlsToStreamProxy(pm.media.id, pm.media.thumbnail_urls);
 
             return {
               id: pm.media.id,
               type: pm.media.type,
               originalName: pm.media.original_name,
-              originalUrl: streamUrl,
-              processedUrls: pm.media.processed_urls,
-              thumbnailUrls: pm.media.thumbnail_urls,
+              mediaUrl: streamUrl,
+              processedUrls,
+              thumbnailUrls,
               processingStatus: pm.media.processing_status,
               duration: pm.media.duration,
             };
@@ -236,7 +241,6 @@ export class PostingService {
                 id: true,
                 type: true,
                 original_name: true,
-                original_url: true,
                 s3_upload_key: true,
                 processed_urls: true,
                 thumbnail_urls: true,
@@ -267,14 +271,20 @@ export class PostingService {
       posting.medias.map(async (pm) => {
         // 새로운 미디어 스트리밍 API URL 사용
         const streamUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${pm.media.id}`;
+        
+        // processedUrls를 /media/stream 프록시를 통하도록 변환
+        const processedUrls = this.convertUrlsToStreamProxy(pm.media.id, pm.media.processed_urls);
+        
+        // thumbnailUrls를 /media/stream 프록시를 통하도록 변환
+        const thumbnailUrls = this.convertThumbnailUrlsToStreamProxy(pm.media.id, pm.media.thumbnail_urls);
 
         return {
           id: pm.media.id,
           type: pm.media.type,
           originalName: pm.media.original_name,
-          originalUrl: streamUrl,
-          processedUrls: pm.media.processed_urls,
-          thumbnailUrls: pm.media.thumbnail_urls,
+          mediaUrl: streamUrl,
+          processedUrls,
+          thumbnailUrls,
           processingStatus: pm.media.processing_status,
           duration: pm.media.duration,
         };
@@ -521,5 +531,61 @@ export class PostingService {
     // 권한이 없는 경우 썸네일이나 블러 처리된 URL 반환
     // 현재는 기존 URL 그대로 반환 (추후 썸네일 로직 구현)
     return originalUrl;
+  }
+
+  /**
+   * processedUrls를 /media/stream 프록시 URL로 변환
+   */
+  private convertUrlsToStreamProxy(mediaId: string, processedUrls: any): any {
+    if (!processedUrls || typeof processedUrls !== 'object') {
+      return processedUrls;
+    }
+
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+    const convertedUrls: any = {};
+
+    // 비디오 품질별 URL 변환
+    if (processedUrls['1080p']) {
+      convertedUrls['1080p'] = `${baseUrl}/media/stream/${mediaId}?quality=1080p`;
+    }
+    if (processedUrls['720p']) {
+      convertedUrls['720p'] = `${baseUrl}/media/stream/${mediaId}?quality=720p`;
+    }
+    if (processedUrls['480p']) {
+      convertedUrls['480p'] = `${baseUrl}/media/stream/${mediaId}?quality=480p`;
+    }
+    
+    // 기타 품질 레벨 (high, medium, low 등)
+    ['high', 'medium', 'low', 'original'].forEach(quality => {
+      if (processedUrls[quality]) {
+        convertedUrls[quality] = `${baseUrl}/media/stream/${mediaId}?quality=${quality}`;
+      }
+    });
+
+    return convertedUrls;
+  }
+
+  /**
+   * thumbnailUrls를 /media/stream 프록시 URL로 변환
+   */
+  private convertThumbnailUrlsToStreamProxy(mediaId: string, thumbnailUrls: any): any {
+    if (!thumbnailUrls || typeof thumbnailUrls !== 'object') {
+      return thumbnailUrls;
+    }
+
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+    const convertedUrls: any = {};
+
+    // 썸네일 인덱스별 URL 변환 (thumb_0, thumb_1, ...)
+    Object.keys(thumbnailUrls).forEach(key => {
+      if (key.startsWith('thumb_')) {
+        convertedUrls[key] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
+      } else {
+        // 기타 썸네일 관련 필드
+        convertedUrls[key] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
+      }
+    });
+
+    return convertedUrls;
   }
 }

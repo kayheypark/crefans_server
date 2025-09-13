@@ -146,7 +146,7 @@ export interface MediaResponse {
   id: string;
   type: string;
   originalName: string;
-  originalUrl: string;
+  mediaUrl: string;
   processedUrls?: any;
   thumbnailUrls?: any;
   processingStatus: string;

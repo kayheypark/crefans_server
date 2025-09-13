@@ -172,15 +172,74 @@ export class MediaController {
       };
     }
 
+    // processedUrls와 thumbnailUrls를 /media/stream 프록시로 변환
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+    const processedUrls = this.convertUrlsToStreamProxy(mediaId, media.processed_urls, baseUrl);
+    const thumbnailUrls = this.convertThumbnailUrlsToStreamProxy(mediaId, media.thumbnail_urls, baseUrl);
+
     return {
       success: true,
       data: {
         id: media.id,
         processing_status: media.processing_status,
-        processed_urls: media.processed_urls,
-        thumbnail_urls: media.thumbnail_urls,
+        processed_urls: processedUrls,
+        thumbnail_urls: thumbnailUrls,
         metadata: media.metadata,
       },
     };
+  }
+
+  /**
+   * processedUrls를 /media/stream 프록시 URL로 변환
+   */
+  private convertUrlsToStreamProxy(mediaId: string, processedUrls: any, baseUrl: string): any {
+    if (!processedUrls || typeof processedUrls !== 'object') {
+      return processedUrls;
+    }
+
+    const convertedUrls: any = {};
+
+    // 비디오 품질별 URL 변환
+    if (processedUrls['1080p']) {
+      convertedUrls['1080p'] = `${baseUrl}/media/stream/${mediaId}?quality=1080p`;
+    }
+    if (processedUrls['720p']) {
+      convertedUrls['720p'] = `${baseUrl}/media/stream/${mediaId}?quality=720p`;
+    }
+    if (processedUrls['480p']) {
+      convertedUrls['480p'] = `${baseUrl}/media/stream/${mediaId}?quality=480p`;
+    }
+    
+    // 기타 품질 레벨 (high, medium, low 등)
+    ['high', 'medium', 'low', 'original'].forEach(quality => {
+      if (processedUrls[quality]) {
+        convertedUrls[quality] = `${baseUrl}/media/stream/${mediaId}?quality=${quality}`;
+      }
+    });
+
+    return convertedUrls;
+  }
+
+  /**
+   * thumbnailUrls를 /media/stream 프록시 URL로 변환
+   */
+  private convertThumbnailUrlsToStreamProxy(mediaId: string, thumbnailUrls: any, baseUrl: string): any {
+    if (!thumbnailUrls || typeof thumbnailUrls !== 'object') {
+      return thumbnailUrls;
+    }
+
+    const convertedUrls: any = {};
+
+    // 썸네일 인덱스별 URL 변환 (thumb_0, thumb_1, ...)
+    Object.keys(thumbnailUrls).forEach(key => {
+      if (key.startsWith('thumb_')) {
+        convertedUrls[key] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
+      } else {
+        // 기타 썸네일 관련 필드
+        convertedUrls[key] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
+      }
+    });
+
+    return convertedUrls;
   }
 }

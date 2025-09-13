@@ -151,7 +151,6 @@ export class UserService {
               select: {
                 id: true,
                 file_name: true,
-                original_url: true,
                 s3_upload_key: true,
                 type: true,
                 processing_status: true,
@@ -260,24 +259,23 @@ export class UserService {
           };
         }
 
-        // 접근 권한이 있는 경우 전체 데이터 반환
-        const mediaWithSignedUrls = await Promise.all(
-          post.medias.map(async (pm) => {
-            const signedUrl = await this.s3Service.getObjectUrl(
-              process.env.S3_UPLOAD_BUCKET,
-              pm.media.s3_upload_key
-            );
+        // 접근 권한이 있는 경우 전체 데이터 반환 - /media/stream 프록시 사용
+        const mediaWithStreamUrls = post.medias.map((pm) => {
+          const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+          const streamUrl = `${baseUrl}/media/stream/${pm.media.id}`;
+          
+          // thumbnailUrls를 /media/stream 프록시로 변환
+          const thumbnailUrls = this.convertThumbnailUrlsToStreamProxy(pm.media.id, pm.media.thumbnail_urls, baseUrl);
 
-            return {
-              id: pm.media.id,
-              type: pm.media.type,
-              fileName: pm.media.file_name,
-              originalUrl: signedUrl,
-              processingStatus: pm.media.processing_status,
-              thumbnailUrls: pm.media.thumbnail_urls,
-            };
-          })
-        );
+          return {
+            id: pm.media.id,
+            type: pm.media.type,
+            fileName: pm.media.file_name,
+            mediaUrl: streamUrl,
+            processingStatus: pm.media.processing_status,
+            thumbnailUrls,
+          };
+        });
 
         return {
           id: post.id,
@@ -293,7 +291,7 @@ export class UserService {
             ? Number(post.individual_purchase_price)
             : undefined,
           images: [], // 피드 API와 통일 (빈 배열로 초기화)
-          media: mediaWithSignedUrls,
+          media: mediaWithStreamUrls,
           textLength: post.content?.length || 0,
           imageCount:
             post.medias?.filter((pm) => pm.media.type === "IMAGE").length || 0,
@@ -388,5 +386,28 @@ export class UserService {
     });
 
     return !!creator;
+  }
+
+  /**
+   * thumbnailUrls를 /media/stream 프록시 URL로 변환
+   */
+  private convertThumbnailUrlsToStreamProxy(mediaId: string, thumbnailUrls: any, baseUrl: string): any {
+    if (!thumbnailUrls || typeof thumbnailUrls !== 'object') {
+      return thumbnailUrls;
+    }
+
+    const convertedUrls: any = {};
+
+    // 썸네일 인덱스별 URL 변환 (thumb_0, thumb_1, ...)
+    Object.keys(thumbnailUrls).forEach(key => {
+      if (key.startsWith('thumb_')) {
+        convertedUrls[key] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
+      } else {
+        // 기타 썸네일 관련 필드
+        convertedUrls[key] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
+      }
+    });
+
+    return convertedUrls;
   }
 }
