@@ -4,6 +4,7 @@ import { AuthService } from "../auth/auth.service";
 import { S3Service } from "../media/s3.service";
 import { UpdateUserProfileDto } from "./dto/user.dto";
 import { CreatorApplicationDto } from "./dto/creator-application.dto";
+import { MediaStreamUtil } from "../common/utils/media-stream.util";
 
 @Injectable()
 export class UserService {
@@ -263,14 +264,12 @@ export class UserService {
 
         // 접근 권한이 있는 경우 전체 데이터 반환 - /media/stream 프록시 사용
         const mediaWithStreamUrls = post.medias.map((pm) => {
-          const baseUrl = process.env.API_BASE_URL;
-          const streamUrl = `${baseUrl}/media/stream/${pm.media.id}`;
+          const streamUrl = MediaStreamUtil.getMediaStreamUrl(pm.media.id);
 
           // thumbnailUrls를 /media/stream 프록시로 변환
-          const thumbnailUrls = this.convertThumbnailUrlsToStreamProxy(
+          const thumbnailUrls = MediaStreamUtil.convertThumbnailUrlsToStreamProxy(
             pm.media.id,
-            pm.media.thumbnail_urls,
-            baseUrl
+            pm.media.thumbnail_urls
           );
 
           return {
@@ -397,34 +396,4 @@ export class UserService {
     return !!creator;
   }
 
-  /**
-   * thumbnailUrls를 /media/stream 프록시 URL로 변환
-   */
-  private convertThumbnailUrlsToStreamProxy(
-    mediaId: string,
-    thumbnailUrls: any,
-    baseUrl: string
-  ): any {
-    if (!thumbnailUrls || typeof thumbnailUrls !== "object") {
-      return thumbnailUrls;
-    }
-
-    const convertedUrls: any = {};
-
-    // 썸네일 인덱스별 URL 변환 (thumb_0, thumb_1, ...)
-    Object.keys(thumbnailUrls).forEach((key) => {
-      if (key.startsWith("thumb_")) {
-        convertedUrls[
-          key
-        ] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
-      } else {
-        // 기타 썸네일 관련 필드
-        convertedUrls[
-          key
-        ] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
-      }
-    });
-
-    return convertedUrls;
-  }
 }

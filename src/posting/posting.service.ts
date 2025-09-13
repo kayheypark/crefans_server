@@ -7,6 +7,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { S3Service } from "../media/s3.service";
 import { PostingLikeService } from "./posting-like.service";
+import { MediaStreamUtil } from "../common/utils/media-stream.util";
 import {
   CreatePostingDto,
   UpdatePostingDto,
@@ -177,16 +178,16 @@ export class PostingService {
         const mediasWithUrls = await Promise.all(
           posting.medias.map(async (pm) => {
             // 새로운 미디어 스트리밍 API URL 사용
-            const streamUrl = `${process.env.API_BASE_URL}/media/stream/${pm.media.id}`;
+            const streamUrl = MediaStreamUtil.getMediaStreamUrl(pm.media.id);
 
             // processedUrls를 /media/stream 프록시를 통하도록 변환
-            const processedUrls = this.convertUrlsToStreamProxy(
+            const processedUrls = MediaStreamUtil.convertProcessedUrlsToStreamProxy(
               pm.media.id,
               pm.media.processed_urls
             );
 
             // thumbnailUrls를 /media/stream 프록시를 통하도록 변환
-            const thumbnailUrls = this.convertThumbnailUrlsToStreamProxy(
+            const thumbnailUrls = MediaStreamUtil.convertThumbnailUrlsToStreamProxy(
               pm.media.id,
               pm.media.thumbnail_urls
             );
@@ -296,16 +297,16 @@ export class PostingService {
     const mediasWithUrls = await Promise.all(
       posting.medias.map(async (pm) => {
         // 새로운 미디어 스트리밍 API URL 사용
-        const streamUrl = `${process.env.API_BASE_URL}/media/stream/${pm.media.id}`;
+        const streamUrl = MediaStreamUtil.getMediaStreamUrl(pm.media.id);
 
         // processedUrls를 /media/stream 프록시를 통하도록 변환
-        const processedUrls = this.convertUrlsToStreamProxy(
+        const processedUrls = MediaStreamUtil.convertProcessedUrlsToStreamProxy(
           pm.media.id,
           pm.media.processed_urls
         );
 
         // thumbnailUrls를 /media/stream 프록시를 통하도록 변환
-        const thumbnailUrls = this.convertThumbnailUrlsToStreamProxy(
+        const thumbnailUrls = MediaStreamUtil.convertThumbnailUrlsToStreamProxy(
           pm.media.id,
           pm.media.thumbnail_urls
         );
@@ -582,70 +583,4 @@ export class PostingService {
     return originalUrl;
   }
 
-  /**
-   * processedUrls를 /media/stream 프록시 URL로 변환
-   */
-  private convertUrlsToStreamProxy(mediaId: string, processedUrls: any): any {
-    if (!processedUrls || typeof processedUrls !== "object") {
-      return processedUrls;
-    }
-
-    const baseUrl = process.env.API_BASE_URL;
-    const convertedUrls: any = {};
-
-    // 비디오 품질별 URL 변환
-    if (processedUrls["1080p"]) {
-      convertedUrls[
-        "1080p"
-      ] = `${baseUrl}/media/stream/${mediaId}?quality=1080p`;
-    }
-    if (processedUrls["720p"]) {
-      convertedUrls["720p"] = `${baseUrl}/media/stream/${mediaId}?quality=720p`;
-    }
-    if (processedUrls["480p"]) {
-      convertedUrls["480p"] = `${baseUrl}/media/stream/${mediaId}?quality=480p`;
-    }
-
-    // 기타 품질 레벨 (high, medium, low 등)
-    ["high", "medium", "low", "original"].forEach((quality) => {
-      if (processedUrls[quality]) {
-        convertedUrls[
-          quality
-        ] = `${baseUrl}/media/stream/${mediaId}?quality=${quality}`;
-      }
-    });
-
-    return convertedUrls;
-  }
-
-  /**
-   * thumbnailUrls를 /media/stream 프록시 URL로 변환
-   */
-  private convertThumbnailUrlsToStreamProxy(
-    mediaId: string,
-    thumbnailUrls: any
-  ): any {
-    if (!thumbnailUrls || typeof thumbnailUrls !== "object") {
-      return thumbnailUrls;
-    }
-
-    const baseUrl = process.env.API_BASE_URL;
-    const convertedUrls: any = {};
-
-    // 썸네일 인덱스별 URL 변환 (thumb_0, thumb_1, ...)
-    Object.keys(thumbnailUrls).forEach((key) => {
-      if (key.startsWith("thumb_")) {
-        convertedUrls[
-          key
-        ] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
-      } else {
-        // 기타 썸네일 관련 필드
-        convertedUrls[
-          key
-        ] = `${baseUrl}/media/stream/${mediaId}?quality=thumbnail`;
-      }
-    });
-
-    return convertedUrls;
-  }
 }
