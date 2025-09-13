@@ -224,33 +224,29 @@ export class FeedService {
             isLiked = false;
           }
 
-          // 이미지 URL 생성
-          const images = await Promise.all(
-            post.medias
-              .filter((media) => media.media.type === "IMAGE")
-              .map(async (media) => ({
-                url: await this.generateMediaUrl(
-                  media.media.s3_upload_key,
-                  media.is_free_preview
-                ),
-                isPublic: media.is_free_preview || false,
-              }))
-          );
+          // 이미지 URL 생성 - /media/stream 프록시 사용
+          const images = post.medias
+            .filter((media) => media.media.type === "IMAGE")
+            .map((media) => ({
+              url: `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${media.media.id}`,
+              isPublic: media.is_free_preview || false,
+            }));
 
           // 미디어 데이터 생성 (프로필 API와 동일한 구조)
           const media = await Promise.all(
-            post.medias.map(async (mediaItem) => ({
-              id: mediaItem.media.id.toString(),
-              fileName: mediaItem.media.file_name,
-              originalUrl: await this.generateMediaUrl(
-                mediaItem.media.s3_upload_key,
-                mediaItem.is_free_preview
-              ),
-              s3UploadKey: mediaItem.media.s3_upload_key,
-              type: mediaItem.media.type,
-              processingStatus: mediaItem.media.processing_status,
-              thumbnailUrls: mediaItem.media.thumbnail_urls,
-            }))
+            post.medias.map(async (mediaItem) => {
+              // /media/stream 프록시 URL 사용 (권한 체크 포함)
+              const streamUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${mediaItem.media.id}`;
+              
+              return {
+                id: mediaItem.media.id.toString(),
+                fileName: mediaItem.media.file_name,
+                mediaUrl: streamUrl,
+                type: mediaItem.media.type,
+                processingStatus: mediaItem.media.processing_status,
+                thumbnailUrls: mediaItem.media.thumbnail_urls,
+              };
+            })
           );
 
           // 실제 사용자 정보 가져오기
@@ -455,32 +451,29 @@ export class FeedService {
 
       const transformedPosts = await Promise.all(
         postings.map(async (post) => {
-          const images = await Promise.all(
-            post.medias
-              .filter((media) => media.media.type === "IMAGE")
-              .map(async (media) => ({
-                url: await this.generateMediaUrl(
-                  media.media.s3_upload_key,
-                  media.is_free_preview
-                ),
-                isPublic: media.is_free_preview || false,
-              }))
-          );
+          // 이미지 URL 생성 - /media/stream 프록시 사용
+          const images = post.medias
+            .filter((media) => media.media.type === "IMAGE")
+            .map((media) => ({
+              url: `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${media.media.id}`,
+              isPublic: media.is_free_preview || false,
+            }));
 
           // 미디어 데이터 생성 (getFeed와 동일한 구조)
           const media = await Promise.all(
-            post.medias.map(async (mediaItem) => ({
-              id: mediaItem.media.id.toString(),
-              fileName: mediaItem.media.file_name,
-              originalUrl: await this.generateMediaUrl(
-                mediaItem.media.s3_upload_key,
-                mediaItem.is_free_preview
-              ),
-              s3UploadKey: mediaItem.media.s3_upload_key,
-              type: mediaItem.media.type,
-              processingStatus: mediaItem.media.processing_status,
-              thumbnailUrls: mediaItem.media.thumbnail_urls,
-            }))
+            post.medias.map(async (mediaItem) => {
+              // /media/stream 프록시 URL 사용 (권한 체크 포함)
+              const streamUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/media/stream/${mediaItem.media.id}`;
+              
+              return {
+                id: mediaItem.media.id.toString(),
+                fileName: mediaItem.media.file_name,
+                mediaUrl: streamUrl,
+                type: mediaItem.media.type,
+                processingStatus: mediaItem.media.processing_status,
+                thumbnailUrls: mediaItem.media.thumbnail_urls,
+              };
+            })
           );
 
           // 좋아요 상태 확인 (public feed는 userId가 없으므로 항상 false)
@@ -591,14 +584,4 @@ export class FeedService {
     }
   }
 
-  private async generateMediaUrl(
-    s3Key: string,
-    isPublic: boolean
-  ): Promise<string> {
-    // S3 signed URL 생성 (user.service.ts와 동일한 방식)
-    return await this.s3Service.getObjectUrl(
-      process.env.S3_UPLOAD_BUCKET,
-      s3Key
-    );
-  }
 }
