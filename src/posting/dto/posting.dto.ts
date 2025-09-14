@@ -153,13 +153,22 @@ export interface MediaResponse {
   duration?: number;
 }
 
+export interface UserResponse {
+  id: string;
+  handle: string;
+  name: string;
+  avatar: string;
+}
+
 export interface PostingResponse {
   id: string;
   userSub: string;
+  user: UserResponse;
   title: string;
   content: string;
   status: PostingStatus;
   isMembership: boolean;
+  isGotMembership?: boolean;
   membershipLevel?: number;
   publishStartAt?: string;
   publishEndAt?: string;

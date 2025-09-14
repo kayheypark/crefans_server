@@ -8,6 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { S3Service } from "../media/s3.service";
 import { PostingLikeService } from "./posting-like.service";
 import { MediaStreamUtil } from "../common/utils/media-stream.util";
+import { AuthService } from "../auth/auth.service";
 import {
   CreatePostingDto,
   UpdatePostingDto,
@@ -24,7 +25,8 @@ export class PostingService {
   constructor(
     private prisma: PrismaService,
     private s3Service: S3Service,
-    private postingLikeService: PostingLikeService
+    private postingLikeService: PostingLikeService,
+    private authService: AuthService
   ) {}
 
   async createPosting(
@@ -174,6 +176,50 @@ export class PostingService {
 
     const formattedPostings: PostingResponse[] = await Promise.all(
       postings.map(async (posting) => {
+        // 멤버십 접근 권한 확인
+        let isGotMembership = false;
+        if (posting.is_membership && viewerId) {
+          // 작성자 본인인지 확인
+          const isOwner = viewerId === posting.user_sub;
+
+          if (isOwner) {
+            isGotMembership = true;
+          } else {
+            // 멤버십 구독 상태 확인
+            try {
+              const subscription = await this.prisma.subscription.findFirst({
+                where: {
+                  subscriber_id: viewerId,
+                  status: "ONGOING",
+                  ended_at: null,
+                },
+                include: {
+                  membership_item: {
+                    select: {
+                      creator_id: true,
+                      level: true,
+                    },
+                  },
+                },
+              });
+
+              // 해당 크리에이터의 구독이 있고, 레벨이 충족되는지 확인
+              if (subscription &&
+                  subscription.membership_item.creator_id === posting.user_sub &&
+                  subscription.membership_item.level >= (posting.membership_level || 1)) {
+                isGotMembership = true;
+              }
+            } catch (error) {
+              // 멤버십 확인 실패 시 기본값 false
+              console.error("Failed to check membership status:", error);
+              isGotMembership = false;
+            }
+          }
+        } else if (!posting.is_membership) {
+          // 공개 게시물의 경우
+          isGotMembership = true;
+        }
+
         // Option 3: 동적 미디어 프록시 URL 사용
         const mediasWithUrls = await Promise.all(
           posting.medias.map(async (pm) => {
@@ -222,13 +268,18 @@ export class PostingService {
           })
         );
 
+        // 사용자 정보 가져오기
+        const userInfo = await this.getUserInfo(posting.user_sub);
+
         return {
           id: posting.id,
           userSub: posting.user_sub,
+          user: userInfo,
           title: posting.title,
           content: posting.content,
           status: posting.status as PostingStatus,
           isMembership: posting.is_membership,
+          isGotMembership: isGotMembership,
           membershipLevel: posting.membership_level,
           publishStartAt: posting.publish_start_at?.toISOString(),
           publishEndAt: posting.publish_end_at?.toISOString(),
@@ -304,6 +355,50 @@ export class PostingService {
       await this.incrementViewCount(id, viewerId);
     }
 
+    // 멤버십 접근 권한 확인
+    let isGotMembership = false;
+    if (posting.is_membership && viewerId) {
+      // 작성자 본인인지 확인
+      const isOwner = viewerId === posting.user_sub;
+
+      if (isOwner) {
+        isGotMembership = true;
+      } else {
+        // 멤버십 구독 상태 확인
+        try {
+          const subscription = await this.prisma.subscription.findFirst({
+            where: {
+              subscriber_id: viewerId,
+              status: "ONGOING",
+              ended_at: null,
+            },
+            include: {
+              membership_item: {
+                select: {
+                  creator_id: true,
+                  level: true,
+                },
+              },
+            },
+          });
+
+          // 해당 크리에이터의 구독이 있고, 레벨이 충족되는지 확인
+          if (subscription &&
+              subscription.membership_item.creator_id === posting.user_sub &&
+              subscription.membership_item.level >= (posting.membership_level || 1)) {
+            isGotMembership = true;
+          }
+        } catch (error) {
+          // 멤버십 확인 실패 시 기본값 false
+          console.error("Failed to check membership status:", error);
+          isGotMembership = false;
+        }
+      }
+    } else if (!posting.is_membership) {
+      // 공개 게시물의 경우
+      isGotMembership = true;
+    }
+
     // 좋아요 상태 조회 - TODO: PostingLikeService should be updated to handle string IDs
     const likesStatus = await this.postingLikeService.getPostingLikesStatus(
       viewerId,
@@ -358,13 +453,18 @@ export class PostingService {
       })
     );
 
+    // 사용자 정보 가져오기
+    const userInfo = await this.getUserInfo(posting.user_sub);
+
     const formattedPosting: PostingResponse = {
       id: posting.id,
       userSub: posting.user_sub,
+      user: userInfo,
       title: posting.title,
       content: posting.content,
       status: posting.status as PostingStatus,
       isMembership: posting.is_membership,
+      isGotMembership: isGotMembership,
       membershipLevel: posting.membership_level,
       publishStartAt: posting.publish_start_at?.toISOString(),
       publishEndAt: posting.publish_end_at?.toISOString(),
@@ -615,6 +715,36 @@ export class PostingService {
     // 권한이 없는 경우 썸네일이나 블러 처리된 URL 반환
     // 현재는 기존 URL 그대로 반환 (추후 썸네일 로직 구현)
     return originalUrl;
+  }
+
+  private async getUserInfo(userSub: string) {
+    try {
+      const cognitoUser = await this.authService.getUserBySub(userSub);
+
+      if (!cognitoUser) {
+        return {
+          id: userSub,
+          handle: userSub,
+          name: userSub,
+          avatar: "/profile-90.png",
+        };
+      }
+
+      return {
+        id: cognitoUser.Username,
+        handle: cognitoUser.UserAttributes.find((attr) => attr.Name === "preferred_username")?.Value || userSub,
+        name: cognitoUser.UserAttributes.find((attr) => attr.Name === "nickname")?.Value || userSub,
+        avatar: cognitoUser.UserAttributes.find((attr) => attr.Name === "picture")?.Value || "/profile-90.png",
+      };
+    } catch (error) {
+      // Fall back to userSub if Cognito lookup fails
+      return {
+        id: userSub,
+        handle: userSub,
+        name: userSub,
+        avatar: "/profile-90.png",
+      };
+    }
   }
 
 }

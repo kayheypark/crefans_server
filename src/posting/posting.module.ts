@@ -6,9 +6,10 @@ import { PostingLikeService } from "./posting-like.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { MediaModule } from "../media/media.module";
 import { LoggerModule } from "../common/logger/logger.module";
+import { AuthModule } from "../auth/auth.module";
 
 @Module({
-  imports: [PrismaModule, MediaModule, LoggerModule],
+  imports: [PrismaModule, MediaModule, LoggerModule, AuthModule],
   controllers: [PostingController, PostingLikeController],
   providers: [PostingService, PostingLikeService],
   exports: [PostingService, PostingLikeService],
