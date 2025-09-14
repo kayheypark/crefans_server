@@ -27,9 +27,21 @@ export class UserService {
       where: { user_id: cognitoUser.Username },
     });
 
-    // 크리에이터 정보 조회
+    // 크리에이터 정보 조회 (카테고리 정보 포함)
     const creator = await this.prisma.creator.findUnique({
       where: { user_id: cognitoUser.Username },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            color_code: true,
+            icon: true,
+            sort_order: true,
+          },
+        },
+      },
     });
 
     // 통계 정보 계산 - 직접 cognitoUser.Username으로 조회
@@ -90,6 +102,7 @@ export class UserService {
       mediaCount,
       userSub: cognitoUser.Username, // 팔로우 API를 위한 userSub 추가
       isFollowing: !!followStatus, // 뷰어의 팔로우 상태
+      category: creator?.category || null, // 크리에이터 카테고리 정보 추가
     };
   }
 

@@ -13,6 +13,7 @@ import { CommentModule } from "./comment/comment.module";
 import { FeedModule } from "./feed/feed.module";
 import { FollowModule } from "./follow/follow.module";
 import { AdminModule } from "./admin/admin.module";
+import { ExploreModule } from "./explore/explore.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { LoggerModule } from "./common/logger/logger.module";
 import awsConfig from "./config/aws.config";
@@ -37,6 +38,7 @@ import appConfig from "./config/app.config";
     FeedModule,
     FollowModule,
     AdminModule,
+    ExploreModule,
   ],
   controllers: [AppController],
   providers: [AppService],
