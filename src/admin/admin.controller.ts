@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminAuthGuard } from './guards/admin-auth.guard';
+import { ApiResponseDto } from '../common/dto/api-response.dto';
 
 @Controller('admin')
 @UseGuards(AdminAuthGuard)
@@ -10,55 +11,65 @@ export class AdminController {
   // Dashboard endpoints
   @Get('dashboard/stats')
   async getDashboardStats() {
-    return this.adminService.getDashboardStats();
+    const data = await this.adminService.getDashboardStats();
+    return ApiResponseDto.success('대시보드 통계를 성공적으로 조회했습니다.', data);
   }
 
   @Get('dashboard/user-growth')
   async getUserGrowth() {
-    return this.adminService.getUserGrowth();
+    const data = await this.adminService.getUserGrowth();
+    return ApiResponseDto.success('사용자 증가 데이터를 성공적으로 조회했습니다.', data);
   }
 
   @Get('dashboard/revenue')
   async getRevenueStats() {
-    return this.adminService.getRevenueStats();
+    const data = await this.adminService.getRevenueStats();
+    return ApiResponseDto.success('매출 통계를 성공적으로 조회했습니다.', data);
   }
 
 
   // Posting management endpoints (READ ONLY)
   @Get('postings')
   async getPostings(@Query() query: any) {
-    return this.adminService.getPostings(query);
+    const data = await this.adminService.getPostings(query);
+    return ApiResponseDto.success('포스팅 목록을 성공적으로 조회했습니다.', data);
   }
 
   @Get('postings/:id')
   async getPosting(@Param('id') id: string) {
-    return this.adminService.getPosting(id);
+    const data = await this.adminService.getPosting(id);
+    return ApiResponseDto.success('포스팅 정보를 성공적으로 조회했습니다.', data);
   }
 
   // Report management endpoints (READ ONLY)
   @Get('reports')
   async getReports(@Query() query: any) {
-    return this.adminService.getReports(query);
+    const data = await this.adminService.getReports(query);
+    return ApiResponseDto.success('신고 목록을 성공적으로 조회했습니다.', data);
   }
 
   @Get('reports/:id')
   async getReport(@Param('id') id: string) {
-    return this.adminService.getReport(id);
+    const data = await this.adminService.getReport(id);
+    return ApiResponseDto.success('신고 정보를 성공적으로 조회했습니다.', data);
   }
 
   // User management endpoints (READ ONLY - using Cognito API)
   @Get('users')
   async getUsers(@Query() query: any) {
-    return this.adminService.getUsers(query);
+    const data = await this.adminService.getUsers(query);
+    return ApiResponseDto.success('사용자 목록을 성공적으로 조회했습니다.', data);
   }
 
   @Get('users/search')
   async searchUsers(@Query('q') query: string) {
-    return this.adminService.searchUsers(query);
+    const data = await this.adminService.searchUsers(query);
+    return ApiResponseDto.success('사용자 검색을 성공적으로 완료했습니다.', data);
   }
 
   @Get('users/:userSub')
   async getUser(@Param('userSub') userSub: string) {
-    return this.adminService.getUser(userSub);
+    const data = await this.adminService.getUser(userSub);
+    return ApiResponseDto.success('사용자 정보를 성공적으로 조회했습니다.', data);
   }
 }

@@ -237,23 +237,27 @@ export class AdminService {
         UserPoolId: userPoolId,
         Limit: validatedLimit,
         PaginationToken: paginationToken,
+        // Remove AttributesToGet to get all attributes
       });
 
       const response = await cognitoClient.send(command);
 
-      // 사용자 데이터를 관리자가 보기 편한 형태로 변환
       const users = response.Users?.map(user => {
-        const attributes = user.UserAttributes?.reduce((acc, attr) => {
-          acc[attr.Name] = attr.Value;
+        const userAttributes = user.Attributes || user.UserAttributes;
+        const attributes = userAttributes?.reduce((acc, attr) => {
+          if (attr.Name && attr.Value) {
+            acc[attr.Name] = attr.Value;
+          }
           return acc;
         }, {} as Record<string, string>) || {};
 
         return {
           username: user.Username,
-          email: attributes.email,
-          name: attributes.name,
-          nickname: attributes.nickname,
-          phoneNumber: attributes.phone_number,
+          email: attributes.email || 'N/A',
+          name: attributes.name || 'N/A',
+          nickname: attributes.nickname || 'N/A',
+          phoneNumber: attributes.phone_number || 'N/A',
+          preferredUsername: attributes.preferred_username || 'N/A',
           isCreator: attributes['custom:is_creator'] === '1',
           emailVerified: attributes.email_verified === 'true',
           userStatus: user.UserStatus,
@@ -270,9 +274,6 @@ export class AdminService {
         hasMore: !!response.PaginationToken,
       };
     } catch (error) {
-      console.error('[ERROR] AdminService.getUsers failed:', error);
-      console.error('[ERROR] Error message:', error.message);
-      console.error('[ERROR] Error stack:', error.stack);
       throw new Error(`사용자 목록 조회 실패: ${error.message}`);
     }
   }
