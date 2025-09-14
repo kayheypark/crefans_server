@@ -328,6 +328,7 @@ model Media {
   /// 소유자 ID (Cognito userSub)
   user_sub          String
   postings          PostingMedia[]
+  deleteQueue       MediaDeleteQueue?
 
   @@map("medias")
 }
@@ -618,4 +619,64 @@ enum ProcessingStatus {
   FAILED
 
   @@map("processing_statuses")
+}
+
+/// 미디어 삭제 큐
+/// S3에서 삭제될 미디어 파일들을 관리하는 큐
+model MediaDeleteQueue {
+  /// 큐 고유 식별자
+  id               String      @id @default(uuid())
+  /// 미디어 ID
+  media_id         String      @unique
+  /// S3 키 (삭제할 파일 경로)
+  s3_key           String
+  /// 원본 파일 URL (백업용)
+  original_url     String
+  /// 큐에 추가된 이유
+  queue_reason     QueueReason
+  /// 유예기간 종료일
+  grace_period_end DateTime
+  /// 처리 상태
+  status           QueueStatus @default(PENDING)
+  /// 재시도 횟수
+  retry_count      Int         @default(0)
+  /// 에러 메시지
+  error_message    String?     @db.Text
+  /// 큐에 추가된 일시
+  queued_at        DateTime    @default(now())
+  /// 처리 완료 일시
+  processed_at     DateTime?
+  /// 생성 일시
+  created_at       DateTime    @default(now())
+  /// 수정 일시
+  updated_at       DateTime    @updatedAt
+  /// 미디어 참조
+  media            Media       @relation(fields: [media_id], references: [id])
+
+  @@index([status])
+  @@index([grace_period_end])
+  @@index([queued_at])
+  @@index([queue_reason])
+  @@map("media_delete_queue")
+}
+
+/// 큐 추가 이유
+enum QueueReason {
+  ORPHANED     // PostingMedia에 연결되지 않음
+  SOFT_DELETED // Media에서 is_deleted=true
+  EXPIRED      // 생성 후 일정 시간 경과
+
+  @@map("queue_reasons")
+}
+
+/// 큐 처리 상태
+enum QueueStatus {
+  PENDING    // 유예기간 대기 중
+  READY      // 삭제 준비 완료
+  PROCESSING // 삭제 진행 중
+  COMPLETED  // 삭제 완료
+  FAILED     // 삭제 실패
+  CANCELLED  // 삭제 취소됨
+
+  @@map("queue_statuses")
 }
