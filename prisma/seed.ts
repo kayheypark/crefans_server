@@ -45,17 +45,16 @@ async function main() {
   });
 
   // 토큰 타입
-  await prisma.tokenType.createMany({
-    skipDuplicates: true,
-    data: [
-      {
-        id: "3f7a9c1e-4d6b-8f2a-9c3f-7a1e4d6b8f2a",
-        name: "콩",
-        symbol: "KNG",
-        description: "기본 사이트 내 재화",
-        price: 100,
-      },
-    ],
+  const tokenType = await prisma.tokenType.upsert({
+    where: { symbol: "KNG" },
+    update: {},
+    create: {
+      id: "3f7a9c1e-4d6b-8f2a-9c3f-7a1e4d6b8f2a",
+      name: "콩",
+      symbol: "KNG",
+      description: "기본 사이트 내 재화",
+      price: 100,
+    },
   });
 
   // 시스템 지갑 (출발점)
@@ -69,7 +68,7 @@ async function main() {
         id: "6b8f2a4c-9e1d-7f3a-8f6b-2a4c9e1d7f3a",
         address: "c5fd6ba5-5b21-4c3c-8f13-3f19e5fc9f58",
         amount: 100000000, //1억개
-        token_type_id: "3f7a9c1e-4d6b-8f2a-9c3f-7a1e4d6b8f2a",
+        token_type_id: tokenType.id,
       },
     });
   }
@@ -144,6 +143,45 @@ async function main() {
         billing_period: 1,
         trial_unit: PeriodUnit.WEEK,
         trial_period: 7,
+      },
+    ],
+  });
+
+  // 관리자 계정 초기 데이터
+  await prisma.admin.createMany({
+    skipDuplicates: true,
+    data: [
+      {
+        id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        user_sub: "admin-super-001", // Cognito에 등록된 관리자 계정의 sub
+        name: "슈퍼 관리자",
+        email: "superadmin@crefans.com",
+        role: "SUPER_ADMIN",
+        is_active: true,
+      },
+      {
+        id: "b2c3d4e5-f6g7-8901-bcde-f23456789012",
+        user_sub: "admin-general-001", // Cognito에 등록된 관리자 계정의 sub
+        name: "일반 관리자",
+        email: "admin@crefans.com",
+        role: "ADMIN",
+        is_active: true,
+      },
+      {
+        id: "c3d4e5f6-g7h8-9012-cdef-345678901234",
+        user_sub: "admin-moderator-001", // Cognito에 등록된 관리자 계정의 sub
+        name: "모더레이터",
+        email: "moderator@crefans.com",
+        role: "MODERATOR",
+        is_active: true,
+      },
+      {
+        id: "d4e5f6g7-h8i9-0123-def4-456789012345",
+        user_sub: "44a8ed1c-9021-709d-b3f7-dacec1fd90b5", // Actual Cognito user_sub
+        name: "Kay Hey Park",
+        email: "kayheypark@gmail.com",
+        role: "SUPER_ADMIN",
+        is_active: true,
       },
     ],
   });

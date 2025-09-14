@@ -9,9 +9,11 @@ export default registerAs("app", () => ({
     origins: [
       "http://localhost:3000",
       "http://localhost:3001",
+      "http://localhost:3002",
       "https://crefans.com",
       "https://www.crefans.com",
       "https://api.crefans.com",
+      "https://admin.crefans.com",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: [

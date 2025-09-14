@@ -680,3 +680,151 @@ enum QueueStatus {
 
   @@map("queue_statuses")
 }
+
+/// 관리자 계정
+/// 시스템 관리를 위한 관리자 계정 정보
+model Admin {
+  /// 관리자 고유 식별자
+  id         String    @id @default(uuid())
+  /// 사용자 ID (Cognito의 userSub 또는 별도 관리자 계정)
+  user_sub   String    @unique
+  /// 관리자 이름
+  name       String
+  /// 관리자 이메일
+  email      String    @unique
+  /// 관리자 역할
+  role       AdminRole @default(MODERATOR)
+  /// 활성 상태
+  is_active  Boolean   @default(true)
+  /// 마지막 로그인 일시
+  last_login DateTime?
+  /// 생성 일시
+  created_at DateTime  @default(now())
+  /// 수정 일시
+  updated_at DateTime  @updatedAt
+  /// 생성한 사용자 ID (상위 관리자)
+  created_by String?
+
+  @@map("admins")
+}
+
+/// 사용자 신고
+/// 사용자가 부적절한 콘텐츠나 행동을 신고하는 기능
+model UserReport {
+  /// 신고 고유 식별자
+  id           String       @id @default(uuid())
+  /// 신고자 ID (Cognito의 userSub)
+  reporter_id  String
+  /// 신고 대상 유형
+  target_type  ReportTarget
+  /// 신고 대상 ID (포스팅 ID, 댓글 ID, 사용자 ID 등)
+  target_id    String
+  /// 신고 사유
+  reason       ReportReason
+  /// 상세 설명
+  description  String?      @db.Text
+  /// 신고 상태
+  status       ReportStatus @default(PENDING)
+  /// 처리 관리자 ID
+  admin_id     String?
+  /// 처리 결과 메모
+  admin_note   String?      @db.Text
+  /// 처리 일시
+  resolved_at  DateTime?
+  /// 생성 일시
+  created_at   DateTime     @default(now())
+  /// 수정 일시
+  updated_at   DateTime     @updatedAt
+
+  @@index([target_type, target_id])
+  @@index([reporter_id])
+  @@index([status])
+  @@map("user_reports")
+}
+
+/// 사용자 정지 이력
+/// 사용자의 정지/활성화 이력을 관리
+model UserSuspension {
+  /// 정지 이력 고유 식별자
+  id          String           @id @default(uuid())
+  /// 대상 사용자 ID (Cognito의 userSub)
+  user_id     String
+  /// 정지 유형
+  type        SuspensionType
+  /// 정지 사유
+  reason      String           @db.Text
+  /// 정지 시작 일시
+  start_date  DateTime         @default(now())
+  /// 정지 종료 일시 (null인 경우 무기한)
+  end_date    DateTime?
+  /// 정지 상태
+  status      SuspensionStatus @default(ACTIVE)
+  /// 처리 관리자 ID
+  admin_id    String
+  /// 생성 일시
+  created_at  DateTime         @default(now())
+  /// 수정 일시
+  updated_at  DateTime         @updatedAt
+
+  @@index([user_id])
+  @@index([status])
+  @@map("user_suspensions")
+}
+
+/// 관리자 역할
+enum AdminRole {
+  SUPER_ADMIN // 최고 관리자
+  ADMIN       // 일반 관리자
+  MODERATOR   // 모더레이터(의미: 포스팅 관리자)
+
+  @@map("admin_roles")
+}
+
+/// 신고 대상 유형
+enum ReportTarget {
+  USER     // 사용자
+  POSTING  // 포스팅
+  COMMENT  // 댓글
+
+  @@map("report_targets")
+}
+
+/// 신고 사유
+enum ReportReason {
+  SPAM           // 스팸
+  HARASSMENT     // 괴롭힘
+  INAPPROPRIATE  // 부적절한 콘텐츠
+  COPYRIGHT      // 저작권 침해
+  FRAUD          // 사기
+  OTHER          // 기타
+
+  @@map("report_reasons")
+}
+
+/// 신고 상태
+enum ReportStatus {
+  PENDING    // 대기 중
+  REVIEWED   // 검토 완료
+  RESOLVED   // 해결됨
+  REJECTED   // 거부됨
+
+  @@map("report_statuses")
+}
+
+/// 정지 유형
+enum SuspensionType {
+  WARNING    // 경고
+  TEMPORARY  // 임시 정지
+  PERMANENT  // 영구 정지
+
+  @@map("suspension_types")
+}
+
+/// 정지 상태
+enum SuspensionStatus {
+  ACTIVE   // 활성 (정지 중)
+  EXPIRED  // 만료됨
+  LIFTED   // 해제됨
+
+  @@map("suspension_statuses")
+}
