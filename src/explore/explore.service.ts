@@ -145,8 +145,8 @@ export class ExploreService {
           } as CreatorResponseDto;
         } catch (error) {
           console.error(
-            `Failed to get Cognito user for creator ${creator.id}:`,
-            error
+            `[DEBUG] Failed to get Cognito user for creator ${creator.id} (user_id: ${creator.user_id}):`,
+            error.message
           );
           return null;
         }
@@ -208,6 +208,12 @@ export class ExploreService {
       take: limit + 1,
     });
 
+    console.log(`[DEBUG] Category ${category.name} (${categoryId}):`, {
+      totalCreators: creators.length,
+      whereClause,
+      creatorIds: creators.map(c => ({ id: c.id, user_id: c.user_id, is_active: c.is_active }))
+    });
+
     const hasMore = creators.length > limit;
     const creatorsToReturn = hasMore ? creators.slice(0, -1) : creators;
 
@@ -266,8 +272,8 @@ export class ExploreService {
           } as CreatorResponseDto;
         } catch (error) {
           console.error(
-            `Failed to get Cognito user for creator ${creator.id}:`,
-            error
+            `[DEBUG] Failed to get Cognito user for creator ${creator.id} (user_id: ${creator.user_id}):`,
+            error.message
           );
           return null;
         }
@@ -277,6 +283,13 @@ export class ExploreService {
     const validCreators = creatorsWithProfiles.filter(
       (creator) => creator !== null
     ) as CreatorResponseDto[];
+
+    console.log(`[DEBUG] ${category.name} final result:`, {
+      originalCreators: creators.length,
+      creatorsAfterCognito: creatorsWithProfiles.length,
+      validCreators: validCreators.length,
+      failedCognito: creatorsWithProfiles.filter(c => c === null).length
+    });
 
     const nextCursor = hasMore
       ? creatorsToReturn[creatorsToReturn.length - 1].created_at.toISOString()

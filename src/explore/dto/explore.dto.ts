@@ -2,9 +2,6 @@ import { IsOptional, IsUUID, IsInt, Min, Max } from "class-validator";
 import { Transform } from "class-transformer";
 
 export class GetCreatorsByCategoryDto {
-  @IsUUID()
-  categoryId: string;
-
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsInt()

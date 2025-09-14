@@ -40,11 +40,16 @@ export class ExploreController {
     @Query() query: GetCreatorsByCategoryDto
   ): Promise<ApiResponseDto<CreatorsByCategoryResponseDto>> {
     const { limit = 20, cursor } = query;
+    console.log(`[DEBUG] API call for category ${categoryId} with limit ${limit}, cursor: ${cursor}`);
     const result = await this.exploreService.getCreatorsByCategory(
       categoryId,
       limit,
       cursor
     );
+    console.log(`[DEBUG] API response for category ${categoryId}:`, {
+      creatorsCount: result.creators.length,
+      categoryName: result.category.name
+    });
     return ApiResponseDto.success(
       "카테고리별 크리에이터를 성공적으로 조회했습니다.",
       result
