@@ -1,8 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { ConfigService } from '@nestjs/config';
-import { v4 as uuidv4 } from 'uuid';
+import { Injectable, Logger } from "@nestjs/common";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { ConfigService } from "@nestjs/config";
+import { v4 as uuidv4 } from "uuid";
 
 @Injectable()
 export class S3Service {
@@ -13,24 +17,24 @@ export class S3Service {
 
   constructor(private readonly configService: ConfigService) {
     this.s3Client = new S3Client({
-      region: this.configService.get('AWS_REGION'),
+      region: this.configService.get("AWS_REGION"),
       credentials: {
-        accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY'),
+        accessKeyId: this.configService.get("AWS_ACCESS_KEY_ID"),
+        secretAccessKey: this.configService.get("AWS_SECRET_ACCESS_KEY"),
       },
     });
 
-    this.uploadBucket = this.configService.get('S3_UPLOAD_BUCKET');
-    this.processedBucket = this.configService.get('S3_PROCESSED_BUCKET');
+    this.uploadBucket = this.configService.get("S3_UPLOAD_BUCKET");
+    this.processedBucket = this.configService.get("S3_PROCESSED_BUCKET");
   }
 
   async generatePresignedUploadUrl(
     userSub: string,
     fileName: string,
     contentType: string,
-    mediaId?: string,
+    mediaId?: string
   ): Promise<{ uploadUrl: string; s3Key: string }> {
-    const fileExtension = fileName.split('.').pop();
+    const fileExtension = fileName.split(".").pop();
     const fileId = mediaId || uuidv4();
     const s3Key = `uploads/${userSub}/${fileId}.${fileExtension}`;
 
@@ -39,8 +43,8 @@ export class S3Service {
       Key: s3Key,
       ContentType: contentType,
       Metadata: {
-        'original-filename': fileName,
-        'uploaded-by': userSub,
+        "original-filename": fileName,
+        "uploaded-by": userSub,
       },
     });
 
@@ -53,8 +57,8 @@ export class S3Service {
 
       return { uploadUrl, s3Key };
     } catch (error) {
-      this.logger.error('Failed to generate presigned URL', error.stack);
-      throw new Error('Failed to generate upload URL');
+      this.logger.error("Failed to generate presigned URL", error.stack);
+      throw new Error("Failed to generate upload URL");
     }
   }
 
@@ -72,7 +76,7 @@ export class S3Service {
       return url;
     } catch (error) {
       this.logger.error(`Failed to get object URL: ${key}`, error.stack);
-      throw new Error('Failed to get object URL');
+      throw new Error("Failed to get object URL");
     }
   }
 
@@ -90,27 +94,21 @@ export class S3Service {
       return url;
     } catch (error) {
       this.logger.error(`Failed to generate signed URL: ${key}`, error.stack);
-      throw new Error('Failed to generate signed URL');
+      throw new Error("Failed to generate signed URL");
     }
   }
 
   getPublicUrl(bucket: string, key: string): string {
-    return `https://${bucket}.s3.${this.configService.get('AWS_REGION')}.amazonaws.com/${key}`;
-  }
-
-  generateProcessedKey(userSub: string, mediaId: string, resolution: string, extension: string = 'mp4'): string {
-    return `processed/${userSub}/${mediaId}/${resolution}.${extension}`;
-  }
-
-  generateThumbnailKey(userSub: string, mediaId: string, index: number = 0): string {
-    return `thumbnails/${userSub}/${mediaId}/thumb_${index}.jpg`;
+    return `https://${bucket}.s3.${this.configService.get(
+      "AWS_REGION"
+    )}.amazonaws.com/${key}`;
   }
 
   async uploadBuffer(
     bucket: string,
     key: string,
     buffer: Buffer,
-    contentType: string,
+    contentType: string
   ): Promise<void> {
     const command = new PutObjectCommand({
       Bucket: bucket,
@@ -123,12 +121,18 @@ export class S3Service {
       await this.s3Client.send(command);
       this.logger.log(`Successfully uploaded buffer to s3://${bucket}/${key}`);
     } catch (error) {
-      this.logger.error(`Failed to upload buffer to s3://${bucket}/${key}`, error.stack);
+      this.logger.error(
+        `Failed to upload buffer to s3://${bucket}/${key}`,
+        error.stack
+      );
       throw error;
     }
   }
 
-  async getObjectStream(bucket: string, key: string): Promise<{ stream: any; contentType?: string; contentLength?: number }> {
+  async getObjectStream(
+    bucket: string,
+    key: string
+  ): Promise<{ stream: any; contentType?: string; contentLength?: number }> {
     const command = new GetObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -139,10 +143,13 @@ export class S3Service {
       return {
         stream: response.Body,
         contentType: response.ContentType,
-        contentLength: response.ContentLength
+        contentLength: response.ContentLength,
       };
     } catch (error) {
-      this.logger.error(`Failed to get object stream: ${bucket}/${key}`, error.stack);
+      this.logger.error(
+        `Failed to get object stream: ${bucket}/${key}`,
+        error.stack
+      );
       throw error;
     }
   }
