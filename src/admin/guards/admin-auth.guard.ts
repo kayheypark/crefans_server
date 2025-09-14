@@ -31,58 +31,48 @@ export class AdminAuthGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    /* Temporarily disable authentication for testing
-    return true;
-
-    Original code commented out for testing */
     const request = context.switchToHttp().getRequest();
 
     // 1. 쿠키에서 토큰 확인 (우선 방식)
-    let accessToken = request.cookies?.access_token;
+    let token = request.cookies?.access_token;
 
     // 2. Authorization 헤더에서 토큰 확인 (Bearer token)
-    if (!accessToken) {
-      accessToken = this.extractTokenFromHeader(request);
+    if (!token) {
+      token = this.extractTokenFromHeader(request);
     }
 
-    if (!accessToken) {
-      this.logger.warn("Admin access token not found", {
-        service: "AdminAuthGuard",
-        method: "canActivate",
+    if (!token) {
+      this.logger.warn('No token provided for admin authentication', {
+        service: 'AdminAuthGuard',
+        method: 'canActivate',
+        hasAuthHeader: !!request.headers.authorization,
+        hasCookie: !!request.cookies?.access_token,
       });
-      throw new UnauthorizedException("관리자 인증 토큰이 없습니다.");
+      throw new UnauthorizedException();
     }
 
     try {
-      // Cognito 토큰 검증
-      const user = await this.validateToken(accessToken);
+      const user = await this.validateToken(token);
 
-      // 관리자 권한 확인
+      // Check if user is an admin
       const adminUser = await this.adminService.getAdminByUserSub(user.sub);
       if (!adminUser || !adminUser.is_active) {
-        this.logger.warn("User is not an admin or inactive", {
-          service: "AdminAuthGuard",
-          method: "canActivate",
+        this.logger.warn('User is not an active admin', {
+          service: 'AdminAuthGuard',
+          method: 'canActivate',
           userSub: user.sub,
         });
-        throw new UnauthorizedException("관리자 권한이 없습니다.");
+        throw new UnauthorizedException();
       }
 
-      // request에 사용자 및 관리자 정보 추가
       request.user = user;
-      request.admin = adminUser;
       return true;
     } catch (error) {
-      this.logger.error("Admin token validation failed", error.stack, {
-        service: "AdminAuthGuard",
-        method: "canActivate",
+      this.logger.error('Admin authentication failed', error.stack, {
+        service: 'AdminAuthGuard',
+        method: 'canActivate',
       });
-
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-
-      throw new UnauthorizedException("유효하지 않은 관리자 토큰입니다.");
+      throw new UnauthorizedException();
     }
   }
 

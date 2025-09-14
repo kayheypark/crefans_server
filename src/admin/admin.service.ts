@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CognitoService } from '../auth/cognito.service';
 
 @Injectable()
 export class AdminService {
   constructor(
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    private cognitoService: CognitoService
   ) {}
 
   // Dashboard methods
@@ -214,5 +216,154 @@ export class AdminService {
       where: { id: adminId },
       data: { last_login: new Date() },
     });
+  }
+
+  // User management methods (using Cognito API)
+  async getUsers(query: any) {
+    const { limit = 20, paginationToken } = query;
+
+
+    try {
+      const { ListUsersCommand } = await import('@aws-sdk/client-cognito-identity-provider');
+
+      const cognitoClient = (this.cognitoService as any).cognitoClient;
+      const userPoolId = (this.cognitoService as any).userPoolId;
+
+
+      // AWS Cognito's maximum limit is 60
+      const validatedLimit = Math.min(parseInt(limit), 60);
+
+      const command = new ListUsersCommand({
+        UserPoolId: userPoolId,
+        Limit: validatedLimit,
+        PaginationToken: paginationToken,
+      });
+
+      const response = await cognitoClient.send(command);
+
+      // 사용자 데이터를 관리자가 보기 편한 형태로 변환
+      const users = response.Users?.map(user => {
+        const attributes = user.UserAttributes?.reduce((acc, attr) => {
+          acc[attr.Name] = attr.Value;
+          return acc;
+        }, {} as Record<string, string>) || {};
+
+        return {
+          username: user.Username,
+          email: attributes.email,
+          name: attributes.name,
+          nickname: attributes.nickname,
+          phoneNumber: attributes.phone_number,
+          isCreator: attributes['custom:is_creator'] === '1',
+          emailVerified: attributes.email_verified === 'true',
+          userStatus: user.UserStatus,
+          enabled: user.Enabled,
+          createdDate: user.UserCreateDate,
+          lastModifiedDate: user.UserLastModifiedDate,
+          sub: attributes.sub,
+        };
+      }) || [];
+
+      return {
+        users,
+        paginationToken: response.PaginationToken,
+        hasMore: !!response.PaginationToken,
+      };
+    } catch (error) {
+      console.error('[ERROR] AdminService.getUsers failed:', error);
+      console.error('[ERROR] Error message:', error.message);
+      console.error('[ERROR] Error stack:', error.stack);
+      throw new Error(`사용자 목록 조회 실패: ${error.message}`);
+    }
+  }
+
+  async getUser(userSub: string) {
+    try {
+      const user = await this.cognitoService.getUserBySub(userSub);
+
+      if (!user) {
+        throw new NotFoundException('사용자를 찾을 수 없습니다');
+      }
+
+      const attributes = user.UserAttributes?.reduce((acc, attr) => {
+        acc[attr.Name] = attr.Value;
+        return acc;
+      }, {} as Record<string, string>) || {};
+
+      return {
+        username: user.Username,
+        email: attributes.email,
+        name: attributes.name,
+        nickname: attributes.nickname,
+        phoneNumber: attributes.phone_number,
+        isCreator: attributes['custom:is_creator'] === '1',
+        emailVerified: attributes.email_verified === 'true',
+        userStatus: user.UserStatus,
+        enabled: user.Enabled,
+        createdDate: user.UserCreateDate,
+        lastModifiedDate: user.UserLastModifiedDate,
+        sub: attributes.sub,
+      };
+    } catch (error) {
+      throw new Error(`사용자 정보 조회 실패: ${error.message}`);
+    }
+  }
+
+  async searchUsers(query: string) {
+    try {
+      const { ListUsersCommand } = await import('@aws-sdk/client-cognito-identity-provider');
+      const cognitoClient = (this.cognitoService as any).cognitoClient;
+      const userPoolId = (this.cognitoService as any).userPoolId;
+
+      // 이메일로 검색
+      const emailSearchCommand = new ListUsersCommand({
+        UserPoolId: userPoolId,
+        Filter: `email ^= "${query}"`,
+        Limit: 10,
+      });
+
+      const emailResults = await cognitoClient.send(emailSearchCommand);
+
+      // 닉네임으로 검색
+      const nicknameSearchCommand = new ListUsersCommand({
+        UserPoolId: userPoolId,
+        Filter: `nickname ^= "${query}"`,
+        Limit: 10,
+      });
+
+      const nicknameResults = await cognitoClient.send(nicknameSearchCommand);
+
+      // 결과 합치기 및 중복 제거
+      const allUsers = [...(emailResults.Users || []), ...(nicknameResults.Users || [])];
+      const uniqueUsers = allUsers.filter((user, index, self) =>
+        index === self.findIndex(u => u.Username === user.Username)
+      );
+
+      const users = uniqueUsers.map(user => {
+        const attributes = user.UserAttributes?.reduce((acc, attr) => {
+          acc[attr.Name] = attr.Value;
+          return acc;
+        }, {} as Record<string, string>) || {};
+
+        return {
+          username: user.Username,
+          email: attributes.email,
+          name: attributes.name,
+          nickname: attributes.nickname,
+          phoneNumber: attributes.phone_number,
+          isCreator: attributes['custom:is_creator'] === '1',
+          emailVerified: attributes.email_verified === 'true',
+          userStatus: user.UserStatus,
+          enabled: user.Enabled,
+          createdDate: user.UserCreateDate,
+          lastModifiedDate: user.UserLastModifiedDate,
+          sub: attributes.sub,
+        };
+      });
+
+      return { users };
+    } catch (error) {
+      throw new Error(`사용자 검색 실패: ${error.message}`);
+    }
   }
 }

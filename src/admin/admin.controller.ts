@@ -2,7 +2,7 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminAuthGuard } from './guards/admin-auth.guard';
 
-@Controller('api/admin')
+@Controller('admin')
 @UseGuards(AdminAuthGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
@@ -44,5 +44,21 @@ export class AdminController {
   @Get('reports/:id')
   async getReport(@Param('id') id: string) {
     return this.adminService.getReport(id);
+  }
+
+  // User management endpoints (READ ONLY - using Cognito API)
+  @Get('users')
+  async getUsers(@Query() query: any) {
+    return this.adminService.getUsers(query);
+  }
+
+  @Get('users/search')
+  async searchUsers(@Query('q') query: string) {
+    return this.adminService.searchUsers(query);
+  }
+
+  @Get('users/:userSub')
+  async getUser(@Param('userSub') userSub: string) {
+    return this.adminService.getUser(userSub);
   }
 }
