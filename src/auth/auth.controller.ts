@@ -84,13 +84,18 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response
   ): Promise<ApiResponseDto<{}>> {
     const accessToken = req.cookies.access_token;
-    if (!accessToken) {
-      throw new CognitoException("인증되지 않은 사용자입니다.", "Unauthorized");
+
+    // access_token이 있고 유효한 경우에만 Cognito signOut 호출
+    if (accessToken) {
+      try {
+        await this.authService.signOut({ accessToken });
+      } catch (error) {
+        // Cognito signOut 실패해도 쿠키는 삭제
+        console.log("Cognito signOut failed, but proceeding with cookie cleanup:", error.message);
+      }
     }
 
-    await this.authService.signOut({ accessToken });
-
-    // 쿠키 삭제
+    // 항상 쿠키 삭제 (토큰 만료되었어도 쿠키 정리)
     clearAuthCookies(res, this.configService);
 
     return ApiResponseDto.success("로그아웃이 완료되었습니다.", {});
