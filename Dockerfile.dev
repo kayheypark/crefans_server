@@ -1,0 +1,35 @@
+FROM node:18-alpine
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 시스템 의존성 설치 (sharp를 위한 vips)
+RUN apk add --no-cache \
+    vips-dev \
+    python3 \
+    make \
+    g++
+
+# package.json과 package-lock.json 복사
+COPY package*.json ./
+
+# 의존성 설치
+RUN npm ci --only=production=false
+
+# Prisma 파일 복사
+COPY prisma ./prisma/
+
+# Prisma 클라이언트 생성
+RUN npx prisma generate
+
+# 소스 코드 복사 (개발모드에서는 볼륨 마운트로 대체됨)
+COPY . .
+
+# TypeScript 컴파일 (개발모드에서는 ts-node 사용)
+# RUN npm run build
+
+# 포트 노출
+EXPOSE 3000
+
+# 개발 모드 시작 (ts-node 사용)
+CMD ["npm", "run", "dev"]
