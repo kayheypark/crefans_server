@@ -12,5 +12,6 @@ import { ConfigModule } from '@nestjs/config';
   imports: [AuthModule, ConfigModule],
   controllers: [AdminController, AdminAuthController],
   providers: [AdminService, AdminAuthGuard, PrismaService, LoggerService],
+  exports: [AdminService, AdminAuthGuard],
 })
 export class AdminModule {}

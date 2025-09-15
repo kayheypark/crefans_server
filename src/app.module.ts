@@ -15,6 +15,7 @@ import { FollowModule } from "./follow/follow.module";
 import { AdminModule } from "./admin/admin.module";
 import { ExploreModule } from "./explore/explore.module";
 import { PaymentModule } from "./payment/payment.module";
+import { BoardModule } from "./board/board.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { LoggerModule } from "./common/logger/logger.module";
 import awsConfig from "./config/aws.config";
@@ -41,6 +42,7 @@ import appConfig from "./config/app.config";
     AdminModule,
     ExploreModule,
     PaymentModule,
+    BoardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

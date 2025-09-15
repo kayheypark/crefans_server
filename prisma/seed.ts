@@ -191,6 +191,27 @@ async function main() {
     ],
   });
 
+  // 게시판 카테고리 초기 데이터
+  await prisma.boardCategory.createMany({
+    skipDuplicates: true,
+    data: [
+      {
+        id: "f2a3b4c5-d6e7-8901-bcd2-a3b4c5d6e789",
+        code: "NOTICE",
+        name: "공지",
+        description: "공지사항 게시글",
+        sort_order: 1,
+      },
+      {
+        id: "a3b4c5d6-e7f8-9012-cde3-b4c5d6e7f890",
+        code: "EVENT",
+        name: "이벤트",
+        description: "이벤트 관련 게시글",
+        sort_order: 2,
+      },
+    ],
+  });
+
   console.log("All seed data completed successfully!");
 }
 

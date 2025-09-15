@@ -902,3 +902,75 @@ enum PaymentStatus {
 
   @@map("payment_statuses")
 }
+
+/// 게시판
+/// 공지사항 및 이벤트 게시글
+model Board {
+  /// 게시글 고유 식별자
+  id            String         @id @default(uuid())
+  /// 게시글 제목
+  title         String
+  /// 게시글 내용
+  content       String         @db.Text
+  /// 카테고리 ID
+  category_id   String
+  /// 카테고리 관계
+  category      BoardCategory @relation(fields: [category_id], references: [id])
+  /// 중요 게시글 여부
+  is_important  Boolean        @default(false)
+  /// 요약/미리보기 텍스트
+  excerpt       String?        @db.Text
+  /// 작성자 (관리자)
+  author        String         @default("크리팬스 관리자")
+  /// 조회수
+  views         Int            @default(0)
+  /// 공개 상태
+  is_published  Boolean        @default(true)
+  /// 발행 일시
+  published_at  DateTime?
+  /// 삭제 여부
+  is_deleted    Boolean        @default(false)
+  /// 삭제 일시
+  deleted_at    DateTime?
+  /// 생성 일시
+  created_at    DateTime       @default(now())
+  /// 수정 일시
+  updated_at    DateTime       @updatedAt
+
+  @@index([category_id])
+  @@index([is_published])
+  @@index([published_at])
+  @@index([created_at])
+  @@map("boards")
+}
+
+/// 게시판 카테고리 테이블
+/// 게시판의 카테고리를 동적으로 관리
+model BoardCategory {
+  /// 카테고리 고유 식별자
+  id          String  @id @default(uuid())
+  /// 카테고리 코드 (NOTICE, EVENT 등)
+  code        String  @unique
+  /// 카테고리 이름
+  name        String
+  /// 카테고리 설명
+  description String?
+  /// 정렬 순서
+  sort_order  Int     @default(0)
+  /// 공개 상태
+  is_public   Boolean @default(true)
+  /// 활성 상태
+  is_active   Boolean @default(true)
+  /// 생성 일시
+  created_at  DateTime @default(now())
+  /// 수정 일시
+  updated_at  DateTime @updatedAt
+
+  /// 게시글과의 관계
+  boards      Board[]
+
+  @@index([sort_order])
+  @@index([is_public])
+  @@index([is_active])
+  @@map("board_categories")
+}
