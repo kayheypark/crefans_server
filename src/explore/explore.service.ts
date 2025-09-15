@@ -120,12 +120,10 @@ export class ExploreService {
           });
 
           return {
-            id: creator.id,
-            user_id: creator.user_id,
             nickname: userInfo.nickname,
-            handle: `@${userInfo.handle}`,
+            handle: userInfo.handle, // Remove @ prefix
             avatar: userInfo.profileImageUrl,
-            bio: userInfo.bio || "새로운 크리에이터입니다.",
+            bio: userInfo.bio || null, // Send null if empty
             followerCount,
             postCount,
             category: creator.category
@@ -249,12 +247,10 @@ export class ExploreService {
           });
 
           return {
-            id: creator.id,
-            user_id: creator.user_id,
             nickname: userInfo.nickname,
-            handle: `@${userInfo.handle}`,
+            handle: userInfo.handle, // Remove @ prefix
             avatar: userInfo.profileImageUrl,
-            bio: userInfo.bio || "",
+            bio: userInfo.bio || null, // Send null if empty
             followerCount,
             postCount,
             category: {

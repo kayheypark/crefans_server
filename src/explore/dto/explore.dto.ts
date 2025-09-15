@@ -36,12 +36,10 @@ export interface CreatorCategoryResponseDto {
 }
 
 export interface CreatorResponseDto {
-  id: string;
-  user_id: string;
   nickname: string;
   handle: string;
   avatar: string;
-  bio: string;
+  bio: string | null;
   followerCount: number;
   postCount: number;
   category?: CreatorCategoryResponseDto;
