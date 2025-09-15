@@ -1,0 +1,19 @@
+{
+  "name": "crefans-subscription-billing-lambda",
+  "version": "1.0.0",
+  "description": "AWS Lambda function for subscription billing automation",
+  "main": "subscription-billing.js",
+  "scripts": {
+    "build": "tsc",
+    "package": "zip -r subscription-billing-lambda.zip subscription-billing.js node_modules"
+  },
+  "dependencies": {
+    "@types/aws-lambda": "^8.10.130",
+    "@prisma/client": "^6.9.0",
+    "axios": "^1.12.2",
+    "prisma": "^6.9.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

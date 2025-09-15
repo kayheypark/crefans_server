@@ -44,4 +44,56 @@ export class MembershipAccessService {
       throw error;
     }
   }
+
+  async checkUserSubscriptionToCreator(
+    subscriberId: string,
+    creatorId: string
+  ): Promise<{ hasSubscription: boolean; subscribedMembershipIds: string[] }> {
+    try {
+      const subscriptions = await this.prisma.subscription.findMany({
+        where: {
+          subscriber_id: subscriberId,
+          status: 'ONGOING',
+          membership_item: {
+            creator_id: creatorId,
+            is_active: true,
+            is_deleted: false,
+          },
+        },
+        include: {
+          membership_item: {
+            select: {
+              id: true,
+              name: true,
+              level: true,
+            }
+          },
+        },
+      });
+
+      const subscribedMembershipIds = subscriptions.map(sub => sub.membership_item.id);
+
+      this.logger.log(`Subscription check for subscriber ${subscriberId} to creator ${creatorId}`, {
+        service: 'MembershipAccessService',
+        method: 'checkUserSubscriptionToCreator',
+        subscriberId,
+        creatorId,
+        hasSubscription: subscriptions.length > 0,
+        subscribedMembershipIds,
+      });
+
+      return {
+        hasSubscription: subscriptions.length > 0,
+        subscribedMembershipIds,
+      };
+    } catch (error) {
+      this.logger.error('Failed to check user subscription to creator', error.stack, {
+        service: 'MembershipAccessService',
+        method: 'checkUserSubscriptionToCreator',
+        subscriberId,
+        creatorId,
+      });
+      throw error;
+    }
+  }
 }

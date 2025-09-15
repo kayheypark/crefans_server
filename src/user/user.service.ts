@@ -5,13 +5,15 @@ import { S3Service } from "../media/s3.service";
 import { UpdateUserProfileDto } from "./dto/user.dto";
 import { CreatorApplicationDto } from "./dto/creator-application.dto";
 import { MediaStreamUtil } from "../common/utils/media-stream.util";
+import { MembershipAccessService } from "../common/services/membership-access.service";
 
 @Injectable()
 export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
-    private readonly s3Service: S3Service
+    private readonly s3Service: S3Service,
+    private readonly membershipAccessService: MembershipAccessService
   ) {}
 
   async getUserProfileByHandle(handle: string, viewerId?: string) {
@@ -44,6 +46,32 @@ export class UserService {
       },
     });
 
+    // 크리에이터인 경우 멤버십 아이템 조회
+    const membershipItems = creator ? await this.prisma.membershipItem.findMany({
+      where: {
+        creator_id: cognitoUser.Username,
+        is_active: true,
+        is_deleted: false
+      },
+      orderBy: {
+        level: 'asc'
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        benefits: true,
+        level: true,
+        price: true,
+        billing_unit: true,
+        billing_period: true,
+        trial_unit: true,
+        trial_period: true,
+        is_active: true,
+        created_at: true
+      }
+    }) : [];
+
     // 통계 정보 계산 - 직접 cognitoUser.Username으로 조회
     const postsCount = await this.prisma.posting.count({
       where: {
@@ -55,8 +83,8 @@ export class UserService {
     // 미디어 카운트 (향후 구현)
     const mediaCount = 0; // TODO: 실제 미디어 테이블에서 계산
 
-    // 팔로워/팔로잉 수 및 팔로우 상태 계산
-    const [followersCount, followingCount, followStatus] = await Promise.all([
+    // 팔로워/팔로잉 수, 팔로우 상태, 구독 상태 계산
+    const [followersCount, followingCount, followStatus, subscriptionStatus] = await Promise.all([
       this.prisma.userFollow.count({
         where: {
           following_id: cognitoUser.Username,
@@ -79,6 +107,10 @@ export class UserService {
             },
           })
         : null,
+      // 뷰어의 구독 상태 확인 (로그인한 경우이면서 크리에이터인 경우만)
+      viewerId && creator
+        ? this.membershipAccessService.checkUserSubscriptionToCreator(viewerId, cognitoUser.Username)
+        : Promise.resolve({ hasSubscription: false, subscribedMembershipIds: [] }),
     ]);
 
     return {
@@ -103,6 +135,10 @@ export class UserService {
       userSub: cognitoUser.Username, // 팔로우 API를 위한 userSub 추가
       isFollowing: !!followStatus, // 뷰어의 팔로우 상태
       category: creator?.category || null, // 크리에이터 카테고리 정보 추가
+      membershipItems, // 멤버십 아이템 추가
+      // 구독 상태 정보 추가
+      hasSubscription: subscriptionStatus.hasSubscription,
+      subscribedMembershipIds: subscriptionStatus.subscribedMembershipIds,
     };
   }
 

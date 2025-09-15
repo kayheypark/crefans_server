@@ -157,6 +157,104 @@ export class TossPaymentsService {
     return `order_${userId}_${timestamp}_${random}`;
   }
 
+  generateCustomerKey(userId: string): string {
+    return `customer_${userId}`;
+  }
+
+  async requestBillingAuth(customerKey: string, successUrl: string, failUrl: string): Promise<any> {
+    try {
+      this.logger.log(`Requesting billing auth for customerKey: ${customerKey}`);
+
+      const response = await this.httpClient.post('/v1/billing/authorizations/issue', {
+        customerKey,
+        successUrl,
+        failUrl,
+      });
+
+      this.logger.log(`Billing auth request successful for customerKey: ${customerKey}`);
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Billing auth request failed for customerKey: ${customerKey}`, error.response?.data || error.message);
+
+      if (error.response?.data) {
+        const { code, message } = error.response.data;
+        throw new BadRequestException(`Billing auth request failed: ${message} (${code})`);
+      }
+
+      throw new InternalServerErrorException('Billing auth request failed due to internal error');
+    }
+  }
+
+  async issueBillingKey(authKey: string, customerKey: string): Promise<any> {
+    try {
+      this.logger.log(`Issuing billing key for customerKey: ${customerKey}`);
+
+      const response = await this.httpClient.post(`/v1/billing/authorizations/${authKey}`, {
+        customerKey,
+      });
+
+      this.logger.log(`Billing key issued successfully for customerKey: ${customerKey}`);
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Billing key issue failed for customerKey: ${customerKey}`, error.response?.data || error.message);
+
+      if (error.response?.data) {
+        const { code, message } = error.response.data;
+        throw new BadRequestException(`Billing key issue failed: ${message} (${code})`);
+      }
+
+      throw new InternalServerErrorException('Billing key issue failed due to internal error');
+    }
+  }
+
+  async requestBillingPayment(billingKey: string, customerKey: string, amount: number, orderId: string): Promise<any> {
+    try {
+      this.logger.log(`Requesting billing payment for orderId: ${orderId}`);
+
+      const response = await this.httpClient.post(`/v1/billing/${billingKey}`, {
+        customerKey,
+        amount,
+        orderId,
+        orderName: '멤버십 구독료',
+      });
+
+      this.logger.log(`Billing payment successful for orderId: ${orderId}`);
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Billing payment failed for orderId: ${orderId}`, error.response?.data || error.message);
+
+      if (error.response?.data) {
+        const { code, message } = error.response.data;
+        throw new BadRequestException(`Billing payment failed: ${message} (${code})`);
+      }
+
+      throw new InternalServerErrorException('Billing payment failed due to internal error');
+    }
+  }
+
+  async deleteBillingKey(billingKey: string, customerKey: string): Promise<void> {
+    try {
+      this.logger.log(`Deleting billing key for customerKey: ${customerKey}`);
+
+      await this.httpClient.delete(`/v1/billing/${billingKey}`, {
+        data: {
+          customerKey,
+        },
+      });
+
+      this.logger.log(`Billing key deleted successfully for customerKey: ${customerKey}`);
+    } catch (error) {
+      this.logger.error(`Billing key deletion failed for customerKey: ${customerKey}`, error.response?.data || error.message);
+
+      if (error.response?.data) {
+        const { code, message } = error.response.data;
+        throw new BadRequestException(`Billing key deletion failed: ${message} (${code})`);
+      }
+
+      throw new InternalServerErrorException('Billing key deletion failed due to internal error');
+    }
+  }
+
   /**
    * 웹훅 서명 검증
    * @param rawBody 웹훅 원본 바디

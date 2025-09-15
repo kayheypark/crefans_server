@@ -132,4 +132,31 @@ export class MembershipService {
       }
     });
   }
+
+  async getActiveMembershipsByCreator(creatorId: string) {
+    return this.prisma.membershipItem.findMany({
+      where: {
+        creator_id: creatorId,
+        is_active: true,
+        is_deleted: false
+      },
+      orderBy: {
+        level: 'asc'
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        benefits: true,
+        level: true,
+        price: true,
+        billing_unit: true,
+        billing_period: true,
+        trial_unit: true,
+        trial_period: true,
+        is_active: true,
+        created_at: true
+      }
+    });
+  }
 }

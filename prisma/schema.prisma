@@ -266,6 +266,14 @@ model Subscription {
   amount             Decimal            @db.Decimal(18, 4)
   /// 자동 갱신 여부 (유저가 구독 취소시 자동 갱신여부가 false로 업데이트됨)
   auto_renew         Boolean            @default(true)
+  /// TossPayments 빌링키
+  billing_key        String?
+  /// 다음 결제 예정일
+  next_billing_date  DateTime?
+  /// 마지막 결제일
+  last_payment_date  DateTime?
+  /// 결제 실패 횟수
+  payment_failure_count Int             @default(0)
   /// 생성 일시
   created_at         DateTime           @default(now())
   /// 수정 일시
@@ -273,6 +281,7 @@ model Subscription {
   membership_item_id String
   membership_item    MembershipItem     @relation(fields: [membership_item_id], references: [id])
   transfers          Transfer[]
+  payment_transactions PaymentTransaction[]
 
   @@unique([subscriber_id, membership_item_id, started_at])
   @@index([membership_item_id], map: "subscriptions_membership_item_id_fkey")
@@ -590,6 +599,7 @@ enum PeriodUnit {
 enum SubscriptionStatus {
   ONGOING
   EXPIRED
+  CANCELLED
 
   @@map("subscription_statuses")
 }
@@ -865,8 +875,16 @@ model PaymentTransaction {
   created_at            DateTime            @default(now())
   /// 수정 일시
   updated_at            DateTime            @updatedAt
+  /// 구독 ID (정기결제용)
+  subscription_id       String?
+  /// 자동결제 빌링키
+  billing_key          String?
+  /// 정기결제 여부
+  is_recurring          Boolean            @default(false)
   /// 토큰 타입 참조
   token_type            TokenType           @relation(fields: [token_type_id], references: [id])
+  /// 구독과의 관계
+  subscription          Subscription?       @relation(fields: [subscription_id], references: [id])
 
   @@index([user_id])
   @@index([status])

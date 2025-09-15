@@ -76,4 +76,12 @@ export class MembershipController {
     const membership = await this.membershipService.toggleMembershipActive(id, sub);
     return ApiResponseDto.success('멤버십 활성 상태가 변경되었습니다.', membership);
   }
+
+  @Get('creator/:creatorId')
+  async getCreatorMemberships(
+    @Param('creatorId') creatorId: string
+  ): Promise<ApiResponseDto<any[]>> {
+    const memberships = await this.membershipService.getActiveMembershipsByCreator(creatorId);
+    return ApiResponseDto.success('크리에이터의 멤버십 목록을 성공적으로 조회했습니다.', memberships);
+  }
 }
