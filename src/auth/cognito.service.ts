@@ -260,6 +260,7 @@ export class CognitoService {
         },
         points: 0, // 기본값 설정
         isCreator: false,
+        profile: null, // profile 속성 추가
       };
 
       this.logger.logAuthEvent(
