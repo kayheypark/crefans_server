@@ -29,21 +29,6 @@ export class BoardCategoryService {
     });
   }
 
-  async create(data: {
-    code: string;
-    name: string;
-    description?: string;
-    sort_order?: number;
-    is_public?: boolean;
-  }) {
-    return await this.prisma.boardCategory.create({
-      data: {
-        ...data,
-        sort_order: data.sort_order ?? 0,
-        is_public: data.is_public ?? true,
-      },
-    });
-  }
 
   async update(id: string, data: {
     code?: string;
@@ -74,32 +59,4 @@ export class BoardCategoryService {
     });
   }
 
-  async initializeDefaultCategories() {
-    const existingCategories = await this.prisma.boardCategory.findMany();
-
-    if (existingCategories.length === 0) {
-      await this.prisma.boardCategory.createMany({
-        data: [
-          {
-            id: '550e8400-e29b-41d4-a716-446655440001',
-            code: 'NOTICE',
-            name: '공지사항',
-            description: '중요한 공지사항을 게시하는 카테고리입니다.',
-            sort_order: 1,
-            is_public: true,
-            is_active: true,
-          },
-          {
-            id: '550e8400-e29b-41d4-a716-446655440002',
-            code: 'EVENT',
-            name: '이벤트',
-            description: '다양한 이벤트 소식을 게시하는 카테고리입니다.',
-            sort_order: 2,
-            is_public: true,
-            is_active: true,
-          },
-        ],
-      });
-    }
-  }
 }

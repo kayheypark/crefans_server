@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { BoardCategoryService } from './board-category.service';
 import { AdminAuthGuard } from '../admin/guards/admin-auth.guard';
-import { CreateBoardCategoryDto, UpdateBoardCategoryDto } from './dto/board-category.dto';
+import { UpdateBoardCategoryDto } from './dto/board-category.dto';
 
 @Controller('admin/board-categories')
 @UseGuards(AdminAuthGuard)
@@ -46,23 +46,6 @@ export class AdminBoardCategoryController {
     };
   }
 
-  @Post()
-  async createCategory(@Body() createBoardCategoryDto: CreateBoardCategoryDto) {
-    try {
-      const category = await this.boardCategoryService.create(createBoardCategoryDto);
-
-      return {
-        success: true,
-        message: '카테고리가 성공적으로 생성되었습니다.',
-        data: category,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: '카테고리 생성에 실패했습니다. 카테고리 코드가 중복되었을 수 있습니다.',
-      };
-    }
-  }
 
   @Put(':id')
   async updateCategory(
@@ -141,20 +124,4 @@ export class AdminBoardCategoryController {
     }
   }
 
-  @Post('init')
-  async initializeDefaultCategories() {
-    try {
-      await this.boardCategoryService.initializeDefaultCategories();
-
-      return {
-        success: true,
-        message: '기본 카테고리가 성공적으로 초기화되었습니다.',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: '기본 카테고리 초기화에 실패했습니다.',
-      };
-    }
-  }
 }
