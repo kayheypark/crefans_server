@@ -38,9 +38,10 @@ model TokenType {
   /// 수정 일시
   updated_at  DateTime   @updatedAt
   /// 토큰 가격 (KRW 기준)
-  price       Decimal    @db.Decimal(18, 4)
+  price       Decimal              @db.Decimal(18, 4)
   transfers   Transfer[]
   wallets     Wallet[]
+  payments    PaymentTransaction[]
 
   @@map("token_types")
 }
@@ -827,4 +828,59 @@ enum SuspensionStatus {
   LIFTED   // 해제됨
 
   @@map("suspension_statuses")
+}
+
+/// 결제 거래 내역
+/// TossPayments를 통한 실제 결제 거래 기록
+model PaymentTransaction {
+  /// 거래 고유 식별자
+  id                    String              @id @default(uuid())
+  /// 주문번호 (클라이언트에서 생성)
+  order_id              String              @unique
+  /// TossPayments 결제키
+  payment_key           String?             @unique
+  /// 결제 요청 사용자 ID (Cognito userSub)
+  user_id               String
+  /// 결제 금액 (원)
+  amount                Decimal             @db.Decimal(10, 0)
+  /// 구매할 토큰 수량
+  token_amount          Decimal             @db.Decimal(18, 4)
+  /// 토큰 타입 ID
+  token_type_id         String
+  /// 결제 상태
+  status                PaymentStatus       @default(PENDING)
+  /// 결제 방법 (카드, 가상계좌 등)
+  method                String?
+  /// 결제 승인 일시
+  approved_at           DateTime?
+  /// 결제 취소 일시
+  cancelled_at          DateTime?
+  /// 결제 실패 사유
+  failure_code          String?
+  /// 결제 실패 메시지
+  failure_message       String?
+  /// TossPayments 응답 원본 (JSON)
+  raw_response          Json?
+  /// 생성 일시
+  created_at            DateTime            @default(now())
+  /// 수정 일시
+  updated_at            DateTime            @updatedAt
+  /// 토큰 타입 참조
+  token_type            TokenType           @relation(fields: [token_type_id], references: [id])
+
+  @@index([user_id])
+  @@index([status])
+  @@index([order_id])
+  @@map("payment_transactions")
+}
+
+/// 결제 상태
+enum PaymentStatus {
+  PENDING    // 결제 대기 중
+  APPROVED   // 결제 승인됨
+  CANCELLED  // 결제 취소됨
+  FAILED     // 결제 실패
+  REFUNDED   // 환불됨
+
+  @@map("payment_statuses")
 }

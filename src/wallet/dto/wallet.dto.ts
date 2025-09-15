@@ -20,3 +20,18 @@ export interface GetUserWalletResponse {
     totalValue: number;
   };
 }
+
+export interface ChargeTokenRequest {
+  tokenTypeId: string;
+  amount: number; // 충전할 토큰 수량
+}
+
+export interface ChargeTokenResponse {
+  success: boolean;
+  data: {
+    orderId: string;
+    amount: number; // 결제 금액 (원)
+    tokenAmount: number; // 충전할 토큰 수량
+    clientKey: string; // TossPayments 클라이언트 키
+  };
+}

@@ -69,6 +69,11 @@ async function main() {
         address: "c5fd6ba5-5b21-4c3c-8f13-3f19e5fc9f58",
         amount: 100000000, //1억개
         token_type_id: tokenType.id,
+        ownerships: {
+          create: {
+            owner_id: "system",
+          },
+        },
       },
     });
   }

@@ -14,6 +14,7 @@ import { FeedModule } from "./feed/feed.module";
 import { FollowModule } from "./follow/follow.module";
 import { AdminModule } from "./admin/admin.module";
 import { ExploreModule } from "./explore/explore.module";
+import { PaymentModule } from "./payment/payment.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { LoggerModule } from "./common/logger/logger.module";
 import awsConfig from "./config/aws.config";
@@ -39,6 +40,7 @@ import appConfig from "./config/app.config";
     FollowModule,
     AdminModule,
     ExploreModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
