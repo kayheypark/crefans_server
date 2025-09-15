@@ -28,17 +28,6 @@ export class SubscriptionController {
     });
   }
 
-  @Post('membership/:membershipItemId')
-  @UseGuards(AuthGuard)
-  async subscribeToMembership(
-    @Req() req: any,
-    @Param('membershipItemId', ParseUUIDPipe) membershipItemId: string
-  ): Promise<ApiResponseDto<any>> {
-    const { sub } = req.user;
-    const subscription = await this.subscriptionService.subscribeToMembership(sub, membershipItemId);
-    
-    return ApiResponseDto.success('멤버십 구독이 성공적으로 생성되었습니다.', subscription);
-  }
 
   @Delete('membership/:membershipItemId')
   @UseGuards(AuthGuard)
