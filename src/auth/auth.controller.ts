@@ -216,4 +216,38 @@ export class AuthController {
     );
     return ApiResponseDto.success(result.message, {});
   }
+
+  @Post("refresh")
+  async refreshToken(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<ApiResponseDto<{}>> {
+    const refreshToken = req.cookies.refresh_token;
+    const idToken = req.cookies.id_token;
+
+    if (!refreshToken) {
+      throw new CognitoException("리프레시 토큰이 없습니다.", "NoRefreshToken");
+    }
+
+    try {
+      const result = await this.authService.refreshToken(refreshToken, idToken);
+
+      // 새로운 토큰들을 쿠키에 저장
+      setAuthCookies(
+        res,
+        {
+          accessToken: result.accessToken,
+          idToken: result.idToken,
+          refreshToken: result.refreshToken,
+        },
+        this.configService
+      );
+
+      return ApiResponseDto.success(result.message, {});
+    } catch (error: any) {
+      // 리프레시 토큰이 만료되었거나 무효한 경우 모든 쿠키 삭제
+      clearAuthCookies(res, this.configService);
+      throw error;
+    }
+  }
 }

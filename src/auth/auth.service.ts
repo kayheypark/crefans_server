@@ -45,14 +45,20 @@ export class AuthService {
               user_sub: cognitoResult.userSub,
             },
           });
-          this.logger.log(`✅ Earlybird record created for user: ${cognitoResult.userSub}`);
+          this.logger.log(
+            `✅ Earlybird record created for user: ${cognitoResult.userSub}`
+          );
         } catch (earlybirdError) {
           // 중복 가입 등의 경우 에러 처리하지만 회원가입은 계속 진행
-          this.logger.error("Failed to create earlybird record", earlybirdError.stack, {
-            service: "AuthService",
-            method: "signUp",
-            userSub: cognitoResult.userSub,
-          });
+          this.logger.error(
+            "Failed to create earlybird record",
+            earlybirdError.stack,
+            {
+              service: "AuthService",
+              method: "signUp",
+              userSub: cognitoResult.userSub,
+            }
+          );
         }
       }
 
@@ -382,26 +388,30 @@ export class AuthService {
   async updateNickname(userSub: string, nickname: string) {
     try {
       this.logger.log(`Updating nickname for user: ${userSub}`, {
-        service: 'AuthService',
-        method: 'updateNickname',
-        userSub
+        service: "AuthService",
+        method: "updateNickname",
+        userSub,
       });
 
-      const result = await this.cognitoService.updateUserAttribute(userSub, 'nickname', nickname);
+      const result = await this.cognitoService.updateUserAttribute(
+        userSub,
+        "nickname",
+        nickname
+      );
 
       this.logger.log(`✅ Nickname updated successfully for user: ${userSub}`, {
-        service: 'AuthService',
-        method: 'updateNickname',
-        userSub
+        service: "AuthService",
+        method: "updateNickname",
+        userSub,
       });
 
       return result;
     } catch (error) {
-      this.logger.error('Failed to update nickname', error.stack, {
-        service: 'AuthService',
-        method: 'updateNickname',
+      this.logger.error("Failed to update nickname", error.stack, {
+        service: "AuthService",
+        method: "updateNickname",
         userSub,
-        nickname
+        nickname,
       });
       throw error;
     }
@@ -410,26 +420,30 @@ export class AuthService {
   async updateHandle(userSub: string, preferredUsername: string) {
     try {
       this.logger.log(`Updating handle for user: ${userSub}`, {
-        service: 'AuthService',
-        method: 'updateHandle',
-        userSub
+        service: "AuthService",
+        method: "updateHandle",
+        userSub,
       });
 
-      const result = await this.cognitoService.updateUserAttribute(userSub, 'preferred_username', preferredUsername);
+      const result = await this.cognitoService.updateUserAttribute(
+        userSub,
+        "preferred_username",
+        preferredUsername
+      );
 
       this.logger.log(`✅ Handle updated successfully for user: ${userSub}`, {
-        service: 'AuthService',
-        method: 'updateHandle',
-        userSub
+        service: "AuthService",
+        method: "updateHandle",
+        userSub,
       });
 
       return result;
     } catch (error) {
-      this.logger.error('Failed to update handle', error.stack, {
-        service: 'AuthService',
-        method: 'updateHandle',
+      this.logger.error("Failed to update handle", error.stack, {
+        service: "AuthService",
+        method: "updateHandle",
         userSub,
-        preferredUsername
+        preferredUsername,
       });
       throw error;
     }
@@ -438,33 +452,33 @@ export class AuthService {
   async getUserByHandle(handle: string) {
     try {
       this.logger.log(`Getting user by handle: ${handle}`, {
-        service: 'AuthService',
-        method: 'getUserByHandle',
-        handle
+        service: "AuthService",
+        method: "getUserByHandle",
+        handle,
       });
 
       const result = await this.cognitoService.getUserByHandle(handle);
 
       if (result) {
         this.logger.log(`✅ User found by handle: ${handle}`, {
-          service: 'AuthService',
-          method: 'getUserByHandle',
-          handle
+          service: "AuthService",
+          method: "getUserByHandle",
+          handle,
         });
       } else {
         this.logger.log(`❌ No user found by handle: ${handle}`, {
-          service: 'AuthService',
-          method: 'getUserByHandle',
-          handle
+          service: "AuthService",
+          method: "getUserByHandle",
+          handle,
         });
       }
 
       return result;
     } catch (error) {
-      this.logger.error('Failed to get user by handle', error.stack, {
-        service: 'AuthService',
-        method: 'getUserByHandle',
-        handle
+      this.logger.error("Failed to get user by handle", error.stack, {
+        service: "AuthService",
+        method: "getUserByHandle",
+        handle,
       });
       return null;
     }
@@ -473,33 +487,33 @@ export class AuthService {
   async getUserBySub(userSub: string) {
     try {
       this.logger.log(`Getting user by sub: ${userSub}`, {
-        service: 'AuthService',
-        method: 'getUserBySub',
-        userSub
+        service: "AuthService",
+        method: "getUserBySub",
+        userSub,
       });
 
       const result = await this.cognitoService.getUserBySub(userSub);
 
       if (result) {
         this.logger.log(`✅ User found by sub: ${userSub}`, {
-          service: 'AuthService',
-          method: 'getUserBySub',
-          userSub
+          service: "AuthService",
+          method: "getUserBySub",
+          userSub,
         });
       } else {
         this.logger.log(`❌ No user found by sub: ${userSub}`, {
-          service: 'AuthService',
-          method: 'getUserBySub',
-          userSub
+          service: "AuthService",
+          method: "getUserBySub",
+          userSub,
         });
       }
 
       return result;
     } catch (error) {
-      this.logger.error('Failed to get user by sub', error.stack, {
-        service: 'AuthService',
-        method: 'getUserBySub',
-        userSub
+      this.logger.error("Failed to get user by sub", error.stack, {
+        service: "AuthService",
+        method: "getUserBySub",
+        userSub,
       });
       return null;
     }
@@ -508,28 +522,87 @@ export class AuthService {
   async checkNicknameAvailability(nickname: string): Promise<boolean> {
     try {
       this.logger.log(`Checking nickname availability: ${nickname}`, {
-        service: 'AuthService',
-        method: 'checkNicknameAvailability',
-        nickname
+        service: "AuthService",
+        method: "checkNicknameAvailability",
+        nickname,
       });
 
-      const result = await this.cognitoService.checkNicknameAvailability(nickname);
+      const result = await this.cognitoService.checkNicknameAvailability(
+        nickname
+      );
 
       this.logger.log(`✅ Nickname availability checked: ${nickname}`, {
-        service: 'AuthService',
-        method: 'checkNicknameAvailability',
+        service: "AuthService",
+        method: "checkNicknameAvailability",
         nickname,
-        available: result
+        available: result,
       });
 
       return result;
     } catch (error) {
-      this.logger.error('Failed to check nickname availability', error.stack, {
-        service: 'AuthService',
-        method: 'checkNicknameAvailability',
-        nickname
+      this.logger.error("Failed to check nickname availability", error.stack, {
+        service: "AuthService",
+        method: "checkNicknameAvailability",
+        nickname,
       });
       return false;
+    }
+  }
+
+  async refreshToken(refreshToken: string, idToken?: string) {
+    try {
+      this.logger.logAuthEvent("RefreshToken started", undefined, {
+        refreshToken: refreshToken.substring(0, 10) + "...",
+      });
+
+      let username: string | undefined;
+
+      // id_token에서 username 추출 시도
+      if (idToken) {
+        try {
+          const base64Url = idToken.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = Buffer.from(base64, "base64").toString("utf8");
+          const tokenData = JSON.parse(jsonPayload);
+
+          // 토큰 내용을 로그로 확인
+          this.logger.log("Token data:", {
+            email: tokenData.email,
+            "cognito:username": tokenData["cognito:username"],
+            preferred_username: tokenData.preferred_username,
+            sub: tokenData.sub,
+          });
+
+          username = tokenData["cognito:username"];
+          this.logger.log(`Selected username for SECRET_HASH: ${username}`);
+        } catch (error) {
+          this.logger.warn(
+            "Failed to extract username from id_token",
+            error.message
+          );
+        }
+      }
+
+      const result = await this.cognitoService.refreshToken(
+        refreshToken,
+        username
+      );
+
+      this.logger.logAuthEvent("RefreshToken completed", undefined, {
+        refreshToken: refreshToken.substring(0, 10) + "...",
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error("RefreshToken failed in AuthService", error.stack, {
+        service: "AuthService",
+        method: "refreshToken",
+      });
+
+      if (error.code) {
+        throw new CognitoException(error.message, error.code);
+      }
+      throw error;
     }
   }
 }

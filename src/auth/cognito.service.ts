@@ -12,6 +12,7 @@ import {
   AdminDeleteUserCommand,
   AdminUpdateUserAttributesCommand,
   AdminGetUserCommand,
+  InitiateAuthCommandOutput,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { LoggerService } from "../common/logger/logger.service";
 import * as crypto from "crypto";
@@ -532,6 +533,62 @@ export class CognitoService {
         userSub,
       });
       return null;
+    }
+  }
+
+  async refreshToken(refreshToken: string, username?: string) {
+    // AWS 문서에 따르면 client secret이 있으면 SECRET_HASH는 필수
+    const authParameters: any = {
+      REFRESH_TOKEN: refreshToken,
+    };
+
+    // client secret이 있으면 SECRET_HASH 추가 (필수)
+    if (this.clientSecret) {
+      if (!username) {
+        throw new Error("Client secret이 설정된 경우 username이 필요합니다.");
+      }
+      const secretHash = this.computeSecretHash(username);
+      authParameters.SECRET_HASH = secretHash;
+      this.logger.log(`Using SECRET_HASH for username: ${username}, hash: ${secretHash.substring(0, 10)}...`);
+    } else {
+      this.logger.log("No client secret configured, proceeding without SECRET_HASH");
+    }
+
+    const command = new InitiateAuthCommand({
+      ClientId: this.clientId,
+      AuthFlow: "REFRESH_TOKEN_AUTH",
+      AuthParameters: authParameters,
+    });
+
+    try {
+      this.logger.log("Refreshing tokens", {
+        service: "CognitoService",
+        method: "refreshToken",
+      });
+
+      const response = await this.cognitoClient.send(command);
+
+      if (!response.AuthenticationResult) {
+        throw new Error("토큰 갱신에 실패했습니다.");
+      }
+
+      this.logger.log("Token refresh successful", {
+        service: "CognitoService",
+        method: "refreshToken",
+      });
+
+      return {
+        accessToken: response.AuthenticationResult.AccessToken,
+        idToken: response.AuthenticationResult.IdToken,
+        refreshToken: response.AuthenticationResult.RefreshToken || refreshToken,
+        message: "토큰이 갱신되었습니다.",
+      };
+    } catch (error) {
+      this.logger.error("RefreshToken failed", error.stack, {
+        service: "CognitoService",
+        method: "refreshToken",
+      });
+      throw this.handleCognitoError(error);
     }
   }
 
