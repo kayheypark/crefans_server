@@ -39,6 +39,7 @@ export class BoardService {
             },
           },
           created_at: true,
+          published_at: true,
           views: true,
           is_important: true,
           excerpt: true,
@@ -54,10 +55,12 @@ export class BoardService {
       title: post.title,
       category: post.category.code.toLowerCase(),
       categoryName: post.category.name,
-      createdAt: post.created_at.toISOString().replace('T', ' ').substring(0, 19),
+      created_at: post.created_at.toISOString(),
+      published_at: post.published_at ? post.published_at.toISOString() : post.created_at.toISOString(),
       views: post.views,
-      isImportant: post.is_important,
+      is_important: post.is_important,
       excerpt: post.excerpt || '',
+      author: '크리팬스 관리자',
     }));
 
     return {
@@ -103,10 +106,11 @@ export class BoardService {
       content: post.content,
       category: post.category.code.toLowerCase(),
       categoryName: post.category.name,
-      createdAt: post.created_at.toISOString().replace('T', ' ').substring(0, 19),
-      updatedAt: post.updated_at.toISOString().replace('T', ' ').substring(0, 19),
+      created_at: post.created_at.toISOString(),
+      updated_at: post.updated_at.toISOString(),
+      published_at: post.published_at ? post.published_at.toISOString() : post.created_at.toISOString(),
       views: post.views + 1,
-      isImportant: post.is_important,
+      is_important: post.is_important,
       author: post.author,
     };
   }
