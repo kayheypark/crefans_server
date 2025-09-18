@@ -74,7 +74,7 @@ export class BoardService {
     };
   }
 
-  async getPostById(id: string) {
+  async getPostById(id: string, clientIp?: string) {
     const post = await this.prisma.board.findFirst({
       where: {
         id,
@@ -95,10 +95,10 @@ export class BoardService {
       return null;
     }
 
-    await this.prisma.board.update({
-      where: { id },
-      data: { views: { increment: 1 } },
-    });
+    // 조회수 증가는 별도 메서드로 처리
+    if (clientIp) {
+      await this.incrementViewCount(id, clientIp);
+    }
 
     return {
       id: post.id,
@@ -109,9 +109,63 @@ export class BoardService {
       created_at: post.created_at.toISOString(),
       updated_at: post.updated_at.toISOString(),
       published_at: post.published_at ? post.published_at.toISOString() : post.created_at.toISOString(),
-      views: post.views + 1,
+      views: post.views,
       is_important: post.is_important,
       author: post.author,
     };
+  }
+
+  async incrementViewCount(boardId: string, ipAddress: string) {
+    try {
+      // 24시간 이내에 같은 IP로 조회한 기록이 있는지 확인
+      const oneDayAgo = new Date();
+      oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
+      const existingView = await this.prisma.boardView.findFirst({
+        where: {
+          board_id: boardId,
+          ip_address: ipAddress,
+          viewed_at: {
+            gte: oneDayAgo,
+          },
+        },
+      });
+
+      // 24시간 이내 조회 기록이 있으면 조회수 증가하지 않음
+      if (existingView) {
+        return {
+          success: false,
+          message: '이미 조회한 게시글입니다.',
+        };
+      }
+
+      // 트랜잭션으로 조회 기록 추가와 조회수 증가를 동시에 처리
+      await this.prisma.$transaction(async (prisma) => {
+        // 조회 기록 추가
+        await prisma.boardView.create({
+          data: {
+            board_id: boardId,
+            ip_address: ipAddress,
+          },
+        });
+
+        // 조회수 증가
+        await prisma.board.update({
+          where: { id: boardId },
+          data: { views: { increment: 1 } },
+        });
+      });
+
+      return {
+        success: true,
+        message: '조회수가 증가했습니다.',
+      };
+    } catch (error) {
+      console.error('조회수 증가 실패:', error);
+      return {
+        success: false,
+        message: '조회수 증가에 실패했습니다.',
+      };
+    }
   }
 }

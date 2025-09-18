@@ -937,12 +937,35 @@ model Board {
   created_at    DateTime       @default(now())
   /// 수정 일시
   updated_at    DateTime       @updatedAt
+  /// 조회 기록
+  board_views   BoardView[]
 
   @@index([category_id])
   @@index([is_published])
   @@index([published_at])
   @@index([created_at])
   @@map("boards")
+}
+
+/// 게시글 조회 기록
+/// IP별 게시글 조회 기록을 관리하여 중복 조회수 증가를 방지
+model BoardView {
+  /// 조회 기록 고유 식별자
+  id          String    @id @default(uuid())
+  /// 게시글 ID
+  board_id    String
+  /// 조회자 IP 주소
+  ip_address  String
+  /// 조회 일시
+  viewed_at   DateTime  @default(now())
+  /// 게시글 관계
+  board       Board     @relation(fields: [board_id], references: [id], onDelete: Cascade)
+
+  @@unique([board_id, ip_address])
+  @@index([board_id])
+  @@index([ip_address])
+  @@index([viewed_at])
+  @@map("board_views")
 }
 
 /// 게시판 카테고리 테이블
