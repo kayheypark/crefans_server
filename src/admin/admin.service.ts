@@ -593,12 +593,18 @@ export class AdminService {
     try {
       const cognitoUser = await this.authService.getUserBySub(userSub);
 
+      // Check if user is creator by looking up Creator table
+      const creator = await this.prisma.creator.findUnique({
+        where: { user_id: userSub, is_active: true }
+      });
+
       if (!cognitoUser) {
         return {
           id: userSub,
           handle: userSub,
           name: userSub,
           avatar: "/profile-90.png",
+          isCreator: !!creator,
         };
       }
 
@@ -607,6 +613,7 @@ export class AdminService {
         handle: cognitoUser.UserAttributes.find((attr) => attr.Name === "preferred_username")?.Value || userSub,
         name: cognitoUser.UserAttributes.find((attr) => attr.Name === "nickname")?.Value || userSub,
         avatar: cognitoUser.UserAttributes.find((attr) => attr.Name === "picture")?.Value || "/profile-90.png",
+        isCreator: !!creator,
       };
     } catch (error) {
       // Fall back to userSub if Cognito lookup fails
@@ -615,6 +622,7 @@ export class AdminService {
         handle: userSub,
         name: userSub,
         avatar: "/profile-90.png",
+        isCreator: false,
       };
     }
   }
