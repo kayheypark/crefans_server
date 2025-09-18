@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException, Unauthorize
 import { PrismaService } from "../prisma/prisma.service";
 import { S3Service } from "./s3.service";
 import { ImageProcessingService } from "./image-processing.service";
+import { AdminService } from "../admin/admin.service";
 import { CreateMediaDto, CompleteUploadDto } from "./dto/media.dto";
 import { Media, ProcessingStatus } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
@@ -15,7 +16,8 @@ export class MediaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
-    private readonly imageProcessingService: ImageProcessingService
+    private readonly imageProcessingService: ImageProcessingService,
+    private readonly adminService: AdminService
   ) {}
 
   async createMedia(
@@ -659,11 +661,26 @@ export class MediaService {
    * 미디어 접근 권한 확인
    */
   private async checkMediaAccess(media: any, userSub?: string): Promise<boolean> {
+    // 1. Admin 권한 확인 - 가장 먼저 체크
+    if (userSub) {
+      try {
+        const adminUser = await this.adminService.getAdminByUserSub(userSub);
+        if (adminUser && adminUser.is_active) {
+          this.logger.log(`Admin access granted for media ${media.id} to admin user ${userSub}`);
+          return true;
+        }
+      } catch (error) {
+        // 관리자 권한 확인 실패는 일반 사용자로 계속 처리
+        this.logger.debug(`Admin check failed for user ${userSub}, proceeding with regular access check`);
+      }
+    }
+
+    // 2. 기존 권한 확인 로직
     // 미디어가 게시물에 포함되어 있는지 확인
     if (media.postings && media.postings.length > 0) {
       for (const postingMedia of media.postings) {
         const posting = postingMedia.posting;
-        
+
         // 공개 게시물이면 접근 허용
         if (!posting.is_membership) {
           return true;

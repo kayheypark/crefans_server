@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CognitoService } from '../auth/cognito.service';
+import { MediaStreamUtil } from '../common/utils/media-stream.util';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class AdminService {
   constructor(
     private prisma: PrismaService,
-    private cognitoService: CognitoService
+    private cognitoService: CognitoService,
+    private authService: AuthService
   ) {}
 
   // Dashboard methods
@@ -94,22 +97,31 @@ export class AdminService {
       where.status = status;
     }
 
-    const postings = await this.prisma.posting.findMany({
+    const postings: any[] = await this.prisma.posting.findMany({
       where,
       skip,
       take: parseInt(limit),
       orderBy: { created_at: 'desc' },
       include: {
         medias: {
-          select: {
-            id: true,
+          where: { is_deleted: false },
+          include: {
             media: {
               select: {
+                id: true,
                 type: true,
+                original_name: true,
                 file_name: true,
-              }
-            }
-          }
+                mime_type: true,
+                s3_upload_key: true,
+                processed_urls: true,
+                thumbnail_urls: true,
+                processing_status: true,
+                duration: true,
+              },
+            },
+          },
+          orderBy: { sort_order: "asc" },
         },
         _count: {
           select: {
@@ -123,8 +135,107 @@ export class AdminService {
 
     const total = await this.prisma.posting.count({ where });
 
+    // Format postings to match crefans_front structure
+    const formattedPostings = await Promise.all(
+      postings.map(async (posting) => {
+        // Convert medias to match front-end structure
+        const mediasWithUrls = await Promise.all(
+          posting.medias.map(async (pm) => {
+            const streamUrl = MediaStreamUtil.getTypedStreamUrl(
+              pm.media.id,
+              pm.media.type === 'VIDEO' ? 'video' : 'image'
+            );
+
+            let processedUrls, thumbnailUrls;
+
+            if (pm.media.type === 'VIDEO') {
+              processedUrls = MediaStreamUtil.convertVideoUrlsToStreamProxy(
+                pm.media.id,
+                pm.media.processed_urls
+              );
+              thumbnailUrls = MediaStreamUtil.convertVideoThumbnailsToStreamProxy(
+                pm.media.id,
+                pm.media.thumbnail_urls
+              );
+            } else if (pm.media.type === 'IMAGE') {
+              processedUrls = MediaStreamUtil.convertImageUrlsToStreamProxy(
+                pm.media.id,
+                pm.media.processed_urls
+              );
+              thumbnailUrls = MediaStreamUtil.convertImageThumbnailsToStreamProxy(
+                pm.media.id,
+                pm.media.thumbnail_urls
+              );
+            }
+
+            return {
+              id: pm.media.id,
+              type: pm.media.type,
+              file_name: pm.media.file_name,
+              content_type: pm.media.mime_type,
+              originalName: pm.media.original_name,
+              mediaUrl: streamUrl,
+              processedUrls,
+              thumbnailUrls,
+              processingStatus: pm.media.processing_status,
+              duration: pm.media.duration,
+            };
+          })
+        );
+
+        // Get user info
+        const userInfo = await this.getUserInfo(posting.user_sub);
+
+        return {
+          id: posting.id,
+          userSub: posting.user_sub,
+          user: userInfo,
+          title: posting.title,
+          content: posting.content,
+          status: posting.status,
+          isMembership: posting.is_membership,
+          isGotMembership: true, // Admin can see all
+          membershipLevel: posting.membership_level,
+          publishStartAt: posting.publish_start_at?.toISOString(),
+          publishEndAt: posting.publish_end_at?.toISOString(),
+          allowIndividualPurchase: posting.allow_individual_purchase,
+          individualPurchasePrice: posting.individual_purchase_price
+            ? Number(posting.individual_purchase_price)
+            : undefined,
+          isPublic: posting.is_public,
+          isSensitive: posting.is_sensitive,
+          totalViewCount: posting.total_view_count,
+          uniqueViewCount: posting.unique_view_count,
+          likeCount: posting.like_count,
+          commentCount: posting.comment_count,
+          publishedAt: posting.published_at?.toISOString(),
+          archivedAt: posting.archived_at?.toISOString(),
+          createdAt: posting.created_at.toISOString(),
+          updatedAt: posting.updated_at.toISOString(),
+          medias: mediasWithUrls,
+          isLiked: false, // Not applicable for admin
+          // For backward compatibility with existing admin frontend
+          total_view_count: posting.total_view_count,
+          like_count: posting.like_count,
+          comment_count: posting.comment_count,
+          created_at: posting.created_at.toISOString(),
+          published_at: posting.published_at?.toISOString(),
+          is_membership: posting.is_membership,
+          is_public: posting.is_public,
+          is_sensitive: posting.is_sensitive,
+          is_deleted: posting.is_deleted,
+          user_sub: posting.user_sub,
+          _count: {
+            comments: posting._count.comments,
+            likes: posting._count.likes,
+            views: posting._count.views,
+          }
+        };
+      })
+    );
+
     return {
-      data: postings,
+      data: formattedPostings,
       total,
       page: parseInt(page),
       limit: parseInt(limit),
@@ -133,13 +244,28 @@ export class AdminService {
   }
 
   async getPosting(postingId: string) {
-    const posting = await this.prisma.posting.findUnique({
+    const posting: any = await this.prisma.posting.findUnique({
       where: { id: postingId },
       include: {
         medias: {
+          where: { is_deleted: false },
           include: {
-            media: true,
-          }
+            media: {
+              select: {
+                id: true,
+                type: true,
+                original_name: true,
+                file_name: true,
+                mime_type: true,
+                s3_upload_key: true,
+                processed_urls: true,
+                thumbnail_urls: true,
+                processing_status: true,
+                duration: true,
+              },
+            },
+          },
+          orderBy: { sort_order: "asc" },
         },
         comments: {
           where: { is_deleted: false },
@@ -160,7 +286,102 @@ export class AdminService {
       throw new NotFoundException('Posting not found');
     }
 
-    return posting;
+    // Convert medias to match front-end structure
+    const mediasWithUrls = await Promise.all(
+      posting.medias.map(async (pm) => {
+        const streamUrl = MediaStreamUtil.getTypedStreamUrl(
+          pm.media.id,
+          pm.media.type === 'VIDEO' ? 'video' : 'image'
+        );
+
+        let processedUrls, thumbnailUrls;
+
+        if (pm.media.type === 'VIDEO') {
+          processedUrls = MediaStreamUtil.convertVideoUrlsToStreamProxy(
+            pm.media.id,
+            pm.media.processed_urls
+          );
+          thumbnailUrls = MediaStreamUtil.convertVideoThumbnailsToStreamProxy(
+            pm.media.id,
+            pm.media.thumbnail_urls
+          );
+        } else if (pm.media.type === 'IMAGE') {
+          processedUrls = MediaStreamUtil.convertImageUrlsToStreamProxy(
+            pm.media.id,
+            pm.media.processed_urls
+          );
+          thumbnailUrls = MediaStreamUtil.convertImageThumbnailsToStreamProxy(
+            pm.media.id,
+            pm.media.thumbnail_urls
+          );
+        }
+
+        return {
+          id: pm.media.id,
+          type: pm.media.type,
+          file_name: pm.media.file_name,
+          content_type: pm.media.mime_type,
+          originalName: pm.media.original_name,
+          mediaUrl: streamUrl,
+          processedUrls,
+          thumbnailUrls,
+          processingStatus: pm.media.processing_status,
+          duration: pm.media.duration,
+        };
+      })
+    );
+
+    // Get user info
+    const userInfo = await this.getUserInfo(posting.user_sub);
+
+    const formattedPosting = {
+      id: posting.id,
+      userSub: posting.user_sub,
+      user: userInfo,
+      title: posting.title,
+      content: posting.content,
+      status: posting.status,
+      isMembership: posting.is_membership,
+      isGotMembership: true, // Admin can see all
+      membershipLevel: posting.membership_level,
+      publishStartAt: posting.publish_start_at?.toISOString(),
+      publishEndAt: posting.publish_end_at?.toISOString(),
+      allowIndividualPurchase: posting.allow_individual_purchase,
+      individualPurchasePrice: posting.individual_purchase_price
+        ? Number(posting.individual_purchase_price)
+        : undefined,
+      isPublic: posting.is_public,
+      isSensitive: posting.is_sensitive,
+      totalViewCount: posting.total_view_count,
+      uniqueViewCount: posting.unique_view_count,
+      likeCount: posting.like_count,
+      commentCount: posting.comment_count,
+      publishedAt: posting.published_at?.toISOString(),
+      archivedAt: posting.archived_at?.toISOString(),
+      createdAt: posting.created_at.toISOString(),
+      updatedAt: posting.updated_at.toISOString(),
+      medias: mediasWithUrls,
+      isLiked: false, // Not applicable for admin
+      comments: posting.comments,
+      // For backward compatibility with existing admin frontend
+      total_view_count: posting.total_view_count,
+      like_count: posting.like_count,
+      comment_count: posting.comment_count,
+      created_at: posting.created_at.toISOString(),
+      published_at: posting.published_at?.toISOString(),
+      is_membership: posting.is_membership,
+      is_public: posting.is_public,
+      is_sensitive: posting.is_sensitive,
+      is_deleted: posting.is_deleted,
+      user_sub: posting.user_sub,
+      _count: {
+        comments: posting._count.comments,
+        likes: posting._count.likes,
+        views: posting._count.views,
+      }
+    };
+
+    return formattedPosting;
   }
 
   // Report management methods
@@ -365,6 +586,36 @@ export class AdminService {
       return { users };
     } catch (error) {
       throw new Error(`사용자 검색 실패: ${error.message}`);
+    }
+  }
+
+  private async getUserInfo(userSub: string) {
+    try {
+      const cognitoUser = await this.authService.getUserBySub(userSub);
+
+      if (!cognitoUser) {
+        return {
+          id: userSub,
+          handle: userSub,
+          name: userSub,
+          avatar: "/profile-90.png",
+        };
+      }
+
+      return {
+        id: cognitoUser.Username,
+        handle: cognitoUser.UserAttributes.find((attr) => attr.Name === "preferred_username")?.Value || userSub,
+        name: cognitoUser.UserAttributes.find((attr) => attr.Name === "nickname")?.Value || userSub,
+        avatar: cognitoUser.UserAttributes.find((attr) => attr.Name === "picture")?.Value || "/profile-90.png",
+      };
+    } catch (error) {
+      // Fall back to userSub if Cognito lookup fails
+      return {
+        id: userSub,
+        handle: userSub,
+        name: userSub,
+        avatar: "/profile-90.png",
+      };
     }
   }
 }
