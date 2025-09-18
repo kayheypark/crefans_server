@@ -25,11 +25,18 @@ RUN npx prisma generate
 # 소스 코드 복사 (개발모드에서는 볼륨 마운트로 대체됨)
 COPY . .
 
+# 시작 스크립트 복사 및 실행 권한 부여
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # TypeScript 컴파일 (개발모드에서는 ts-node 사용)
 # RUN npm run build
 
 # 포트 노출
 EXPOSE 3000
+
+# 시작 스크립트를 엔트리포인트로 설정
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 # 개발 모드 시작 (ts-node 사용)
 CMD ["npm", "run", "dev"]

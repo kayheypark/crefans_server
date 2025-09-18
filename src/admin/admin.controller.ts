@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, Patch, Body } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminAuthGuard } from './guards/admin-auth.guard';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
@@ -39,6 +39,12 @@ export class AdminController {
   async getPosting(@Param('id') id: string) {
     const data = await this.adminService.getPosting(id);
     return ApiResponseDto.success('포스팅 정보를 성공적으로 조회했습니다.', data);
+  }
+
+  @Patch('postings/:id/privacy')
+  async togglePostingPrivacy(@Param('id') id: string, @Body() body: { isPrivate: boolean }) {
+    const data = await this.adminService.togglePostingPrivacy(id, body.isPrivate);
+    return ApiResponseDto.success('포스팅 공개/비공개 설정을 성공적으로 변경했습니다.', data);
   }
 
   // Report management endpoints (READ ONLY)

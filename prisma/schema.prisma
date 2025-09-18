@@ -622,6 +622,7 @@ enum PostingStatus {
   @@map("posting_statuses")
 }
 
+
 /// 미디어 처리 상태
 enum ProcessingStatus {
   UPLOADING

@@ -618,4 +618,34 @@ export class AdminService {
       };
     }
   }
+
+  async togglePostingPrivacy(postingId: string, isPrivate: boolean) {
+    try {
+      const posting = await this.prisma.posting.findUnique({
+        where: { id: postingId },
+      });
+
+      if (!posting) {
+        throw new NotFoundException('포스팅을 찾을 수 없습니다.');
+      }
+
+      const updatedPosting = await this.prisma.posting.update({
+        where: { id: postingId },
+        data: {
+          is_public: !isPrivate,
+          updated_at: new Date()
+        },
+      });
+
+      return {
+        id: updatedPosting.id,
+        isPublic: updatedPosting.is_public
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new Error('포스팅 공개/비공개 설정 변경 중 오류가 발생했습니다.');
+    }
+  }
 }
