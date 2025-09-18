@@ -92,6 +92,49 @@ export class AdminAuthController {
     return ApiResponseDto.success("관리자 로그아웃이 완료되었습니다.", {});
   }
 
+  @Post("refresh")
+  async adminRefreshToken(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<ApiResponseDto<{}>> {
+    const refreshToken = req.cookies.refresh_token;
+    const idToken = req.cookies.id_token;
+    if (!refreshToken) {
+      throw new UnauthorizedException("리프레시 토큰이 없습니다.");
+    }
+
+    try {
+      // 토큰 갱신
+      const authResult = await this.authService.refreshToken(refreshToken, idToken);
+
+      // 새로운 토큰으로 사용자 정보 확인
+      const userInfo = await this.authService.getUserInfo(authResult.accessToken);
+
+      // 관리자 권한 재확인
+      const adminUser = await this.adminService.getAdminByUserSub(userInfo.attributes.sub);
+      if (!adminUser || !adminUser.is_active) {
+        throw new UnauthorizedException("관리자 권한이 없습니다.");
+      }
+
+      // 새로운 쿠키 설정
+      setAuthCookies(
+        res,
+        {
+          accessToken: authResult.accessToken,
+          idToken: authResult.idToken,
+          refreshToken: authResult.refreshToken,
+        },
+        this.configService
+      );
+
+      return ApiResponseDto.success("토큰이 성공적으로 갱신되었습니다.", {});
+    } catch (error: any) {
+      // 리프레시 토큰이 만료되었거나 무효한 경우 모든 쿠키 삭제
+      clearAuthCookies(res, this.configService);
+      throw error;
+    }
+  }
+
   @Get("me")
   @UseGuards(AdminAuthGuard)
   async getCurrentAdmin(
