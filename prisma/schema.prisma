@@ -26,22 +26,22 @@ model UserProfile {
 /// 시스템에서 사용되는 모든 토큰의 타입을 관리
 model TokenType {
   /// 토큰 타입 고유 식별자
-  id          String     @id @default(uuid())
+  id          String               @id @default(uuid())
   /// 토큰 심볼
-  symbol      String     @unique
+  symbol      String               @unique
   /// 토큰 타입 이름
   name        String
   /// 토큰 설명
   description String?
   /// 생성 일시
-  created_at  DateTime   @default(now())
+  created_at  DateTime             @default(now())
   /// 수정 일시
-  updated_at  DateTime   @updatedAt
+  updated_at  DateTime             @updatedAt
   /// 토큰 가격 (KRW 기준)
   price       Decimal              @db.Decimal(18, 4)
+  payments    PaymentTransaction[]
   transfers   Transfer[]
   wallets     Wallet[]
-  payments    PaymentTransaction[]
 
   @@map("token_types")
 }
@@ -253,35 +253,35 @@ model MembershipItem {
 /// 크리에이터와 구독자 간의 구독 관계를 관리
 model Subscription {
   /// 구독 고유 식별자
-  id                 String             @id @default(uuid())
+  id                    String               @id @default(uuid())
   /// 구독자 ID (Cognito의 userSub)
-  subscriber_id      String
+  subscriber_id         String
   /// 구독 시작 일시
-  started_at         DateTime           @default(now())
+  started_at            DateTime             @default(now())
   /// 구독 종료 일시 (null인 경우 현재 구독 중)
-  ended_at           DateTime?
+  ended_at              DateTime?
   /// 구독 상태
-  status             SubscriptionStatus @default(ONGOING)
+  status                SubscriptionStatus   @default(ONGOING)
   /// 구독 금액
-  amount             Decimal            @db.Decimal(18, 4)
+  amount                Decimal              @db.Decimal(18, 4)
   /// 자동 갱신 여부 (유저가 구독 취소시 자동 갱신여부가 false로 업데이트됨)
-  auto_renew         Boolean            @default(true)
-  /// TossPayments 빌링키
-  billing_key        String?
-  /// 다음 결제 예정일
-  next_billing_date  DateTime?
-  /// 마지막 결제일
-  last_payment_date  DateTime?
-  /// 결제 실패 횟수
-  payment_failure_count Int             @default(0)
+  auto_renew            Boolean              @default(true)
   /// 생성 일시
-  created_at         DateTime           @default(now())
+  created_at            DateTime             @default(now())
   /// 수정 일시
-  updated_at         DateTime           @updatedAt
-  membership_item_id String
-  membership_item    MembershipItem     @relation(fields: [membership_item_id], references: [id])
-  transfers          Transfer[]
-  payment_transactions PaymentTransaction[]
+  updated_at            DateTime             @updatedAt
+  membership_item_id    String
+  /// TossPayments 빌링키
+  billing_key           String?
+  /// 마지막 결제일
+  last_payment_date     DateTime?
+  /// 다음 결제 예정일
+  next_billing_date     DateTime?
+  /// 결제 실패 횟수
+  payment_failure_count Int                  @default(0)
+  payment_transactions  PaymentTransaction[]
+  membership_item       MembershipItem       @relation(fields: [membership_item_id], references: [id])
+  transfers             Transfer[]
 
   @@unique([subscriber_id, membership_item_id, started_at])
   @@index([membership_item_id], map: "subscriptions_membership_item_id_fkey")
@@ -292,7 +292,7 @@ model Subscription {
 /// 포스팅에 첨부되는 미디어 파일 정보
 model Media {
   /// 미디어 고유 식별자
-  id                String           @id @default(uuid())
+  id                String            @id @default(uuid())
   /// 미디어 타입
   type              MediaType
   /// 원본 파일명
@@ -310,13 +310,13 @@ model Media {
   /// 메타데이터 (JSON)
   metadata          Json?
   /// 삭제 여부
-  is_deleted        Boolean          @default(false)
+  is_deleted        Boolean           @default(false)
   /// 삭제 일시
   deleted_at        DateTime?
   /// 생성 일시
-  created_at        DateTime         @default(now())
+  created_at        DateTime          @default(now())
   /// 수정 일시
-  updated_at        DateTime         @updatedAt
+  updated_at        DateTime          @updatedAt
   /// 원본 파일 URL
   original_url      String
   /// 처리 완료 일시
@@ -326,19 +326,19 @@ model Media {
   /// 처리 작업 ID (MediaConvert Job ID)
   processing_job_id String?
   /// 처리 상태
-  processing_status ProcessingStatus @default(UPLOADING)
+  processing_status ProcessingStatus  @default(UPLOADING)
   /// S3 처리된 키들 (JSON)
   s3_processed_keys Json?
   /// S3 업로드 키
   s3_upload_key     String
   /// 썸네일 URL들 (JSON)
   thumbnail_urls    Json?
-  /// 재생 길이 (초 단위, 비디오만 해당)
-  duration          Float?
   /// 소유자 ID (Cognito userSub)
   user_sub          String
-  postings          PostingMedia[]
+  /// 재생 길이 (초 단위, 비디오만 해당)
+  duration          Float?
   deleteQueue       MediaDeleteQueue?
+  postings          PostingMedia[]
 
   @@map("medias")
 }
@@ -578,6 +578,276 @@ model UserFollow {
   @@map("user_follows")
 }
 
+/// 미디어 삭제 큐
+/// S3에서 삭제될 미디어 파일들을 관리하는 큐
+model MediaDeleteQueue {
+  /// 큐 고유 식별자
+  id               String      @id @default(uuid())
+  /// 미디어 ID
+  media_id         String      @unique
+  /// S3 키 (삭제할 파일 경로)
+  s3_key           String
+  /// 원본 파일 URL (백업용)
+  original_url     String
+  /// 큐에 추가된 이유
+  queue_reason     QueueReason
+  /// 유예기간 종료일
+  grace_period_end DateTime
+  /// 처리 상태
+  status           QueueStatus @default(PENDING)
+  /// 재시도 횟수
+  retry_count      Int         @default(0)
+  /// 에러 메시지
+  error_message    String?     @db.Text
+  /// 큐에 추가된 일시
+  queued_at        DateTime    @default(now())
+  /// 처리 완료 일시
+  processed_at     DateTime?
+  /// 생성 일시
+  created_at       DateTime    @default(now())
+  /// 수정 일시
+  updated_at       DateTime    @updatedAt
+  media            Media       @relation(fields: [media_id], references: [id])
+
+  @@index([status])
+  @@index([grace_period_end])
+  @@index([queued_at])
+  @@index([queue_reason])
+  @@map("media_delete_queue")
+}
+
+/// 관리자 계정
+/// 시스템 관리를 위한 관리자 계정 정보
+model Admin {
+  /// 관리자 고유 식별자
+  id         String    @id @default(uuid())
+  /// 사용자 ID (Cognito의 userSub 또는 별도 관리자 계정)
+  user_sub   String    @unique
+  /// 관리자 이름
+  name       String
+  /// 관리자 이메일
+  email      String    @unique
+  /// 관리자 역할
+  role       AdminRole @default(MODERATOR)
+  /// 활성 상태
+  is_active  Boolean   @default(true)
+  /// 마지막 로그인 일시
+  last_login DateTime?
+  /// 생성 일시
+  created_at DateTime  @default(now())
+  /// 수정 일시
+  updated_at DateTime  @updatedAt
+  /// 생성한 사용자 ID (상위 관리자)
+  created_by String?
+
+  @@map("admins")
+}
+
+/// 사용자 신고
+/// 사용자가 부적절한 콘텐츠나 행동을 신고하는 기능
+model UserReport {
+  /// 신고 고유 식별자
+  id          String       @id @default(uuid())
+  /// 신고자 ID (Cognito의 userSub)
+  reporter_id String
+  /// 신고 대상 유형
+  target_type ReportTarget
+  /// 신고 대상 ID (포스팅 ID, 댓글 ID, 사용자 ID 등)
+  target_id   String
+  /// 신고 사유
+  reason      ReportReason
+  /// 상세 설명
+  description String?      @db.Text
+  /// 신고 상태
+  status      ReportStatus @default(PENDING)
+  /// 처리 관리자 ID
+  admin_id    String?
+  /// 처리 결과 메모
+  admin_note  String?      @db.Text
+  /// 처리 일시
+  resolved_at DateTime?
+  /// 생성 일시
+  created_at  DateTime     @default(now())
+  /// 수정 일시
+  updated_at  DateTime     @updatedAt
+
+  @@index([target_type, target_id])
+  @@index([reporter_id])
+  @@index([status])
+  @@map("user_reports")
+}
+
+/// 사용자 정지 이력
+/// 사용자의 정지/활성화 이력을 관리
+model UserSuspension {
+  /// 정지 이력 고유 식별자
+  id         String           @id @default(uuid())
+  /// 대상 사용자 ID (Cognito의 userSub)
+  user_id    String
+  /// 정지 유형
+  type       SuspensionType
+  /// 정지 사유
+  reason     String           @db.Text
+  /// 정지 시작 일시
+  start_date DateTime         @default(now())
+  /// 정지 종료 일시 (null인 경우 무기한)
+  end_date   DateTime?
+  /// 정지 상태
+  status     SuspensionStatus @default(ACTIVE)
+  /// 처리 관리자 ID
+  admin_id   String
+  /// 생성 일시
+  created_at DateTime         @default(now())
+  /// 수정 일시
+  updated_at DateTime         @updatedAt
+
+  @@index([user_id])
+  @@index([status])
+  @@map("user_suspensions")
+}
+
+/// 결제 거래 내역
+/// TossPayments를 통한 실제 결제 거래 기록
+model PaymentTransaction {
+  /// 거래 고유 식별자
+  id              String        @id @default(uuid())
+  /// 주문번호 (클라이언트에서 생성)
+  order_id        String        @unique
+  /// TossPayments 결제키
+  payment_key     String?       @unique
+  /// 결제 요청 사용자 ID (Cognito userSub)
+  user_id         String
+  /// 결제 금액 (원)
+  amount          Decimal       @db.Decimal(10, 0)
+  /// 구매할 토큰 수량
+  token_amount    Decimal       @db.Decimal(18, 4)
+  /// 토큰 타입 ID
+  token_type_id   String
+  /// 결제 상태
+  status          PaymentStatus @default(PENDING)
+  /// 결제 방법 (카드, 가상계좌 등)
+  method          String?
+  /// 결제 승인 일시
+  approved_at     DateTime?
+  /// 결제 취소 일시
+  cancelled_at    DateTime?
+  /// 결제 실패 사유
+  failure_code    String?
+  /// 결제 실패 메시지
+  failure_message String?
+  /// TossPayments 응답 원본 (JSON)
+  raw_response    Json?
+  /// 생성 일시
+  created_at      DateTime      @default(now())
+  /// 수정 일시
+  updated_at      DateTime      @updatedAt
+  /// 구독 ID (정기결제용)
+  subscription_id String?
+  /// 자동결제 빌링키
+  billing_key     String?
+  /// 정기결제 여부
+  is_recurring    Boolean       @default(false)
+  subscription    Subscription? @relation(fields: [subscription_id], references: [id])
+  token_type      TokenType     @relation(fields: [token_type_id], references: [id])
+
+  @@index([user_id])
+  @@index([status])
+  @@index([order_id])
+  @@index([subscription_id], map: "payment_transactions_subscription_id_fkey")
+  @@index([token_type_id], map: "payment_transactions_token_type_id_fkey")
+  @@map("payment_transactions")
+}
+
+/// 게시판
+/// 공지사항 및 이벤트 게시글
+model Board {
+  /// 게시글 고유 식별자
+  id           String        @id @default(uuid())
+  /// 게시글 제목
+  title        String
+  /// 게시글 내용
+  content      String        @db.Text
+  /// 카테고리 ID
+  category_id  String
+  /// 중요 게시글 여부
+  is_important Boolean       @default(false)
+  /// 요약/미리보기 텍스트
+  excerpt      String?       @db.Text
+  /// 작성자 (관리자)
+  author       String        @default("크리팬스 관리자")
+  /// 조회수
+  views        Int           @default(0)
+  /// 공개 상태
+  is_published Boolean       @default(true)
+  /// 발행 일시
+  published_at DateTime?
+  /// 삭제 여부
+  is_deleted   Boolean       @default(false)
+  /// 삭제 일시
+  deleted_at   DateTime?
+  /// 생성 일시
+  created_at   DateTime      @default(now())
+  /// 수정 일시
+  updated_at   DateTime      @updatedAt
+  board_views  BoardView[]
+  category     BoardCategory @relation(fields: [category_id], references: [id])
+
+  @@index([category_id])
+  @@index([is_published])
+  @@index([published_at])
+  @@index([created_at])
+  @@map("boards")
+}
+
+/// 게시글 조회 기록
+/// IP별 게시글 조회 기록을 관리하여 중복 조회수 증가를 방지
+model BoardView {
+  /// 조회 기록 고유 식별자
+  id         String   @id @default(uuid())
+  /// 게시글 ID
+  board_id   String
+  /// 조회자 IP 주소
+  ip_address String
+  /// 조회 일시
+  viewed_at  DateTime @default(now())
+  board      Board    @relation(fields: [board_id], references: [id], onDelete: Cascade)
+
+  @@unique([board_id, ip_address])
+  @@index([board_id])
+  @@index([ip_address])
+  @@index([viewed_at])
+  @@map("board_views")
+}
+
+/// 게시판 카테고리 테이블
+/// 게시판의 카테고리를 동적으로 관리
+model BoardCategory {
+  /// 카테고리 고유 식별자
+  id          String   @id @default(uuid())
+  /// 카테고리 코드 (NOTICE, EVENT 등)
+  code        String   @unique
+  /// 카테고리 이름
+  name        String
+  /// 카테고리 설명
+  description String?
+  /// 정렬 순서
+  sort_order  Int      @default(0)
+  /// 공개 상태
+  is_public   Boolean  @default(true)
+  /// 활성 상태
+  is_active   Boolean  @default(true)
+  /// 생성 일시
+  created_at  DateTime @default(now())
+  /// 수정 일시
+  updated_at  DateTime @updatedAt
+  boards      Board[]
+
+  @@index([sort_order])
+  @@index([is_public])
+  @@index([is_active])
+  @@map("board_categories")
+}
+
 enum CommonStatus {
   PENDING
   SUCCESS
@@ -622,7 +892,6 @@ enum PostingStatus {
   @@map("posting_statuses")
 }
 
-
 /// 미디어 처리 상태
 enum ProcessingStatus {
   UPLOADING
@@ -633,368 +902,92 @@ enum ProcessingStatus {
   @@map("processing_statuses")
 }
 
-/// 미디어 삭제 큐
-/// S3에서 삭제될 미디어 파일들을 관리하는 큐
-model MediaDeleteQueue {
-  /// 큐 고유 식별자
-  id               String      @id @default(uuid())
-  /// 미디어 ID
-  media_id         String      @unique
-  /// S3 키 (삭제할 파일 경로)
-  s3_key           String
-  /// 원본 파일 URL (백업용)
-  original_url     String
-  /// 큐에 추가된 이유
-  queue_reason     QueueReason
-  /// 유예기간 종료일
-  grace_period_end DateTime
-  /// 처리 상태
-  status           QueueStatus @default(PENDING)
-  /// 재시도 횟수
-  retry_count      Int         @default(0)
-  /// 에러 메시지
-  error_message    String?     @db.Text
-  /// 큐에 추가된 일시
-  queued_at        DateTime    @default(now())
-  /// 처리 완료 일시
-  processed_at     DateTime?
-  /// 생성 일시
-  created_at       DateTime    @default(now())
-  /// 수정 일시
-  updated_at       DateTime    @updatedAt
-  /// 미디어 참조
-  media            Media       @relation(fields: [media_id], references: [id])
-
-  @@index([status])
-  @@index([grace_period_end])
-  @@index([queued_at])
-  @@index([queue_reason])
-  @@map("media_delete_queue")
-}
-
 /// 큐 추가 이유
 enum QueueReason {
-  ORPHANED     // PostingMedia에 연결되지 않음
-  SOFT_DELETED // Media에서 is_deleted=true
-  EXPIRED      // 생성 후 일정 시간 경과
+  ORPHANED
+  SOFT_DELETED
+  EXPIRED
 
   @@map("queue_reasons")
 }
 
 /// 큐 처리 상태
 enum QueueStatus {
-  PENDING    // 유예기간 대기 중
-  READY      // 삭제 준비 완료
-  PROCESSING // 삭제 진행 중
-  COMPLETED  // 삭제 완료
-  FAILED     // 삭제 실패
-  CANCELLED  // 삭제 취소됨
+  PENDING
+  READY
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
 
   @@map("queue_statuses")
 }
 
-/// 관리자 계정
-/// 시스템 관리를 위한 관리자 계정 정보
-model Admin {
-  /// 관리자 고유 식별자
-  id         String    @id @default(uuid())
-  /// 사용자 ID (Cognito의 userSub 또는 별도 관리자 계정)
-  user_sub   String    @unique
-  /// 관리자 이름
-  name       String
-  /// 관리자 이메일
-  email      String    @unique
-  /// 관리자 역할
-  role       AdminRole @default(MODERATOR)
-  /// 활성 상태
-  is_active  Boolean   @default(true)
-  /// 마지막 로그인 일시
-  last_login DateTime?
-  /// 생성 일시
-  created_at DateTime  @default(now())
-  /// 수정 일시
-  updated_at DateTime  @updatedAt
-  /// 생성한 사용자 ID (상위 관리자)
-  created_by String?
-
-  @@map("admins")
-}
-
-/// 사용자 신고
-/// 사용자가 부적절한 콘텐츠나 행동을 신고하는 기능
-model UserReport {
-  /// 신고 고유 식별자
-  id           String       @id @default(uuid())
-  /// 신고자 ID (Cognito의 userSub)
-  reporter_id  String
-  /// 신고 대상 유형
-  target_type  ReportTarget
-  /// 신고 대상 ID (포스팅 ID, 댓글 ID, 사용자 ID 등)
-  target_id    String
-  /// 신고 사유
-  reason       ReportReason
-  /// 상세 설명
-  description  String?      @db.Text
-  /// 신고 상태
-  status       ReportStatus @default(PENDING)
-  /// 처리 관리자 ID
-  admin_id     String?
-  /// 처리 결과 메모
-  admin_note   String?      @db.Text
-  /// 처리 일시
-  resolved_at  DateTime?
-  /// 생성 일시
-  created_at   DateTime     @default(now())
-  /// 수정 일시
-  updated_at   DateTime     @updatedAt
-
-  @@index([target_type, target_id])
-  @@index([reporter_id])
-  @@index([status])
-  @@map("user_reports")
-}
-
-/// 사용자 정지 이력
-/// 사용자의 정지/활성화 이력을 관리
-model UserSuspension {
-  /// 정지 이력 고유 식별자
-  id          String           @id @default(uuid())
-  /// 대상 사용자 ID (Cognito의 userSub)
-  user_id     String
-  /// 정지 유형
-  type        SuspensionType
-  /// 정지 사유
-  reason      String           @db.Text
-  /// 정지 시작 일시
-  start_date  DateTime         @default(now())
-  /// 정지 종료 일시 (null인 경우 무기한)
-  end_date    DateTime?
-  /// 정지 상태
-  status      SuspensionStatus @default(ACTIVE)
-  /// 처리 관리자 ID
-  admin_id    String
-  /// 생성 일시
-  created_at  DateTime         @default(now())
-  /// 수정 일시
-  updated_at  DateTime         @updatedAt
-
-  @@index([user_id])
-  @@index([status])
-  @@map("user_suspensions")
-}
-
 /// 관리자 역할
 enum AdminRole {
-  SUPER_ADMIN // 최고 관리자
-  ADMIN       // 일반 관리자
-  MODERATOR   // 모더레이터(의미: 포스팅 관리자)
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
 
   @@map("admin_roles")
 }
 
 /// 신고 대상 유형
 enum ReportTarget {
-  USER     // 사용자
-  POSTING  // 포스팅
-  COMMENT  // 댓글
+  USER
+  POSTING
+  COMMENT
 
   @@map("report_targets")
 }
 
 /// 신고 사유
 enum ReportReason {
-  SPAM           // 스팸
-  HARASSMENT     // 괴롭힘
-  INAPPROPRIATE  // 부적절한 콘텐츠
-  COPYRIGHT      // 저작권 침해
-  FRAUD          // 사기
-  OTHER          // 기타
+  SPAM
+  HARASSMENT
+  INAPPROPRIATE
+  COPYRIGHT
+  FRAUD
+  OTHER
 
   @@map("report_reasons")
 }
 
 /// 신고 상태
 enum ReportStatus {
-  PENDING    // 대기 중
-  REVIEWED   // 검토 완료
-  RESOLVED   // 해결됨
-  REJECTED   // 거부됨
+  PENDING
+  REVIEWED
+  RESOLVED
+  REJECTED
 
   @@map("report_statuses")
 }
 
 /// 정지 유형
 enum SuspensionType {
-  WARNING    // 경고
-  TEMPORARY  // 임시 정지
-  PERMANENT  // 영구 정지
+  WARNING
+  TEMPORARY
+  PERMANENT
 
   @@map("suspension_types")
 }
 
 /// 정지 상태
 enum SuspensionStatus {
-  ACTIVE   // 활성 (정지 중)
-  EXPIRED  // 만료됨
-  LIFTED   // 해제됨
+  ACTIVE
+  EXPIRED
+  LIFTED
 
   @@map("suspension_statuses")
 }
 
-/// 결제 거래 내역
-/// TossPayments를 통한 실제 결제 거래 기록
-model PaymentTransaction {
-  /// 거래 고유 식별자
-  id                    String              @id @default(uuid())
-  /// 주문번호 (클라이언트에서 생성)
-  order_id              String              @unique
-  /// TossPayments 결제키
-  payment_key           String?             @unique
-  /// 결제 요청 사용자 ID (Cognito userSub)
-  user_id               String
-  /// 결제 금액 (원)
-  amount                Decimal             @db.Decimal(10, 0)
-  /// 구매할 토큰 수량
-  token_amount          Decimal             @db.Decimal(18, 4)
-  /// 토큰 타입 ID
-  token_type_id         String
-  /// 결제 상태
-  status                PaymentStatus       @default(PENDING)
-  /// 결제 방법 (카드, 가상계좌 등)
-  method                String?
-  /// 결제 승인 일시
-  approved_at           DateTime?
-  /// 결제 취소 일시
-  cancelled_at          DateTime?
-  /// 결제 실패 사유
-  failure_code          String?
-  /// 결제 실패 메시지
-  failure_message       String?
-  /// TossPayments 응답 원본 (JSON)
-  raw_response          Json?
-  /// 생성 일시
-  created_at            DateTime            @default(now())
-  /// 수정 일시
-  updated_at            DateTime            @updatedAt
-  /// 구독 ID (정기결제용)
-  subscription_id       String?
-  /// 자동결제 빌링키
-  billing_key          String?
-  /// 정기결제 여부
-  is_recurring          Boolean            @default(false)
-  /// 토큰 타입 참조
-  token_type            TokenType           @relation(fields: [token_type_id], references: [id])
-  /// 구독과의 관계
-  subscription          Subscription?       @relation(fields: [subscription_id], references: [id])
-
-  @@index([user_id])
-  @@index([status])
-  @@index([order_id])
-  @@map("payment_transactions")
-}
-
 /// 결제 상태
 enum PaymentStatus {
-  PENDING    // 결제 대기 중
-  APPROVED   // 결제 승인됨
-  CANCELLED  // 결제 취소됨
-  FAILED     // 결제 실패
-  REFUNDED   // 환불됨
+  PENDING
+  APPROVED
+  CANCELLED
+  FAILED
+  REFUNDED
 
   @@map("payment_statuses")
-}
-
-/// 게시판
-/// 공지사항 및 이벤트 게시글
-model Board {
-  /// 게시글 고유 식별자
-  id            String         @id @default(uuid())
-  /// 게시글 제목
-  title         String
-  /// 게시글 내용
-  content       String         @db.Text
-  /// 카테고리 ID
-  category_id   String
-  /// 카테고리 관계
-  category      BoardCategory @relation(fields: [category_id], references: [id])
-  /// 중요 게시글 여부
-  is_important  Boolean        @default(false)
-  /// 요약/미리보기 텍스트
-  excerpt       String?        @db.Text
-  /// 작성자 (관리자)
-  author        String         @default("크리팬스 관리자")
-  /// 조회수
-  views         Int            @default(0)
-  /// 공개 상태
-  is_published  Boolean        @default(true)
-  /// 발행 일시
-  published_at  DateTime?
-  /// 삭제 여부
-  is_deleted    Boolean        @default(false)
-  /// 삭제 일시
-  deleted_at    DateTime?
-  /// 생성 일시
-  created_at    DateTime       @default(now())
-  /// 수정 일시
-  updated_at    DateTime       @updatedAt
-  /// 조회 기록
-  board_views   BoardView[]
-
-  @@index([category_id])
-  @@index([is_published])
-  @@index([published_at])
-  @@index([created_at])
-  @@map("boards")
-}
-
-/// 게시글 조회 기록
-/// IP별 게시글 조회 기록을 관리하여 중복 조회수 증가를 방지
-model BoardView {
-  /// 조회 기록 고유 식별자
-  id          String    @id @default(uuid())
-  /// 게시글 ID
-  board_id    String
-  /// 조회자 IP 주소
-  ip_address  String
-  /// 조회 일시
-  viewed_at   DateTime  @default(now())
-  /// 게시글 관계
-  board       Board     @relation(fields: [board_id], references: [id], onDelete: Cascade)
-
-  @@unique([board_id, ip_address])
-  @@index([board_id])
-  @@index([ip_address])
-  @@index([viewed_at])
-  @@map("board_views")
-}
-
-/// 게시판 카테고리 테이블
-/// 게시판의 카테고리를 동적으로 관리
-model BoardCategory {
-  /// 카테고리 고유 식별자
-  id          String  @id @default(uuid())
-  /// 카테고리 코드 (NOTICE, EVENT 등)
-  code        String  @unique
-  /// 카테고리 이름
-  name        String
-  /// 카테고리 설명
-  description String?
-  /// 정렬 순서
-  sort_order  Int     @default(0)
-  /// 공개 상태
-  is_public   Boolean @default(true)
-  /// 활성 상태
-  is_active   Boolean @default(true)
-  /// 생성 일시
-  created_at  DateTime @default(now())
-  /// 수정 일시
-  updated_at  DateTime @updatedAt
-
-  /// 게시글과의 관계
-  boards      Board[]
-
-  @@index([sort_order])
-  @@index([is_public])
-  @@index([is_active])
-  @@map("board_categories")
 }
