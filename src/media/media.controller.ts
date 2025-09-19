@@ -149,7 +149,6 @@ export class MediaController {
     return { success: true };
   }
 
-
   // 비디오 전용 스트리밍 엔드포인트
   @UseGuards(OptionalAuthGuard)
   @Get("video/:mediaId")
@@ -159,10 +158,15 @@ export class MediaController {
     @CurrentUser() user?: CurrentUserType,
     @Res() res?: Response
   ) {
-    return this.mediaService.streamVideoMedia(mediaId, quality, user?.userSub, res);
+    return this.mediaService.streamVideoMedia(
+      mediaId,
+      quality,
+      user?.userSub,
+      res
+    );
   }
 
-  // 이미지 전용 스트리밍 엔드포인트
+  // 이미지 전용 스트리밍 엔드포인트.
   @UseGuards(OptionalAuthGuard)
   @Get("image/:mediaId")
   async streamImage(
@@ -171,8 +175,11 @@ export class MediaController {
     @CurrentUser() user?: CurrentUserType,
     @Res() res?: Response
   ) {
-    return this.mediaService.streamImageMedia(mediaId, quality, user?.userSub, res);
+    return this.mediaService.streamImageMedia(
+      mediaId,
+      quality,
+      user?.userSub,
+      res
+    );
   }
-
-
 }
