@@ -56,6 +56,10 @@ export class CreatePostingDto {
   @IsOptional()
   @IsBoolean()
   is_sensitive?: boolean = false;
+
+  @IsOptional()
+  @IsBoolean()
+  allow_comments?: boolean = true;
 }
 
 export class UpdatePostingDto {
@@ -109,6 +113,10 @@ export class UpdatePostingDto {
   @IsOptional()
   @IsBoolean()
   is_sensitive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allow_comments?: boolean;
 }
 
 export class PostingQueryDto {
@@ -180,6 +188,7 @@ export interface PostingResponse {
   uniqueViewCount: number;
   likeCount: number;
   commentCount: number;
+  allowComments: boolean;
   publishedAt?: string;
   archivedAt?: string;
   createdAt: string;

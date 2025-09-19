@@ -675,31 +675,37 @@ export class MediaService {
       }
     }
 
-    // 2. 기존 권한 확인 로직
-    // 미디어가 게시물에 포함되어 있는지 확인
+    // 2. 활성 포스팅에 포함된 미디어 확인 (is_deleted: false)
     if (media.postings && media.postings.length > 0) {
-      for (const postingMedia of media.postings) {
-        const posting = postingMedia.posting;
+      // 활성 포스팅에 포함된 미디어만 필터링
+      const activePostingMedias = media.postings.filter(
+        (postingMedia: any) => !postingMedia.is_deleted && !postingMedia.posting.is_deleted
+      );
 
-        // 공개 게시물이면 접근 허용
-        if (!posting.is_membership) {
-          return true;
-        }
+      if (activePostingMedias.length > 0) {
+        for (const postingMedia of activePostingMedias) {
+          const posting = postingMedia.posting;
 
-        // 멤버십 게시물인 경우 사용자 확인 필요
-        if (userSub) {
-          // 작성자 본인이면 접근 허용
-          if (posting.user_sub === userSub) {
+          // 공개 게시물이면 접근 허용
+          if (!posting.is_membership) {
             return true;
           }
 
-          // 멤버십 구독 확인 로직
-          const hasSubscription = await this.checkMembershipAccess(userSub, posting.user_sub, posting.membership_level);
-          if (hasSubscription) return true;
+          // 멤버십 게시물인 경우 사용자 확인 필요
+          if (userSub) {
+            // 작성자 본인이면 접근 허용
+            if (posting.user_sub === userSub) {
+              return true;
+            }
+
+            // 멤버십 구독 확인 로직
+            const hasSubscription = await this.checkMembershipAccess(userSub, posting.user_sub, posting.membership_level);
+            if (hasSubscription) return true;
+          }
         }
+        // 활성 게시물이 있지만 접근 권한이 없음
+        return false;
       }
-      // 게시물이 있지만 접근 권한이 없음
-      return false;
     }
 
     // 게시물에 포함되지 않은 미디어 (업로드 중이거나 개인 미디어)

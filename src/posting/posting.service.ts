@@ -293,6 +293,7 @@ export class PostingService {
           uniqueViewCount: posting.unique_view_count,
           likeCount: likesStatus[posting.id]?.likeCount || posting.like_count,
           commentCount: posting.comment_count,
+          allowComments: posting.allow_comments ?? true,
           publishedAt: posting.published_at?.toISOString(),
           archivedAt: posting.archived_at?.toISOString(),
           createdAt: posting.created_at.toISOString(),
@@ -478,6 +479,7 @@ export class PostingService {
       uniqueViewCount: posting.unique_view_count,
       likeCount: likesStatus[id]?.likeCount || posting.like_count,
       commentCount: posting.comment_count,
+      allowComments: posting.allow_comments ?? true,
       publishedAt: posting.published_at?.toISOString(),
       archivedAt: posting.archived_at?.toISOString(),
       createdAt: posting.created_at.toISOString(),
@@ -539,50 +541,85 @@ export class PostingService {
 
     // 미디어 연결 업데이트
     if (media_ids !== undefined) {
-      // 기존 미디어 연결 삭제
-      await this.prisma.postingMedia.updateMany({
+      // 현재 포스팅에 연결된 모든 미디어 레코드 조회 (삭제된 것 포함)
+      const allPostingMedias = await this.prisma.postingMedia.findMany({
         where: { posting_id: id },
-        data: { is_deleted: true },
+        select: { media_id: true, is_deleted: true },
       });
 
-      // 새로운 미디어 연결 생성
-      if (media_ids.length > 0) {
+      // 활성 미디어와 삭제된 미디어 분리
+      const activeMediaIds = allPostingMedias
+        .filter(m => !m.is_deleted)
+        .map(m => m.media_id);
+      const deletedMediaIds = allPostingMedias
+        .filter(m => m.is_deleted)
+        .map(m => m.media_id);
+
+      // 새로운 미디어 ID 목록
+      const newMediaIds = media_ids || [];
+
+      // 차이점 분석
+      const toKeep = newMediaIds.filter(id => activeMediaIds.includes(id));           // 유지
+      const toRemove = activeMediaIds.filter(id => !newMediaIds.includes(id));       // 삭제
+      const toRestore = newMediaIds.filter(id => deletedMediaIds.includes(id));      // 복원
+      const toCreate = newMediaIds.filter(id =>
+        !activeMediaIds.includes(id) && !deletedMediaIds.includes(id)               // 신규 생성
+      );
+
+      // 삭제할 미디어 soft delete
+      if (toRemove.length > 0) {
+        await this.prisma.postingMedia.updateMany({
+          where: { posting_id: id, media_id: { in: toRemove }, is_deleted: false },
+          data: { is_deleted: true, deleted_at: new Date() },
+        });
+      }
+
+      // 삭제된 미디어 복원
+      if (toRestore.length > 0) {
+        for (const mediaId of toRestore) {
+          const newSortOrder = newMediaIds.indexOf(mediaId);
+          await this.prisma.postingMedia.updateMany({
+            where: { posting_id: id, media_id: mediaId, is_deleted: true },
+            data: { is_deleted: false, deleted_at: null, sort_order: newSortOrder },
+          });
+        }
+      }
+
+      // 신규 미디어 생성
+      if (toCreate.length > 0) {
+        // 신규 미디어가 실제로 존재하는지 확인
         const existingMedias = await this.prisma.media.findMany({
           where: {
-            id: { in: media_ids },
+            id: { in: toCreate },
             user_sub: userId,
             is_deleted: false,
           },
         });
 
-        if (existingMedias.length !== media_ids.length) {
+        if (existingMedias.length !== toCreate.length) {
           throw new BadRequestException("일부 미디어 파일을 찾을 수 없습니다.");
         }
 
-        // 미디어 정보를 가져와서 타입과 함께 저장
-        const mediaList = await this.prisma.media.findMany({
-          where: {
-            id: { in: media_ids },
-            user_sub: userId,
-            is_deleted: false,
-          },
-          select: {
-            id: true,
-            type: true,
-          },
-        });
-
-        // media_ids 순서대로 정렬
-        const sortedMediaList = media_ids
-          .map((id) => mediaList.find((media) => media.id === id))
-          .filter(Boolean);
-
+        // 신규 미디어 연결 생성
         await this.prisma.postingMedia.createMany({
-          data: sortedMediaList.map((media, index) => ({
+          data: toCreate.map((mediaId) => ({
             posting_id: id,
-            media_id: media.id,
-            sort_order: index,
+            media_id: mediaId,
+            sort_order: newMediaIds.indexOf(mediaId),
           })),
+        });
+      }
+
+      // 유지되는 미디어의 sort_order 업데이트
+      for (const mediaId of toKeep) {
+        const newSortOrder = newMediaIds.indexOf(mediaId);
+        await this.prisma.postingMedia.updateMany({
+          where: {
+            posting_id: id,
+            media_id: mediaId,
+            is_deleted: false
+          },
+          data: { sort_order: newSortOrder },
         });
       }
     }
