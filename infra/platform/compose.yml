@@ -1,0 +1,65 @@
+# Run from this directory. Secrets: .env and runtime.env (never checked in).
+services:
+  database:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: crefans
+      MYSQL_USER: crefans
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD}
+    volumes: ["database:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/platform/Dockerfile
+    command: ["node", "dist/src/platform/main.js"]
+    env_file: [runtime.env]
+    volumes: ["media:/data/media"]
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    networks: [private]
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/platform/Dockerfile
+    command: ["node", "dist/src/platform/worker.js"]
+    env_file: [runtime.env]
+    volumes: ["media:/data/media"]
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    networks: [private]
+  frontend:
+    build:
+      context: ../../../crefans_front
+      dockerfile: infra/platform/Dockerfile
+    environment:
+      PLATFORM_API_ORIGIN: http://api:3001
+      PORT: 3010
+    restart: unless-stopped
+    networks: [private]
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy:/data"]
+    restart: unless-stopped
+    depends_on: [frontend, api]
+    networks: [private]
+volumes:
+  database:
+  media:
+  caddy:
+networks:
+  private:

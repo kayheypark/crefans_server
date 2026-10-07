@@ -1,4 +1,5 @@
-import { Module } from "@nestjs/common";
+import { LocalMemberModule } from "./local/local-member.module";
+import { Global, Module } from "@nestjs/common";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { CognitoService } from "./cognito.service";
@@ -6,8 +7,9 @@ import { ConfigModule } from "@nestjs/config";
 import { TokenModule } from "../token/token.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { LoggerModule } from "../common/logger/logger.module";
+@Global()
 @Module({
-  imports: [ConfigModule, TokenModule, PrismaModule, LoggerModule],
+  imports: [LocalMemberModule, ConfigModule, TokenModule, PrismaModule, LoggerModule],
   controllers: [AuthController],
   providers: [AuthService, CognitoService],
   exports: [AuthService, CognitoService],

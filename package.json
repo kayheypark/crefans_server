@@ -7,7 +7,18 @@
     "build": "nest build",
     "start": "node dist/src/main.js",
     "dev": "ts-node src/main.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:auth": "node --test tests/local-members.test.cjs",
+    "members:export": "ts-node scripts/export-cognito-members.ts",
+    "members:import": "ts-node scripts/migrate-members.ts",
+    "members:audit": "ts-node scripts/audit-members.ts",
+    "dev:platform": "node scripts/platform-dev.cjs",
+    "start:platform": "node dist/src/platform/main.js",
+    "worker:platform": "node dist/src/platform/worker.js",
+    "test:platform": "node --test tests/platform.integration.test.cjs",
+    "test:platform:domain": "node --test tests/platform-auth.test.cjs tests/platform-finance.test.cjs tests/platform-jobs.test.cjs tests/platform-billing.test.cjs",
+    "platform:audit": "node scripts/platform-audit.cjs",
+    "platform:admin": "node scripts/platform-admin.cjs"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -38,6 +49,7 @@
     "ejs": "^3.1.10",
     "express": "^4.21.1",
     "express-session": "^1.18.1",
+    "nodemailer": "^7.0.13",
     "openid-client": "^5.7.0",
     "passport": "^0.7.0",
     "prisma": "^6.9.0",
@@ -50,6 +62,7 @@
     "@nestjs/cli": "^11.0.10",
     "@types/aws-lambda": "^8.10.152",
     "@types/node": "^24.3.1",
+    "@types/nodemailer": "^8.0.1",
     "@types/uuid": "^9.0.8",
     "ts-node": "^10.9.2",
     "wait-port": "^1.1.0"

@@ -185,6 +185,15 @@ model Creator {
   updated_at  DateTime         @updatedAt
   /// 카테고리 ID (선택사항)
   category_id String?
+  display_name String?
+  handle String? @unique
+  bio String? @db.Text
+  about String? @db.Text
+  links Json?
+  avatar String? @db.Text
+  cover String? @db.Text
+  comments_enabled Boolean @default(true)
+  promoted Boolean @default(false)
   category    CreatorCategory? @relation(fields: [category_id], references: [id])
 
   @@index([category_id])
@@ -242,6 +251,8 @@ model MembershipItem {
   is_active      Boolean        @default(true)
   /// 삭제 여부
   is_deleted     Boolean        @default(false)
+  image String? @db.Text
+  version Int @default(1)
   subscriptions  Subscription[]
 
   @@index([creator_id])
@@ -264,6 +275,8 @@ model Subscription {
   status                SubscriptionStatus   @default(ONGOING)
   /// 구독 금액
   amount                Decimal              @db.Decimal(18, 4)
+  plan_snapshot Json?
+  billing_method_id String?
   /// 자동 갱신 여부 (유저가 구독 취소시 자동 갱신여부가 false로 업데이트됨)
   auto_renew            Boolean              @default(true)
   /// 생성 일시
@@ -415,6 +428,8 @@ model Posting {
   user_sub                  String
   /// 댓글 허용 여부
   allow_comments            Boolean        @default(true)
+  access_plan_id String?
+  scheduled_at DateTime?
   comments                  Comment[]
   likes                     PostingLike[]
   medias                    PostingMedia[]
@@ -475,6 +490,8 @@ model Comment {
   created_at     DateTime      @default(now())
   /// 수정 일시
   updated_at     DateTime      @updatedAt
+  hidden Boolean @default(false)
+  mentions Json?
   likes          CommentLike[]
   parent         Comment?      @relation("CommentToComment", fields: [parent_id], references: [id])
   children       Comment[]     @relation("CommentToComment")
@@ -992,3 +1009,332 @@ enum PaymentStatus {
   @@map("payment_statuses")
 }
 //
+/// Identity key is the original Cognito sub; existing business tables are untouched.
+model Member {
+  id                 String   @id @db.VarChar(191)
+  email              String   @unique @db.VarChar(191)
+  cognito_username   String?  @unique @db.VarChar(191)
+  password_hash      String?  @db.VarChar(255)
+  name               String   @db.VarChar(255)
+  nickname           String   @db.VarChar(191)
+  preferred_username String   @unique @db.VarChar(191)
+  phone_number       String   @default("") @db.VarChar(64)
+  picture            String?  @db.Text
+  email_verified     Boolean  @default(false)
+  enabled            Boolean  @default(true)
+  status             String   @default("UNCONFIRMED") @db.VarChar(32)
+  migrated_at        DateTime?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  identity_hash String? @unique @db.Char(64)
+  sessions           MemberSession[]
+  challenges         MemberChallenge[]
+  @@index([nickname])
+  @@map("members")
+}
+
+model MemberSession {
+  id           String   @id @default(uuid())
+  member_id    String   @db.VarChar(191)
+  access_hash  String   @unique @db.Char(64)
+  refresh_hash String   @unique @db.Char(64)
+  access_until DateTime
+  expires_at   DateTime
+  created_at   DateTime @default(now())
+  member       Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@index([member_id])
+  @@index([expires_at])
+  @@map("member_sessions")
+}
+
+model MemberChallenge {
+  member_id  String @db.VarChar(191)
+  purpose    String @db.VarChar(24)
+  digest     String @db.Char(64)
+  attempts   Int @default(0)
+  expires_at DateTime
+  sent_at    DateTime @default(now())
+  target_email String? @db.VarChar(191)
+  member     Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@id([member_id, purpose])
+  @@index([expires_at])
+  @@map("member_challenges")
+}
+
+/// Shared across processes; keys are hashes, not emails or IP addresses.
+model AuthRateBucket {
+  id         String @id @db.Char(64)
+  count      Int @default(1)
+  expires_at DateTime
+  @@index([expires_at])
+  @@map("auth_rate_buckets")
+}
+
+
+model AccountPreference {
+  member_id String @id @db.VarChar(191)
+  content_alert Boolean @default(true)
+  message_alert Boolean @default(true)
+  marketing_alert Boolean @default(false)
+  show_activity Boolean @default(true)
+  allow_search Boolean @default(true)
+  show_following Boolean @default(true)
+  updated_at DateTime @updatedAt
+  @@map("account_preferences")
+}
+model SavedPost {
+  member_id String @db.VarChar(191)
+  posting_id String
+  created_at DateTime @default(now())
+  @@id([member_id, posting_id])
+  @@map("saved_posts")
+}
+model MemberBlock {
+  member_id String @db.VarChar(191)
+  target_id String @db.VarChar(191)
+  created_at DateTime @default(now())
+  @@id([member_id, target_id])
+  @@map("member_blocks")
+}
+model DirectMessage {
+  id String @id @default(uuid())
+  sender_id String @db.VarChar(191)
+  recipient_id String @db.VarChar(191)
+  body String @db.Text
+  read_at DateTime?
+  created_at DateTime @default(now())
+  @@index([recipient_id, created_at])
+  @@index([sender_id, recipient_id, created_at])
+  @@map("direct_messages")
+}
+model MemberNotification {
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  actor_id String? @db.VarChar(191)
+  type String
+  text String
+  path String
+  read_at DateTime?
+  created_at DateTime @default(now())
+  @@index([member_id, created_at])
+  @@map("member_notifications")
+}
+model SupportTicket {
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  category String
+  title String
+  message String @db.Text
+  reply String? @db.Text
+  status String @default("pending")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([member_id, created_at])
+  @@map("support_tickets")
+}
+model ServiceDocument {
+  id String @id @default(uuid())
+  kind String
+  title String
+  category String @default("")
+  content Json
+  pinned Boolean @default(false)
+  published Boolean @default(false)
+  updated_at DateTime @updatedAt
+  @@index([kind, published])
+  @@map("service_documents")
+}
+model SignupChallenge {
+  email String @id @db.VarChar(191)
+  code_hash String @db.Char(64)
+  attempts Int @default(0)
+  sent_at DateTime
+  expires_at DateTime
+  proof_hash String? @db.Char(64)
+  verified_at DateTime?
+  @@map("signup_challenges")
+}
+model IdentityProof {
+ adult_verified Boolean @default(false)
+ verified_name String? @db.VarChar(80)
+  id String @id @default(uuid())
+  token_hash String @unique @db.Char(64)
+  provider_reference String @unique
+  member_id String? @db.VarChar(191)
+  attempt_id String @unique
+  purpose String @default("signup")
+  identity_hash String @db.Char(64)
+  expires_at DateTime
+  consumed_at DateTime?
+  @@map("identity_proofs")
+}
+model MembershipVersion {
+  id String @id @default(uuid())
+  membership_id String
+  version Int
+  snapshot Json
+  created_at DateTime @default(now())
+  @@unique([membership_id, version])
+  @@map("membership_versions")
+}
+model BillingMethod {
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  billing_key_encrypted String @db.Text
+  customer_key String? @db.VarChar(36)
+  masked_number String? @db.VarChar(24)
+  revoked_at DateTime?
+  revoke_retry_at DateTime?
+  revoke_attempts Int @default(0)
+  label String
+  last_four String @db.Char(4)
+  is_default Boolean @default(false)
+  deleted_at DateTime?
+  created_at DateTime @default(now())
+  @@index([member_id])
+  @@map("billing_methods")
+}
+model CheckoutOrder {
+  attempts Int @default(0)
+  retry_at DateTime?
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  membership_id String
+  snapshot Json
+  amount Int
+  status String @default("pending")
+  payment_key String? @unique
+  subscription_id String?
+  billing_method_id String?
+  period_start DateTime?
+  idempotency_key String @unique
+  failure_code String?
+  expires_at DateTime
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([member_id, created_at])
+  @@map("checkout_orders")
+}
+model RevenueEntry {
+  id String @id @default(uuid())
+  creator_id String @db.VarChar(191)
+  order_id String @unique
+  title String
+  gross Int
+  reversals Int @default(0)
+  fees Int
+  net Int
+  available_at DateTime
+  created_at DateTime @default(now())
+  @@index([creator_id, available_at])
+  @@map("revenue_entries")
+}
+model SettlementAccount {
+  id String @id @default(uuid())
+  creator_id String @db.VarChar(191)
+  bank String
+  holder_alias String
+  last_four String @db.Char(4)
+  account_encrypted String? @db.Text
+  verified Boolean @default(false)
+  version Int @default(1)
+  is_default Boolean @default(false)
+  created_at DateTime @default(now())
+  @@index([creator_id])
+  @@map("settlement_accounts")
+}
+model WithdrawalCredential {
+  creator_id String @id @db.VarChar(191)
+  pin_hash String
+  updated_at DateTime @updatedAt
+  @@map("withdrawal_credentials")
+}
+model WithdrawalAuthorization {
+  id String @id @default(uuid())
+  creator_id String @db.VarChar(191)
+  account_id String
+  account_version Int
+  amount Int
+  expires_at DateTime
+  consumed_at DateTime?
+  @@map("withdrawal_authorizations")
+}
+model WithdrawalRequest {
+  id String @id @default(uuid())
+  creator_id String @db.VarChar(191)
+  request_key String @unique
+  account_id String
+  account_label String
+  amount Int
+  status String @default("requested")
+  note String @default("")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([creator_id, status])
+  @@map("withdrawal_requests")
+}
+
+model IdentityAttempt {
+ id String @id @default(uuid())
+ state_hash String @unique @db.Char(64)
+ proof_encrypted String? @db.Text
+ member_id String? @db.VarChar(191)
+ purpose String
+ provider_reference String? @unique
+ status String @default("pending")
+ expires_at DateTime
+ created_at DateTime @default(now())
+ @@map("identity_attempts")
+}
+model PlatformJob {
+ id String @id
+ locked_until DateTime
+ completed_at DateTime?
+ note String?
+ @@map("platform_jobs")
+}
+
+model MemberConsent {
+ document_snapshot Json?
+ id String @id @default(uuid())
+ member_id String
+ kind String @db.VarChar(40)
+ document_id String?
+ accepted_at DateTime @default(now())
+ @@index([member_id])
+ @@map("member_consents")
+}
+
+model FollowEvent {
+ id String @id @default(uuid())
+ follower_id String
+ following_id String
+ enabled Boolean
+ created_at DateTime @default(now())
+ @@index([following_id,created_at])
+ @@index([follower_id,following_id])
+ @@map("follow_events")
+}
+
+model BillingCustomer {
+ member_id String @id @db.VarChar(191)
+ customer_key String @unique @default(uuid()) @db.VarChar(36)
+ created_at DateTime @default(now())
+ @@map("billing_customers")
+}
+model BillingRegistration {
+ id String @id @default(uuid())
+ member_id String @db.VarChar(191)
+ customer_key String @db.VarChar(36)
+ state_hash String @db.Char(64)
+ return_path String @db.VarChar(250)
+ status String @default("pending") @db.VarChar(24)
+ auth_key_encrypted String? @db.Text
+ billing_method_id String? @db.VarChar(191)
+ locked_until DateTime?
+ expires_at DateTime
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([member_id])
+ @@map("billing_registrations")
+}
