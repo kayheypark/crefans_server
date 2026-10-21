@@ -1,5 +1,7 @@
 # Option 3: Dynamic Media Proxy Architecture
 
+> 문서 상태 (2026-10-08): 구형 앱/이전 설계·조사 기록이며 신규 `/api/v1`의 구현·운영 완료를 설명하지 않는다. 본문의 Cognito·비버전 API·S3/Lambda·가격·정책·완료율은 당시 범위다. 현재 계약은 [플랫폼 API](./platform-api.md), 구조/남은 작업은 [구현 추적](./platform-implementation.md), 실행은 [현재 안내](./README.md)를 우선한다. 과거 명령을 신규 배포에 그대로 실행하지 않는다.
+
 ## 개요
 
 Option 3은 미디어 파일에 대한 동적 접근 제어를 제공하는 아키텍처입니다. 모든 미디어 접근은 서버를 통해 제어되며, 게시물의 공개 여부 변경 시 즉시 반영됩니다.

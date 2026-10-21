@@ -173,7 +173,11 @@ test('SMTP adapter sends verification codes to a loopback SMTP server', async ()
     const sender = new MemberMailService(new ConfigService({ MEMBER_MAIL_PROVIDER:'smtp', SMTP_HOST:'127.0.0.1', SMTP_PORT:server.address().port, SMTP_FROM:'test@example.test' }));
     await sender.sendCode('recipient@example.test', '123456', 'verify');
     assert.match(received, /To: recipient@example.test/);
-    assert.match(Buffer.from(received.split("\r\n\r\n")[1].replace(/\s/g, ""), "base64").toString("utf8"), /123456/);
+    assert.match(received, /Content-Type: text\/html/);
+    assert.match(received, /Content-ID: <crefans-logo@crefans.com>/);
+    const textPart = received.match(/Content-Type: text\/plain[^]*?Content-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]+)/);
+    assert.ok(textPart, 'plain text alternative is present');
+    assert.match(Buffer.from(textPart[1].replace(/\s/g, ''), 'base64').toString('utf8'), /123456/);
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 

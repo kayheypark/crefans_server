@@ -7,7 +7,7 @@ export class PlatformController {
  constructor(private service:PlatformService,private emailChange:EmailChangeService){}
  @Get('health') async health(){await this.service.db.$queryRaw`SELECT 1`;return{status:'ready',version:'v1'};}
  @Get('session') @UseGuards(PlatformAuthGuard) session(){return{active:true};}
- @Get('bootstrap') @UseGuards(PlatformOptionalAuthGuard) bootstrap(@Req() r:any){return this.service.bootstrap(r.user?.sub);}
+ @Get('bootstrap') @UseGuards(PlatformOptionalAuthGuard) bootstrap(@Req() r:any,@Query('collection') collection:string){return this.service.bootstrap(r.user?.sub,collection);}
  @Get('creators') @UseGuards(PlatformOptionalAuthGuard) creators(@Query('query') query:string,@Query('category') category:string,@Query('cursor') cursor:string,@Req() r:any){return this.service.directory(r.user?.sub,query,category,cursor);}
  @Get('posts') @UseGuards(PlatformOptionalAuthGuard) posts(@Query('creatorId') creator:string,@Query('cursor') cursor:string,@Req() r:any){return this.service.postPage(r.user?.sub,creator,cursor);}
  @Get('posts/:id') @UseGuards(PlatformOptionalAuthGuard) post(@Param('id') id:string,@Req() r:any){return this.service.postDetail(id,r.user?.sub);}

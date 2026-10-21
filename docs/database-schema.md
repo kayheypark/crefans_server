@@ -1,5 +1,7 @@
 # Database Schema Documentation
 
+> 문서 상태 (2026-10-08): 아래 핵심 엔티티 발췌는 구형 스키마 설명으로 보존한다. 현재 전체 model/enum/필드·관계·인덱스는 [코드 추출 계약](./current-contracts.md)의 Prisma 원문 스냅샷과 `prisma/schema.prisma`를 기준으로 한다. Member 자체 인증/금융/작업 모델까지 포함하며 운영 DB에 적용됐다는 뜻은 아니다.
+
 이 문서는 crefans_server의 데이터베이스 스키마를 설명합니다.
 
 ## 개요

@@ -182,11 +182,16 @@ export class LocalMemberService implements OnModuleInit {
   }
   private async issueCode(member: Member, purpose: "verify" | "reset") {
     // Resend cooldown: one code per member/purpose every 3 minutes (product decision 2026-09-13); the code itself stays valid 10 minutes.
-    await this.limit(`mail:${member.id}:${purpose}`, 1, 180);
     const code = String(randomInt(0, 1000000)).padStart(6, "0");
     const data = { digest: this.codeDigest(member.id, purpose, code), attempts: 0, expires_at: new Date(Date.now() + 600000), sent_at: new Date() };
-    await this.prisma.memberChallenge.upsert({ where: { member_id_purpose: { member_id: member.id, purpose } },
-      create: { member_id: member.id, purpose, ...data }, update: data });
+    await this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM members WHERE id=${member.id} FOR UPDATE`;
+      const prior = await tx.memberChallenge.findUnique({ where: { member_id_purpose: { member_id: member.id, purpose } } });
+      if (prior && Date.now() - prior.sent_at.getTime() < 180000)
+        throw new HttpException("3분 후 인증 코드를 다시 요청해주세요.", 429);
+      await tx.memberChallenge.upsert({ where: { member_id_purpose: { member_id: member.id, purpose } },
+        create: { member_id: member.id, purpose, ...data }, update: data });
+    });
     try { await this.mail.sendCode(member.email, code, purpose); }
     catch { throw new HttpException("이메일 발송에 실패했습니다. 잠시 후 인증 코드를 다시 요청해주세요.", 503); }
   }

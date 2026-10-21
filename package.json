@@ -15,10 +15,12 @@
     "dev:platform": "node scripts/platform-dev.cjs",
     "start:platform": "node dist/src/platform/main.js",
     "worker:platform": "node dist/src/platform/worker.js",
-    "test:platform": "node --test tests/platform.integration.test.cjs",
-    "test:platform:domain": "node --test tests/platform-auth.test.cjs tests/platform-finance.test.cjs tests/platform-jobs.test.cjs tests/platform-billing.test.cjs",
+    "test:platform": "node --test tests/platform.integration.test.cjs tests/platform-access.integration.test.cjs",
+    "test:platform:domain": "node --test tests/platform-auth.test.cjs tests/platform-finance.test.cjs tests/platform-jobs.test.cjs tests/platform-billing.test.cjs tests/platform-payment-lifecycle.test.cjs tests/platform-payment-http.test.cjs tests/platform-provider-lifecycle.test.cjs tests/platform-provider-http.test.cjs",
     "platform:audit": "node scripts/platform-audit.cjs",
-    "platform:admin": "node scripts/platform-admin.cjs"
+    "platform:admin": "node scripts/platform-admin.cjs",
+    "test:mail": "npm run build && node --test tests/mail-templates.test.cjs tests/platform-mail.integration.test.cjs tests/platform-auth.test.cjs tests/platform-provider-lifecycle.test.cjs tests/platform-provider-http.test.cjs",
+    "dev:billing": "npm run build && node scripts/platform-billing-test.cjs"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

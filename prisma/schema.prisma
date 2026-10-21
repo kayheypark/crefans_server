@@ -1195,6 +1195,12 @@ model BillingMethod {
   @@map("billing_methods")
 }
 model CheckoutOrder {
+  usage_tracking_started_at DateTime?
+  content_accessed_at DateTime?
+  locked_until DateTime?
+  processing_started_at DateTime?
+  paid_at DateTime?
+  period_end DateTime?
   attempts Int @default(0)
   retry_at DateTime?
   id String @id @default(uuid())

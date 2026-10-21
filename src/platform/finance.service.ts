@@ -3,12 +3,12 @@ import {ConfigService} from '@nestjs/config';
 import {randomUUID,randomBytes} from 'crypto';
 import {billingCard} from './billing-card';
 import {PlatformService} from './service';
-import {PaymentProvider} from './payment-provider';
+import {PaymentProvider,providerOrderId} from './payment-provider';
 import {BankProvider} from './bank-provider';
 import {digest} from '../auth/local/credentials';
 import {hashPassword,verifyPassword} from '../auth/local/credentials';
 import {reject,text,dateOnly} from './http';
-const nextMonth=(now:Date)=>{const date=new Date(now),day=date.getUTCDate();date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+1);date.setUTCDate(Math.min(day,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()));return date;};
+export const nextMonth=(now:Date,anchor:Date=now)=>{const date=new Date(now),day=anchor.getUTCDate();date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+1);date.setUTCDate(Math.min(day,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()));return date;};
 @Injectable()
 export class PlatformFinanceService {
  constructor(private service:PlatformService,private provider:PaymentProvider,private config:ConfigService,private bank:BankProvider){}
@@ -23,25 +23,120 @@ export class PlatformFinanceService {
   }catch(error:any){const failed=error.getResponse?.()?.code==='PAYMENT_FAILED';await this.db.billingRegistration.updateMany({where:{id,status:'processing'},data:{status:failed?'failed':'pending',locked_until:failed?null:new Date(Date.now()+30000),...(failed?{auth_key_encrypted:null}:{})}});throw error;}
  }
  async revokeMethod(id:string){const method=await this.db.billingMethod.findFirst({where:{id,deleted_at:{not:null},revoked_at:null}});if(!method)return;try{await this.provider.revoke(this.provider.decrypt(method.billing_key_encrypted),`revoke-${id}`);await this.db.billingMethod.update({where:{id},data:{revoked_at:new Date(),revoke_retry_at:null,billing_key_encrypted:''}});}catch(error){await this.db.billingMethod.update({where:{id},data:{revoke_attempts:{increment:1},revoke_retry_at:new Date(Date.now()+300000)}});throw error;}}
- async retryBilling(){const pending=await this.db.billingRegistration.findMany({where:{status:{in:['pending','processing']},expires_at:{gt:new Date()},auth_key_encrypted:{not:null},OR:[{locked_until:null},{locked_until:{lt:new Date()}}]},take:20,orderBy:{updated_at:'asc'}});for(const row of pending){try{await this.finishRegistration(row.id);}catch{}}const revoked=await this.db.billingMethod.findMany({where:{deleted_at:{not:null},revoked_at:null,OR:[{revoke_retry_at:null},{revoke_retry_at:{lte:new Date()}}]},take:20,orderBy:{created_at:'asc'}});for(const row of revoked){try{await this.revokeMethod(row.id);}catch{}}await this.db.billingRegistration.updateMany({where:{expires_at:{lte:new Date()},status:{not:'completed'},OR:[{locked_until:null},{locked_until:{lt:new Date()}}]},data:{status:'expired',auth_key_encrypted:null}});}
+ async retryBilling(){const pending=await this.db.billingRegistration.findMany({where:{status:{in:['pending','processing']},expires_at:{gt:new Date()},auth_key_encrypted:{not:null},OR:[{locked_until:null},{locked_until:{lt:new Date()}}]},take:20,orderBy:{updated_at:'asc'}});let failures=0;for(const row of pending){try{await this.finishRegistration(row.id);}catch{failures++;}}const revoked=await this.db.billingMethod.findMany({where:{deleted_at:{not:null},revoked_at:null,OR:[{revoke_retry_at:null},{revoke_retry_at:{lte:new Date()}}]},take:20,orderBy:{created_at:'asc'}});for(const row of revoked){try{await this.revokeMethod(row.id);}catch{failures++;}}await this.db.billingRegistration.updateMany({where:{expires_at:{lte:new Date()},status:{not:'completed'},OR:[{locked_until:null},{locked_until:{lt:new Date()}}]},data:{status:'expired',auth_key_encrypted:null}});if(failures)reject(503,'BILLING_RETRY_FAILED','결제수단 재처리 실패가 있어 운영 확인이 필요합니다.');}
  async method(member:string,id:string,operation:string){if(!['delete','default'].includes(operation))reject(400,'INVALID_OPERATION','결제수단 작업을 확인해주세요.');await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;const m=await tx.billingMethod.findFirst({where:{id,member_id:member}});if(!m||m.deleted_at&&operation!=='delete')reject(404,'METHOD_NOT_FOUND','결제수단을 찾을 수 없습니다.');if(operation==='delete'){if(m.deleted_at)return;if(await tx.checkoutOrder.count({where:{member_id:member,billing_method_id:id,status:'processing'}})||await tx.subscription.count({where:{subscriber_id:member,billing_method_id:id,status:'ONGOING',auto_renew:true}}))reject(409,'METHOD_IN_USE','구독 갱신에 사용 중입니다. 다른 기본 결제수단을 먼저 선택해주세요.');await tx.billingMethod.update({where:{id},data:{deleted_at:new Date(),is_default:false}});if(m.is_default){const next=await tx.billingMethod.findFirst({where:{member_id:member,deleted_at:null},orderBy:{created_at:'asc'}});if(next)await tx.billingMethod.update({where:{id:next.id},data:{is_default:true}});}}else{await tx.billingMethod.updateMany({where:{member_id:member},data:{is_default:false}});await tx.billingMethod.update({where:{id},data:{is_default:true}});await tx.subscription.updateMany({where:{subscriber_id:member,status:'ONGOING',auto_renew:true},data:{billing_method_id:id}});}});if(operation==='delete'){try{await this.revokeMethod(id);}catch{return{message:'결제수단을 삭제했습니다. 결제사 등록 해제는 확인 중입니다.'};}}return{message:'결제수단을 변경했습니다.'};}
- async createOrder(member:string,input:any){const key=text(input.requestId,100),planId=text(input.planId,191);return this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;const prior=await tx.checkoutOrder.findUnique({where:{idempotency_key:key}});if(prior){if(prior.member_id!==member||prior.membership_id!==planId)reject(409,'IDEMPOTENCY_CONFLICT','요청 식별자가 다른 주문에 사용되었습니다.');return this.orderView(prior);}await tx.$queryRaw`SELECT id FROM membership_items WHERE id=${planId} FOR UPDATE`;const p=await tx.membershipItem.findUnique({where:{id:planId}});const c=p?await tx.creator.findUnique({where:{user_id:p.creator_id}}):null;if(!p?.is_active||p.is_deleted||!c?.is_active)reject(409,'PLAN_UNAVAILABLE','가입할 수 없는 멤버십입니다.');if(p.creator_id===member)reject(400,'SELF_SUBSCRIPTION','본인 멤버십에 가입할 수 없습니다.');if(await tx.subscription.count({where:{subscriber_id:member,membership_item:{creator_id:p.creator_id},ended_at:{gt:new Date()},status:{in:['ONGOING','CANCELLED']}}}))reject(409,'ALREADY_SUBSCRIBED','이미 이용 중인 멤버십입니다.');const order=await tx.checkoutOrder.create({data:{member_id:member,membership_id:p.id,amount:Number(p.price),snapshot:{...this.service.plan(p),creatorId:p.creator_id},idempotency_key:key,expires_at:new Date(Date.now()+1800000)}});return this.orderView(order);});}
+ async createOrder(member:string,input:any){const key=text(input.requestId,100),planId=text(input.planId,191);return this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;const prior=await tx.checkoutOrder.findUnique({where:{idempotency_key:key}});if(prior){if(prior.member_id!==member||prior.membership_id!==planId)reject(409,'IDEMPOTENCY_CONFLICT','요청 식별자가 다른 주문에 사용되었습니다.');return this.orderView(prior);}await tx.$queryRaw`SELECT id FROM membership_items WHERE id=${planId} FOR UPDATE`;const p=await tx.membershipItem.findUnique({where:{id:planId}});const c=p?await tx.creator.findUnique({where:{user_id:p.creator_id}}):null;if(!p?.is_active||p.is_deleted||!c?.is_active)reject(409,'PLAN_UNAVAILABLE','가입할 수 없는 멤버십입니다.');if(!Number.isSafeInteger(Number(p.price))||Number(p.price)<100||Number(p.price)>10000000)reject(400,'INVALID_AMOUNT','카드 결제 금액은 100원 이상이어야 합니다.');if(p.creator_id===member)reject(400,'SELF_SUBSCRIPTION','본인 멤버십에 가입할 수 없습니다.');if(await tx.subscription.count({where:{subscriber_id:member,membership_item:{creator_id:p.creator_id},ended_at:{gt:new Date()},status:{in:['ONGOING','CANCELLED']}}}))reject(409,'ALREADY_SUBSCRIBED','이미 이용 중인 멤버십입니다.');const order=await tx.checkoutOrder.create({data:{member_id:member,membership_id:p.id,amount:Number(p.price),snapshot:{...this.service.plan(p),creatorId:p.creator_id},idempotency_key:key,expires_at:new Date(Date.now()+1800000)}});return this.orderView(order);});}
  orderView(o:any){return{id:o.id,planId:o.membership_id,amount:o.amount,status:o.status,snapshot:o.snapshot,expiresAt:o.expires_at.toISOString()};}
  async order(member:string,id:string){const o=await this.db.checkoutOrder.findFirst({where:{id,member_id:member}});if(!o)reject(404,'ORDER_NOT_FOUND','주문을 찾을 수 없습니다.');return this.orderView(o);}
- async pay(member:string,id:string,methodId?:string){this.provider.configForClient();const bps=Number(this.config.get('PLATFORM_FEE_BPS'));if(!this.config.get('PLATFORM_FEE_BPS')||!Number.isInteger(bps)||bps<0||bps>10000)reject(503,'FEE_POLICY_REQUIRED','수수료 정책 설정이 필요합니다.');const hold=Number(this.config.get('SETTLEMENT_HOLD_DAYS'));if(!this.config.get('SETTLEMENT_HOLD_DAYS')||!Number.isInteger(hold)||hold<0||hold>365)reject(503,'SETTLEMENT_POLICY_REQUIRED','정산 보류 정책 설정이 필요합니다.');let method:any;
-   const order=await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;const o=await tx.checkoutOrder.findFirst({where:{id,member_id:member}});if(!o)reject(404,'ORDER_NOT_FOUND','주문을 찾을 수 없습니다.');if(o.status==='paid')return o;if(o.status!=='pending'&&o.status!=='processing')reject(409,'INVALID_ORDER_STATE','결제할 수 없는 주문입니다.');if(o.status==='pending'&&o.expires_at<=new Date())reject(409,'ORDER_EXPIRED','주문이 만료되었습니다.');const p=await tx.membershipItem.findUnique({where:{id:o.membership_id}});if(o.status==='pending'&&!o.subscription_id&&(!p?.is_active||p.is_deleted||!await tx.creator.findFirst({where:{user_id:p.creator_id,is_active:true}})))reject(409,'PLAN_UNAVAILABLE','가입할 수 없는 멤버십입니다.');if(o.status==='pending'&&!o.subscription_id&&await tx.subscription.count({where:{subscriber_id:member,membership_item:{creator_id:p.creator_id},ended_at:{gt:new Date()},status:{in:['ONGOING','CANCELLED']}}}))reject(409,'ALREADY_SUBSCRIBED','이미 이용 중인 멤버십입니다.');if(o.status==='pending'&&await tx.checkoutOrder.count({where:{member_id:member,status:'processing',NOT:{id}}}))reject(409,'PAYMENT_IN_PROGRESS','다른 주문 결제가 진행 중입니다.');method=await tx.billingMethod.findFirst({where:{member_id:member,deleted_at:null,...(o.billing_method_id?{id:o.billing_method_id}:methodId?{id:methodId}:{is_default:true})}});if(!method)reject(409,'PAYMENT_METHOD_REQUIRED','결제수단을 등록해주세요.');return tx.checkoutOrder.update({where:{id},data:{status:'processing',billing_method_id:method.id,...(o.status==='pending'?{snapshot:{...(o.snapshot as any),platformFeeBps:bps,settlementHoldDays:hold}}:{})}});});
-   if(order.status==='paid')return{message:'가입이 완료되었습니다.',order:this.orderView(order)};
-   let response:any;try{response=await this.provider.charge(this.provider.decrypt(method.billing_key_encrypted),method.customer_key||member,order);}catch(error){if(error.getResponse?.().code==='PAYMENT_FAILED')await this.db.checkoutOrder.updateMany({where:{id,status:'processing'},data:{status:'failed',failure_code:'PAYMENT_FAILED',retry_at:new Date(Date.now()+Number(this.config.get('RENEWAL_RETRY_HOURS')||24)*3600000)}});throw error;}
-   if(response.status!=='DONE'||response.totalAmount!==order.amount||response.orderId!==order.id)reject(502,'PAYMENT_UNCERTAIN','결제 응답 확인이 필요합니다.');
-   await this.finalize(order.id,response.paymentKey);return{message:'가입이 완료되었습니다.',order:await this.order(member,id)};
+ async retryPayment(member:string,id:string){
+  return this.db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
+   const order=await tx.checkoutOrder.findFirst({where:{id,member_id:member}});if(!order)reject(404,'ORDER_NOT_FOUND','주문을 찾을 수 없습니다.');
+   if(order.status!=='failed')return this.orderView(order);
+   if(order.subscription_id)reject(409,'RENEWAL_MANAGED','구독 갱신은 자동 재시도 정책으로 처리됩니다.');
+   if(order.expires_at<=new Date())reject(409,'ORDER_EXPIRED','주문이 만료되었습니다. 멤버십을 다시 선택해주세요.');
+   const updated=await tx.checkoutOrder.update({where:{id},data:{status:'pending',attempts:{increment:1},billing_method_id:null,payment_key:null,failure_code:null,retry_at:null,locked_until:null,processing_started_at:null}});return this.orderView(updated);
+  });
  }
- async finalize(id:string,paymentKey:string){const owner=await this.db.checkoutOrder.findUniqueOrThrow({where:{id},select:{member_id:true}});await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${owner.member_id} FOR UPDATE`;await tx.$queryRaw`SELECT id FROM checkout_orders WHERE id=${id} FOR UPDATE`;const o=await tx.checkoutOrder.findUniqueOrThrow({where:{id}});if(o.status==='paid')return;if(o.status!=='processing')reject(409,'INVALID_ORDER_STATE','결제 결과 확인 상태가 아닙니다.');text(paymentKey,300);const p=await tx.membershipItem.findUniqueOrThrow({where:{id:o.membership_id}});const end=nextMonth(new Date());const sub=o.subscription_id?await tx.subscription.findUniqueOrThrow({where:{id:o.subscription_id}}):await tx.subscription.create({data:{subscriber_id:o.member_id,membership_item_id:p.id,amount:o.amount,plan_snapshot:o.snapshot,billing_method_id:o.billing_method_id,ended_at:end,next_billing_date:end,last_payment_date:new Date(),auto_renew:true}});if(o.subscription_id){const renewed=nextMonth(o.period_start||new Date());await tx.subscription.update({where:{id:sub.id},data:{ended_at:renewed,next_billing_date:renewed,last_payment_date:new Date(),payment_failure_count:0}});}await tx.checkoutOrder.update({where:{id},data:{status:'paid',payment_key:paymentKey,subscription_id:sub.id}});
-   const bps=Number((o.snapshot as any).platformFeeBps);if(!Number.isInteger(bps)||bps<0||bps>10000)reject(503,'FEE_POLICY_REQUIRED','주문의 수수료 정책 확인이 필요합니다.');const fees=Math.floor(o.amount*bps/10000);await tx.revenueEntry.create({data:{creator_id:p.creator_id,order_id:o.id,title:(o.snapshot as any).name,gross:o.amount,fees,net:o.amount-fees,available_at:new Date(Date.now()+Number((o.snapshot as any).settlementHoldDays)*86400000)}});
-   await tx.memberNotification.create({data:{member_id:o.member_id,actor_id:p.creator_id,type:'subscription',text:'멤버십 가입이 완료되었습니다.',path:'/subscriptions'}});
- });}
- async cancelSubscription(member:string,creator:string){const result=await this.db.subscription.updateMany({where:{subscriber_id:member,membership_item:{creator_id:creator},status:'ONGOING',auto_renew:true},data:{auto_renew:false,status:'CANCELLED'}});if(!result.count)reject(404,'SUBSCRIPTION_NOT_FOUND','구독을 찾을 수 없습니다.');return{message:'갱신을 해지했습니다. 이용 종료일까지 권한이 유지됩니다.'};}
- async finance(member:string,tx:any=this.db){const [entries,withdrawals,accounts]=await Promise.all([tx.revenueEntry.findMany({where:{creator_id:member},orderBy:{created_at:'desc'}}),tx.withdrawalRequest.findMany({where:{creator_id:member},orderBy:{created_at:'desc'}}),tx.settlementAccount.findMany({where:{creator_id:member}})]);const sum=(key:string)=>entries.reduce((a:any,e:any)=>a+e[key],0),pending=entries.filter((e:any)=>e.available_at>new Date()).reduce((a:any,e:any)=>a+e.net,0),requested=withdrawals.filter((w:any)=>['requested','processing'].includes(w.status)).reduce((a:any,w:any)=>a+w.amount,0),paid=withdrawals.filter((w:any)=>w.status==='paid').reduce((a:any,w:any)=>a+w.amount,0);
-   return{summary:{gross:sum('gross'),reversals:sum('reversals'),fees:sum('fees'),net:sum('net'),pending,available:sum('net')-pending-requested-paid,requested,paid},earnings:entries.map((e:any)=>({id:e.id,settlementId:e.id,date:dateOnly(e.created_at),title:e.title,gross:e.gross,reversals:e.reversals,fees:e.fees,net:e.net})),settlements:entries.map((e:any)=>({id:e.id,period:dateOnly(e.created_at),status:e.available_at>new Date()?'pending':'available',availableAt:dateOnly(e.available_at)})),withdrawals:withdrawals.map((w:any)=>this.withdrawalView(w)),accounts:accounts.map((a:any)=>this.accountView(a)),pinConfigured:!!await tx.withdrawalCredential.findUnique({where:{creator_id:member}})};
+ async paymentWindow(member:string,id:string){
+  const config=await this.billingConfig(member);
+  return this.db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
+   const o=await tx.checkoutOrder.findFirst({where:{id,member_id:member}});
+   if(!o)reject(404,'ORDER_NOT_FOUND','주문을 찾을 수 없습니다.');
+   if(o.status!=='pending'||o.subscription_id||o.expires_at<=new Date())reject(409,'INVALID_ORDER_STATE','새 주문으로 결제해주세요.');
+   await tx.checkoutOrder.update({where:{id},data:{snapshot:{...(o.snapshot as any),paymentMode:'one-time'}}});
+   return{...config,orderId:providerOrderId(o),amount:o.amount,orderName:String((o.snapshot as any).name).slice(0,100)};
+  });
+ }
+ async confirmPayment(member:string,id:string,input:any){
+  const o=await this.db.checkoutOrder.findFirst({where:{id,member_id:member}});
+  if(!o)reject(404,'ORDER_NOT_FOUND','주문을 찾을 수 없습니다.');
+  if((o.snapshot as any).paymentMode!=='one-time'||input.orderId!==providerOrderId(o)||input.amount!==o.amount)reject(400,'PAYMENT_MISMATCH','결제 주문과 금액이 일치하지 않습니다.');
+  const paymentKey=text(input.paymentKey,300);
+  if(o.payment_key&&o.payment_key!==paymentKey)reject(409,'PAYMENT_MISMATCH','다른 결제 요청입니다.');
+  return this.pay(member,id,undefined,paymentKey);
+ }
+ async pay(member:string,id:string,methodId?:string,windowKey?:string){
+  this.provider.configForClient();const bps=Number(this.config.get('PLATFORM_FEE_BPS')),hold=Number(this.config.get('SETTLEMENT_HOLD_DAYS'));
+  if(!this.config.get('PLATFORM_FEE_BPS')||!Number.isInteger(bps)||bps<0||bps>10000)reject(503,'FEE_POLICY_REQUIRED','수수료 정책 설정이 필요합니다.');
+  if(!this.config.get('SETTLEMENT_HOLD_DAYS')||!Number.isInteger(hold)||hold<0||hold>365)reject(503,'SETTLEMENT_POLICY_REQUIRED','정산 보류 정책 설정이 필요합니다.');
+  let method:any,recover=false;
+  const order=await this.db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
+   const o=await tx.checkoutOrder.findFirst({where:{id,member_id:member}});if(!o)reject(404,'ORDER_NOT_FOUND','주문을 찾을 수 없습니다.');if(o.status==='paid')return o;
+   if(!['pending','processing'].includes(o.status))reject(409,'INVALID_ORDER_STATE','결제할 수 없는 주문입니다.');
+   if(o.locked_until&&o.locked_until>new Date())reject(409,'PAYMENT_IN_PROGRESS','결제 결과를 확인 중입니다. 잠시 후 다시 확인해주세요.');
+   const oneTime=(o.snapshot as any).paymentMode==='one-time';
+   if(windowKey&&!oneTime||oneTime&&!windowKey&&!o.payment_key)reject(409,'PAYMENT_AUTH_REQUIRED','결제창에서 인증을 완료해주세요.');
+   if(windowKey&&o.payment_key&&o.payment_key!==windowKey)reject(409,'PAYMENT_MISMATCH','다른 결제 요청입니다.');
+   recover=o.status==='processing';if(!recover&&o.expires_at<=new Date())reject(409,'ORDER_EXPIRED','주문이 만료되었습니다.');
+   const p=await tx.membershipItem.findUnique({where:{id:o.membership_id}});
+   if(!recover){
+    if(!p?.is_active||p.is_deleted||!await tx.creator.findFirst({where:{user_id:p.creator_id,is_active:true}}))reject(409,'PLAN_UNAVAILABLE','가입할 수 없는 멤버십입니다.');
+    const m=await tx.member.findUnique({where:{id:member}});if(!m?.enabled)reject(403,'MEMBER_UNAVAILABLE','계정을 확인해주세요.');
+    if(o.subscription_id){if(await tx.checkoutOrder.count({where:{subscription_id:o.subscription_id,status:'refunding'}}))reject(409,'REFUND_IN_PROGRESS','환불 결과 확인 후 갱신할 수 있습니다.');await tx.$queryRaw`SELECT id FROM subscriptions WHERE id=${o.subscription_id} FOR UPDATE`;const sub=await tx.subscription.findUniqueOrThrow({where:{id:o.subscription_id}});if(!sub.auto_renew||sub.status!=='ONGOING'||!sub.next_billing_date||sub.next_billing_date.getTime()!==o.period_start?.getTime())reject(409,'RENEWAL_CANCELLED','구독 갱신이 중단되었습니다.');}
+    else if(await tx.subscription.count({where:{subscriber_id:member,membership_item:{creator_id:p.creator_id},ended_at:{gt:new Date()},status:{in:['ONGOING','CANCELLED']}}}))reject(409,'ALREADY_SUBSCRIBED','이미 이용 중인 멤버십입니다.');
+    if(await tx.checkoutOrder.count({where:{member_id:member,status:'processing',NOT:{id}}}))reject(409,'PAYMENT_IN_PROGRESS','다른 주문 결제가 진행 중입니다.');
+   }
+   method=await tx.billingMethod.findFirst({where:{member_id:member,...(!recover?{deleted_at:null}:{}),...(o.billing_method_id?{id:o.billing_method_id}:methodId?{id:methodId}:{is_default:true})}});
+   if(!recover&&(o.snapshot as any).paymentMode!=='one-time'&&!method)reject(409,'PAYMENT_METHOD_REQUIRED','결제수단을 등록해주세요.');
+   return tx.checkoutOrder.update({where:{id},data:{status:'processing',locked_until:new Date(Date.now()+90000),...(!recover?{billing_method_id:oneTime?null:method.id,...(oneTime?{payment_key:windowKey}:{}),processing_started_at:new Date(),snapshot:{...(o.snapshot as any),...(!o.subscription_id?{platformFeeBps:bps,settlementHoldDays:hold}:{})}}:{})}});
+  });
+  if(order.status==='paid')return{message:'가입이 완료되었습니다.',order:this.orderView(order)};
+  try{
+   let response=recover?await this.provider.lookup(providerOrderId(order)):null;
+   if(!response){
+    // The provider's idempotency window is 15 days; unresolved old attempts need manual reconciliation.
+    if(recover&&Date.now()-(order.processing_started_at||order.created_at).getTime()>=15*86400000)reject(503,'PAYMENT_RECONCILIATION_REQUIRED','오래된 결제의 확인이 필요합니다. 고객센터로 문의해주세요.');
+    if((order.snapshot as any).paymentMode==='one-time'){
+     if(!order.payment_key)reject(503,'PAYMENT_UNCERTAIN','결제 인증 확인이 필요합니다.');
+     response=await this.provider.confirm(order.payment_key,order);
+    }else{
+    if(!method?.billing_key_encrypted)reject(503,'PAYMENT_UNCERTAIN','결제수단과 결제 결과 확인이 필요합니다.');
+    response=await this.provider.charge(this.provider.decrypt(method.billing_key_encrypted),method.customer_key||member,order);
+    }
+   }
+   if(response&&['ABORTED','EXPIRED'].includes(response.status)&&response.totalAmount===order.amount&&response.orderId===providerOrderId(order))reject(400,'PAYMENT_FAILED','결제가 승인되지 않았습니다.');
+   if((order.snapshot as any).paymentMode==='one-time'&&response?.paymentKey!==order.payment_key)reject(503,'PAYMENT_UNCERTAIN','결제 식별자 확인이 필요합니다.');
+   if(response?.status!=='DONE'||response.totalAmount!==order.amount||response.orderId!==providerOrderId(order)||!response.paymentKey)reject(503,'PAYMENT_UNCERTAIN','결제 응답 확인이 필요합니다.');
+   await this.finalize(order.id,response.paymentKey);return{message:'가입이 완료되었습니다.',order:await this.order(member,id)};
+  }catch(error:any){
+   if(error.getResponse?.().code==='PAYMENT_FAILED')await this.db.checkoutOrder.updateMany({where:{id,status:'processing'},data:{status:'failed',locked_until:null,failure_code:'PAYMENT_FAILED',retry_at:new Date(Date.now()+Number(this.config.get('RENEWAL_RETRY_HOURS')||24)*3600000)}});
+   throw error;
+  }finally{await this.db.checkoutOrder.updateMany({where:{id,status:'processing'},data:{locked_until:null}});}
+ }
+ async finalize(id:string,paymentKey:string){
+  const owner=await this.db.checkoutOrder.findUniqueOrThrow({where:{id},select:{member_id:true}});
+  await this.db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM members WHERE id=${owner.member_id} FOR UPDATE`;
+   const o=await tx.checkoutOrder.findUniqueOrThrow({where:{id}});if(o.status==='paid')return;if(o.status!=='processing')reject(409,'INVALID_ORDER_STATE','결제 결과 확인 상태가 아닙니다.');text(paymentKey,300);
+   const p=await tx.membershipItem.findUniqueOrThrow({where:{id:o.membership_id}});
+   await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${p.creator_id} FOR UPDATE`;
+   const now=new Date(),start=o.period_start||now;let end=nextMonth(start);
+   let sub:any;
+   if(o.subscription_id){
+    await tx.$queryRaw`SELECT id FROM subscriptions WHERE id=${o.subscription_id} FOR UPDATE`;
+    sub=await tx.subscription.findUniqueOrThrow({where:{id:o.subscription_id}});end=nextMonth(start,sub.started_at);
+    await tx.subscription.update({where:{id:sub.id},data:{ended_at:end,next_billing_date:sub.auto_renew?end:null,status:sub.auto_renew?'ONGOING':'CANCELLED',last_payment_date:now,payment_failure_count:0}});
+   }else sub=await tx.subscription.create({data:{subscriber_id:o.member_id,membership_item_id:p.id,amount:o.amount,plan_snapshot:o.snapshot,billing_method_id:o.billing_method_id,started_at:start,ended_at:end,next_billing_date:(o.snapshot as any).paymentMode==='one-time'?null:end,last_payment_date:now,auto_renew:(o.snapshot as any).paymentMode!=='one-time',status:(o.snapshot as any).paymentMode==='one-time'?'CANCELLED':'ONGOING'}});
+   await tx.checkoutOrder.update({where:{id},data:{status:'paid',usage_tracking_started_at:now,payment_key:paymentKey,subscription_id:sub.id,period_start:start,period_end:end,paid_at:now,locked_until:null}});
+   const bps=Number((o.snapshot as any).platformFeeBps),hold=Number((o.snapshot as any).settlementHoldDays);
+   if(!Number.isInteger(bps)||bps<0||bps>10000)reject(503,'FEE_POLICY_REQUIRED','주문의 수수료 정책 확인이 필요합니다.');
+   if(!Number.isInteger(hold)||hold<0||hold>365)reject(503,'SETTLEMENT_POLICY_REQUIRED','주문의 정산 정책 확인이 필요합니다.');
+   const fees=Math.floor(o.amount*bps/10000);await tx.revenueEntry.create({data:{creator_id:p.creator_id,order_id:o.id,title:(o.snapshot as any).name,gross:o.amount,fees,net:o.amount-fees,available_at:new Date(now.getTime()+hold*86400000)}});
+   await tx.memberNotification.create({data:{member_id:o.member_id,actor_id:p.creator_id,type:'subscription',text:o.subscription_id?'멤버십 갱신이 완료되었습니다.':'멤버십 가입이 완료되었습니다.',path:'/subscriptions'}});
+  });
+ }
+ async cancelSubscription(member:string,creator:string){
+  await this.db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
+   const rows=await tx.subscription.findMany({where:{subscriber_id:member,membership_item:{creator_id:creator},status:{in:['ONGOING','CANCELLED']}}});if(!rows.length)reject(404,'SUBSCRIPTION_NOT_FOUND','구독을 찾을 수 없습니다.');
+   for(const sub of rows){await tx.subscription.update({where:{id:sub.id},data:{auto_renew:false,status:'CANCELLED',next_billing_date:null}});await tx.checkoutOrder.updateMany({where:{subscription_id:sub.id,status:{in:['pending','failed']}},data:{status:'cancelled',retry_at:null}});}
+  });return{message:'갱신을 해지했습니다. 이용 종료일까지 권한이 유지됩니다.'};
+ }
+ async finance(member:string,tx:any=this.db){const [entries,withdrawals,accounts]=await Promise.all([tx.revenueEntry.findMany({where:{creator_id:member},orderBy:{created_at:'desc'}}),tx.withdrawalRequest.findMany({where:{creator_id:member},orderBy:{created_at:'desc'}}),tx.settlementAccount.findMany({where:{creator_id:member}})]);const refunding=await tx.checkoutOrder.findMany({where:{id:{in:entries.map((e:any)=>e.order_id)},status:'refunding'},select:{id:true,amount:true}}),refundReserved=refunding.reduce((a:any,o:any)=>{const entry=entries.find((e:any)=>e.order_id===o.id);return a+o.amount-(entry?.available_at>new Date()?Math.max(0,entry.net):0);},0);const sum=(key:string)=>entries.reduce((a:any,e:any)=>a+e[key],0),pending=entries.filter((e:any)=>e.available_at>new Date()).reduce((a:any,e:any)=>a+Math.max(0,e.net),0),requested=withdrawals.filter((w:any)=>['requested','processing'].includes(w.status)).reduce((a:any,w:any)=>a+w.amount,0),paid=withdrawals.filter((w:any)=>w.status==='paid').reduce((a:any,w:any)=>a+w.amount,0);
+   return{summary:{gross:sum('gross'),reversals:sum('reversals'),fees:sum('fees'),net:sum('net'),pending,available:sum('net')-pending-requested-paid-refundReserved,requested,paid,refundReserved},earnings:entries.map((e:any)=>({id:e.id,settlementId:e.id,date:dateOnly(e.created_at),title:e.title,gross:e.gross,reversals:e.reversals,fees:e.fees,net:e.net})),settlements:entries.map((e:any)=>({id:e.id,period:dateOnly(e.created_at),status:e.available_at>new Date()?'pending':'available',availableAt:dateOnly(e.available_at)})),withdrawals:withdrawals.map((w:any)=>this.withdrawalView(w)),accounts:accounts.map((a:any)=>this.accountView(a)),pinConfigured:!!await tx.withdrawalCredential.findUnique({where:{creator_id:member}})};
  }
  accountView(a:any){return{id:a.id,bank:a.bank,holderAlias:a.holder_alias,lastFour:a.last_four,verified:a.verified,isDefault:a.is_default};}
  withdrawalView(w:any){return{id:w.id,requestId:w.request_key,accountId:w.account_id,accountLabel:w.account_label,amount:w.amount,requestedAt:dateOnly(w.created_at),status:w.status,statusNote:w.note};}
@@ -59,8 +154,73 @@ export class PlatformFinanceService {
  async requestWithdrawal(member:string,input:any){await this.service.requireCreator(member);const key=text(input.requestId,100);return this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${member} FOR UPDATE`;const prior=await tx.withdrawalRequest.findUnique({where:{request_key:key}});if(prior){if(prior.creator_id!==member||prior.amount!==input.amount||prior.account_id!==input.accountId)reject(409,'IDEMPOTENCY_CONFLICT','다른 출금에 사용된 요청입니다.');return{withdrawal:this.withdrawalView(prior),message:'출금 신청을 접수했습니다.'};}
    const authorization=await tx.withdrawalAuthorization.findFirst({where:{id:input.authorizationId,creator_id:member,amount:input.amount,account_id:input.accountId,consumed_at:null,expires_at:{gt:new Date()}}});if(!authorization)reject(403,'AUTHORIZATION_EXPIRED','출금 인증이 만료되었거나 일치하지 않습니다.');const quote=await this.review(member,input,tx);const account=await tx.settlementAccount.findUniqueOrThrow({where:{id:input.accountId}});if(account.version!==authorization.account_version)reject(403,'ACCOUNT_CHANGED','계좌 정보가 변경되었습니다. 다시 인증해주세요.');await tx.withdrawalAuthorization.update({where:{id:authorization.id},data:{consumed_at:new Date()}});const w=await tx.withdrawalRequest.create({data:{creator_id:member,request_key:key,account_id:quote.account.id,account_label:`${quote.account.bank} · •••• ${quote.account.lastFour}`,amount:input.amount}});return{withdrawal:this.withdrawalView(w),message:'출금 신청을 접수했습니다.'};});}
 
- async refund(member:string,id:string){const days=Number(this.config.get('REFUND_WINDOW_DAYS'));if(!Number.isInteger(days)||days<1)reject(503,'REFUND_POLICY_REQUIRED','환불 정책 설정이 필요합니다.');const o=await this.db.checkoutOrder.findFirst({where:{id,member_id:member}});if(!o)reject(404,'ORDER_NOT_FOUND','결제를 찾을 수 없습니다.');if(o.status==='refunded')return{message:'환불이 완료되었습니다.'};if(!['paid','refunding'].includes(o.status)||!o.payment_key)reject(409,'INVALID_ORDER_STATE','환불할 수 없는 결제입니다.');if(o.status==='paid'&&Date.now()-o.created_at.getTime()>days*86400000)reject(409,'REFUND_WINDOW_EXPIRED','고객센터로 환불을 문의해주세요.');await this.db.checkoutOrder.updateMany({where:{id,status:'paid'},data:{status:'refunding'}});const result=await this.provider.cancel(o.payment_key,'사용자 환불 요청',`refund-${id}`);if(result.status!=='CANCELED')reject(503,'REFUND_UNCERTAIN','환불 결과 확인이 필요합니다.');await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM checkout_orders WHERE id=${id} FOR UPDATE`;const current=await tx.checkoutOrder.findUniqueOrThrow({where:{id}});if(current.status==='refunded')return;await tx.checkoutOrder.update({where:{id},data:{status:'refunded'}});await tx.revenueEntry.update({where:{order_id:id},data:{reversals:o.amount,net:{decrement:o.amount}}});if(o.subscription_id)await tx.subscription.update({where:{id:o.subscription_id},data:{auto_renew:false,status:'EXPIRED',ended_at:new Date(),next_billing_date:null}});});return{message:'환불이 완료되었습니다.'};}
- async reconcile(id:string){const order=await this.db.checkoutOrder.findUniqueOrThrow({where:{id}});if(order.status!=='processing')return;const response=await this.provider.lookup(order.id);if(response.status==='DONE'&&response.totalAmount===order.amount&&response.orderId===order.id)await this.finalize(order.id,response.paymentKey);}
- async renew(id:string){const retries=Number(this.config.get('RENEWAL_MAX_RETRIES')),hours=Number(this.config.get('RENEWAL_RETRY_HOURS'));if(!this.config.get('RENEWAL_MAX_RETRIES')||!Number.isInteger(retries)||retries<0||retries>10||!Number.isFinite(hours)||hours<1||hours>168)reject(503,'RENEWAL_POLICY_REQUIRED','구독 갱신 재시도 정책 설정이 필요합니다.');const order=await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM subscriptions WHERE id=${id} FOR UPDATE`;const sub=await tx.subscription.findUniqueOrThrow({where:{id}});if(!sub.auto_renew||!sub.next_billing_date||sub.next_billing_date>new Date())return null;const key=`renew-${sub.id}-${sub.next_billing_date.toISOString()}`;const existing=await tx.checkoutOrder.findUnique({where:{idempotency_key:key}});if(existing){if(existing.status!=='failed')return existing;if(existing.attempts>=retries){await tx.subscription.update({where:{id},data:{status:'EXPIRED',auto_renew:false,next_billing_date:null,payment_failure_count:existing.attempts+1}});await tx.memberNotification.create({data:{member_id:sub.subscriber_id,actor_id:(existing.snapshot as any).creatorId,type:'subscription',text:'결제 실패로 멤버십 갱신이 중단되었습니다.',path:'/subscriptions'}});return null;}if(existing.retry_at&&existing.retry_at>new Date())return null;return tx.checkoutOrder.update({where:{id:existing.id},data:{status:'pending',attempts:{increment:1},failure_code:null,expires_at:new Date(Date.now()+86400000)}});}const snapshot=sub.plan_snapshot as any;if(!snapshot)reject(409,'MISSING_SNAPSHOT','기존 구독 조건 확인이 필요합니다.');return tx.checkoutOrder.create({data:{member_id:sub.subscriber_id,membership_id:sub.membership_item_id,subscription_id:sub.id,amount:Number(sub.amount),snapshot,billing_method_id:sub.billing_method_id,idempotency_key:key,period_start:sub.next_billing_date,expires_at:new Date(Date.now()+86400000)}});});if(order&&['pending','processing'].includes(order.status)){try{await this.pay(order.member_id,order.id,order.billing_method_id);}catch(error){if(error.getResponse?.().code==='PAYMENT_FAILED')await this.db.subscription.update({where:{id},data:{payment_failure_count:order.attempts+1}});throw error;}}}
- async payout(id:string){const w=await this.db.withdrawalRequest.findUniqueOrThrow({where:{id}});if(!['requested','processing'].includes(w.status))return;const account=await this.db.settlementAccount.findUniqueOrThrow({where:{id:w.account_id}});if(!account.verified||!account.account_encrypted)reject(409,'ACCOUNT_NOT_VERIFIED','계좌를 확인해주세요.');await this.db.withdrawalRequest.updateMany({where:{id,status:'requested'},data:{status:'processing'}});const result=await this.bank.transfer(account.bank,this.provider.decrypt(account.account_encrypted),(await this.db.member.findUniqueOrThrow({where:{id:w.creator_id}})).name,w.amount,w.id);if(!['paid','pending','rejected'].includes(result.status))reject(502,'INVALID_PROVIDER_RESPONSE','은행 응답 확인이 필요합니다.');if(result.status!=='pending')await this.db.withdrawalRequest.updateMany({where:{id,status:'processing'},data:{status:result.status==='paid'?'paid':'rejected',note:result.status==='paid'?'은행 지급 완료':'은행 이체 반려'}});}
+ async refundEligibility(member:string,id:string){
+  const row=await this.db.checkoutOrder.findFirst({where:{id,member_id:member}});if(!row)reject(404,'ORDER_NOT_FOUND','결제를 찾을 수 없습니다.');
+  const reason=row.status==='refunded'?'ALREADY_REFUNDED':row.status==='refunding'?'REFUND_IN_PROGRESS':row.status!=='paid'?'INVALID_ORDER_STATE':!row.usage_tracking_started_at?'REFUND_USAGE_UNKNOWN':row.content_accessed_at?'CONTENT_ALREADY_ACCESSED':null;
+  return{eligible:reason===null,reason,amount:reason===null?row.amount:0,currency:'KRW'};
+ }
+ async refund(member:string,id:string){
+  const o=await this.db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
+   const row=await tx.checkoutOrder.findFirst({where:{id,member_id:member}});if(!row)reject(404,'ORDER_NOT_FOUND','결제를 찾을 수 없습니다.');if(row.status==='refunded')return row;
+   if(row.subscription_id&&await tx.checkoutOrder.count({where:{subscription_id:row.subscription_id,status:'processing',NOT:{id}}}))reject(409,'PAYMENT_IN_PROGRESS','진행 중인 결제 확인 후 환불해주세요.');
+   if(!['paid','refunding'].includes(row.status)||!row.payment_key)reject(409,'INVALID_ORDER_STATE','환불할 수 없는 결제입니다.');
+   if(row.locked_until&&row.locked_until>new Date())reject(409,'REFUND_IN_PROGRESS','환불 결과를 확인 중입니다.');
+   if(row.status==='paid'){if(!row.usage_tracking_started_at)reject(409,'REFUND_USAGE_UNKNOWN','이용 기록 확인이 필요한 결제입니다. 고객센터로 문의해주세요.');if(row.content_accessed_at)reject(409,'CONTENT_ALREADY_ACCESSED','구독 콘텐츠 이용 이력이 있어 자동 환불할 수 없습니다.');}
+   const p=await tx.membershipItem.findUniqueOrThrow({where:{id:row.membership_id}});await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${p.creator_id} FOR UPDATE`;
+   return tx.checkoutOrder.update({where:{id},data:{status:'refunding',locked_until:new Date(Date.now()+90000)}});
+  });if(o.status==='refunded')return{message:'환불이 완료되었습니다.'};
+  try{
+   let result=await this.provider.lookup(providerOrderId(o));
+   if(!result||!['DONE','CANCELED'].includes(result.status)||result.orderId!==providerOrderId(o)||result.paymentKey!==o.payment_key||result.totalAmount!==o.amount)reject(503,'REFUND_UNCERTAIN','환불할 결제 확인이 필요합니다.');
+   if(result.status==='DONE'){
+    try{result=await this.provider.cancel(o.payment_key,'사용자 환불 요청',`refund-${id}`);}catch(error:any){
+     if(error.getResponse?.().code==='PAYMENT_FAILED')await this.db.checkoutOrder.updateMany({where:{id,status:'refunding'},data:{status:'paid',locked_until:null}});
+     throw error;
+    }
+   }
+   if(result?.status!=='CANCELED'||result.orderId!==providerOrderId(o)||result.paymentKey!==o.payment_key||result.totalAmount!==o.amount||result.balanceAmount!==0)reject(503,'REFUND_UNCERTAIN','환불 결과 확인이 필요합니다.');
+   await this.db.$transaction(async tx=>{
+    await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
+    const p=await tx.membershipItem.findUniqueOrThrow({where:{id:o.membership_id}});await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${p.creator_id} FOR UPDATE`;
+    const current=await tx.checkoutOrder.findUniqueOrThrow({where:{id}});if(current.status==='refunded')return;
+    await tx.checkoutOrder.update({where:{id},data:{status:'refunded',locked_until:null}});await tx.revenueEntry.update({where:{order_id:id},data:{reversals:o.amount,fees:0,net:0}});
+    if(o.subscription_id){
+     const newer=await tx.checkoutOrder.count({where:{subscription_id:o.subscription_id,status:{in:['paid','refunding','processing']},NOT:{id},OR:[{period_start:{gt:o.period_start||o.created_at}},{paid_at:{gt:o.paid_at||o.created_at}},{paid_at:null,created_at:{gt:o.created_at}}]}});
+     if(!newer){await tx.subscription.update({where:{id:o.subscription_id},data:{auto_renew:false,status:'EXPIRED',ended_at:new Date(),next_billing_date:null}});await tx.checkoutOrder.updateMany({where:{subscription_id:o.subscription_id,status:{in:['pending','failed']}},data:{status:'cancelled',retry_at:null}});}
+    }
+   });return{message:'환불이 완료되었습니다.'};
+  }finally{await this.db.checkoutOrder.updateMany({where:{id,status:'refunding'},data:{locked_until:null}});}
+ }
+ async reconcile(id:string){const order=await this.db.checkoutOrder.findUniqueOrThrow({where:{id}});if(order.status==='processing'&&(!order.locked_until||order.locked_until<=new Date()))await this.pay(order.member_id,id);}
+ async renew(id:string){
+  const retries=Number(this.config.get('RENEWAL_MAX_RETRIES')),hours=Number(this.config.get('RENEWAL_RETRY_HOURS'));
+  if(!this.config.get('RENEWAL_MAX_RETRIES')||!Number.isInteger(retries)||retries<0||retries>10||!Number.isFinite(hours)||hours<1||hours>168)reject(503,'RENEWAL_POLICY_REQUIRED','구독 갱신 재시도 정책 설정이 필요합니다.');
+  const owner=await this.db.subscription.findUniqueOrThrow({where:{id},select:{subscriber_id:true}});
+  const order=await this.db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM members WHERE id=${owner.subscriber_id} FOR UPDATE`;await tx.$queryRaw`SELECT id FROM subscriptions WHERE id=${id} FOR UPDATE`;
+   const sub=await tx.subscription.findUniqueOrThrow({where:{id}});if(!sub.auto_renew||sub.status!=='ONGOING'||!sub.next_billing_date||sub.next_billing_date>new Date())return null;
+   const key=`renew-${sub.id}-${sub.next_billing_date.toISOString()}`,existing=await tx.checkoutOrder.findUnique({where:{idempotency_key:key}});
+   if(existing?.status==='processing')return existing;
+   const p=await tx.membershipItem.findUnique({where:{id:sub.membership_item_id}}),m=await tx.member.findUnique({where:{id:sub.subscriber_id}});
+   if(!m?.enabled||!p?.is_active||p.is_deleted||!await tx.creator.findFirst({where:{user_id:p.creator_id,is_active:true}})){await tx.subscription.update({where:{id},data:{auto_renew:false,status:'CANCELLED',next_billing_date:null}});if(existing)await tx.checkoutOrder.update({where:{id:existing.id},data:{status:'cancelled'}});return null;}
+   if(existing){
+    if(existing.status!=='failed')return existing;
+    if(existing.attempts>=retries){await tx.subscription.update({where:{id},data:{status:'EXPIRED',auto_renew:false,next_billing_date:null,payment_failure_count:existing.attempts+1}});await tx.memberNotification.create({data:{member_id:sub.subscriber_id,actor_id:(existing.snapshot as any).creatorId,type:'subscription',text:'결제 실패로 멤버십 갱신이 중단되었습니다.',path:'/subscriptions'}});return null;}
+    if(existing.retry_at&&existing.retry_at>new Date())return null;
+    return tx.checkoutOrder.update({where:{id:existing.id},data:{status:'pending',locked_until:null,attempts:{increment:1},billing_method_id:sub.billing_method_id,failure_code:null,expires_at:new Date(Date.now()+86400000)}});
+   }
+   const snapshot=sub.plan_snapshot as any;if(!snapshot)reject(409,'MISSING_SNAPSHOT','기존 구독 조건 확인이 필요합니다.');
+   return tx.checkoutOrder.create({data:{member_id:sub.subscriber_id,membership_id:sub.membership_item_id,subscription_id:sub.id,amount:Number(sub.amount),snapshot,billing_method_id:sub.billing_method_id,idempotency_key:key,period_start:sub.next_billing_date,expires_at:new Date(Date.now()+86400000)}});
+  });
+  if(order&&['pending','processing'].includes(order.status)){
+   try{await this.pay(order.member_id,order.id,order.billing_method_id);}catch(error:any){
+    const code=error.getResponse?.().code;if(['PAYMENT_FAILED','PAYMENT_METHOD_REQUIRED'].includes(code)){
+     await this.db.checkoutOrder.updateMany({where:{id:order.id,status:{in:['pending','failed']}},data:{status:'failed',failure_code:code,retry_at:new Date(Date.now()+hours*3600000)}});
+     await this.db.subscription.update({where:{id},data:{payment_failure_count:order.attempts+1}});
+    }throw error;
+   }
+  }
+ }
+ async payout(id:string){const w=await this.db.withdrawalRequest.findUniqueOrThrow({where:{id}});if(!['requested','processing'].includes(w.status))return;const account=await this.db.settlementAccount.findUniqueOrThrow({where:{id:w.account_id}});if(!account.verified||!account.account_encrypted)reject(409,'ACCOUNT_NOT_VERIFIED','계좌를 확인해주세요.');await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${w.creator_id} FOR UPDATE`;const current=await tx.withdrawalRequest.findUniqueOrThrow({where:{id}});if(current.status==='requested'){if((await this.finance(w.creator_id,tx)).summary.available<0)reject(409,'PAYOUT_BALANCE_CHANGED','환불로 출금 가능 잔액이 변경되어 운영 확인이 필요합니다.');await tx.withdrawalRequest.update({where:{id},data:{status:'processing'}});}});const result=await this.bank.transfer(account.bank,this.provider.decrypt(account.account_encrypted),(await this.db.member.findUniqueOrThrow({where:{id:w.creator_id}})).name,w.amount,w.id);if(!['paid','pending','rejected'].includes(result.status))reject(502,'INVALID_PROVIDER_RESPONSE','은행 응답 확인이 필요합니다.');if(result.status!=='pending')await this.db.withdrawalRequest.updateMany({where:{id,status:'processing'},data:{status:result.status==='paid'?'paid':'rejected',note:result.status==='paid'?'은행 지급 완료':'은행 이체 반려'}});}
 }
