@@ -6,14 +6,37 @@
 
 | Method | 경로 | 근거 |
 | --- | --- | --- |
+| POST | `/api/v1/admin/beans/charges/:id/receipt` | `src/platform/beans.controller.ts::receipt` |
+| GET | `/api/v1/admin/beans/overview` | `src/platform/beans.controller.ts::overview` |
+| POST | `/api/v1/admin/beans/promotions` | `src/platform/beans.controller.ts::grant` |
+| GET | `/api/v1/admin/beans/wallets/:id` | `src/platform/beans.controller.ts::wallet` |
+| POST | `/api/v1/admin/beans/withdrawals/:id/approve` | `src/platform/beans.controller.ts::approve` |
+| POST | `/api/v1/admin/beans/withdrawals/:id/reject` | `src/platform/beans.controller.ts::reject` |
 | POST | `/api/v1/admin/categories` | `src/platform/admin.controller.ts::category` |
+| POST | `/api/v1/admin/client-errors` | `src/platform/admin.controller.ts::clientError` |
 | POST | `/api/v1/admin/creators/:id/promotion` | `src/platform/admin.controller.ts::promotion` |
+| PUT | `/api/v1/admin/creators/:id/verification` | `src/platform/admin.controller.ts::verification` |
+| GET | `/api/v1/admin/dashboard` | `src/platform/admin.controller.ts::dashboard` |
 | GET | `/api/v1/admin/documents` | `src/platform/admin.controller.ts::documents` |
 | POST | `/api/v1/admin/documents` | `src/platform/admin.controller.ts::document` |
+| GET | `/api/v1/admin/financial-policy` | `src/platform/admin.controller.ts::financialPolicy` |
+| PUT | `/api/v1/admin/financial-policy` | `src/platform/admin.controller.ts::setFinancialPolicy` |
+| GET | `/api/v1/admin/financial-policy/history` | `src/platform/admin.controller.ts::financialPolicyHistory` |
 | GET | `/api/v1/admin/inquiries` | `src/platform/admin.controller.ts::inquiries` |
 | POST | `/api/v1/admin/inquiries/:id/reply` | `src/platform/admin.controller.ts::reply` |
+| GET | `/api/v1/admin/logs` | `src/platform/admin.controller.ts::logs` |
+| GET | `/api/v1/admin/logs/:id` | `src/platform/admin.controller.ts::logDetail` |
+| POST | `/api/v1/admin/marketing/campaigns` | `src/platform/admin.controller.ts::campaign` |
+| GET | `/api/v1/admin/me` | `src/platform/admin.controller.ts::me` |
+| GET | `/api/v1/admin/members` | `src/platform/admin.controller.ts::members` |
+| GET | `/api/v1/admin/overview` | `src/platform/admin.controller.ts::overview` |
+| GET | `/api/v1/admin/payments` | `src/platform/admin.controller.ts::payments` |
+| GET | `/api/v1/admin/posts` | `src/platform/admin.controller.ts::posts` |
 | GET | `/api/v1/admin/reports` | `src/platform/admin.controller.ts::reports` |
 | POST | `/api/v1/admin/reports/:id/resolve` | `src/platform/admin.controller.ts::resolve` |
+| GET | `/api/v1/admin/revenue` | `src/platform/admin.controller.ts::revenue` |
+| POST | `/api/v1/admin/revenue/:id/receipt` | `src/platform/admin.controller.ts::receipt` |
+| GET | `/api/v1/admin/withdrawals` | `src/platform/admin.controller.ts::withdrawals` |
 | POST | `/api/v1/auth/forgot-password` | `src/platform/auth.controller.ts::forgot` |
 | POST | `/api/v1/auth/identity` | `src/platform/auth.controller.ts::identity` |
 | POST | `/api/v1/auth/login` | `src/platform/auth.controller.ts::login` |
@@ -23,6 +46,13 @@
 | POST | `/api/v1/auth/signup` | `src/platform/auth.controller.ts::signup` |
 | POST | `/api/v1/auth/signup/email/request` | `src/platform/auth.controller.ts::request` |
 | POST | `/api/v1/auth/signup/email/verify` | `src/platform/auth.controller.ts::verify` |
+| POST | `/api/v1/beans/charges` | `src/platform/beans.controller.ts::create` |
+| GET | `/api/v1/beans/charges/:id` | `src/platform/beans.controller.ts::charge` |
+| POST | `/api/v1/beans/charges/:id/confirm` | `src/platform/beans.controller.ts::confirm` |
+| POST | `/api/v1/beans/charges/:id/payment-window` | `src/platform/beans.controller.ts::window` |
+| GET | `/api/v1/beans/tips` | `src/platform/beans.controller.ts::tips` |
+| GET | `/api/v1/beans/wallet` | `src/platform/beans.controller.ts::wallet` |
+| POST | `/api/v1/beans/webhook` | `src/platform/beans.controller.ts::webhook` |
 | GET | `/api/v1/billing/config` | `src/platform/finance.controller.ts::config` |
 | POST | `/api/v1/billing/methods` | `src/platform/finance.controller.ts::method` |
 | PUT | `/api/v1/billing/methods/:id` | `src/platform/finance.controller.ts::methodState` |
@@ -38,10 +68,13 @@
 | POST | `/api/v1/checkout/:id/retry` | `src/platform/finance.controller.ts::retry` |
 | GET | `/api/v1/common` | `src/platform/controller.ts::common` |
 | GET | `/api/v1/creators` | `src/platform/controller.ts::creators` |
+| POST | `/api/v1/creators/:id/tips` | `src/platform/beans.controller.ts::tip` |
 | GET | `/api/v1/health` | `src/platform/controller.ts::health` |
 | POST | `/api/v1/identity/callback` | `src/platform/identity.controller.ts::callback` |
 | POST | `/api/v1/identity/start` | `src/platform/identity.controller.ts::start` |
 | POST | `/api/v1/identity/status` | `src/platform/identity.controller.ts::status` |
+| GET | `/api/v1/marketing/unsubscribe` | `src/platform/marketing.controller.ts::confirmation` |
+| POST | `/api/v1/marketing/unsubscribe` | `src/platform/marketing.controller.ts::unsubscribe` |
 | POST | `/api/v1/me/email/confirm` | `src/platform/controller.ts::emailConfirm` |
 | POST | `/api/v1/me/email/request` | `src/platform/controller.ts::emailRequest` |
 | POST | `/api/v1/me/inquiries` | `src/platform/controller.ts::inquiry` |
@@ -49,10 +82,13 @@
 | PUT | `/api/v1/me/settings` | `src/platform/controller.ts::settings` |
 | POST | `/api/v1/me/withdraw` | `src/platform/controller.ts::withdraw` |
 | POST | `/api/v1/media` | `src/platform/media.controller.ts::upload` |
+| GET | `/api/v1/media/:id/edge-authorize` | `src/platform/media.controller.ts::edgeAuthorize` |
 | GET | `/api/v1/media/:id/file` | `src/platform/media.controller.ts::download` |
+| GET | `/api/v1/media/:id/origin-file` | `src/platform/media.controller.ts::originDownload` |
 | PUT | `/api/v1/members/:id/block` | `src/platform/controller.ts::block` |
 | PUT | `/api/v1/members/:id/follow` | `src/platform/controller.ts::follow` |
 | POST | `/api/v1/members/:id/messages` | `src/platform/controller.ts::message` |
+| PUT | `/api/v1/members/:id/messages/read` | `src/platform/controller.ts::readMessages` |
 | PUT | `/api/v1/notifications/read` | `src/platform/controller.ts::read` |
 | GET | `/api/v1/posts` | `src/platform/controller.ts::posts` |
 | GET | `/api/v1/posts/:id` | `src/platform/controller.ts::post` |
@@ -62,6 +98,7 @@
 | PUT | `/api/v1/posts/:id/like` | `src/platform/controller.ts::like` |
 | PUT | `/api/v1/posts/:id/save` | `src/platform/controller.ts::save` |
 | GET | `/api/v1/profiles/:id` | `src/platform/controller.ts::profileData` |
+| GET | `/api/v1/profiles/:id/connections` | `src/platform/controller.ts::profileConnections` |
 | GET | `/api/v1/profiles/:id/following` | `src/platform/controller.ts::profileFollowing` |
 | POST | `/api/v1/reports` | `src/platform/controller.ts::report` |
 | GET | `/api/v1/session` | `src/platform/controller.ts::session` |
@@ -69,6 +106,10 @@
 | PUT | `/api/v1/studio/accounts/:id/default` | `src/platform/finance.controller.ts::defaultAccount` |
 | POST | `/api/v1/studio/accounts/:id/verify` | `src/platform/finance.controller.ts::verifyAccount` |
 | PUT | `/api/v1/studio/activity` | `src/platform/studio.controller.ts::activity` |
+| GET | `/api/v1/studio/bean-finance` | `src/platform/beans.controller.ts::studio` |
+| POST | `/api/v1/studio/bean-withdrawal-quotes` | `src/platform/beans.controller.ts::review` |
+| POST | `/api/v1/studio/bean-withdrawals` | `src/platform/beans.controller.ts::withdraw` |
+| POST | `/api/v1/studio/bean-withdrawals/verify` | `src/platform/beans.controller.ts::verify` |
 | PUT | `/api/v1/studio/comments-setting` | `src/platform/studio.controller.ts::comments` |
 | PUT | `/api/v1/studio/comments/:id` | `src/platform/studio.controller.ts::moderate` |
 | POST | `/api/v1/studio/comments/:id/reply` | `src/platform/studio.controller.ts::reply` |
@@ -83,10 +124,12 @@
 | PUT | `/api/v1/studio/profile` | `src/platform/studio.controller.ts::profile` |
 | GET | `/api/v1/studio/reports/:id` | `src/platform/studio.controller.ts::report` |
 | POST | `/api/v1/studio/start` | `src/platform/studio.controller.ts::start` |
+| GET | `/api/v1/studio/tips` | `src/platform/beans.controller.ts::received` |
 | POST | `/api/v1/studio/withdraw` | `src/platform/finance.controller.ts::withdraw` |
 | POST | `/api/v1/studio/withdraw/review` | `src/platform/finance.controller.ts::review` |
 | POST | `/api/v1/studio/withdraw/verify` | `src/platform/finance.controller.ts::verifyPin` |
 | POST | `/api/v1/subscriptions/:creator/cancel` | `src/platform/finance.controller.ts::cancel` |
+| POST | `/api/v1/telemetry/browser-errors` | `src/platform/telemetry.controller.ts::report` |
 
 GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator 목록에 추가하지 않는다. 바이너리 미디어 예외와 권한 의미는 [API 계약](./platform-api.md)을 따른다.
 
@@ -94,6 +137,12 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 | 경로 | 메뉴명 |
 | --- | --- |
+| `/preview/beans` | 지갑 |
+| `/preview/beans/charges` | 충전 주문 |
+| `/preview/beans/history` | 콩 이동 내역 |
+| `/preview/beans/tips` | 보낸 후원 |
+| `/preview/beans/charge` | 콩 충전 |
+| `/preview/beans/success` | 콩 충전 완료 |
 | `/preview/landing` | 랜딩페이지 |
 | `/preview/explore` | 탐색하기 |
 | `/preview/creator/haneul` | 크리에이터 프로필 |
@@ -111,6 +160,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/following` | 팔로잉 목록 |
 | `/preview/followers` | 팔로워 목록 |
 | `/preview/payment-methods` | 결제수단 관리 |
+| `/preview/studio/beans` | 콩 후원·출금 |
 | `/preview/studio` | 대시보드 |
 | `/preview/studio/start` | 크리에이터 시작하기 |
 | `/preview/studio/content` | 게시물 |
@@ -130,6 +180,10 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/studio/accounts` | 정산 계좌 |
 | `/preview/studio/security` | 출금 PIN 설정 |
 | `/preview/studio/settings` | 크리에이터 설정 |
+| `/preview/events` | 이벤트 안내 |
+| `/preview/events/beta-first` | 크레팬스 오픈베타 감사 이벤트 |
+| `/preview/guide/fan` | 팬 이용안내 |
+| `/preview/guide/creator` | 크리에이터 이용안내 |
 | `/preview/reset-password` | 비밀번호 재설정 |
 | `/preview/notices` | 공지사항 |
 | `/preview/legal/terms` | 이용약관 |
@@ -144,7 +198,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 ### front
 
-환경 키: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_ENV`, `NEXT_PUBLIC_APP_VERSION`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`, `NEXT_PUBLIC_LANDING_USE_ASSETS`
+환경 키: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_ENV`, `NEXT_PUBLIC_APP_VERSION`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`, `NEXT_PUBLIC_LANDING_USE_ASSETS`, `NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY`
 
 | 명령 | package.json 실행문 |
 | --- | --- |
@@ -168,7 +222,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 ### server
 
-환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`
+환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`
 
 | 명령 | package.json 실행문 |
 | --- | --- |
@@ -183,12 +237,17 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `npm run dev:platform` | `node scripts/platform-dev.cjs` |
 | `npm run start:platform` | `node dist/src/platform/main.js` |
 | `npm run worker:platform` | `node dist/src/platform/worker.js` |
-| `npm run test:platform` | `node --test tests/platform.integration.test.cjs tests/platform-access.integration.test.cjs` |
-| `npm run test:platform:domain` | `node --test tests/platform-auth.test.cjs tests/platform-finance.test.cjs tests/platform-jobs.test.cjs tests/platform-billing.test.cjs tests/platform-payment-lifecycle.test.cjs tests/platform-payment-http.test.cjs tests/platform-provider-lifecycle.test.cjs tests/platform-provider-http.test.cjs` |
+| `npm run test:platform` | `CREFANS_E2E=true node --test tests/platform.integration.test.cjs tests/platform-access.integration.test.cjs` |
+| `npm run test:platform:domain` | `CREFANS_E2E=true node --test tests/platform-auth.test.cjs tests/platform-finance.test.cjs tests/platform-jobs.test.cjs tests/platform-billing.test.cjs tests/platform-payment-lifecycle.test.cjs tests/platform-payment-http.test.cjs tests/platform-provider-lifecycle.test.cjs tests/platform-provider-http.test.cjs tests/platform-financial-policy.test.cjs` |
 | `npm run platform:audit` | `node scripts/platform-audit.cjs` |
 | `npm run platform:admin` | `node scripts/platform-admin.cjs` |
-| `npm run test:mail` | `npm run build && node --test tests/mail-templates.test.cjs tests/platform-mail.integration.test.cjs tests/platform-auth.test.cjs tests/platform-provider-lifecycle.test.cjs tests/platform-provider-http.test.cjs` |
+| `npm run test:mail` | `npm run build && CREFANS_E2E=true node --test tests/mail-templates.test.cjs tests/platform-mail.integration.test.cjs tests/platform-auth.test.cjs tests/platform-provider-lifecycle.test.cjs tests/platform-provider-http.test.cjs` |
 | `npm run dev:billing` | `npm run build && node scripts/platform-billing-test.cjs` |
+| `npm run test:policy` | `npm run build && CREFANS_E2E=true node --test tests/platform-financial-policy.test.cjs` |
+| `npm run test:operations` | `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs tests/platform-billing-activity.test.cjs` |
+| `npm run test:audit` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-audit.test.cjs tests/platform-audit-export.test.cjs tests/platform-external-monitor.test.cjs tests/platform-log-config.test.cjs tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs` |
+| `npm run test:openapi` | `npm run build && CREFANS_E2E=true node --test tests/platform-openapi.test.cjs` |
+| `npm run test:beans` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-beans.test.cjs tests/platform-bean-ledger.test.cjs tests/platform-openapi.test.cjs` |
 
 ## migration 파일 목록
 
@@ -203,8 +262,22 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261007060000_billing_registration`
 - `20261008000000_payment_lifecycle`
 - `20261021070000_unused_content_refund`
+- `20261021080000_db_financial_policy`
+- `20261021160000_platform_security_ip`
+- `20261021161000_operational_events`
+- `20261022020000_audit_logs`
+- `20261022030000_billing_recovery`
+- `20261024120000_creator_verification`
+- `20261025100000_beta_policy`
+- `20261025110000_marketing_delivery_claim`
+- `20261025120000_bean_ledger`
+- `20261025130000_bean_product`
+- `20261026090000_post_supporters`
+- `20261026100000_profile_connections`
+- `20261026110000_post_tip_setting`
+- `20261026120000_tip_attribution`
 
-## Prisma 전체 정의 (54 models · 15 enums)
+## Prisma 전체 정의 (73 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -405,6 +478,8 @@ model Creator {
   cover String? @db.Text
   comments_enabled Boolean @default(true)
   promoted Boolean @default(false)
+  /// Administrator-issued creator badge; independent of identity verification.
+  is_verified Boolean @default(false)
   category    CreatorCategory? @relation(fields: [category_id], references: [id])
 
   @@index([category_id])
@@ -638,6 +713,7 @@ model Posting {
   /// 크리에이터 ID (Cognito의 userSub)
   user_sub                  String
   /// 댓글 허용 여부
+  allow_tips                Boolean        @default(true)
   allow_comments            Boolean        @default(true)
   access_plan_id String?
   scheduled_at DateTime?
@@ -1283,12 +1359,14 @@ model AuthRateBucket {
 
 
 model AccountPreference {
+  marketing_consent_id String? @db.VarChar(191)
   member_id String @id @db.VarChar(191)
   content_alert Boolean @default(true)
   message_alert Boolean @default(true)
   marketing_alert Boolean @default(false)
   show_activity Boolean @default(true)
   allow_search Boolean @default(true)
+  show_followers Boolean @default(true)
   show_following Boolean @default(true)
   updated_at DateTime @updatedAt
   @@map("account_preferences")
@@ -1389,6 +1467,8 @@ model MembershipVersion {
   @@map("membership_versions")
 }
 model BillingMethod {
+  unavailable_at DateTime?
+  unavailable_reason String? @db.VarChar(80)
   id String @id @default(uuid())
   member_id String @db.VarChar(191)
   billing_key_encrypted String @db.Text
@@ -1404,6 +1484,23 @@ model BillingMethod {
   created_at DateTime @default(now())
   @@index([member_id])
   @@map("billing_methods")
+}
+model BillingNotice {
+  id String @id @default(uuid())
+  dedupe_key String @unique @db.VarChar(191)
+  member_id String @db.VarChar(191)
+  subscription_id String @db.VarChar(191)
+  order_id String? @db.VarChar(191)
+  kind String @db.VarChar(40)
+  action_required Boolean @default(false)
+  attempts Int @default(0)
+  retry_at DateTime @default(now())
+  locked_until DateTime?
+  completed_at DateTime?
+  outcome String? @db.VarChar(40)
+  created_at DateTime @default(now())
+  @@index([completed_at, retry_at])
+  @@map("billing_notices")
 }
 model CheckoutOrder {
   usage_tracking_started_at DateTime?
@@ -1433,6 +1530,9 @@ model CheckoutOrder {
   @@map("checkout_orders")
 }
 model RevenueEntry {
+  receipt_confirmed_at DateTime?
+  receipt_reference String? @db.VarChar(191)
+  received_amount Int?
   id String @id @default(uuid())
   creator_id String @db.VarChar(191)
   order_id String @unique
@@ -1554,5 +1654,263 @@ model BillingRegistration {
  updated_at DateTime @updatedAt
  @@index([member_id])
  @@map("billing_registrations")
+}
+
+model FinancialPolicy {
+  id String @id @default("platform") @db.VarChar(32)
+  version Int @default(0)
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  updated_at DateTime @updatedAt
+  @@map("financial_policies")
+}
+model FinancialPolicyChange {
+  id String @id @default(uuid())
+  version Int @unique
+  platform_fee_bps Int
+  settlement_hold_days Int
+  changed_by String? @db.VarChar(191)
+  reason String @db.VarChar(500)
+  created_at DateTime @default(now())
+  @@map("financial_policy_changes")
+}
+
+model PlatformSecurityIp {
+ ip String @id @db.VarChar(45)
+ blocked_until DateTime?
+ window_start DateTime
+ count Int @default(0)
+ detected_at DateTime?
+ @@map("platform_security_ips")
+}
+
+model PlatformOperationalEvent {
+ id String @id @default(uuid()) @db.VarChar(36)
+ type String @db.VarChar(64)
+ data Json
+ ip String? @db.VarChar(45)
+ peer_ip String? @db.VarChar(45)
+ request_id String? @db.VarChar(36)
+ dedupe_key String? @unique @db.VarChar(191)
+ created_at DateTime @default(now())
+ available_at DateTime @default(now())
+ attempts Int @default(0)
+ locked_until DateTime?
+ delivered_at DateTime?
+ last_error_code String? @db.VarChar(64)
+ @@index([delivered_at,available_at,locked_until],map:"platform_operations_dispatch_idx")
+ @@index([created_at])
+ @@map("platform_operational_events")
+}
+
+// Application-append-only audit trail, independent from Telegram delivery/cleanup.
+model PlatformAuditLog {
+ id String @id @default(uuid()) @db.VarChar(36)
+ category String @db.VarChar(24)
+ action String @db.VarChar(96)
+ level String @db.VarChar(8)
+ actor_id String? @db.VarChar(191)
+ actor_role String? @db.VarChar(32)
+ ip String? @db.VarChar(45)
+ peer_ip String? @db.VarChar(45)
+ request_id String? @db.VarChar(36)
+ job_id String? @db.VarChar(64)
+ entity_id String? @db.VarChar(191)
+ source_id String? @unique @db.VarChar(191)
+ release String @db.VarChar(96)
+ environment String @db.VarChar(32)
+ status_code Int?
+ duration_ms Int?
+ metadata Json
+ occurred_at DateTime @default(now()) @db.DateTime(3)
+ @@index([occurred_at, id])
+ @@index([category, occurred_at])
+ @@index([request_id, occurred_at])
+ @@index([actor_id, occurred_at])
+ @@index([entity_id, occurred_at])
+ @@index([ip, occurred_at])
+ @@index([job_id, occurred_at])
+ @@map("platform_audit_logs")
+}
+
+model MarketingDelivery {
+ id String @id @default(uuid())
+ member_id String @db.VarChar(191)
+ kind String @db.VarChar(40)
+ dedupe_key String @unique @db.VarChar(191)
+ consent_id String? @db.VarChar(191)
+ subject String @db.VarChar(200)
+ body String @db.Text
+ status String @default("queued") @db.VarChar(30)
+ created_at DateTime @default(now())
+ started_at DateTime?
+ completed_at DateTime?
+ @@index([status, created_at])
+ @@index([member_id, kind, completed_at])
+ @@map("marketing_deliveries")
+}
+
+// New platform bean ledger. Legacy Wallet/Transfer remain isolated.
+model BeanWallet {
+ accounts BeanAccount[]
+ id String @id
+ owner_key String @unique(map:"owner_key") @db.VarChar(191)
+ status String @default("active") @db.VarChar(20)
+ created_at DateTime @default(now())
+ @@map("bean_wallets")
+}
+model BeanAccount {
+ wallet BeanWallet @relation(fields:[wallet_id],references:[id],onUpdate:NoAction,map:"bean_accounts_ibfk_1")
+ entries BeanEntry[]
+ id String @id
+ wallet_id String
+ bucket String @db.VarChar(40)
+ balance BigInt @default(0)
+ version Int @default(0)
+ @@unique([wallet_id,bucket])
+ @@map("bean_accounts")
+}
+model BeanMovement {
+ entries BeanEntry[]
+ id String @id
+ request_key String @unique(map:"request_key") @db.VarChar(191)
+ fingerprint String @db.Char(64)
+ kind String @db.VarChar(40)
+ reason String @db.VarChar(500)
+ actor_id String @db.VarChar(191)
+ reference_id String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@index([kind,created_at])
+ @@map("bean_movements")
+}
+model BeanEntry {
+ movement BeanMovement @relation(fields:[movement_id],references:[id],onUpdate:NoAction,map:"bean_entries_ibfk_1")
+ account BeanAccount @relation(fields:[account_id],references:[id],onUpdate:NoAction,map:"bean_entries_ibfk_2")
+ id String @id
+ movement_id String
+ account_id String
+ delta BigInt
+ balance_after BigInt
+ created_at DateTime @default(now())
+ @@unique([movement_id,account_id])
+ @@index([account_id,created_at])
+ @@map("bean_entries")
+}
+
+model BeanCharge {
+ id String @id @default(uuid())
+ member_id String
+ request_key String @unique
+ quantity Int
+ amount Int
+ environment String @db.VarChar(10)
+ status String @default("pending") @db.VarChar(30)
+ payment_key String? @unique
+ locked_until DateTime?
+ expires_at DateTime
+ paid_at DateTime?
+ receipt_confirmed_at DateTime?
+ receipt_reference String?
+ received_amount Int?
+ failure_code String?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([member_id,created_at])
+ @@index([status,updated_at])
+ @@map("bean_charges")
+}
+model BeanLot {
+ id String @id @default(uuid())
+ member_id String
+ bucket String @db.VarChar(40)
+ charge_id String?
+ grant_id String?
+ available Int
+ reserved Int @default(0)
+ release_at DateTime
+ frozen Boolean @default(false)
+ created_at DateTime @default(now())
+ @@index([member_id,bucket,created_at])
+ @@index([charge_id])
+ @@map("bean_lots")
+}
+model BeanTip {
+ id String @id @default(uuid())
+ request_key String @unique
+ sender_id String
+ creator_id String
+ post_id String?
+ post_title_snapshot String? @db.Text
+ quantity Int
+ paid_quantity Int
+ promotion_quantity Int
+ message String @db.VarChar(500)
+ created_at DateTime @default(now())
+ @@index([sender_id,created_at])
+ @@index([creator_id,created_at])
+ @@index([post_id,sender_id])
+ @@map("bean_tips")
+}
+model BeanTipAllocation {
+ id String @id @default(uuid())
+ tip_id String
+ source_lot_id String
+ target_lot_id String @unique
+ quantity Int
+ @@index([tip_id])
+ @@map("bean_tip_allocations")
+}
+model BeanPromotion {
+ id String @id @default(uuid())
+ request_key String @unique
+ member_id String
+ quantity Int
+ reason String @db.VarChar(500)
+ actor_id String
+ created_at DateTime @default(now())
+ @@index([member_id,created_at])
+ @@map("bean_promotions")
+}
+model BeanPayout {
+ id String @id @default(uuid())
+ request_key String @unique
+ creator_id String
+ account_id String
+ account_version Int
+ account_label String
+ quantity Int
+ gross Int
+ fee Int
+ net Int
+ fee_bps Int
+ environment String @db.VarChar(10)
+ status String @default("requested") @db.VarChar(30)
+ note String @default("") @db.VarChar(500)
+ approved_by String?
+ locked_until DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([creator_id,created_at])
+ @@index([status,updated_at])
+ @@map("bean_payouts")
+}
+model BeanPayoutAllocation {
+ id String @id @default(uuid())
+ payout_id String
+ lot_id String
+ quantity Int
+ @@unique([payout_id,lot_id])
+ @@map("bean_payout_allocations")
+}
+model BeanWithdrawalAuthorization {
+ id String @id @default(uuid())
+ creator_id String
+ account_id String
+ account_version Int
+ quantity Int
+ expires_at DateTime
+ consumed_at DateTime?
+ @@index([creator_id,expires_at])
+ @@map("bean_withdrawal_authorizations")
 }
 ```

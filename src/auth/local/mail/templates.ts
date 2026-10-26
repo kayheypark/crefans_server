@@ -7,6 +7,7 @@ const codeCopy = {
   'email-change': ['새 이메일 주소를 인증해주세요', '새 이메일을 인증해주세요', '계정 이메일 주소를 변경하려면 아래 인증 코드를 입력해주세요.'],
 } as const;
 export const noticeCopy = {
+  'renewal-stopped': ['멤버십 자동 갱신이 종료되었습니다', '자동 갱신이 종료되었습니다', '결제가 완료되지 않아 멤버십 자동 갱신이 종료되었습니다. 결제수단을 확인한 후 다시 가입할 수 있습니다.', '구독 내역 보기'],
   'account-changed': ['계정 정보가 변경되었습니다', '계정 정보가 변경되었습니다', '계정 정보 변경 내역을 확인해주세요.', '계정 설정 확인'],
   'payment-completed': ['멤버십 결제가 완료되었습니다', '멤버십 결제가 완료되었습니다', '멤버십 결제 내역을 확인해주세요.', '결제 내역 보기'],
   'renewal-upcoming': ['멤버십 정기결제가 예정되어 있습니다', '다음 결제를 안내드립니다', '다음 정기결제가 예정되어 있습니다. 결제수단과 구독 상태를 확인해주세요.', '구독 관리'],
@@ -31,11 +32,22 @@ export function codeMail(code: string, purpose: CodePurpose) {
   const [subject,title,intro] = codeCopy[purpose];
   return render(subject,title,intro,`<p style="background:#f0f5ff;color:#245bdc;border-radius:8px;text-align:center;padding:24px 8px;margin:24px 0 12px;font-size:32px;font-weight:bold;letter-spacing:6px">${code}</p><p style="text-align:center;font-size:12px;color:#626b7c">발송 시점부터 10분간 유효합니다.</p>`,`인증 코드: ${code}\n발송 시점부터 10분간 유효합니다.`,security);
 }
-// Prepared templates only: financial events must supply confirmed provider results before sending.
+export function marketingMail(subject:string,body:string,unsubscribeUrl:string,advertisement:boolean){
+ const url=new URL(unsubscribeUrl);
+ if(url.protocol!=='https:'||!['crefans.com','beta.crefans.com'].includes(url.hostname)||url.username||url.password||url.port||url.pathname!=='/api/v1/marketing/unsubscribe')throw Error('Invalid unsubscribe URL');
+ const contact='좋아하는일해야지(크레팬스) · 고객지원 khpark@grade.im · 010-3211-3164';
+ const result=render(subject,subject,advertisement?'수신에 동의한 크레팬스 이벤트·프로모션 안내입니다.':'광고 메일 수신 설정에 관한 안내입니다.',`<p style="white-space:pre-line;font-size:14px;line-height:1.8">${escape(body)}</p><p><a href="${escape(url.href)}">광고 메일 무료 수신거부</a></p>`,`${body}\n광고 메일 무료 수신거부: ${url.href}`,contact);
+ result.subject=(advertisement?'(광고) ':'')+result.subject;
+ result.html=result.html.replace('이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.',advertisement?'이 메일은 광고성 정보입니다.':'이 메일은 수신 설정 처리에 관한 안내입니다.');
+ result.text=result.text.replace('이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.',advertisement?'이 메일은 광고성 정보입니다.':'이 메일은 수신 설정 처리에 관한 안내입니다.');
+ return{...result,replyTo:'khpark@grade.im',headers:{'List-Unsubscribe':`<${url.href}>`,'List-Unsubscribe-Post':'List-Unsubscribe=One-Click'}};
+}
+// Payment failure/recovery notices are delivered by the durable billing notice worker.
+// Other notice templates remain prepared only, without event delivery.
 export function noticeMail(kind: keyof typeof noticeCopy, rows: Array<[string,string]>, actionUrl: string, note: string) {
   if (!Object.prototype.hasOwnProperty.call(noticeCopy,kind)) throw new Error('Unknown notice');
   const url = new URL(actionUrl);
-  if (url.protocol !== 'https:' || url.hostname !== 'crefans.com' || url.username || url.password || url.port) throw new Error('Invalid mail action URL');
+  if (url.protocol !== 'https:' || !['crefans.com','beta.crefans.com'].includes(url.hostname) || url.username || url.password || url.port) throw new Error('Invalid mail action URL');
   const [subject,title,intro,action] = noticeCopy[kind];
   const table = rows.map(([label,value])=>`<tr><td style="padding:8px 0;color:#626b7c">${escape(label)}</td><td align="right" style="padding:8px 0">${escape(value)}</td></tr>`).join('');
   return render(subject,title,intro,`<table role="presentation" width="100%" style="font-size:13px;margin:24px 0">${table}</table><a href="${escape(url.href)}" style="display:block;text-align:center;background:#2962ff;color:#fff;padding:14px;border-radius:8px;text-decoration:none;font-size:14px">${escape(action)}</a>`,rows.map(([k,v])=>`${k}: ${v}`).join('\n')+`\n${action}: ${url.href}`,note);

@@ -1,0 +1,189 @@
+import type {SchemaObject, ReferenceObject, ParameterObject} from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
+
+type Schema=SchemaObject|ReferenceObject;
+export const str=(description?:string):SchemaObject=>({type:'string',...(description?{description}:{})});
+const bool:SchemaObject={type:'boolean'},integer:SchemaObject={type:'integer'},money:SchemaObject={type:'integer',description:'원 단위 정수'},date:SchemaObject={type:'string',format:'date'},time:SchemaObject={type:'string',format:'date-time'};
+const nullable=(schema:SchemaObject):SchemaObject=>({...schema,nullable:true});
+const list=(items:Schema):SchemaObject=>({type:'array',items});
+const strings=list(str());
+export const object=(properties:Record<string,Schema>,required:string[]=[]):SchemaObject=>({type:'object',properties,...(required.length?{required}:{})});
+const dictionary=(value:Schema):SchemaObject=>({type:'object',additionalProperties:value});
+const json:SchemaObject={description:'JSON 데이터. 고정 필드는 해당 응답 모델을 참고하세요.'};
+export const ref=(name:string):ReferenceObject=>({$ref:'#/components/schemas/'+name});
+const enumeration=(...values:string[]):SchemaObject=>({type:'string',enum:values});
+const maxString=(maxLength:number,description?:string):SchemaObject=>({...str(description),maxLength});
+const secret=(description:string):SchemaObject=>({...str(description),writeOnly:true});
+const person=object({id:str(),name:str(),handle:str(),image:str(),isVerified:{type:'boolean',description:'운영자가 직접 부여한 크리에이터 인증 배지. PASS 본인인증과 별도이며 기본 false.'}});
+const media=object({id:str(),type:enumeration('image','video'),url:str()});
+const commentFields={id:str(),body:str(),time,author:person,mentions:list(json)};
+const metrics=object({newSubscriptions:integer,paymentCount:integer,gross:money,refunds:money,netSales:money,platformFees:money});
+const amounts=object({count:integer,gross:money,refunds:money,netSales:money,platformFees:money,creatorNet:money});
+const page=(item:Schema)=>object({items:list(item),total:integer,page:integer,pageSize:integer});
+
+// Presentation contracts are explicit; Prisma secrets and real examples are never exported.
+export const schemas:Record<string,Schema>={
+ Message:object({message:str()},['message']),IdMessage:object({id:str(),message:str()},['id','message']),
+ Error:object({success:{type:'boolean',enum:[false]},data:{nullable:true,enum:[null]},errorMessage:str(),errorCode:str()},['success','data','errorMessage','errorCode']),
+ Plan:object({id:str(),name:str(),price:money,rank:integer,benefits:strings,version:integer,image:str(),description:str(),available:bool,entitlementMode:str()}),
+ Creator:object({...person.properties,tags:strings,cover:str(),position:str(),bio:str(),about:str(),links:object({youtube:str(),instagram:str(),facebook:str()}),followersPublic:bool,followingPublic:bool,followers:str(),followerCount:integer,followingCount:integer,isCreator:bool,searchable:bool,postCount:integer,promoted:bool,plans:list(ref('Plan'))}),
+ Post:object({id:str(),creatorId:str(),title:str(),body:str(),image:str(),media:list(media),position:str(),time,canAccess:bool,tipsEnabled:bool,commentsEnabled:bool,requiredPlanId:str(),requiredRank:integer,comments:integer,likes:integer,views:{...integer,description:'DB에 저장된 누적 조회수'},supporterCount:{...integer,description:'게시물에 후원한 고유 회원 수; 반복 후원은 한 명'}}),
+ Comment:object({id:str(),author:person,body:str(),time,fromCreator:bool,mentions:list(object({id:str(),name:str(),handle:str()})),replyCount:integer}),
+ BillingMethod:object({id:str(),label:str(),description:str(),isDefault:bool,requiresUpdate:bool}),
+ Bootstrap:object({beanSupport:bool,data:object({creators:list(ref('Creator')),plans:list(ref('Plan')),creatorPlans:dictionary(list(ref('Plan'))),posts:list(ref('Post')),notifications:list(object({id:str(),creatorId:nullable(str()),type:str(),text:str(),time,href:str()})),paymentHistory:list(json),messages:dictionary(list(json)),faqs:list(object({question:str(),answer:str()})),categories:strings,followers:list(person)}),viewer:person,signedIn:bool,ownCreatorIds:strings,following:strings,liked:strings,saved:strings,subscriptions:list(json),read:strings,messagesByCreator:dictionary(list(json)),commentsByPost:dictionary(list(ref('Comment'))),account:object({email:str(),stats:object({posts:integer,followers:integer}),preferences:object({contentAlert:bool,messageAlert:bool,marketingAlert:bool,showActivity:bool,allowSearch:bool,showFollowers:bool,showFollowing:bool}),blockedCreatorIds:strings,paymentMethods:list(ref('BillingMethod')),tickets:list(json),inquiryCategories:strings,banner:nullable(str()),policies:dictionary(str()),agreements:ref('Agreements'),signupRequirements:object({identityRequired:bool,inviteOnly:bool}),guidance:json})}),
+ LegalDocument:object({title:str(),version:str(),updatedAt:date,status:str(),publishedAt:date,effectiveAt:nullable(date),notice:str(),sections:list(object({title:str(),body:str(),links:list(object({label:str(),href:str()}))}))}),
+ Agreements:object({published:bool,documentsPublished:bool,signupReady:bool,blockingMessage:nullable(str()),documents:dictionary(ref('LegalDocument')),collection:ref('LegalDocument'),versions:dictionary(str())}),
+ Common:object({notices:list(object({id:str(),title:str(),category:str(),date,pinned:bool,paragraphs:strings})),legal:dictionary(ref('LegalDocument')),paymentMethods:list(ref('BillingMethod')),paymentGuidance:str(),auth:object({email:str(),guidance:str()})}),
+ CreatorProfile:object({name:str(),handle:str(),bio:str(),about:str(),links:dictionary(str()),avatar:str(),cover:str(),category:str(),active:bool,commentsEnabled:bool}),
+ StudioContent:object({id:str(),title:str(),body:str(),media:list(media),tipsEnabled:bool,commentsEnabled:bool,accessPlanId:nullable(str()),accessLevel:nullable({type:'integer',minimum:1,maximum:100}),status:enumeration('draft','scheduled','published'),scheduledAt:nullable(time),updatedAt:date}),
+ StudioOverview:object({profile:ref('CreatorProfile'),started:bool,categories:strings,period:str(),metrics:list(object({id:str(),label:str(),value:str(),description:str(),points:list(integer)})),activities:list(json),tasks:list(json),series:list(object({label:date,subscribers:integer,followers:integer,revenue:money})),contentPerformance:list(json),management:object({contents:list(ref('StudioContent')),memberships:list(object({id:str(),name:str(),rank:integer,price:money,benefits:strings,active:bool,version:integer,image:str(),canDelete:bool})),subscribers:list(json),now:time})}),
+ Community:object({posts:list(object({id:str(),title:str()})),comments:list(object({...commentFields,postId:str(),hidden:bool,replies:list(object(commentFields))})),messagesByCreator:dictionary(list(json)),contacts:list(person),blockedCreatorIds:strings}),
+ Report:object({id:str(),title:str(),description:str(),asOf:date,periodLabel:str(),dateRange:object({startDate:date,endDate:date}),availableRange:nullable(object({startDate:date,endDate:date})),coverageNotice:str(),summary:list(object({id:str(),label:str(),value:integer,unit:str()})),columns:list(object({key:str(),label:str(),unit:str()})),rows:list(object({id:str(),date,values:dictionary(integer)})),chart:object({label:str(),items:list(object({id:str(),label:str(),value:integer}))}),guidance:strings,links:list(json)}),
+ BillingConfig:object({clientKey:str('공개 SDK 키'),customerKey:str('현재 회원 전용 고객 식별자')}),
+ Registration:object({clientKey:str(),customerKey:str(),registrationId:str(),state:str('반환 검증용 일회성 값. 로그에 저장하지 않음'),returnPath:str()}),
+ Order:object({id:str(),planId:str(),amount:money,status:str(),snapshot:json,expiresAt:time}),
+ Account:object({id:str(),bank:str(),holderAlias:str('표시용 별칭이며 본인확인 실명과 다름'),lastFour:str(),verified:bool,isDefault:bool}),
+ Withdrawal:object({id:str(),requestId:str(),accountId:str(),accountLabel:str(),amount:money,requestedAt:date,status:str(),statusNote:nullable(str())}),
+ Finance:object({summary:object({gross:money,reversals:money,fees:money,net:money,pending:money,available:money,requested:money,paid:money,refundReserved:money}),earnings:list(object({id:str(),settlementId:str(),date,title:str(),gross:money,reversals:money,fees:money,net:money})),settlements:list(object({id:str(),period:date,status:enumeration('pending','available'),availableAt:date})),withdrawals:list(ref('Withdrawal')),accounts:list(ref('Account')),pinConfigured:bool}),
+ FinancialPolicy:object({version:integer,platformFeeBps:{type:'integer',nullable:true,description:'1%=100bps, 20%=2000bps'},settlementHoldDays:nullable(integer),configured:bool}),
+ AuditEvent:object({id:str(),category:str(),action:str(),level:str(),actorId:nullable(str()),actorRole:nullable(str()),ip:nullable(str()),peerIp:nullable(str()),requestId:nullable(str()),jobId:nullable(str()),entityId:nullable(str()),sourceId:nullable(str()),release:nullable(str()),environment:nullable(str()),status:nullable(integer),durationMs:nullable(integer),at:time,metadata:dictionary(json)}),
+ SupportTicket:object({id:str(),member_id:str(),category:str(),title:str(),message:str(),status:str(),reply:nullable(str()),created_at:time,updated_at:time}),
+ UserReport:object({id:str(),reporter_id:str(),target_id:str(),target_type:str(),reason:str(),description:nullable(str()),status:str(),admin_id:nullable(str()),admin_note:nullable(str()),resolved_at:nullable(time),created_at:time,updated_at:time}),
+ ServiceDocument:object({id:str(),kind:enumeration('faq','notice'),title:str(),content:json,published:bool,pinned:bool,category:str(),updated_at:time}),
+ BrowserErrorInput:object({errorType:enumeration('Error','TypeError','RangeError','ReferenceError','SyntaxError','URIError','EvalError','BrowserError'),frames:{type:'array',maxItems:12,items:json},requestId:str('선택 UUID. 오류 본문·개인정보·토큰은 보내지 않음')},['errorType','frames']),
+};
+
+export type EndpointDoc={summary:string;tag:string;body?:Schema;response:Schema;query?:ParameterObject[];description?:string;contentType?:string;successStatus?:number;deprecated?:boolean};
+export const endpoints:Record<string,EndpointDoc>={};
+const add=(method:string,path:string,tag:string,summary:string,options:Partial<EndpointDoc>={})=>{endpoints[method+' /api/v1/'+path]={summary,tag,response:ref('Message'),...options};};
+const query=(name:string,schema:Schema=str(),required=false):ParameterObject=>({name,in:'query',required,schema});
+const email:SchemaObject={type:'string',format:'email',maxLength:191};
+const password:SchemaObject={type:'string',format:'password',minLength:8,maxLength:128,writeOnly:true};
+const code:SchemaObject={type:'string',maxLength:6,writeOnly:true,description:'이메일로 수신한 인증 코드'};
+const enabled=object({enabled:bool},['enabled']);
+const textBody=object({body:maxString(2000)},['body']);
+const period=[query('from',date),query('to',date)],paging=[query('page',{type:'integer',minimum:1,default:1})];
+
+add('get','health','시스템','DB 연결 상태', {response:object({status:str(),version:str()})});
+add('get','session','인증','로그인 세션 유효성 확인',{response:object({active:bool})});
+add('post','auth/signup/email/request','인증','회원가입 이메일 코드 발송',{body:object({email},['email']),description:'게시·시행 가능한 가입 정책 필요. 코드 10분 유효, 재전송 3분 제한. 실제 이메일을 발송합니다.'});
+add('post','auth/signup/email/verify','인증','이메일 코드 검증',{body:object({email,code},['email','code']),response:object({message:str(),proof:str('가입에 소비하는 30분 유효 일회성 증명')})});
+add('post','auth/identity','인증','구형 본인인증 호환 경로',{deprecated:true,description:'항상 503 PASS_NOT_CONFIGURED를 반환합니다. identity/start 및 identity/status를 사용하세요.'});
+add('post','auth/signup','인증','회원가입',{body:object({email,password,nickname:maxString(40),emailProof:secret('이메일 확인 증명'),identityProof:secret('PASS 필수 모드의 가입 증명'),ageAcknowledged:bool,terms:bool,privacy:bool,marketing:bool,policyVersions:object({terms:str(),privacy:str(),marketing:str()},['terms','privacy'])},['email','password','nickname','emailProof','terms','privacy','policyVersions']),description:'이메일 증명과 시행 가능한 약관 버전을 확인합니다. 기본 pass 모드는 PASS 증명·생일 기준 만19세 이상 확인이 필수입니다. 서버가 email-only 모드일 때는 ageAcknowledged=true를 요구하며 본인/성인 인증 권한은 부여하지 않습니다. 이메일 초대 제한은 서버 설정을 따릅니다. terms·privacy는 true여야 하며 marketing=true면 해당 버전도 필요합니다.'});
+add('post','auth/login','인증','로그인 및 HttpOnly 세션 쿠키 발급',{body:object({email,password:secret('계정 비밀번호')},['email','password']),description:'응답 Set-Cookie로 access_token/refresh_token을 설정합니다. 토큰을 JSON으로 반환하지 않습니다.'});
+add('post','auth/logout','인증','로그아웃 및 세션 철회');
+add('post','auth/refresh','인증','세션 갱신',{description:'refresh_token 쿠키 필요. 실패 시 쿠키를 삭제합니다.'});
+add('post','auth/forgot-password','인증','비밀번호 재설정 코드 요청',{body:object({email},['email']),description:'실제 이메일 발송. 계정 존재 여부를 응답으로 구분하지 않습니다.'});
+add('post','auth/reset-password','인증','비밀번호 재설정',{body:object({email,code,password},['email','code','password'])});
+add('post','identity/start','본인확인','PASS 본인확인 시작',{body:object({purpose:enumeration('signup','withdrawal-pin')},['purpose']),response:object({attemptId:str(),state:str(),redirectUrl:str()}),description:'withdrawal-pin은 로그인이 필요합니다. 가입 최종 제출 시 별도로 가입 정책 준비 상태를 확인합니다. 실제 공급사 연결 전에는 503으로 차단됩니다.'});
+add('post','identity/status','본인확인','본인확인 결과 조회',{body:object({attemptId:str(),state:secret('시작 시 받은 state')},['attemptId','state']),response:object({status:str(),proof:nullable(str()),message:str()})});
+add('post','identity/callback','본인확인','공급사 브리지 결과 수신',{body:object({attemptId:str(),reference:str(),verified:bool,name:str(),identity:secret('공급자 검증 CI. 원문 로그 금지'),adultVerified:bool},['attemptId','reference','verified','name','identity']),description:'내부 브리지 전용. raw body의 HMAC-SHA256을 x-pass-signature로 검증. signup은 adultVerified=true 필수. NICE 원본 콜백을 직접 보내는 API가 아닙니다.'});
+add('get','bootstrap','팬 서비스','화면 초기 데이터 및 내 계정 상태',{query:[query('collection',enumeration('saved','liked'))],response:ref('Bootstrap'),description:'비로그인은 공개 정보만 반환. saved/liked 컬렉션의 유료 콘텐츠 열람은 이용 기록에 반영될 수 있습니다.'});
+add('get','common','팬 서비스','약관·공지·결제수단 공통 데이터',{response:ref('Common')});
+add('get','creators','팬 서비스','크리에이터 검색',{query:[query('query'),query('category'),query('cursor')],response:object({creators:list(ref('Creator')),nextCursor:nullable(str())})});
+add('get','profiles/{id}','팬 서비스','회원·크리에이터 공개 프로필',{response:ref('Creator'),description:'id는 회원 UUID 또는 핸들. 비공개 팔로잉 정보는 제외됩니다.'});
+add('get','profiles/{id}/connections','팬 서비스','프로필 팔로워·팔로잉 목록',{query:[query('kind',{type:'string',enum:['followers','following']}),query('offset',{type:'integer',minimum:0,default:0})],response:object({profile:ref('Creator'),people:list(ref('Creator')),nextOffset:nullable(integer)}),description:'20명 단위. 비공개 목록은 소유자 외 403 CONNECTIONS_PRIVATE. 비활성 회원 제외.'});
+add('get','profiles/{id}/following','팬 서비스','공개 설정에 따른 팔로잉 목록',{response:list(ref('Creator'))});
+add('get','posts','게시물','피드 게시물 페이지',{query:[query('creatorId'),query('cursor'),query('category')],response:object({posts:list(ref('Post')),creators:list(ref('Creator')),nextCursor:nullable(str())})});
+add('get','posts/{id}','게시물','게시물 상세',{response:object({post:ref('Post'),creator:ref('Creator')}),description:'구독·상품·레벨·소유권 검사. 권한이 없으면 유료 본문과 미디어를 제공하지 않습니다. 유료 콘텐츠 조회는 환불 판단용 이용 기록에 반영됩니다.'});
+add('get','posts/{id}/comments-page','댓글','댓글 페이지',{query:[query('offset',{type:'integer',minimum:0,default:0})],response:object({comments:list(ref('Comment')),nextOffset:nullable(integer)})});
+add('get','posts/{id}/comments','댓글','댓글 또는 답글 조회',{query:[query('parentId')],response:list(ref('Comment')),description:'parentId가 있으면 해당 1뎁스 댓글의 답글을 조회합니다. 게시물 권한과 댓글 설정을 검사합니다.'});
+add('post','posts/{id}/comments','댓글','댓글·답글 등록',{body:object({body:maxString(2000),parentId:str(),mentions:{type:'array',maxItems:100,items:object({id:str(),name:str(),handle:str()})}},['body'])});
+for(const [path,summary]of [['posts/{id}/like','좋아요 변경'],['posts/{id}/save','게시물 저장 변경'],['members/{id}/follow','팔로우 변경'],['members/{id}/block','사용자 차단 변경']])add('put',path,'팬 서비스',summary,{body:enabled});
+add('post','members/{id}/messages','메시지','메시지 전송',{body:textBody});
+add('put','members/{id}/messages/read','메시지','지정한 대화의 수신 메시지 읽음 처리',{body:object({ids:{type:'array',items:str(),minItems:1,maxItems:100}},['ids']),response:object({message:str(),readIds:strings})});
+add('post','reports','신고·지원','게시물 또는 회원 신고',{body:object({id:str(),kind:enumeration('USER','POSTING')},['id','kind'])});
+add('put','notifications/read','알림','내 알림 읽음 처리',{body:object({ids:{type:'array',items:str(),maxItems:100}},['ids'])});
+add('put','me/profile','계정','내 프로필 수정',{body:object({name:maxString(40,'닉네임. 본인확인 실명 변경 아님'),bio:maxString(120)},['name','bio'])});
+add('post','me/email/request','계정','이메일 변경 코드 요청',{body:object({email},['email'])});
+add('post','me/email/confirm','계정','이메일 변경 완료 및 세션 철회',{body:object({email,code},['email','code'])});
+add('put','me/settings','계정','계정·비밀번호·알림·공개 설정',{body:{oneOf:[object({section:enumeration('password'),currentPassword:secret('현재 비밀번호'),newPassword:password},['section','currentPassword','newPassword']),object({section:enumeration('account'),name:maxString(40)},['section','name']),object({section:enumeration('notifications'),contentAlert:bool,messageAlert:bool,marketingAlert:bool,marketingVersion:str()},['section','contentAlert','messageAlert','marketingAlert']),object({section:enumeration('privacy'),showActivity:bool,allowSearch:bool,showFollowers:bool,showFollowing:bool},['section','showActivity','allowSearch','showFollowing'])]},description:'비밀번호 변경 후 모든 세션을 철회합니다. 이메일 변경은 별도 인증 API를 이용하세요.'});
+add('post','me/inquiries','신고·지원','문의 등록',{body:object({category:maxString(50),title:maxString(80),message:maxString(2000)},['category','title','message'])});
+add('post','me/withdraw','계정','회원 탈퇴',{description:'자동 갱신 중인 구독 및 처리 중인 출금이 있으면 차단됩니다.'});
+const creatorInput=object({name:maxString(40),handle:{type:'string',pattern:'^[a-zA-Z0-9_-]{3,40}$'},bio:maxString(120),category:str('활성 카테고리 이름'),about:maxString(1000),links:object({youtube:maxString(500),instagram:maxString(500),facebook:maxString(500)})},['name','handle','category']);
+add('get','studio/overview','스튜디오','내 스튜디오 초기 데이터',{response:ref('StudioOverview')});
+add('get','studio/community','스튜디오','내 댓글·대화·구독자 연락처',{response:ref('Community')});
+add('post','studio/start','스튜디오','크리에이터 시작하기',{body:creatorInput});
+add('put','studio/profile','스튜디오','크리에이터 프로필·소개·SNS 수정',{body:creatorInput});
+add('put','studio/activity','스튜디오','크리에이터 활동 상태 변경',{body:object({active:bool},['active'])});
+add('put','studio/comments-setting','스튜디오','전체 게시물 댓글 허용 설정',{body:enabled,description:'게시물 개별 댓글 설정보다 우선합니다.'});
+add('post','studio/content','스튜디오','게시물 작성·수정·예약',{body:object({id:str('수정할 게시물 UUID. 생략하면 생성'),title:maxString(200),body:maxString(10000),media:{type:'array',maxItems:10,items:object({id:str()},['id'])},commentsEnabled:bool,tipsEnabled:bool,accessPlanId:nullable(str('특정 멤버십 상품 전용')),accessLevel:nullable({type:'integer',minimum:1,maximum:100}),status:enumeration('draft','scheduled','published'),scheduledAt:nullable(time)},['title','media','commentsEnabled','status']),response:ref('IdMessage'),description:'이미지/영상 합계 10개. media의 id는 소유한 업로드 완료 파일이어야 합니다. 특정 상품과 최소 레벨은 구분하며 둘을 동시에 지정하지 않습니다. 발행·예약에는 본문이 필요하며 임시저장은 빈 본문을 허용합니다. 예약은 미래 시각을 사용합니다.'});
+add('post','studio/content/{id}/delete','스튜디오','내 게시물 삭제');
+add('post','studio/memberships','멤버십','멤버십 생성·수정',{body:object({id:str(),name:maxString(60),price:{type:'integer',minimum:1,maximum:10000000},benefits:{type:'array',minItems:1,maxItems:50,items:maxString(500)},image:maxString(500,'본인 업로드 이미지의 API 파일 경로'),rank:{type:'integer',minimum:1,maximum:100}},['name','price','benefits']),response:ref('IdMessage'),description:'서버에서 저장된 version을 대조하고 증가시킵니다. 구독·거래의 기존 가입 조건 스냅샷은 보존합니다.'});
+add('put','studio/memberships/{id}','멤버십','멤버십 활성화·삭제',{body:{oneOf:[object({active:bool},['active']),object({deleted:{type:'boolean',enum:[true]}},['deleted'])]}});
+add('put','studio/comments/{id}','스튜디오','내 게시물 댓글 숨김',{body:object({hidden:bool},['hidden'])});
+add('post','studio/comments/{id}/reply','스튜디오','크리에이터 답글 등록',{body:textBody});
+add('get','studio/reports/{id}','스튜디오','수익·구독자·팔로워 리포트',{query:[query('startDate',date,true),query('endDate',date,true)],response:ref('Report'),description:'id: revenue, subscribers, followers. 한국 날짜 기준, 미래 종료일 불가.'});
+add('get','billing/config','결제수단','Toss 공개 SDK 설정',{response:ref('BillingConfig')});
+add('post','billing/registrations','결제수단','카드 등록 시도 생성',{body:object({returnPath:str('/service/payment-methods 또는 본인 checkout 경로')}),response:ref('Registration'),description:'30분 유효. 카드번호/CVC를 이 서버로 보내지 않습니다.'});
+add('post','billing/methods','결제수단','빌링키 발급·카드 등록 완료',{body:object({registrationId:str(),state:secret('카드 등록 state'),authKey:secret('Toss 인증 결과. 최초 요청 시 필요, 재처리는 서버 저장값 사용'),customerKey:str()},['registrationId','state']),response:object({message:str(),returnPath:str()})});
+add('put','billing/methods/{id}','결제수단','기본 카드 지정·카드 삭제',{body:object({operation:enumeration('default','delete')},['operation'])});
+add('post','checkout','결제·구독','멤버십 주문 생성',{body:object({planId:str(),requestId:maxString(100,'동일 작업 재시도에 같은 값을 사용')},['planId','requestId']),response:ref('Order')});
+add('get','checkout/{id}','결제·구독','내 주문 조회',{response:ref('Order')});
+add('post','checkout/{id}/retry','결제·구독','실패한 최초 주문 재시도 준비',{response:ref('Order')});
+add('post','checkout/{id}/payment-window','결제·구독','단건결제 창 설정',{response:object({clientKey:str(),customerKey:str(),orderId:str(),orderName:str(),amount:money}),description:'한 달 단건 결제로 고정합니다. 정기결제 등록이 아닙니다.'});
+for(const [path,summary,body]of [['confirm','단건결제 승인',object({paymentKey:secret('Toss 결제 인증 키'),orderId:str(),amount:money},['paymentKey','orderId','amount'])],['pay','등록 카드로 구독 결제',object({methodId:str('생략하면 기본 카드 사용')})]] as const)add('post',`checkout/{id}/${path}`,'결제·구독',summary,{body,response:object({message:str(),order:ref('Order')}),description:'실제 과금 API. 서버 금액과 소유권을 검증하고 동일 주문의 처리 결과를 복구합니다. 응답 유실을 실패로 간주해 새 주문을 만들지 마세요.'});
+add('post','subscriptions/{creator}/cancel','결제·구독','정기결제 해지 예약',{description:'자동 갱신을 해지하며 이미 결제한 이용 기간의 접근 권한은 유지합니다.'});
+add('get','checkout/{id}/refund-eligibility','환불','미사용 전액 환불 가능 여부',{response:object({eligible:bool,reason:nullable(str()),amount:money,currency:enumeration('KRW')}),description:'서버의 실제 콘텐츠 접근 기록과 결제 상태로 판단합니다. 브라우저의 열람 신고만으로 판단하지 않습니다.'});
+add('post','checkout/{id}/refund','환불','미사용 전액 환불 실행',{description:'실제 결제 취소 API. 사용 기록이 있으면 거부하며 성공 후 원장·수수료·구독 권한을 반영합니다.'});
+add('get','studio/finance','정산·출금','내 수익·정산·출금·계좌',{response:ref('Finance')});
+add('post','studio/accounts','정산·출금','정산 계좌 등록·수정',{body:object({id:str(),bank:maxString(60),holderAlias:maxString(60,'표시용 별칭'),accountNumber:{type:'string',pattern:'^\\d{8,30}$',writeOnly:true}},['bank','holderAlias','accountNumber']),response:object({account:ref('Account'),message:str()}),description:'계좌 변경 시 검증 상태와 기본 계좌를 해제합니다. 처리 중 출금에 사용된 계좌는 수정할 수 없습니다.'});
+add('post','studio/accounts/{id}/verify','정산·출금','계좌·예금주 확인',{description:'입력 별칭이 아닌 본인확인 실명을 공급사에 전달합니다. 은행 공급사 미연동이면 성공으로 처리하지 않습니다.'});
+add('put','studio/accounts/{id}/default','정산·출금','기본 정산 계좌 지정');
+add('post','studio/pin','정산·출금','출금 PIN 설정',{body:object({pin:{type:'string',pattern:'^\\d{6}$',writeOnly:true},identityProof:secret('withdrawal-pin 목적의 본인확인 증명')},['pin','identityProof'])});
+const quoteFields={amount:{type:'integer',minimum:1},accountId:str()};
+add('post','studio/withdraw/review','정산·출금','출금 신청 전 검토',{body:object(quoteFields,['amount','accountId']),response:object({amount:money,account:ref('Account'),availableAfterRequest:money})});
+add('post','studio/withdraw/verify','정산·출금','출금 PIN 검증 및 일회성 승인',{body:object({...quoteFields,pin:secret('6자리 출금 PIN')},['amount','accountId','pin']),response:object({authorizationId:str()}),description:'승인은 금액·계좌·버전에 묶이며 2분 유효합니다.'});
+add('post','studio/withdraw','정산·출금','출금 신청 접수',{body:object({...quoteFields,requestId:maxString(100,'동일 출금 재시도에 같은 값'),authorizationId:str()},['amount','accountId','requestId','authorizationId']),response:object({withdrawal:ref('Withdrawal'),message:str()}),description:'접수와 은행 지급 완료는 다릅니다. worker가 별도 지급 처리합니다.'});
+add('post','media','미디어','이미지·영상 업로드',{contentType:'multipart/form-data',body:object({file:{type:'string',format:'binary'}},['file']),response:media,description:'이미지 JPEG/PNG/WebP 5MiB, 영상 MP4/WebM 300MiB. 이미지는 WebP 재인코딩, 영상 컨테이너 검사. 업로드된 파일도 매 요청마다 접근 권한을 확인합니다.'});
+for(const path of ['media/{id}/file','media/{id}/origin-file'])add('get',path,'미디어','권한 검사 후 미디어 전송',{description:'JSON 공통 응답의 예외: 파일 바이트. GET/HEAD/단일 Range 지원. 소유자 또는 현재 게시물·멤버십 권한 필요. CDN 캐시 적중에도 현재 세션을 검사하며 유료 파일 접근은 이용 기록에 반영됩니다.'});
+add('get','media/{id}/edge-authorize','내부 연동','CDN 엣지의 미디어 권한 확인',{response:object({delivery:enumeration('api','s3'),key:str()}),description:'서명된 엣지 요청 전용. x-crefans-edge-purpose/ip/at/id/method/signature 헤더 및 현재 세션을 검증합니다. 서명키는 공개하지 않습니다.'});
+for(const path of ['telemetry/browser-errors','admin/client-errors'])add('post',path,'운영 로그','브라우저 오류 보고',{body:ref('BrowserErrorInput'),response:object({reportId:str()}),description:'최대 6000자 JSON, 12개 프레임. 원문 URL·개인정보·토큰 없이 오류 종류와 정제한 프레임만 전달합니다.'});
+add('get','admin/me','관리자','내 운영자 권한',{response:object({id:str(),name:str(),role:str()})});
+add('get','admin/dashboard','관리자','전일 대비 대시보드',{query:[query('date',date),query('days',enumeration('7','30','90'))],response:object({asOf:time,timeZone:str(),currency:str(),basis:str(),period:object({date,previousDate:date,days:integer,from:date,to:date,partial:bool,cutoff:time,previousCutoff:time}),currentActive:integer,summary:metrics,previous:metrics,trend:list(object({date,...metrics.properties}))}),description:'금융 조회 권한 필요. 한국 날짜와 동일 경과 시간 기준으로 전일을 비교합니다.'});
+add('get','admin/overview','관리자','운영 상태 요약',{response:object({members:integer,creators:integer,posts:integer,reports:integer,inquiries:integer,failedPayments:integer,pendingWithdrawals:integer,undeliveredEvents:integer,jobs:list(json)})});
+add('get','admin/revenue','관리자','기간별 매출',{query:[...period,...paging],response:object({period:json,basis:str(),currency:str(),summary:amounts,daily:list(object({date,...amounts.properties})),creators:page(object({id:str(),name:str(),...amounts.properties}))}),description:'SUPER_ADMIN·ADMIN 금융 조회 권한 필요.'});
+for(const path of ['members','posts','payments','withdrawals'])add('get','admin/'+path,'관리자',({members:'회원 목록',posts:'게시물 목록',payments:'결제 목록',withdrawals:'출금 목록'})[path],{query:[...paging,...(['members','posts'].includes(path)?[query('search',maxString(100))]:path==='payments'?period:[])],response:page(object(path==='members'?{id:str(),email:str(),nickname:str(),enabled:bool,status:str(),created_at:time,creator:nullable(object({user_id:str(),display_name:nullable(str()),is_active:bool,is_verified:{type:'boolean',description:'운영자가 직접 부여한 크리에이터 인증'}}))}:path==='posts'?{id:str(),title:str(),user_sub:str(),status:str(),is_membership:bool,is_public:bool,is_deleted:bool,created_at:time}:path==='payments'?{id:str(),member_id:str(),amount:money,status:str(),failure_code:nullable(str()),paid_at:nullable(time),created_at:time}:{id:str(),creator_id:str(),amount:money,status:str(),created_at:time,updated_at:time})),description:['payments','withdrawals'].includes(path)?'SUPER_ADMIN·ADMIN 금융 조회 권한 필요.':'운영자 전용.'});
+add('get','admin/financial-policy','관리자','현재 수수료·정산 보류 정책',{response:ref('FinancialPolicy'),description:'SUPER_ADMIN 전용.'});
+add('put','admin/financial-policy','관리자','수수료·정산 보류 정책 변경',{body:object({expectedVersion:{type:'integer',minimum:0,maximum:2147483646},platformFeeBps:{type:'integer',minimum:0,maximum:10000},settlementHoldDays:{type:'integer',minimum:0,maximum:365},reason:maxString(500)},['expectedVersion','platformFeeBps','settlementHoldDays','reason']),response:ref('FinancialPolicy'),description:'SUPER_ADMIN 전용. 변경 후 신규 결제에 반영하며 기존 거래의 snapshot은 보존합니다.'});
+add('get','admin/financial-policy/history','관리자','금융 정책 변경 이력',{response:list(object({id:str(),version:integer,platform_fee_bps:integer,settlement_hold_days:integer,changed_by:nullable(str()),reason:str(),created_at:time})),description:'SUPER_ADMIN 전용. 최근100건.'});
+add('get','admin/inquiries','관리자','문의 목록',{response:list(ref('SupportTicket'))});
+add('post','admin/inquiries/{id}/reply','관리자','문의 답변',{body:object({reply:maxString(10000)},['reply'])});
+add('get','admin/reports','관리자','미처리 신고 목록',{response:list(ref('UserReport'))});
+add('post','admin/reports/{id}/resolve','관리자','신고 처리',{body:object({status:enumeration('RESOLVED','REJECTED'),note:maxString(2000)},['status','note'])});
+add('get','admin/documents','관리자','공지·FAQ 목록',{response:list(ref('ServiceDocument'))});
+add('post','admin/documents','관리자','공지·FAQ 저장',{body:object({id:str(),kind:enumeration('faq','notice'),title:maxString(200),content:json,published:bool,pinned:bool,category:maxString(50)},['kind','title','content','published']),response:ref('IdMessage'),description:'MODERATOR 불가. 약관·개인정보·운영정책은 코드 관리이므로 이 API로 변경할 수 없습니다.'});
+add('post','admin/categories','관리자','카테고리 생성·상태 변경',{body:object({name:maxString(40),active:bool},['name']),description:'MODERATOR 불가.'});
+add('put','admin/creators/{id}/verification','관리자','크리에이터 인증 배지 부여·해제',{body:object({isVerified:bool},['isVerified']),response:object({message:str(),isVerified:bool}),description:'활성 ADMIN·SUPER_ADMIN 전용. 기본 false. PASS 본인인증과 별도. 변경과 감사 로그를 한 트랜잭션으로 저장합니다.'});
+add('post','admin/creators/{id}/promotion','관리자','크리에이터 광고 노출 설정',{body:object({promoted:bool},['promoted']),description:'MODERATOR 불가.'});
+add('get','admin/logs','운영 로그','운영 감사 로그 검색',{query:[...period,...paging,...['category','level','ip','requestId','actorId','entityId','jobId','action'].map(key=>query(key))],response:object({...page(ref('AuditEvent')).properties,period:json}),description:'SUPER_ADMIN·ADMIN 전용. 원문 개인정보/토큰을 제외한 허용 필드만 조회합니다.'});
+add('get','admin/logs/{id}','운영 로그','감사 로그 및 연관 타임라인',{response:object({event:ref('AuditEvent'),timeline:list(ref('AuditEvent')),hasMore:bool,delivery:nullable(object({attempts:integer,available_at:time,delivered_at:nullable(time),last_error_code:nullable(str())}))}),description:'SUPER_ADMIN·ADMIN 전용. 관련 타임라인 최대100개.'});
+
+add('get','marketing/unsubscribe','계정','광고 메일 수신거부 확인 화면',{query:[query('token',secret('수신거부 전용 서명 토큰'),true)],response:{type:'string'},contentType:'text/html',description:'로그인 불필요. GET은 상태를 변경하지 않습니다.'});
+add('post','marketing/unsubscribe','계정','광고 메일 무료 수신거부',{query:[query('token',secret('수신거부 전용 서명 토큰'),true)],description:'서명 토큰 소유자의 광고 수신만 해제합니다. 쿠키·로그인 불필요. 필수 안내는 유지합니다.'});
+add('post','admin/marketing/campaigns','운영 관리','동의 대상 광고 메일 대기열 등록',{body:object({campaignId:maxString(80),subject:maxString(120),body:maxString(10000),memberIds:{type:'array',items:str(),minItems:1,maxItems:100}},['campaignId','subject','body','memberIds']),response:object({queued:integer,skipped:integer,message:str()}),description:'활성 SUPER_ADMIN 전용. 시행 정책·발송 설정이 필요하며 최종 전송 시 동의를 다시 확인합니다. 입력은 회원 ID이며 이메일 원문을 받지 않습니다.'});
+add('post','admin/revenue/{id}/receipt','금융 정책','PG 실제 입금 수동 대사 기록',{body:object({reference:maxString(191),reason:maxString(500),amount:money,receivedAt:time},['reference','reason','amount','receivedAt']),description:'활성 SUPER_ADMIN 전용. 실제 결제/입금 증거를 대조한 뒤 기록합니다. 테스트 거래는 거부하며 자동 은행조회나 송금 API가 아닙니다. 이력은 변경하지 않습니다.'});
+
+// Bean support is independent from membership checkout and income ledgers.
+const beanQuantity={type:'integer' as const,minimum:1,maximum:100000};
+const beanInput=object({quantity:beanQuantity,requestId:maxString(100)},['quantity','requestId']);
+add('get','beans/wallet','콩','내 콩 지갑·이동 내역',{query:[query('page',integer),query('from',date),query('to',date),query('status',enumeration('pending','processing','paid','failed','cancelled','disputed')),query('direction',enumeration('in','out'))],response:json,description:'본인 지갑만 조회. 기간은 KST 날짜 양끝 포함. 충전 주문 status/이동 delta 부호 direction 필터를 전체 목록에 적용한 뒤 각각20개씩 페이지네이션. chargesTotal/entriesTotal은 필터 적용 총수. charges[].createdAt은 주문 생성 ISO 시각으로 화면 CF-YYYYMMDDHHmmss(KST) 표시용. UUID id는 결제/권한 식별에 계속 사용. BigInt 잔액/증감은10진 문자열이며 지갑 잔액은 필터와 무관. 후원 이동은 movement.tip에 sourceType/postTitle/postTitleSource/postAvailable을 제공합니다. 기존 원장 reason은 수정하지 않습니다.'});
+add('post','beans/charges','콩','일회성 콩 충전 주문·재고 예약',{body:beanInput,response:json});
+add('get','beans/charges/{id}','콩','본인 충전 주문 조회',{response:json});
+add('post','beans/charges/{id}/payment-window','콩','Toss 일회성 충전 결제창 정보',{response:json});
+add('post','beans/charges/{id}/confirm','콩','서버 충전 승인·중복 방지',{body:object({paymentKey:secret('PG 결제 인증 키'),orderId:str(),amount:money},['paymentKey','orderId','amount']),response:json,description:'서버 원주문·금액·통화·승인잔액·결제키 일치 후 콩을1회 지급합니다. 결과불명은 같은 주문으로 조회합니다.'});
+add('post','creators/{id}/tips','콩','크리에이터 일회성 후원',{body:object({quantity:beanQuantity,requestId:maxString(100),message:maxString(500),postId:str()},['quantity','requestId']),response:json,description:'자기 후원 금지. 프로모션콩 우선 소비. postId 지정 시 게시물 후원이며 supporterCount는 해당 게시물의 고유 후원자 수입니다. 반복·동일요청 재시도는 한 명으로 집계합니다. 후원은 멤버십 권한을 부여하지 않습니다. sourceType으로 게시물/프로필 후원을 구분하며 postTitle은 후원 당시 snapshot, 기존 미기록은 current/unavailable로 명시합니다.'});
+add('get','beans/tips','콩','내가 보낸 후원 내역',{query:[query('page',integer),query('from',date),query('to',date),query('q',maxString(100))],response:json,description:'KST 기간 양끝 포함, q는 표시 크리에이터명·후원 당시 게시물 제목·후원 메시지의 부분 검색. 본인 후원 범위에서 필터 후20개씩 조회. total은 필터 적용 총수.'});
+add('get','studio/bean-finance','콩 후원 관리','후원 수익·지급 가능콩·출금·본인계좌',{query:[query('page',integer)],response:json,description:'receivedByType은 게시물/프로필별 일반·프로모션콩 총수와 건수. tips는 sourceType/postTitle/postTitleSource/postAvailable, payouts[].sources는 출금에 실제 배정된 postQuantity/profileQuantity/unattributedQuantity이며 지급 수수료와 별도입니다.'});
+add('get','studio/tips','콩 후원 관리','받은 후원 목록',{query:[query('page',integer)],response:json});
+const beanWithdrawal=object({quantity:beanQuantity,accountId:str()},['quantity','accountId']);
+add('post','studio/bean-withdrawal-quotes','콩 후원 관리','최소1,000콩 출금 견적',{body:beanWithdrawal,response:json,description:'PG 실제입금 확인·7일 보류가 끝난 후원 일반콩만 가능. 총액10만원부터,20% 수수료·실지급8만원.'});
+add('post','studio/bean-withdrawals/verify','콩 후원 관리','출금 PIN·수량·계좌 version 인증',{body:object({quantity:beanQuantity,accountId:str(),pin:secret('숫자6자리 PIN')},['quantity','accountId','pin']),response:json});
+add('post','studio/bean-withdrawals','콩 후원 관리','콩 출금 접수·잔액 예약',{body:object({quantity:beanQuantity,accountId:str(),authorizationId:secret('출금 인증ID'),requestId:maxString(100)},['quantity','accountId','authorizationId','requestId']),response:json});
+add('get','admin/beans/overview','관리자','콩 충전·후원·출금·회사재고·부채 집계',{query:[query('page',integer)],response:json,description:'ADMIN/SUPER_ADMIN. tipSourceGroups는 게시물/프로필별 live/test/promotion 사용량. 후원 제목과 출금 sources를 함께 반환합니다. payoutFundingGroups는 출금 원장 출처별 일반/프로모션 수량·총액·수수료·실지급. 프로모션은 회사 부담이며 PG 충전 매출과 분리. test/live 충전/지급 그룹 분리, 충전과후원을 합산하여 매출로 집계하지 않습니다.'});
+add('get','admin/beans/wallets/{id}','관리자','회원 콩 지갑·이동 추적',{query:[query('page',integer)],response:json,description:'SUPER_ADMIN. id는 회원ID.'});
+add('post','admin/beans/promotions','관리자','사유 있는 프로모션콩 지급',{body:object({memberId:str(),quantity:beanQuantity,requestId:maxString(100),reason:maxString(500)},['memberId','quantity','requestId','reason']),response:json,description:'SUPER_ADMIN. 회사재고에서 지급. 직접 지급받은 잔액은 출금 불가, 후원받은 크리에이터의 프로모션 수익은 출금 가능. 수수료20%·최소1,000콩·PIN/계좌/은행 가드 유지.'});
+add('post','admin/beans/charges/{id}/receipt','관리자','콩 PG 실제입금 대사',{body:object({amount:money,receivedAt:time,reference:maxString(191),reason:maxString(500)},['amount','receivedAt','reference','reason']),response:json,description:'SUPER_ADMIN. 실제 결제만 기록, 중복동일 요청 멱등.'});
+add('post','admin/beans/withdrawals/{id}/approve','관리자','동일 은행 요청ID로 콩 출금 처리·결과 확인',{response:json,description:'SUPER_ADMIN. 베타 실지급 금지, 신규 수요일 처리. 은행 성공 후만 회사로 콩 반환·수수료 확정.'});
+add('post','admin/beans/withdrawals/{id}/reject','관리자','은행 전송 전 콩 출금 반려',{body:object({reason:maxString(500)},['reason']),response:json,description:'SUPER_ADMIN. 은행 처리 중 결과불명 요청은 임의 반려 불가.'});
+
+add('post','beans/webhook','콩','PG 상태변경 재조회 예약',{body:object({eventType:str(),data:object({orderId:str()},['orderId'])},['data']),response:object({received:bool}),successStatus:200,description:'웹훅 본문은 승인 근거로 신뢰하지 않습니다. IP별 제한 후 기존 주문만 재조회 예약하고 worker가 인증된 PG 조회로 검증합니다.'});

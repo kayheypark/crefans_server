@@ -194,6 +194,8 @@ model Creator {
   cover String? @db.Text
   comments_enabled Boolean @default(true)
   promoted Boolean @default(false)
+  /// Administrator-issued creator badge; independent of identity verification.
+  is_verified Boolean @default(false)
   category    CreatorCategory? @relation(fields: [category_id], references: [id])
 
   @@index([category_id])
@@ -427,6 +429,7 @@ model Posting {
   /// 크리에이터 ID (Cognito의 userSub)
   user_sub                  String
   /// 댓글 허용 여부
+  allow_tips                Boolean        @default(true)
   allow_comments            Boolean        @default(true)
   access_plan_id String?
   scheduled_at DateTime?
@@ -1072,12 +1075,14 @@ model AuthRateBucket {
 
 
 model AccountPreference {
+  marketing_consent_id String? @db.VarChar(191)
   member_id String @id @db.VarChar(191)
   content_alert Boolean @default(true)
   message_alert Boolean @default(true)
   marketing_alert Boolean @default(false)
   show_activity Boolean @default(true)
   allow_search Boolean @default(true)
+  show_followers Boolean @default(true)
   show_following Boolean @default(true)
   updated_at DateTime @updatedAt
   @@map("account_preferences")
@@ -1178,6 +1183,8 @@ model MembershipVersion {
   @@map("membership_versions")
 }
 model BillingMethod {
+  unavailable_at DateTime?
+  unavailable_reason String? @db.VarChar(80)
   id String @id @default(uuid())
   member_id String @db.VarChar(191)
   billing_key_encrypted String @db.Text
@@ -1193,6 +1200,23 @@ model BillingMethod {
   created_at DateTime @default(now())
   @@index([member_id])
   @@map("billing_methods")
+}
+model BillingNotice {
+  id String @id @default(uuid())
+  dedupe_key String @unique @db.VarChar(191)
+  member_id String @db.VarChar(191)
+  subscription_id String @db.VarChar(191)
+  order_id String? @db.VarChar(191)
+  kind String @db.VarChar(40)
+  action_required Boolean @default(false)
+  attempts Int @default(0)
+  retry_at DateTime @default(now())
+  locked_until DateTime?
+  completed_at DateTime?
+  outcome String? @db.VarChar(40)
+  created_at DateTime @default(now())
+  @@index([completed_at, retry_at])
+  @@map("billing_notices")
 }
 model CheckoutOrder {
   usage_tracking_started_at DateTime?
@@ -1222,6 +1246,9 @@ model CheckoutOrder {
   @@map("checkout_orders")
 }
 model RevenueEntry {
+  receipt_confirmed_at DateTime?
+  receipt_reference String? @db.VarChar(191)
+  received_amount Int?
   id String @id @default(uuid())
   creator_id String @db.VarChar(191)
   order_id String @unique
@@ -1343,4 +1370,262 @@ model BillingRegistration {
  updated_at DateTime @updatedAt
  @@index([member_id])
  @@map("billing_registrations")
+}
+
+model FinancialPolicy {
+  id String @id @default("platform") @db.VarChar(32)
+  version Int @default(0)
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  updated_at DateTime @updatedAt
+  @@map("financial_policies")
+}
+model FinancialPolicyChange {
+  id String @id @default(uuid())
+  version Int @unique
+  platform_fee_bps Int
+  settlement_hold_days Int
+  changed_by String? @db.VarChar(191)
+  reason String @db.VarChar(500)
+  created_at DateTime @default(now())
+  @@map("financial_policy_changes")
+}
+
+model PlatformSecurityIp {
+ ip String @id @db.VarChar(45)
+ blocked_until DateTime?
+ window_start DateTime
+ count Int @default(0)
+ detected_at DateTime?
+ @@map("platform_security_ips")
+}
+
+model PlatformOperationalEvent {
+ id String @id @default(uuid()) @db.VarChar(36)
+ type String @db.VarChar(64)
+ data Json
+ ip String? @db.VarChar(45)
+ peer_ip String? @db.VarChar(45)
+ request_id String? @db.VarChar(36)
+ dedupe_key String? @unique @db.VarChar(191)
+ created_at DateTime @default(now())
+ available_at DateTime @default(now())
+ attempts Int @default(0)
+ locked_until DateTime?
+ delivered_at DateTime?
+ last_error_code String? @db.VarChar(64)
+ @@index([delivered_at,available_at,locked_until],map:"platform_operations_dispatch_idx")
+ @@index([created_at])
+ @@map("platform_operational_events")
+}
+
+// Application-append-only audit trail, independent from Telegram delivery/cleanup.
+model PlatformAuditLog {
+ id String @id @default(uuid()) @db.VarChar(36)
+ category String @db.VarChar(24)
+ action String @db.VarChar(96)
+ level String @db.VarChar(8)
+ actor_id String? @db.VarChar(191)
+ actor_role String? @db.VarChar(32)
+ ip String? @db.VarChar(45)
+ peer_ip String? @db.VarChar(45)
+ request_id String? @db.VarChar(36)
+ job_id String? @db.VarChar(64)
+ entity_id String? @db.VarChar(191)
+ source_id String? @unique @db.VarChar(191)
+ release String @db.VarChar(96)
+ environment String @db.VarChar(32)
+ status_code Int?
+ duration_ms Int?
+ metadata Json
+ occurred_at DateTime @default(now()) @db.DateTime(3)
+ @@index([occurred_at, id])
+ @@index([category, occurred_at])
+ @@index([request_id, occurred_at])
+ @@index([actor_id, occurred_at])
+ @@index([entity_id, occurred_at])
+ @@index([ip, occurred_at])
+ @@index([job_id, occurred_at])
+ @@map("platform_audit_logs")
+}
+
+model MarketingDelivery {
+ id String @id @default(uuid())
+ member_id String @db.VarChar(191)
+ kind String @db.VarChar(40)
+ dedupe_key String @unique @db.VarChar(191)
+ consent_id String? @db.VarChar(191)
+ subject String @db.VarChar(200)
+ body String @db.Text
+ status String @default("queued") @db.VarChar(30)
+ created_at DateTime @default(now())
+ started_at DateTime?
+ completed_at DateTime?
+ @@index([status, created_at])
+ @@index([member_id, kind, completed_at])
+ @@map("marketing_deliveries")
+}
+
+// New platform bean ledger. Legacy Wallet/Transfer remain isolated.
+model BeanWallet {
+ accounts BeanAccount[]
+ id String @id
+ owner_key String @unique(map:"owner_key") @db.VarChar(191)
+ status String @default("active") @db.VarChar(20)
+ created_at DateTime @default(now())
+ @@map("bean_wallets")
+}
+model BeanAccount {
+ wallet BeanWallet @relation(fields:[wallet_id],references:[id],onUpdate:NoAction,map:"bean_accounts_ibfk_1")
+ entries BeanEntry[]
+ id String @id
+ wallet_id String
+ bucket String @db.VarChar(40)
+ balance BigInt @default(0)
+ version Int @default(0)
+ @@unique([wallet_id,bucket])
+ @@map("bean_accounts")
+}
+model BeanMovement {
+ entries BeanEntry[]
+ id String @id
+ request_key String @unique(map:"request_key") @db.VarChar(191)
+ fingerprint String @db.Char(64)
+ kind String @db.VarChar(40)
+ reason String @db.VarChar(500)
+ actor_id String @db.VarChar(191)
+ reference_id String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@index([kind,created_at])
+ @@map("bean_movements")
+}
+model BeanEntry {
+ movement BeanMovement @relation(fields:[movement_id],references:[id],onUpdate:NoAction,map:"bean_entries_ibfk_1")
+ account BeanAccount @relation(fields:[account_id],references:[id],onUpdate:NoAction,map:"bean_entries_ibfk_2")
+ id String @id
+ movement_id String
+ account_id String
+ delta BigInt
+ balance_after BigInt
+ created_at DateTime @default(now())
+ @@unique([movement_id,account_id])
+ @@index([account_id,created_at])
+ @@map("bean_entries")
+}
+
+model BeanCharge {
+ id String @id @default(uuid())
+ member_id String
+ request_key String @unique
+ quantity Int
+ amount Int
+ environment String @db.VarChar(10)
+ status String @default("pending") @db.VarChar(30)
+ payment_key String? @unique
+ locked_until DateTime?
+ expires_at DateTime
+ paid_at DateTime?
+ receipt_confirmed_at DateTime?
+ receipt_reference String?
+ received_amount Int?
+ failure_code String?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([member_id,created_at])
+ @@index([status,updated_at])
+ @@map("bean_charges")
+}
+model BeanLot {
+ id String @id @default(uuid())
+ member_id String
+ bucket String @db.VarChar(40)
+ charge_id String?
+ grant_id String?
+ available Int
+ reserved Int @default(0)
+ release_at DateTime
+ frozen Boolean @default(false)
+ created_at DateTime @default(now())
+ @@index([member_id,bucket,created_at])
+ @@index([charge_id])
+ @@map("bean_lots")
+}
+model BeanTip {
+ id String @id @default(uuid())
+ request_key String @unique
+ sender_id String
+ creator_id String
+ post_id String?
+ post_title_snapshot String? @db.Text
+ quantity Int
+ paid_quantity Int
+ promotion_quantity Int
+ message String @db.VarChar(500)
+ created_at DateTime @default(now())
+ @@index([sender_id,created_at])
+ @@index([creator_id,created_at])
+ @@index([post_id,sender_id])
+ @@map("bean_tips")
+}
+model BeanTipAllocation {
+ id String @id @default(uuid())
+ tip_id String
+ source_lot_id String
+ target_lot_id String @unique
+ quantity Int
+ @@index([tip_id])
+ @@map("bean_tip_allocations")
+}
+model BeanPromotion {
+ id String @id @default(uuid())
+ request_key String @unique
+ member_id String
+ quantity Int
+ reason String @db.VarChar(500)
+ actor_id String
+ created_at DateTime @default(now())
+ @@index([member_id,created_at])
+ @@map("bean_promotions")
+}
+model BeanPayout {
+ id String @id @default(uuid())
+ request_key String @unique
+ creator_id String
+ account_id String
+ account_version Int
+ account_label String
+ quantity Int
+ gross Int
+ fee Int
+ net Int
+ fee_bps Int
+ environment String @db.VarChar(10)
+ status String @default("requested") @db.VarChar(30)
+ note String @default("") @db.VarChar(500)
+ approved_by String?
+ locked_until DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([creator_id,created_at])
+ @@index([status,updated_at])
+ @@map("bean_payouts")
+}
+model BeanPayoutAllocation {
+ id String @id @default(uuid())
+ payout_id String
+ lot_id String
+ quantity Int
+ @@unique([payout_id,lot_id])
+ @@map("bean_payout_allocations")
+}
+model BeanWithdrawalAuthorization {
+ id String @id @default(uuid())
+ creator_id String
+ account_id String
+ account_version Int
+ quantity Int
+ expires_at DateTime
+ consumed_at DateTime?
+ @@index([creator_id,expires_at])
+ @@map("bean_withdrawal_authorizations")
 }

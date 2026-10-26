@@ -1,8 +1,50 @@
-{$APP_DOMAIN} {
+{
+  log default {
+    output stdout
+    format filter {
+      wrap json
+      fields {
+        request>uri delete
+        request>headers delete
+        request>tls delete
+        resp_headers delete
+      }
+    }
+  }
+}
+
+# Request paths, query strings and all headers may contain tokens or private IDs.
+# API route templates are recorded by the application under X-Request-ID.
+(safe_access) {
+  log {
+    output stdout
+    format filter {
+      wrap json
+      fields {
+        request>uri delete
+        request>headers delete
+        request>tls delete
+        resp_headers delete
+      }
+    }
+  }
+  log_append request_id {http.response.header.X-Request-ID}
+}
+
+{$APP_DOMAIN}, {$MEDIA_AUTH_ORIGIN:media-auth.localhost} {
+  import safe_access
   encode zstd gzip
+  redir / /service/feed 302
+  @privateFiles path /.env /.env.* /.git /.git/* /runtime.env /compose.yml /compose.beta.yml /bootstrap-ubuntu.sh
+  handle @privateFiles {
+    respond 404
+  }
   @platform path /api/v1/*
   handle @platform {
-    reverse_proxy api:3001
+    reverse_proxy api:3001 {
+      header_up X-Crefans-Client-IP {remote_host}
+      header_up -CF-Connecting-IP
+    }
   }
   handle {
     reverse_proxy frontend:3010
@@ -10,6 +52,38 @@
   header {
     X-Content-Type-Options nosniff
     Referrer-Policy strict-origin-when-cross-origin
+    -Server
+  }
+}
+
+# Independent operator app. Only the established platform API receives auth cookies.
+{$ADMIN_DOMAIN:admin.crefans.com} {
+  import safe_access
+  encode zstd gzip
+  redir / /console 302
+  @privateFiles path /.env /.env.* /.git /.git/* /runtime.env /compose.yml /compose.beta.yml /compose.admin.yml
+  handle @privateFiles {
+    respond 404
+  }
+  @adminApi path /api/v1/admin /api/v1/admin/* /api/v1/auth/login /api/v1/auth/logout /api/v1/auth/refresh
+  handle @adminApi {
+    reverse_proxy api:3001 {
+      header_up X-Crefans-Client-IP {remote_host}
+      header_up -CF-Connecting-IP
+    }
+  }
+  @otherApi path /api/*
+  handle @otherApi {
+    respond 404
+  }
+  handle {
+    reverse_proxy admin:3002
+  }
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    X-Robots-Tag "noindex, nofollow, noarchive"
+    Referrer-Policy same-origin
     -Server
   }
 }

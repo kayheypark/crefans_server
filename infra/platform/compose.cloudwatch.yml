@@ -1,0 +1,23 @@
+# OPTIONAL. Apply LAST, after compose.yml + compose.beta.yml + compose.admin.yml.
+# Requires Docker Compose >=2.24.4; provision log group/retention and EC2 role first.
+x-cloudwatch: &cloudwatch
+  driver: awslogs
+  options:
+    awslogs-region: ${LOGS_AWS_REGION:?Set log region}
+    awslogs-group: ${LOGS_GROUP:?Create the log group and retention first}
+    awslogs-create-group: "false"
+    tag: "{{.Name}}/{{.ID}}"
+    mode: non-blocking
+    max-buffer-size: "4m"
+services:
+  api:
+    logging: !override
+      <<: *cloudwatch
+  worker:
+    logging: !override
+      <<: *cloudwatch
+  proxy:
+    logging: !override
+      <<: *cloudwatch
+# Deliberately excludes DB/Next stdout: upstream error text needs separate review.
+# Non-blocking buffers protect checkout availability but can drop logs on overflow.

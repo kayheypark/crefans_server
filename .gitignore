@@ -19,3 +19,6 @@ member-export*.json
 
 infra/platform/runtime.env
 infra/platform/.env
+
+# Local generated files
+*.tsbuildinfo

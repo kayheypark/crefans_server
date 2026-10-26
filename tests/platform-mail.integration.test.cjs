@@ -2,6 +2,7 @@ require('reflect-metadata');require('dotenv').config({path:'.local/platform.env'
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),net=require('node:net');
 const {randomUUID}=require('node:crypto'),{PrismaClient}=require('@prisma/client');
 assert.match(process.env.DATABASE_URL||'',/@127\.0\.0\.1:3307\/crefans_platform_dev$/);
+const testLegal=require('./legal-fixture.cjs').installTestLegal();
 const {NestFactory}=require('@nestjs/core'),{PlatformModule}=require('../dist/src/platform/module'),{cookieParser}=require('../dist/src/platform/middleware'),{EnvelopeInterceptor,PlatformExceptionFilter}=require('../dist/src/platform/http'),{MemberMailService}=require('../dist/src/auth/local/member-mail.service'),{digest,hashPassword}=require('../dist/src/auth/local/credentials');
 const db=new PrismaClient(),members=[],emails=[],sent=[],wire=[],rateIds=new Set();let app,origin,smtp,failMail=false,cookie='';
 const original=MemberMailService.prototype.sendCode;

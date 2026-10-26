@@ -5,7 +5,7 @@
 - 크레팬스(팬·크리에이터 멤버십 플랫폼) 백엔드. NestJS + Prisma + MySQL. AWS Cognito 제거·자체 회원 인증·단일 원서버(docker compose, host Postfix SMTP) 배포를 준비 중. `dev`는 승인된 개발 기준, `prod`는 기존 운영 기준이다. 새 작업은 `dev`에서 `feat/<작업명>` 브랜치로 진행한다.
 - 작업 전에 `PROGRESS.md`를 먼저 읽고, 작업 후 갱신한다. 신규 서비스 기준은 `docs/platform-api.md`, `docs/platform-implementation.md`, `infra/platform/`이다. `docs/local-member-migration.md`와 `infra/single-instance/`는 구형 인증 전환 참고 자료다. `docs/prd.md`·`docs/deployment-setup.md`의 Cognito 전제 내용은 구식.
 - 운영 DB에 `migrate dev`/`db push`/`seed`를 실행하지 않는다. 비밀번호·인증 코드·AWS 키를 로그에 남기지 않는다.
-- 프론트(crefans_front)의 인증 화면 계약: 회원가입 화면 안에서 이메일 코드 인증 + PASS 본인인증을 끝낸 뒤 가입. 코드 유효 10분, 재전송 쿨다운 3분.
+- 프론트(crefans_front)의 인증 화면 계약: 회원가입 화면 안에서 이메일 코드 인증을 완료한다. PASS 필수/임시 이메일 가입은 서버 signupRequirements에 따른다. 코드 유효 10분, 재전송 쿨다운 3분.
 
 - 신규 실제 서비스는 `src/platform/`의 독립 런타임(`/api/v1`)이다. API/구조/검증은 `docs/platform-implementation.md`, `docs/platform-api.md`, 외부 경계는 `docs/provider-contracts.md`. `/preview` 목업은 유지한다. 기존 비버전/Cognito 런타임에 신규 API를 섞지 않는다.
 - 현재 개발 DB는 `.local/platform.env`의 127.0.0.1:3307 격리 DB다. 일반 `.env`를 실제 서비스 개발·테스트에 로드하지 않는다. 외부 계정 미설정 오류를 가짜 성공으로 바꾸지 않는다.
@@ -25,3 +25,30 @@
 ## 서드파티 연결 재개 규칙
 
 - 사용자가 나중에 서드파티 연결을 진행하겠다고 하면 프론트 `docs/third-party-setup.md`를 먼저 읽고 그 실행 순서·공식 신청 링크·사용자 역할·추가 개발·검증 기준을 안내한다. 오래된 계약/가격/공급사 절차는 공식 문서로 재확인한다. 키 입력만으로 PASS·지급대행·신규 S3 업로드가 완료된다고 안내하지 않는다.
+
+## 운영 알림·방어
+
+- `[crefans] operations` 전용 설정은 `TELEGRAM_OPERATIONS_*`. 사업 이벤트는 동일 DB 트랜잭션의 outbox에만 기록하고 발송은 별도로 재시도한다. 카드·계좌·본문·이메일·토큰·원문 query를 알림/로그에 넣지 않는다.
+- IP는 socket 기본, 명시한 `TRUSTED_PROXY_IPS`의 Caddy가 덮어쓴 전용 헤더만 신뢰한다. Caddy 고정 IP/Compose 네트워크/환경설정을 함께 변경·검증한다. 운영 절차와 검증 범위는 `infra/platform/README.md` 및 PROGRESS 최신 로그를 따른다.
+
+- 운영 콘솔 소스는 별도 crefans_admin이며 서비스프론트에 합치지 않는다. 운영 Compose는 기본+beta+admin을 함께 사용하고 관리자 API도 기존 guard/Origin/접속IP 규약을 지킨다.
+
+- 감사 원장은 platform_audit_logs이며 Telegram outbox와 독립이다. 안전한 필드 허용 목록을 유지하고 사업 변경은 동일 트랜잭션으로 기록한다. 구현/보관/외부 보관·감시/검증 경계는 docs/operational-logging.md. test:audit와 관리자 E2E는 공유 격리 DB 사용 시 순차 실행한다.
+
+- 분실·정지 카드 오류는 billing-failures의 공식 코드 허용 목록으로만 처리한다. 미확정 승인을 실패로 바꾸거나 새로운 주문으로 재청구하지 않는다. 복구 중 카드 교체/해지/기한/권한은 platform-billing-recovery 테스트를 실행하며, 서버 build/E2E 공유 DB 테스트는 반드시 순차 실행한다.
+
+- 신규 운영 미디어는 `MEDIA_STORAGE=s3`의 비공개 S3이며 local은 개발/호환 경로다. 미디어 GET/HEAD/Range마다 캐시 적중을 포함해 현재 세션·구독·환불 권한을 검사한다. CDN은 viewer-request 권한 검사 후 비공개 S3 전송만 허용하며 공유 가능한 bearer URL은 금지. 직접 API 스트리밍은 동일 권한의 롤백/호환 경로다. 운영/회귀/롤백은 `docs/private-media.md`, 실 AWS 검사는 명시적 opt-in + 로컬 DB에서만 수행한다.
+
+- 게시물 공개는 상품 전용(accessPlanId)과 최소 레벨(accessLevel)을 구분한다. 레벨 판정은 동일 크리에이터의 가입 당시 snapshot.rank 기준이며 상품 가격/현재 레벨로 추정하지 않는다. 기존 상품 전용 글·구독 조건을 자동 확대/변경하지 않고 본문·댓글·GET/HEAD/Range 권한을 함께 검증한다.
+
+- 약관·개인정보·운영정책 원본은 server `src/platform/legal-documents.ts`의 코드 릴리스다. 관리자 DB문서로 덮어쓰지 않는다. 공개일(publishedAt)과 가입 적용 시행일(effectiveAt)/준비상태(signupReady)를 분리한다. 공개 화면과 가입 동의 본문/버전·해시를 일치시키고 미해결 필수사항·미래 시행본은 가입에 사용하지 않는다. 테스트 발행본 주입은 tests/ 격리 런타임에서만 한다.
+
+- 가입 기준은 만19세 이상이다. 기본 PASS 모드는 서명된 공급사 결과·서버 proof를 검사한다. 사용자 요청의 임시 email-only 모드는 PASS를 보류할 수 있지만 연령 확인 체크를 본인/성인인증으로 취급하거나 identity_hash를 생성하지 않는다. 보호 콘텐츠·출금 인증과 법률문서 signupReady 검사는 유지한다. 실제 공급사 연결 전 대역 검증을 실연동 완료로 보고하지 않는다.
+
+- Swagger는 `/api/v1/admin/docs/{user,studio,console}` 세 페이지다. 전용 API는 분리하고 실제 사용하는 공통 API만 함께 표시한다. 모든 문서·JSON/YAML·정적 파일에 회원·활성 관리자 guard를 적용하고 UI 요청 실행은 비활성화한다. route 변경 시 `src/platform/openapi-contract.ts`와 의미 문서를 갱신하며 `npm run test:openapi`로 합집합·분류·권한을 검증한다. 비밀값·실제 개인정보 예시는 금지한다.
+
+- 운영 SSH: 2026-10-24 사용자가 현재 집 IP의 지속 허용을 승인했다. AWS `crefans-beta`의 TCP 22 관리 규칙 `sgr-0042cbcbcd1b74b35`은 기한 없이 유지하고 배포 후 정리에서 삭제하지 않는다. 정확한 /32·검증은 server `.local/home-ssh-20261024/verification.json`, 공개 증거는 server `docs/home-ssh-access-20261024.json`. IP 변경 시 허용 범위를 임의로 넓히지 않는다.
+
+- 2026-10-25 베타 선택·개방 조건은 프론트 `docs/beta-role-test-plan.md`, 서버 적용 계약은 `docs/platform-api.md` 최신 베타 절을 따른다. BETA_MODE의 테스트 결제/실송금 차단, 신규 환불 snapshot·기존 계약 보존, PG 입금 대사와 광고 동의/철회 이력을 우회하지 않는다. 실제 처리 사실이 미확정이면 법률문서 signupReady를 임의로 해제하지 않는다.
+
+- 콩 후원은 server `docs/platform-implementation.md`의 콩 확장 설계를 따른다. 구형 Wallet/Transfer와 신규 Bean 원장을 자동 혼합하지 않고, 충전·후원·출금은 중복 집계하지 않는다. 공유 지갑/후원/출금과 독립 콘솔은 연결되어 있다. 기능/live 판매 기본 off 및 실공급자 미확인 경계·배포 상태는 PROGRESS.md에서 확인한다.

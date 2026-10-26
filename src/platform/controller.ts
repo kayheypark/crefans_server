@@ -9,9 +9,10 @@ export class PlatformController {
  @Get('session') @UseGuards(PlatformAuthGuard) session(){return{active:true};}
  @Get('bootstrap') @UseGuards(PlatformOptionalAuthGuard) bootstrap(@Req() r:any,@Query('collection') collection:string){return this.service.bootstrap(r.user?.sub,collection);}
  @Get('creators') @UseGuards(PlatformOptionalAuthGuard) creators(@Query('query') query:string,@Query('category') category:string,@Query('cursor') cursor:string,@Req() r:any){return this.service.directory(r.user?.sub,query,category,cursor);}
- @Get('posts') @UseGuards(PlatformOptionalAuthGuard) posts(@Query('creatorId') creator:string,@Query('cursor') cursor:string,@Req() r:any){return this.service.postPage(r.user?.sub,creator,cursor);}
+ @Get('posts') @UseGuards(PlatformOptionalAuthGuard) posts(@Query('creatorId') creator:string,@Query('cursor') cursor:string,@Query('category') category:string,@Req() r:any){return this.service.postPage(r.user?.sub,creator,cursor,category);}
  @Get('posts/:id') @UseGuards(PlatformOptionalAuthGuard) post(@Param('id') id:string,@Req() r:any){return this.service.postDetail(id,r.user?.sub);}
  @Get('profiles/:id') @UseGuards(PlatformOptionalAuthGuard) profileData(@Param('id') id:string,@Req() r:any){return this.service.publicProfile(id,r.user?.sub);}
+ @Get('profiles/:id/connections') @UseGuards(PlatformOptionalAuthGuard) profileConnections(@Param('id') id:string,@Query('kind') kind:string,@Query('offset') offset='0',@Req() r:any){return this.service.profileConnections(id,kind,offset,r.user?.sub);}
  @Get('profiles/:id/following') @UseGuards(PlatformOptionalAuthGuard) profileFollowing(@Param('id') id:string,@Req() r:any){return this.service.profileFollowing(id,r.user?.sub);}
  @Get('common') @UseGuards(PlatformOptionalAuthGuard) common(@Req() r:any){return this.service.common(r.user?.sub);}
  @Get('posts/:id/comments-page') @UseGuards(PlatformOptionalAuthGuard) commentPage(@Param('id') id:string,@Query('offset') offset:string,@Req() r:any){return this.service.commentPage(id,r.user?.sub,offset);}
@@ -22,6 +23,7 @@ export class PlatformController {
  @Put('members/:id/follow') @UseGuards(PlatformAuthGuard) follow(@Param('id') id:string,@Body('enabled') enabled:boolean,@Req() r:any){return this.service.follow(r.user.sub,id,enabled===true);}
  @Put('members/:id/block') @UseGuards(PlatformAuthGuard) block(@Param('id') id:string,@Body('enabled') enabled:boolean,@Req() r:any){return this.service.block(r.user.sub,id,enabled===true);}
  @Post('members/:id/messages') @UseGuards(PlatformAuthGuard) message(@Param('id') id:string,@Body('body') body:string,@Req() r:any){return this.service.sendMessage(r.user.sub,id,body);}
+ @Put('members/:id/messages/read') @UseGuards(PlatformAuthGuard) readMessages(@Param('id') id:string,@Body('ids') ids:unknown,@Req() r:any){return this.service.readMessages(r.user.sub,id,ids);}
  @Post('reports') @UseGuards(PlatformAuthGuard) report(@Body() b:any,@Req() r:any){return this.service.report(r.user.sub,b.id,b.kind==='POSTING'?'POSTING':'USER');}
  @Put('notifications/read') @UseGuards(PlatformAuthGuard) async read(@Body('ids') ids:string[],@Req() r:any){await this.service.db.memberNotification.updateMany({where:{member_id:r.user.sub,id:{in:Array.isArray(ids)?ids.slice(0,100):[]}},data:{read_at:new Date()}});return{message:'읽음 처리했습니다.'};}
  @Put('me/profile') @UseGuards(PlatformAuthGuard) profile(@Body() b:any,@Req() r:any){return this.service.profile(r.user.sub,b);}

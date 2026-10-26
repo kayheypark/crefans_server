@@ -1,9 +1,16 @@
+import {BeansService} from './beans.service';
+import {BeansController,BeansAdminController,BeanWebhookController} from './beans.controller';
+import {MarketingService} from './marketing.service';
+import {MarketingController} from './marketing.controller';
+import {LegalDocumentsService} from './legal-documents';
+import {BillingNoticesService} from './billing-notices.service';
+import {PlatformTelemetryController} from './telemetry.controller';
 import {Module} from '@nestjs/common';
 import {ConfigModule} from '@nestjs/config';
 import {PrismaModule} from '../prisma/prisma.module';
 import {LocalMemberModule} from '../auth/local/local-member.module';
 import {MemberMailService} from '../auth/local/member-mail.service';
-import {PlatformAuthGuard,PlatformOptionalAuthGuard} from './platform-auth.guard';
+import {PlatformAuthGuard,PlatformOptionalAuthGuard,PlatformMediaEdgeGuard} from './platform-auth.guard';
 import {PlatformAuthService} from './auth.service';
 import {PlatformAuthController} from './auth.controller';
 import {PlatformController} from './controller';
@@ -20,6 +27,9 @@ import {BankProvider} from './bank-provider';
 import {PlatformAdminController,PlatformAdminGuard} from './admin.controller';
 import {EmailChangeService} from './email-change.service';
 import {PlatformJobsService} from './jobs.service';
+import {PlatformOperationsService} from './operations.service';
+import {PlatformSecurityService} from './security.service';
 import appConfig from '../config/app.config';
-@Module({imports:[ConfigModule.forRoot({isGlobal:true,ignoreEnvFile:true,load:[appConfig]}),PrismaModule,LocalMemberModule],controllers:[PlatformAdminController,IdentityController,PlatformAuthController,PlatformController,PlatformStudioController,PlatformFinanceController,PlatformMediaController],providers:[PlatformJobsService,EmailChangeService,PlatformAdminGuard,IdentityProvider,BankProvider,MemberMailService,PlatformAuthGuard,PlatformOptionalAuthGuard,PlatformAuthService,PlatformService,PlatformStudioService,PlatformFinanceService,PaymentProvider]})
+import {PlatformMediaStorage} from './media-storage';
+@Module({imports:[ConfigModule.forRoot({isGlobal:true,ignoreEnvFile:true,load:[appConfig]}),PrismaModule,LocalMemberModule],controllers:[BeanWebhookController,BeansController,BeansAdminController,MarketingController,PlatformTelemetryController,PlatformAdminController,IdentityController,PlatformAuthController,PlatformController,PlatformStudioController,PlatformFinanceController,PlatformMediaController],providers:[BeansService,MarketingService,LegalDocumentsService,PlatformMediaEdgeGuard,PlatformMediaStorage,BillingNoticesService,PlatformOperationsService,PlatformSecurityService,PlatformJobsService,EmailChangeService,PlatformAdminGuard,IdentityProvider,BankProvider,MemberMailService,PlatformAuthGuard,PlatformOptionalAuthGuard,PlatformAuthService,PlatformService,PlatformStudioService,PlatformFinanceService,PaymentProvider]})
 export class PlatformModule{}

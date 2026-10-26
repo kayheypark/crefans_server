@@ -1,0 +1,25 @@
+# Independent source/image; no host port or application secret is exposed to Next.
+services:
+  admin:
+    image: ${ADMIN_IMAGE:?Set the verified operator console image tag}
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      PORT: "3002"
+      HOSTNAME: 0.0.0.0
+    mem_limit: 384m
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [private]
+  proxy:
+    environment:
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:-admin.crefans.com}
+    depends_on: [frontend, api, admin]

@@ -1,0 +1,52 @@
+{
+  "verifiedAt": "2026-10-23T23:50:13.691383+00:00",
+  "repository": "/Users/ethan/repository/crefans_server",
+  "head": "c100a3af5a5508adb0e6ba521d2e5238fb5f1ff1",
+  "workingTreeDirty": true,
+  "target": "crefans-beta AWS EC2 / ap-northeast-2",
+  "authorization": "2026-10-24 user requested the current home public IP remain allowed indefinitely",
+  "ruleId": "sgr-0042cbcbcd1b74b35",
+  "protocol": "tcp",
+  "port": 22,
+  "sourceScope": "single current public IPv4 /32; exact address kept in ignored private evidence",
+  "persistent": true,
+  "existingRulesPreserved": true,
+  "sshAuthenticated": true,
+  "executions": [
+    {
+      "operation": "describe-security-group-rules",
+      "at": "2026-10-23T23:50:10.957990+00:00",
+      "exitCode": 0
+    },
+    {
+      "operation": "authorize-security-group-ingress",
+      "at": "2026-10-23T23:50:11.346714+00:00",
+      "exitCode": 0
+    },
+    {
+      "operation": "describe-security-group-rules",
+      "at": "2026-10-23T23:50:11.967228+00:00",
+      "exitCode": 0
+    },
+    {
+      "operation": "SSH authenticated no-op with existing private key and strict known host verification",
+      "at": "2026-10-23T23:50:12.344486+00:00",
+      "exitCode": 0
+    }
+  ],
+  "localEvidence": "/Users/ethan/repository/crefans_server/.local/home-ssh-20261024/verification.json",
+  "localEvidenceSha256": "d931cddc624ab676dac11ba7eed0d118f3da13afe31656328bf186b309801b82",
+  "automationReview": {
+    "crefansRemovalAutomationFound": false,
+    "unrelatedNhnOneMonthRemovalSchedule": "preserved"
+  },
+  "reference": {
+    "url": "https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html",
+    "checkedAt": "2026-10-24",
+    "application": "Allow only current IPv4 /32 on TCP 22. AWS rule read-back and existing-key SSH verified. Other rules unchanged."
+  },
+  "limits": [
+    "Allowance applies to the observed public IPv4 only; a future changed home IP is not automatically allowed.",
+    "No application changes, restarts, deployments or financial actions performed."
+  ]
+}
