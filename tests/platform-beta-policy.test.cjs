@@ -23,7 +23,7 @@ before(async()=>{
  policy=await db.financialPolicy.findUniqueOrThrow({where:{id:'platform'}});history=await db.financialPolicyChange.findMany();
  for(const id of ids)await db.member.create({data:{id,email:id+'@example.invalid',name:'Test',nickname:'Test',preferred_username:id,email_verified:true,status:'CONFIRMED'}});
  admin=await db.admin.create({data:{user_sub:adminId,email:adminId+'@example.invalid',name:'Test',role:'SUPER_ADMIN'}});
- await updateFinancialPolicy(db,admin,{expectedVersion:policy.version,platformFeeBps:2000,settlementHoldDays:7,reason:'Isolated selected policy test'});
+ await updateFinancialPolicy(db,admin,{expectedVersion:policy.version,platformFeeBps:2000,settlementHoldDays:7,reason:'Isolated selected policy test',confirmation:'정책 변경'});
  await db.creator.create({data:{user_id:owner}});plan=await db.membershipItem.create({data:{creator_id:owner,name:'Test membership',price:10000,benefits:'[]',billing_unit:'MONTH',level:1}});
  for(const member of [fan,late,renewing])await db.billingMethod.create({data:{member_id:member,billing_key_encrypted:'test',last_four:'1234',label:'Test',is_default:true}});
  app=await NestFactory.create(PlatformModule,{logger:false});app.setGlobalPrefix('api/v1');app.use(cookieParser());app.useGlobalInterceptors(new EnvelopeInterceptor());app.useGlobalFilters(new PlatformExceptionFilter());await app.listen(0,'127.0.0.1');origin=await app.getUrl();
@@ -58,7 +58,7 @@ test('test subscription never becomes real charge by swapping provider keys; uns
  const live=new PlatformFinanceService(service,{...provider,configForClient:()=>({clientKey:'live_ck_fixture'})},new ConfigService({RENEWAL_MAX_RETRIES:'3',RENEWAL_RETRY_HOURS:'24'}),{});const count=charges;await assert.rejects(live.renew(sub.id),code('PAYMENT_ENVIRONMENT_CHANGED'));assert.equal(charges,count);
  await db.checkoutOrder.update({where:{id:row.id},data:{snapshot:{...row.snapshot,paymentEnvironment:'live'}}});
  const receipt={reference:'isolated-bank-statement',reason:'Provider double only',amount:9000,receivedAt:new Date().toISOString()};
- await assert.rejects(confirmSettlementReceipt(db,{...admin,role:'ADMIN'},entry.id,receipt),code('SUPER_ADMIN_REQUIRED'));
+ await assert.rejects(confirmSettlementReceipt(db,{...admin,role:'ADMIN'},entry.id,receipt),code('ADMIN_PERMISSION_REQUIRED'));
  await assert.rejects(confirmSettlementReceipt(db,admin,entry.id,{...receipt,amount:1000}),code('INVALID_RECEIPT'));
  await confirmSettlementReceipt(db,admin,entry.id,receipt);await confirmSettlementReceipt(db,admin,entry.id,receipt);assert.equal((await finance.finance(owner)).summary.available,8000);
  assert.equal(await db.platformAuditLog.count({where:{action:'settlement.receipt_confirmed',entity_id:entry.id}}),1);
@@ -91,7 +91,7 @@ test('public unsubscribe GET is non-mutating; POST idempotent, forged link rejec
  const html=await fetch(path,{method:'POST',headers:{Accept:'text/html'}});assert.equal(html.status,201);assert.match(await html.text(),/수신거부를 처리했습니다/);assert.equal((await fetch(path)).status,200);
 });
 test('mail HTML escapes content, uses ad prefix/contact/unsubscribe headers, contains no em dash',()=>{
- const m=marketingMail('제목\u2014예시','<script>alert(1)</script>\u2014','https://beta.crefans.com/api/v1/marketing/unsubscribe?token=test',true);assert.match(m.subject,/^\(광고\)/);assert.doesNotMatch(m.html,/<script>/);assert.match(m.html,/khpark@grade.im/);assert.equal(m.headers['List-Unsubscribe-Post'],'List-Unsubscribe=One-Click');assert.doesNotMatch(m.subject+m.text+m.html,/\u2014/);
+ const m=marketingMail('제목\u2014예시','<script>alert(1)</script>\u2014','https://beta.crefans.com/api/v1/marketing/unsubscribe?token=test',true);assert.match(m.subject,/^\(광고\)/);assert.doesNotMatch(m.html,/<script>/);assert.match(m.html,/khpark@crefans.com/);assert.equal(m.headers['List-Unsubscribe-Post'],'List-Unsubscribe=One-Click');assert.doesNotMatch(m.subject+m.text+m.html,/\u2014/);
 });
 test('two-year notice precedes overdue campaigns; uncertain delivery and interrupted claims are never retried',async()=>{
  await choice(recipient,true);
@@ -101,8 +101,9 @@ test('two-year notice precedes overdue campaigns; uncertain delivery and interru
  await marketing.deliver();
  assert.equal(await db.marketingDelivery.count({where:{member_id:recipient,kind:'reminder',status:'accepted'}}),1);
  const key='campaign:reminder-'+recipient+':'+recipient;
- assert.equal((await db.marketingDelivery.findUniqueOrThrow({where:{dedupe_key:key}})).status,'queued');
- await marketing.deliver();assert.equal((await db.marketingDelivery.findUniqueOrThrow({where:{dedupe_key:key}})).status,'accepted');
+  // Notices are sent before campaigns in the same batch, so the campaign goes out right after the due notice.
+ const notice=await db.marketingDelivery.findFirstOrThrow({where:{member_id:recipient,kind:'reminder',status:'accepted'}}),campaign=await db.marketingDelivery.findUniqueOrThrow({where:{dedupe_key:key}});
+ assert.equal(campaign.status,'accepted');assert.ok(notice.completed_at<=campaign.completed_at);
  await marketing.queue(admin,{campaignId:'uncertain-'+recipient,subject:'SMTP ambiguity',body:'Synthetic',memberIds:[recipient]});
  const send=mail.sendMarketing;let attempts=0;
  mail.sendMarketing=async()=>{attempts++;throw Error('Synthetic SMTP connection loss');};

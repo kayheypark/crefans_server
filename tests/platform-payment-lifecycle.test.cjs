@@ -176,3 +176,36 @@ test('refund claim prevents concurrent disclosure, including uncertain cancellat
 test('renewal starts fresh tracking without erasing the prior cycle',async()=>{
  const f=await contentFixture();await f.service.postDetail(f.post.id,f.fan);const sub=await due(f);await db.checkoutOrder.update({where:{id:f.order.id},data:{period_end:new Date(Date.now()-60000)}});await f.finance.renew(sub.id);const current=await db.checkoutOrder.findFirstOrThrow({where:{subscription_id:sub.id,status:'paid',NOT:{id:f.order.id}}});assert.equal((await f.finance.refundEligibility(f.fan,current.id)).eligible,true);assert.equal((await f.finance.refundEligibility(f.fan,f.order.id)).eligible,false);await f.service.postDetail(f.post.id,f.fan);assert.equal((await f.finance.refundEligibility(f.fan,current.id)).eligible,false);
 });
+test('FIN-01: provider lookup errors keep the order uncertain and never turn it into a new charge',async()=>{
+ const axios=require('axios'),original=axios.request,provider=new PaymentProvider(new ConfigService({TOSS_CLIENT_KEY:'test_ck_x',TOSS_SECRET_KEY:'test_sk_x'}));
+ const fail=(status,code)=>{axios.request=async()=>{throw{response:{status,data:{code}}};};};
+ try{
+  for(const [status,providerCode] of [[403,'FORBIDDEN_CONSECUTIVE_REQUEST'],[401,'UNAUTHORIZED_KEY_X'],[400,'INVALID_REQUEST'],[429,'TOO_MANY_REQUESTS'],[500,'PROVIDER_ERROR']]){fail(status,providerCode);await assert.rejects(provider.lookup('order-1'),code('PAYMENT_UNCERTAIN'),`${status} ${providerCode}`);}
+  fail(404,'NOT_FOUND_PAYMENT');assert.equal(await provider.lookup('order-1'),null);
+  fail(400,'ALREADY_CANCELED_PAYMENT');await assert.rejects(provider.cancel('pay-1','환불','refund-1'),code('PAYMENT_UNCERTAIN'));
+  // Control: a card company refusal on approval is still a confirmed failure.
+  fail(400,'REJECT_CARD_COMPANY');await assert.rejects(provider.confirm('pay-1',{id:'o',amount:1000,attempts:0}),code('PAYMENT_FAILED'));
+ }finally{axios.request=original;}
+ const f=await fixture(),charge=f.provider.charge,lookup=f.provider.lookup;let limited=true;
+ f.provider.charge=async(...args)=>{await charge(...args);reject(503,'PAYMENT_UNCERTAIN','연결 단절');};
+ f.provider.lookup=async id=>{if(limited)reject(503,'PAYMENT_UNCERTAIN','조회 제한');return lookup(id);};
+ await assert.rejects(f.finance.pay(f.fan,f.order.id),code('PAYMENT_UNCERTAIN'));
+ await db.checkoutOrder.update({where:{id:f.order.id},data:{locked_until:null}});
+ await assert.rejects(f.finance.reconcile(f.order.id),code('PAYMENT_UNCERTAIN'));
+ const held=await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}});assert.equal(held.status,'processing');assert.equal(held.attempts,0);
+ limited=false;await f.finance.reconcile(f.order.id);
+ assert.equal(f.calls.length,1);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'paid');assert.equal(await db.revenueEntry.count({where:{order_id:f.order.id}}),1);
+});
+test('FIN-04: a paid membership cancelled at the provider is reversed once; partial cancels are escalated',async()=>{
+ const f=await fixture();await f.finance.pay(f.fan,f.order.id);const external=f.order.id;
+ assert.equal(await f.finance.reconcilePaid(f.order.id),0);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'paid');
+ const approved=f.approved.get(external);f.approved.set(external,{...approved,status:'CANCELED',balanceAmount:0});
+ assert.equal(await f.finance.reconcilePaid(f.order.id),1);assert.equal(await f.finance.reconcilePaid(f.order.id),0);
+ const order=await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}}),revenue=await db.revenueEntry.findUniqueOrThrow({where:{order_id:f.order.id}}),sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});
+ assert.equal(order.status,'refunded');assert.equal(revenue.reversals,order.amount);assert.equal(revenue.net,0);assert.equal(sub.status,'EXPIRED');
+ assert.equal(await db.platformOperationalEvent.count({where:{dedupe_key:'external-cancel:'+f.order.id}}),1);
+ const g=await fixture();await g.finance.pay(g.fan,g.order.id);const second=g.approved.get(g.order.id);g.approved.set(g.order.id,{...second,status:'PARTIAL_CANCELED',balanceAmount:5000});
+ assert.equal(await g.finance.reconcilePaid(g.order.id),0);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:g.order.id}})).status,'paid');
+ assert.equal(await db.platformOperationalEvent.count({where:{dedupe_key:'reconcile-paid:'+g.order.id+':PARTIAL_CANCELED:5000'}}),1);
+ await db.platformOperationalEvent.deleteMany({where:{dedupe_key:{in:['external-cancel:'+f.order.id,'reconcile-paid:'+g.order.id+':PARTIAL_CANCELED:5000']}}});
+});

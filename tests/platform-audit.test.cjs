@@ -65,7 +65,7 @@ test('retention deletes only expired access rows by default; explicit audit rete
  const saved={access:process.env.ACCESS_LOG_RETENTION_DAYS,audit:process.env.AUDIT_RETENTION_DAYS};process.env.ACCESS_LOG_RETENTION_DAYS='7';process.env.AUDIT_RETENTION_DAYS='0';let query,deleted;
  const fake={platformAuditLog:{findMany:async q=>{query=q;return[{id:scope}];},deleteMany:async q=>{deleted=q;return{count:1};}}};
  try{const now=new Date('2026-10-22T00:00:00Z');assert.equal(await pruneAuditLogs(fake,now),1);assert.equal(query.where.OR.length,1);assert.equal(query.where.OR[0].category,'request');assert.equal(query.where.OR[0].occurred_at.lt.toISOString(),'2026-10-15T00:00:00.000Z');assert.equal(query.take,1000);assert.deepEqual(deleted.where,{id:{in:[scope]}});
- process.env.AUDIT_RETENTION_DAYS='90';await pruneAuditLogs(fake,now);assert.equal(query.where.OR.length,2);process.env.AUDIT_RETENTION_DAYS='-1';await assert.rejects(pruneAuditLogs(fake),/Invalid/);
+ process.env.AUDIT_RETENTION_DAYS='90';await assert.rejects(pruneAuditLogs(fake,now),/Invalid/);process.env.AUDIT_RETENTION_DAYS='730';await pruneAuditLogs(fake,now);assert.equal(query.where.OR.length,2);assert.deepEqual(query.where.OR[0].OR,[{actor_role:null},{actor_role:{notIn:['SUPER_ADMIN','ADMIN','MODERATOR']}}]);assert.equal(query.where.OR[1].occurred_at.lt.toISOString(),'2024-10-22T00:00:00.000Z');process.env.AUDIT_RETENTION_DAYS='-1';await assert.rejects(pruneAuditLogs(fake),/Invalid/);
  }finally{for(const [k,v]of [['ACCESS_LOG_RETENTION_DAYS',saved.access],['AUDIT_RETENTION_DAYS',saved.audit]])v===undefined?delete process.env[k]:process.env[k]=v;}
 });
 test('client reports are bounded, untrusted, rate-limited and scrubbed server-side',async()=>{
@@ -76,8 +76,18 @@ test('client reports are bounded, untrusted, rate-limited and scrubbed server-si
  await assert.rejects(scoped(()=>reportClientError(db,{limit:async()=>{throw Error('rate limited');}},{errorType:'Error',frames:[]},'service')),/rate limited/);
 });
 test('API watchdog detects missing/stale worker but never alerts for fresh heartbeat',async()=>{
- let heartbeat=null;const events=[];const ops=new PlatformOperationsService({platformJob:{findUnique:async()=>heartbeat}},new ConfigService({}));ops.record=async(...args)=>events.push(args);
+ const none={count:async()=>0};let heartbeat=null;const events=[];const ops=new PlatformOperationsService({platformJob:{findUnique:async()=>heartbeat},checkoutOrder:none,beanCharge:none,marketingDelivery:none,platformAuditLog:none,platformOperationalEvent:none},new ConfigService({}));ops.record=async(...args)=>events.push(args);
  const now=new Date();await ops.checkWorkerHealth(now);heartbeat={completed_at:new Date(+now-300001)};await ops.checkWorkerHealth(now);heartbeat={completed_at:now};await ops.checkWorkerHealth(now);assert.equal(events.length,2);assert.equal(events[0][0],'worker.stale');assert.equal(events[0][2],events[1][2]);
+});
+
+test('API watchdog reports each stalled queue once an hour and stays quiet when queues are empty',async()=>{
+ const now=new Date('2026-10-29T03:10:00Z'),counts={processing:0,refunding:0,beans:0,uncertain:0,lagging:0,backlog:0},events=[];
+ const db={platformJob:{findUnique:async()=>({completed_at:now})},checkoutOrder:{count:async q=>q.where.status==='processing'?counts.processing:counts.refunding},beanCharge:{count:async()=>counts.beans},marketingDelivery:{count:async()=>counts.uncertain},platformAuditLog:{count:async()=>counts.lagging},platformOperationalEvent:{count:async()=>counts.backlog}};
+ const ops=new PlatformOperationsService(db,new ConfigService({TELEGRAM_OPERATIONS_BOT_TOKEN:'configured'}));ops.record=async(...args)=>events.push(args);
+ await ops.checkWorkerHealth(now);assert.equal(events.length,0);
+ Object.assign(counts,{processing:2,refunding:1,beans:1,uncertain:3,lagging:5,backlog:4});await ops.checkWorkerHealth(now);
+ assert.deepEqual(events.map(e=>e[0]),['payment.stuck','refund.stuck','beans.charge_stuck','marketing.uncertain','audit.retention_lagging','alerts.backlog']);
+ assert.equal(events[0][1].count,2);assert.equal(events[0][2],'payment.stuck:'+Math.floor(+now/3600000));
 });
 
 test('audit persistence failure aborts the business transaction and outbox insert',async()=>{

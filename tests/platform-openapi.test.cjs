@@ -1,4 +1,5 @@
 require('reflect-metadata');
+const ADMIN_TOKEN='aa.'+'a'.repeat(43),DISABLED_TOKEN='aa.'+'d'.repeat(43);
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict');
 const {randomBytes}=require('node:crypto');
 // This suite never loads .env, connects to a DB, sends mail or calls payment providers.
@@ -27,20 +28,22 @@ before(async()=>{
  app.get(PlatformOperationsService).error=async()=>{};
  db.onModuleInit=async()=>{};db.onModuleDestroy=async()=>{};members.onModuleInit=async()=>{};
  members.validateToken=async token=>{if(!['admin','member','disabled-admin'].includes(token))throw Error('invalid test session');return{sub:token};};
- db.admin.findUnique=async({where})=>{if(denyAdmin)throw Error('private-db-failure');return where.user_sub==='member'?null:{id:1,name:'Test operator',role:'ADMIN',is_active:where.user_sub==='admin'};};
+ // Console docs use the separate operator session (admin_sessions), never a member session.
+ const {digest}=require('../dist/src/auth/local/credentials'),future=new Date(Date.now()+3600000),operatorSessions={[digest(ADMIN_TOKEN)]:true,[digest(DISABLED_TOKEN)]:false};
+ db.adminSession.findUnique=async({where})=>{if(denyAdmin)throw Error('private-db-failure');const active=operatorSessions[where.access_hash];return active===undefined?null:{access_until:future,expires_at:future,admin:{id:1,user_sub:'admin',name:'Test operator',role:'ADMIN',is_active:active,must_change_password:false}};};
  app.use(cookieParser());app.setGlobalPrefix('api/v1');
  app.useGlobalInterceptors(new EnvelopeInterceptor());app.useGlobalFilters(new PlatformExceptionFilter());
  document=buildPlatformOpenApi(app);documents=installPlatformOpenApi(app);await app.listen(0,'127.0.0.1');base=await app.getUrl();
 });
 after(async()=>{await app?.close();});
 const request=(path,cookie)=>fetch(base+path,{headers:cookie?{cookie}:{},redirect:'manual'});
-test('OpenAPI 3 validates, has all 124 runtime operations and no legacy controllers',async()=>{
+test('OpenAPI 3 validates, has all 165 runtime operations and no legacy controllers',async()=>{
  await Parser.validate(structuredClone(document));
  const operations=Object.entries(document.paths).flatMap(([path,item])=>Object.keys(item).filter(method=>['get','post','put','patch','delete','head','options'].includes(method)).map(method=>method+' '+path));
- assert.equal(operations.length,124);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());
+ assert.equal(operations.length,165);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());
  assert.ok(operations.every(key=>key.includes(' /api/v1/')));assert.equal(document.info.version,'v1');
  assert.equal(document.components.securitySchemes.memberSession.name,'access_token');
- assert.equal(document.paths['/api/v1/admin/me'].get.security[0].memberSession.length,0);
+ assert.equal(document.paths['/api/v1/admin/me'].get.security[0].adminSession.length,0);assert.equal(document.paths['/api/v1/admin/me'].get.security[0].memberSession,undefined,'console uses the operator session only');assert.equal(document.components.securitySchemes.adminSession.name,'admin_access_token');
 });
 test('named Body/Query parameters from every controller are documented',()=>{
  const controllers=Reflect.getMetadata('controllers',PlatformModule);
@@ -67,17 +70,17 @@ test('HTML, JSON, YAML, assets, trailing slash and encoded path require login',a
   const response=await request(path+suffix);assert.equal(response.status,401,suffix);
   assert.equal((await response.json()).errorCode,'UNAUTHORIZED');assert.match(response.headers.get('cache-control'),/no-store/);
  }
- for(const path of Object.values(API_DOCS_PAGES))for(const cookie of ['access_token=expired','refresh_token=admin'])assert.equal((await request(path+'/openapi.json',cookie)).status,401);
+ for(const path of Object.values(API_DOCS_PAGES))for(const cookie of ['access_token=expired','refresh_token=admin','access_token=member','admin_access_token=expired'])assert.equal((await request(path+'/openapi.json',cookie)).status,401);
  for(const audience of ['user','studio','console'])for(const path of ['/api/v1/admin/%64ocs/'+audience+'/openapi.json','/api/v1/admin/docs%2f'+audience+'/openapi.json'])assert.notEqual((await request(path)).status,200);
 });
 test('regular members and inactive operators cannot read or load docs',async()=>{
- for(const path of Object.values(API_DOCS_PAGES))for(const token of ['member','disabled-admin'])for(const suffix of ['', '/openapi.json','/openapi.yaml','/swagger-ui-bundle.js']){
-  const response=await request(path+suffix,'access_token='+token);assert.equal(response.status,403);assert.equal((await response.json()).errorCode,'ADMIN_REQUIRED');
+ for(const path of Object.values(API_DOCS_PAGES))for(const cookie of ['access_token=member','admin_access_token='+DISABLED_TOKEN])for(const suffix of ['', '/openapi.json','/openapi.yaml','/swagger-ui-bundle.js']){
+  const response=await request(path+suffix,cookie);assert.equal(response.status,401);assert.equal((await response.json()).errorCode,'UNAUTHORIZED');
  }
 });
 test('active administrator can load local assets and both export formats; unsafe UI actions disabled',async()=>{
  for(const [audience,path]of Object.entries(API_DOCS_PAGES))for(const suffix of ['', '/openapi.json','/openapi.yaml','/swagger-ui.css','/swagger-ui-bundle.js','/swagger-ui-init.js']){
-  const response=await request(path+suffix,'access_token=admin');assert.equal(response.status,200,suffix);
+  const response=await request(path+suffix,'admin_access_token='+ADMIN_TOKEN);assert.equal(response.status,200,suffix);
   assert.match(response.headers.get('x-robots-tag'),/noindex/);assert.equal(response.headers.get('x-frame-options'),'DENY');assert.match(response.headers.get('content-security-policy'),/connect-src 'self'/);
   const content=await response.text();
   if(suffix==='')assert.ok(content.includes(documents[audience].info.title));
@@ -85,11 +88,11 @@ test('active administrator can load local assets and both export formats; unsafe
   if(suffix==='/openapi.yaml')assert.match(content,/openapi: 3\.0\.0/);
   if(suffix==='/swagger-ui-init.js'){assert.match(content,/"supportedSubmitMethods": \[\]/);assert.match(content,/"validatorUrl": null/);assert.match(content,/"persistAuthorization": false/);}
  }
- for(const path of ['/api/v1/admin/docs/openapi.json','/api/v1/admin/docs/openapi.yaml','/api/v1/admin/docs-json','/api/v1/admin/docs-yaml','/api-json','/api-yaml','/api/docs'])assert.equal((await request(path,'access_token=admin')).status,404);
+ for(const path of ['/api/v1/admin/docs/openapi.json','/api/v1/admin/docs/openapi.yaml','/api/v1/admin/docs-json','/api/v1/admin/docs-yaml','/api-json','/api-yaml','/api/docs'])assert.equal((await request(path,'admin_access_token='+ADMIN_TOKEN)).status,404);
 });
 test('guard backend failure is closed and never exposes internal exception',async()=>{
  denyAdmin=true;
- try{for(const path of Object.values(API_DOCS_PAGES)){const response=await request(path+'/openapi.json','access_token=admin');assert.equal(response.status,500);assert.doesNotMatch(await response.text(),/private-db-failure|openapi/);}}finally{denyAdmin=false;}
+ try{for(const path of Object.values(API_DOCS_PAGES)){const response=await request(path+'/openapi.json','admin_access_token='+ADMIN_TOKEN);assert.equal(response.status,500);assert.doesNotMatch(await response.text(),/private-db-failure|openapi/);}}finally{denyAdmin=false;}
 });
 test('documented serializers use the current response field names',async()=>{
  const schema=document.components.schemas;
@@ -115,7 +118,7 @@ test('media is documented as binary, JSON APIs have common envelope, key materia
 test('three valid documents isolate business APIs, retain required shared calls and cover all operations',async()=>{
  const operations=doc=>Object.entries(doc.paths).flatMap(([path,item])=>Object.keys(item).map(method=>method+' '+path));
  const user=operations(documents.user),studio=operations(documents.studio),console=operations(documents.console);
- assert.equal(user.length,67);assert.equal(studio.length,42);assert.equal(console.length,34);
+ assert.equal(user.length,72);assert.equal(studio.length,45);assert.equal(console.length,67);
  assert.deepEqual([...new Set([...user,...studio,...console])].sort(),operations(document).sort());
  const auth=['post /api/v1/auth/login','post /api/v1/auth/logout','post /api/v1/auth/refresh'];
  assert.deepEqual(user.filter(key=>console.includes(key)).sort(),auth);
@@ -133,11 +136,11 @@ test('three valid documents isolate business APIs, retain required shared calls 
  for(const doc of Object.values(documents))await Parser.validate(structuredClone(doc));
 });
 test('entry redirects to user page, all three pages link to each other and HEAD stays protected',async()=>{
- const entry=await request(API_DOCS_PATH,'access_token=admin');assert.equal(entry.status,302);assert.equal(entry.headers.get('location'),API_DOCS_PAGES.user);
+ const entry=await request(API_DOCS_PATH,'admin_access_token='+ADMIN_TOKEN);assert.equal(entry.status,302);assert.equal(entry.headers.get('location'),API_DOCS_PAGES.user);
  assert.equal((await request(API_DOCS_PATH)).status,401);
  for(const [audience,path]of Object.entries(API_DOCS_PAGES)){
   for(const link of Object.values(API_DOCS_PAGES))assert.ok(documents[audience].info.description.includes(link));
   const response=await fetch(base+path+'/openapi.json',{method:'HEAD'});assert.equal(response.status,401);
-  const init=await request(path+'/swagger-ui-init.js','access_token=admin');assert.ok((await init.text()).includes(documents[audience].info.title));
+  const init=await request(path+'/swagger-ui-init.js','admin_access_token='+ADMIN_TOKEN);assert.ok((await init.text()).includes(documents[audience].info.title));
  }
 });
