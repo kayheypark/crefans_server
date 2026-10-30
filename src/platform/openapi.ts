@@ -20,6 +20,7 @@ export function buildPlatformOpenApi(app:INestApplication):OpenAPIObject{
   .setDescription('운영 중인 /api/v1 API 계약. 관리자 전용 문서이며 UI에서 요청 실행은 비활성화되어 있습니다. 인증은 HttpOnly 쿠키를 사용합니다. 쿠키가 포함된 변경 요청은 허용된 Origin이 필요합니다. POST 기본 성공 상태는 201, GET/PUT은 200입니다. 미디어 파일은 JSON 응답 예외이며 GET 조회도 유료 콘텐츠 이용 기록을 남길 수 있습니다. 문서 열람이 PG/PASS/은행 실연동을 보장하지 않습니다.')
   .addServer('/').addCookieAuth('access_token',{type:'apiKey',in:'cookie'},'memberSession')
   .addCookieAuth('refresh_token',{type:'apiKey',in:'cookie'},'refreshSession')
+  .addCookieAuth('admin_access_token',{type:'apiKey',in:'cookie',description:'운영 콘솔 전용 세션. 회원 세션과 분리'},'adminSession')
   .addApiKey({type:'apiKey',in:'header',name:'x-pass-signature',description:'서버 브리지 HMAC-SHA256; 비밀키 직접 입력 금지'},'passSignature')
   .addApiKey({type:'apiKey',in:'header',name:'x-crefans-edge-signature',description:'내부 엣지 HMAC와 관련 헤더가 모두 필요'},'edgeSignature');
  const document=SwaggerModule.createDocument(app,builder.build(),{include:[PlatformModule],deepScanRoutes:false});
@@ -34,7 +35,7 @@ export function buildPlatformOpenApi(app:INestApplication):OpenAPIObject{
   seen.add(key);const guards=authNames(handler.controller,handler.name),admin=guards.includes(PlatformAdminGuard),member=guards.includes(PlatformAuthGuard),optional=guards.includes(PlatformOptionalAuthGuard),edge=guards.includes(PlatformMediaEdgeGuard);
   op.summary=contract.summary;op.tags=[contract.tag];op.description=[contract.description,admin?'활성 운영자 계정 필수. 역할별 추가 제한은 각 API 설명을 따릅니다.':member?'로그인한 회원 세션 필수.':optional?'비로그인 조회 가능하나 콘텐츠별 권한 제한을 검사합니다. 유효하지 않은 갱신 세션은 401을 반환할 수 있습니다.':'공개 또는 요청별 증명 검증 API.'].filter(Boolean).join('\n\n');
   op.deprecated=contract.deprecated;
-  op.security=edge?[{edgeSignature:[],memberSession:[]},{edgeSignature:[]}]:path==='/api/v1/identity/callback'?[{passSignature:[]}]:path==='/api/v1/auth/refresh'?[{refreshSession:[]}]:member?[{memberSession:[]}]:optional?[{}, {memberSession:[]}]:[];
+  op.security=edge?[{edgeSignature:[],memberSession:[]},{edgeSignature:[]}]:path==='/api/v1/identity/callback'?[{passSignature:[]}]:path==='/api/v1/auth/refresh'?[{refreshSession:[]}]:admin?[{adminSession:[]}]:member?[{memberSession:[]}]:optional?[{}, {memberSession:[]}]:[];
   op.parameters=[...(op.parameters||[]).filter((p:any)=>p.in==='path').map((p:any)=>({...p,required:true,schema:str(p.name==='id'&&path==='/api/v1/profiles/{id}'?'회원 UUID 또는 핸들':undefined)})),...(contract.query||[])];
   if(contract.body)op.requestBody={required:true,content:{[contract.contentType||'application/json']:{schema:contract.body}}};else delete op.requestBody;
   const success=String(contract.successStatus||(method==='post'?201:200));
@@ -42,6 +43,7 @@ export function buildPlatformOpenApi(app:INestApplication):OpenAPIObject{
   if(path==='/api/v1/marketing/unsubscribe')op.responses[success]={description:method==='get'?'수신거부 확인 HTML. 상태 변경 없음.':'수신거부 처리. Accept: text/html이면 완료 화면.',content:{...(method==='post'?{'application/json':{schema:envelope(contract.response)}}:{}),'text/html':{schema:{type:'string'}}}};
   for(const [status,description]of Object.entries({400:'입력값 또는 상태 오류',401:'로그인 또는 세션 갱신 필요',403:'권한·Origin·본인확인 실패',404:'대상 없음',409:'중복·버전·처리 상태 충돌',429:'요청 제한',500:'서버 내부 오류',502:'외부 공급사 응답 검증 실패',503:'정책/공급사 준비 또는 일시적 처리 불가'}))op.responses[status]={description,content:{'application/json':{schema:ref('Error')}}};
   if(path==='/api/v1/auth/identity')delete op.responses[success];
+  if(path==='/api/v1/admin/auth/login'||path==='/api/v1/admin/auth/refresh')op.responses[success]['headers']={'Set-Cookie':{schema:str(),description:'HttpOnly·SameSite=Strict admin_access_token(1시간)·admin_refresh_token(7일) 쿠키, 콘솔 도메인 전용. 운영에서는 Secure.'}};
   if(path==='/api/v1/auth/login'||path==='/api/v1/auth/refresh')op.responses[success]['headers']={'Set-Cookie':{schema:str(),description:'HttpOnly access_token 및 refresh_token 쿠키. 운영에서는 Secure.'}};
   if(path==='/api/v1/media')op.responses['413']={description:'파일 용량 제한 초과',content:{'application/json':{schema:ref('Error')}}};
   if(['/api/v1/media/{id}/file','/api/v1/media/{id}/origin-file'].includes(path)){
@@ -77,13 +79,13 @@ export function splitPlatformOpenApi(document:OpenAPIObject):Record<keyof typeof
 }
 
 export function installPlatformOpenApi(app:INestApplication){
- const documents=splitPlatformOpenApi(buildPlatformOpenApi(app)),memberGuard=app.get(PlatformAuthGuard),adminGuard=app.get(PlatformAdminGuard),filter=new PlatformExceptionFilter(app.get(PlatformOperationsService));
+ const documents=splitPlatformOpenApi(buildPlatformOpenApi(app)),adminGuard=app.get(PlatformAdminGuard),filter=new PlatformExceptionFilter(app.get(PlatformOperationsService));
  // Swagger registers Express routes outside Nest guards: protect HTML, assets and BOTH raw formats first.
  app.use(API_DOCS_PATH,async(req:any,res:any,next:any)=>{
   res.setHeader('Cache-Control','private, no-store');res.setHeader('X-Robots-Tag','noindex, nofollow, noarchive');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');res.vary('Cookie');
   res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'");
   const context=new ExecutionContextHost([req,res]);
-  try{await memberGuard.canActivate(context);await adminGuard.canActivate(context);next();}catch(error){filter.catch(error,context);}
+  try{await adminGuard.canActivate(context);next();}catch(error){filter.catch(error,context);}
  });
  // The base URL is only an entry redirect; it does not serve a combined document.
  app.getHttpAdapter().get(API_DOCS_PATH,(_req:any,res:any)=>res.redirect(302,API_DOCS_PAGES.user));

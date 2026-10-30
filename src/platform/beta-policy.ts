@@ -1,8 +1,8 @@
 import {ConfigService} from '@nestjs/config';
 import {reject} from './http';
 
-// User selections of 2026-10-25. Financial fee/hold values remain versioned in DB.
-export const betaPolicy=Object.freeze({version:'2026-10-25',days:14,platformFeeBps:2000,settlementHoldDays:7,refundDays:7,minimumWithdrawal:10000,retries:3,retryHours:24});
+// User selections of 2026-10-25; minimum KRW withdrawal raised to 100,000 on 2026-10-27. Financial fee/hold values remain versioned in DB.
+export const betaPolicy=Object.freeze({version:'2026-10-25',days:14,platformFeeBps:2000,settlementHoldDays:7,refundDays:7,minimumWithdrawal:100000,retries:3,retryHours:24});
 export const isBeta=(config:ConfigService)=>config.get('BETA_MODE')==='true';
 export function paymentEnvironment(clientKey:string){return clientKey?.startsWith('test_')?'test':clientKey?.startsWith('live_')?'live':'unknown';}
 export function assertBetaPayment(config:ConfigService){

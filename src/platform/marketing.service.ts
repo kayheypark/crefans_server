@@ -48,7 +48,10 @@ export class MarketingService {
   // Notify before the two-year deadline. Campaigns are held if a due notice was not accepted.
   const preferences=await this.db.accountPreference.findMany({where:{marketing_alert:true,marketing_consent_id:{not:null}}});
   for(const pref of preferences){const consent=await this.db.memberConsent.findUnique({where:{id:pref.marketing_consent_id}});if(!consent)continue;const last=await this.db.marketingDelivery.findFirst({where:{member_id:pref.member_id,kind:'reminder',consent_id:consent.id,status:'accepted'},orderBy:{completed_at:'desc'}}),base=last?.completed_at||consent.accepted_at;if(twoYearsAfter(base).getTime()>now.getTime()+7*86400000)continue;await this.db.marketingDelivery.upsert({where:{dedupe_key:`reminder:${consent.id}:${base.toISOString()}`},create:{member_id:pref.member_id,kind:'reminder',consent_id:consent.id,dedupe_key:`reminder:${consent.id}:${base.toISOString()}`,subject:'광고 메일 수신 동의 확인 안내',body:`좋아하는일해야지(크레팬스)\n동의일: ${consent.accepted_at.toISOString()}\n이벤트·프로모션 이메일 수신에 동의한 상태입니다. 아래 링크에서 무료로 수신거부할 수 있습니다. 별도 의사표시가 없으면 기존 동의를 유지합니다.`},update:{}});}
-  const rows=await this.db.marketingDelivery.findMany({where:{status:'queued'},orderBy:{created_at:'asc'},take:30});let sent=0;
+  // Consent notices and choice confirmations go first: campaigns held for a due notice must not fill the batch
+  // and keep that notice from ever being sent.
+  const notices=await this.db.marketingDelivery.findMany({where:{status:'queued',kind:{not:'campaign'}},orderBy:{created_at:'asc'},take:30});
+  const rows=[...notices,...await this.db.marketingDelivery.findMany({where:{status:'queued',kind:'campaign'},orderBy:{created_at:'asc'},take:30-notices.length})];let sent=0;
   for(const row of rows){
    const claim=await this.db.marketingDelivery.updateMany({where:{id:row.id,status:'queued'},data:{status:'sending',started_at:new Date()}});if(!claim.count)continue;
    try{await this.db.$transaction(async tx=>{

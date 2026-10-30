@@ -47,7 +47,7 @@ export class PlatformMediaController {
  private async authorize(id:string,req:any){const m=await this.service.db.media.findUnique({where:{id},include:{postings:{include:{posting:true}}}});if(!m||m.is_deleted||m.processing_status!=='COMPLETED')reject(404,'MEDIA_NOT_FOUND','파일을 찾을 수 없습니다.');let allowed=req.user?.sub===m.user_sub;
    const links=m.postings.filter(link=>!link.is_deleted&&!link.posting.is_deleted);
    // Public references must never weaken a shared file's paid, private or adult restrictions.
-   const restricted=links.filter(link=>link.posting.is_membership||link.posting.is_sensitive||!link.posting.is_public);
+   const restricted=links.filter(link=>link.posting.is_membership||link.posting.is_sensitive||!link.posting.is_public||link.posting.hidden_at);
    if(!allowed){for(const link of restricted){if(!await this.service.access(link.posting,req.user?.sub))reject(403,'MEDIA_ACCESS_DENIED','파일 이용 권한이 없습니다.');}for(const link of links){if(await this.service.access(link.posting,req.user?.sub)){allowed=true;break;}}}
    // Membership versions preserve image references; only images used by publicly active plans are public.
    if(!allowed&&m.type==='IMAGE'){allowed=!!await this.service.db.membershipItem.findFirst({where:{creator_id:m.user_sub,image:m.original_url,is_active:true,is_deleted:false}});}

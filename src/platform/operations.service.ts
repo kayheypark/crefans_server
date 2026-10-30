@@ -47,6 +47,17 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
  async checkWorkerHealth(now=new Date()){
   const row=await this.db.platformJob.findUnique({where:{id:'worker-health'}});
   if(!row?.completed_at||+now-+row.completed_at>300000)return this.record('worker.stale',{job:'worker-heartbeat',status:'stale'},`worker-stale:${Math.floor(+now/3600000)}`);
+  // A live worker can still stall on one kind of work; each backlog is reported at most once an hour.
+  const hour=Math.floor(+now/3600000),ago=(minutes:number)=>new Date(+now-minutes*60000),access=Number(process.env.ACCESS_LOG_RETENTION_DAYS||7);
+  const checks:Array<[string,()=>Promise<number>]>=[
+   ['payment.stuck',()=>this.db.checkoutOrder.count({where:{status:'processing',OR:[{processing_started_at:{lt:ago(30)}},{processing_started_at:null,created_at:{lt:ago(30)}}]}})],
+   ['refund.stuck',()=>this.db.checkoutOrder.count({where:{status:'refunding',updated_at:{lt:ago(30)}}})],
+   ['beans.charge_stuck',()=>this.db.beanCharge.count({where:{status:'processing',created_at:{lt:ago(30)}}})],
+   ['marketing.uncertain',()=>this.db.marketingDelivery.count({where:{status:'uncertain'}})],
+   ['audit.retention_lagging',()=>Number.isInteger(access)&&access>0?this.db.platformAuditLog.count({where:{category:'request',actor_role:null,occurred_at:{lt:new Date(+now-(access+2)*86400000)}}}):Promise.resolve(0)],
+   ...(this.config.get('TELEGRAM_OPERATIONS_BOT_TOKEN')?[['alerts.backlog',()=>this.db.platformOperationalEvent.count({where:{delivered_at:null,created_at:{lt:ago(15)}}})] as [string,()=>Promise<number>]]:[]),
+  ];
+  for(const [type,count] of checks){const pending=await count();if(pending>0)await this.record(type,{job:'watchdog',status:'backlog',count:pending},`${type}:${hour}`);}
  }
  async record(type:string,data:Record<string,unknown>,dedupeKey?:string){
   const context=requestContext.getStore(),safe=metadata(data);

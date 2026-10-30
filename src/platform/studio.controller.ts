@@ -1,7 +1,7 @@
-import {Body,Controller,Get,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
+import {Body,Controller,Delete,Get,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
 import {PlatformStudioService} from './studio.service';
 import {PlatformAuthGuard} from './platform-auth.guard';
-import {reject,text} from './http';
+import {reject} from './http';
 @Controller('studio') @UseGuards(PlatformAuthGuard)
 export class PlatformStudioController {
  constructor(private studio:PlatformStudioService){}
@@ -16,6 +16,8 @@ export class PlatformStudioController {
  @Post('memberships') membership(@Body() b:any,@Req() r:any){return this.studio.saveMembership(r.user.sub,b);}
  @Put('memberships/:id') state(@Param('id') id:string,@Body() b:any,@Req() r:any){return this.studio.membershipState(r.user.sub,id,b);}
  @Put('comments/:id') moderate(@Param('id') id:string,@Body('hidden') hidden:boolean,@Req() r:any){return this.studio.moderate(r.user.sub,id,hidden);}
- @Post('comments/:id/reply') async reply(@Param('id') id:string,@Body('body') body:string,@Req() r:any){const c=await this.studio.db.comment.findUnique({where:{id},include:{posting:true}});if(c?.posting.user_sub!==r.user.sub||c.parent_id)reject(404,'COMMENT_NOT_FOUND','댓글을 찾을 수 없습니다.');await this.studio.db.$transaction([this.studio.db.comment.create({data:{posting_id:c.posting_id,author_id:r.user.sub,parent_id:c.id,content:text(body)}}),this.studio.db.posting.update({where:{id:c.posting_id},data:{comment_count:{increment:1}}})]);return{message:'답글을 등록했습니다.'};}
+ @Post('comments/:id/reply') reply(@Param('id') id:string,@Body('body') body:string,@Req() r:any){return this.studio.createReply(r.user.sub,id,body);}
+ @Put('comments/:id/replies/:replyId') updateReply(@Param('id') id:string,@Param('replyId') replyId:string,@Body('body') body:string,@Req() r:any){return this.studio.updateReply(r.user.sub,id,replyId,body);}
+ @Delete('comments/:id/replies/:replyId') deleteReply(@Param('id') id:string,@Param('replyId') replyId:string,@Req() r:any){return this.studio.deleteReply(r.user.sub,id,replyId);}
  @Get('reports/:id') report(@Param('id') id:string,@Query('startDate') start:string,@Query('endDate') end:string,@Req() r:any){return this.studio.report(r.user.sub,id,start,end);}
 }
