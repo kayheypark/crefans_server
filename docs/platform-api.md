@@ -450,6 +450,7 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 | GET | /admin/comments/:id/moderation | content.view. 댓글 조치 이력(최신 100건) |
 | POST | /admin/members/:id/suspension | members.update. suspended·days(7/30/null=무기한)·reason. 제한 시 세션 삭제, 기간 중 로그인 403 ACCOUNT_SUSPENDED(비밀번호 일치 후에만 안내), 토큰 검증·갱신도 거부. 기간 경과 시 자동 해제. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
 | GET | /admin/members/:id/suspension | members.view. 회원 이용 제한 이력 |
+| POST | /admin/members/:id/erase | SUPER_ADMIN 전용 회원 즉시 삭제(2026-10-30). reason(내부, 500자)·confirmEmail(회원 이메일, 대소문자 무시) 필수, 불일치 400 CONFIRMATION_MISMATCH. 탈퇴 전 회원은 회원 탈퇴와 같은 검사(자동 갱신 구독·남은 콩·진행 중 콩 충전·출금·남은 수익·진행 중 출금·판매 중 멤버십·남은 구독 기간·미수금, 409)를 통과해야 함. 통과하면 30일 유예 없이 `purgeMember`로 즉시 파기(이메일·이름·프로필·게시물·본인확인 값·세션, 이메일이 `withdrawn-<id>@deleted.invalid`가 되어 같은 이메일 재초대·재가입 가능). 결제·정산·주문 기록은 회원 번호로 보관, 댓글·메시지는 '탈퇴한 사용자'. 이미 파기됨 409 MEMBER_ALREADY_PURGED. moderation_actions(member.erased)·감사 로그(admin.member_erased, member.purged) 기록, 당사자 알림 없음 |
 | GET | /admin/members/:id/terms | members.view. 회원 개별 수수료·출금 조건(terms, null=기본값)·version·플랫폼 기본값(defaults)·변경 이력(history, 최신 100건) |
 | PUT | /admin/members/:id/terms | members.update + settings.update, confirmation '정책 변경', expectedVersion, reason(필수). 이후 신규 구독 결제·출금 신청부터 적용, 기존 결제·진행 중 정기결제 조건 유지. 저장마다 creator_financial_term_changes 이력 1행 |
 

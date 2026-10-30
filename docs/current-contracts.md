@@ -50,6 +50,7 @@
 | POST | `/api/v1/admin/me/totp/enable` | `src/platform/admin-totp.ts::enable` |
 | POST | `/api/v1/admin/me/totp/setup` | `src/platform/admin-totp.ts::setup` |
 | GET | `/api/v1/admin/members` | `src/platform/admin.controller.ts::members` |
+| POST | `/api/v1/admin/members/:id/erase` | `src/platform/moderation.ts::erase` |
 | GET | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::memberHistory` |
 | POST | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::member` |
 | GET | `/api/v1/admin/members/:id/terms` | `src/platform/signup-invites.controller.ts::terms` |

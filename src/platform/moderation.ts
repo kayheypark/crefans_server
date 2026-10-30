@@ -6,6 +6,7 @@ import {reject,text} from './http';
 import {PlatformService} from './service';
 import {SUSPENSION_DAYS} from './suspension';
 import {notifyMember} from './member-notices';
+import {purgeMember} from './member-purge';
 
 // Operator moderation promised by terms §8: hide a post, restrict an account. Every action is kept in moderation_actions.
 // reason is internal; publicReason is what the affected member reads in the app notice and mail (D11, 2026-10-30).
@@ -86,6 +87,24 @@ export async function moderateMember(db:any,admin:any,id:string,input:any){
   return{message:'회원 이용 제한을 해제했습니다.'};
  });
 }
+// Console erase (SUPER_ADMIN, 2026-10-30): the self-withdrawal checks apply (subscriptions, beans, earnings, receivables),
+// then personal data is purged at once instead of 30 days later. Payment/settlement rows stay for legal retention (member ID only).
+export async function eraseMember(service:PlatformService,admin:any,id:string,input:any){
+ const reason=text(input?.reason,500),confirmEmail=text(input?.confirmEmail,320).toLowerCase();
+ return service.db.$transaction(async(tx:any)=>{
+  await tx.$queryRaw`SELECT id FROM members WHERE id=${id} FOR UPDATE`;
+  const member=await tx.member.findUnique({where:{id}});
+  if(!member)reject(404,'MEMBER_NOT_FOUND','회원을 찾을 수 없습니다.');
+  if(member.purged_at)reject(409,'MEMBER_ALREADY_PURGED','이미 파기된 회원입니다.');
+  if(confirmEmail!==String(member.email).toLowerCase())reject(400,'CONFIRMATION_MISMATCH','확인용 이메일이 회원 이메일과 다릅니다.');
+  // A member who already withdrew passed these checks then; anyone else is checked now.
+  if(!member.withdrawn_at)await service.closeAccount(tx,id);
+  await record(tx,'MEMBER',id,'member.erased',reason,admin);
+  await purgeMember(tx,id,member.email);
+  await appendAudit(tx,{category:'admin',action:'admin.member_erased',entityId:id,data:{memberId:id}});
+  return{message:'회원을 삭제했습니다. 같은 이메일로 다시 초대·가입할 수 있습니다.'};
+ },{isolationLevel:'ReadCommitted'});
+}
 export async function moderationHistory(db:any,type:'POST'|'MEMBER'|'COMMENT',id:string){
  const rows=await db.moderationAction.findMany({where:{target_type:type,target_id:id},orderBy:{created_at:'desc'},take:100});
  const admins=await db.admin.findMany({where:{id:{in:[...new Set(rows.map((r:any)=>r.admin_id))]}},select:{id:true,name:true}});
@@ -101,5 +120,6 @@ export class ModerationAdminController {
  @Post('comments/:id/moderation') @Permit(['content','update']) comment(@Req() r:any,@Param('id') id:string,@Body() body:any){return moderateComment(this.service.db,r.admin,id,body);}
  @Get('comments/:id/moderation') @Permit(['content','view']) commentHistory(@Param('id') id:string){return moderationHistory(this.service.db,'COMMENT',id);}
  @Post('members/:id/suspension') @Permit(['members','update']) member(@Req() r:any,@Param('id') id:string,@Body() body:any){return moderateMember(this.service.db,r.admin,id,body);}
+ @Post('members/:id/erase') @Permit('super') erase(@Req() r:any,@Param('id') id:string,@Body() body:any){return eraseMember(this.service,r.admin,id,body);}
  @Get('members/:id/suspension') @Permit(['members','view']) memberHistory(@Param('id') id:string){return moderationHistory(this.service.db,'MEMBER',id);}
 }
