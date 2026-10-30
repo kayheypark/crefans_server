@@ -8,7 +8,7 @@ const {BeansService}=require('../dist/src/platform/beans.service'),{PlatformServ
 const db=new PrismaClient(),ids=Array.from({length:4},()=>randomUUID()),[fan,creator,stranger,adminId]=ids,pg=new Map();let release,charges=0,transfers=0,lost=false,bankStatus='paid',account,firstCharge;
 const config=new ConfigService({BEAN_LEDGER_ENABLED:'true',BEAN_LIVE_PAYMENTS_APPROVED:'true',BANK_PAYOUTS_ENABLED:'true',BETA_MODE:'false'}),provider={configForClient:()=>({clientKey:'live_ck_synthetic'}),decrypt:x=>x,encrypt:x=>x,lookup:async id=>pg.get(id)||null,confirm:async(key,o)=>{charges++;const r={status:'DONE',currency:'KRW',totalAmount:o.amount,balanceAmount:o.amount,paymentKey:key,orderId:o.id,approvedAt:new Date(Date.now()-8*86400000).toISOString()};pg.set(o.id,r);if(lost){lost=false;throw Error('Synthetic lost response');}return r;}},bank={transfer:async(...args)=>{transfers++;return{status:bankStatus};}},service=new PlatformService(db,undefined,config),finance=new PlatformFinanceService(service,provider,config,bank),beans=new BeansService(service,finance,provider,bank,config),tipNow=beans.tip.bind(beans),admin={is_active:true,role:'SUPER_ADMIN',user_sub:adminId},code=c=>e=>e.getResponse?.().code===c;
 // Received beans now wait 7 days from the tip (beanPolicy.tipHoldDays). Payout tests below run as if that week passed: each tip's lots move back 7 days, keeping any later source maturity they test.
-beans.tip=async(member,creator,input)=>{const before=new Date();const r=await tipNow(member,creator,input);const lots=await db.beanLot.findMany({where:{member_id:creator,bucket:{in:['earned-paid','earned-promotion']},created_at:{gte:new Date(before.getTime()-1000)}}});for(const lot of lots)await db.beanLot.update({where:{id:lot.id},data:{release_at:new Date(lot.release_at.getTime()-7*86400000)}});return r;};
+beans.tip=async(member,creator,input)=>{const before=new Date();const r=await tipNow(member,creator,{creatorProvision:'2026-10-30.1',...input});const lots=await db.beanLot.findMany({where:{member_id:creator,bucket:{in:['earned-paid','earned-promotion']},created_at:{gte:new Date(before.getTime()-1000)}}});for(const lot of lots)await db.beanLot.update({where:{id:lot.id},data:{release_at:new Date(lot.release_at.getTime()-7*86400000)}});return r;};
 const charge=async(q)=>{const o=await beans.createCharge(fan,{quantity:q,requestId:randomUUID()});await beans.confirm(fan,o.id,{paymentKey:'synthetic-'+o.id,orderId:o.id,amount:o.amount});return db.beanCharge.findUniqueOrThrow({where:{id:o.id}});};
 async function receipt(o){await beans.receipt(admin,o.id,{amount:o.amount*.97,reference:'synthetic-bank-'+o.id,reason:'Isolated provider double',receivedAt:new Date().toISOString()});}
 async function payout(q=1000){const input={quantity:q,accountId:account.id},auth=await beans.authorize(creator,{...input,pin:'123456'});return beans.requestPayout(creator,{...input,authorizationId:auth.authorizationId,requestId:randomUUID()});}
@@ -170,7 +170,10 @@ test('all promotional grants including earlier lots can be withdrawn after a rea
  const grant=await beans.grant(admin,{memberId:sender,quantity:2500,requestId:randomUUID(),reason:'Earlier campaign, company funded'});
  assert.equal((await beans.wallet(sender)).withdrawableBeans,0);
  await assert.rejects(beans.tip(sender,sender,{quantity:1000,requestId:randomUUID()}),code('SELF_TIP'));
+ for(const creatorProvision of [undefined,'2026-10-01.0'])await assert.rejects(tipNow(sender,owner,{quantity:1500,requestId:randomUUID(),creatorProvision}),code('TIP_PROVISION_CONSENT_REQUIRED'));
+ assert.equal(await db.beanTip.count({where:{sender_id:sender}}),0,'no tip without consent to show the sender to the creator');
  const tip=await beans.tip(sender,owner,{quantity:1500,requestId:randomUUID()});assert.equal(tip.promotion_quantity,1500);
+ const consent=await db.memberConsent.findFirstOrThrow({where:{member_id:sender,kind:'tip-provision',document_snapshot:{path:'$.tipId',equals:tip.id}}});assert.equal(consent.document_id,'code:tip-provision:2026-10-30.1');assert.equal(consent.document_snapshot.creatorId,owner);
  const lot=await db.beanLot.findFirstOrThrow({where:{member_id:owner,bucket:'earned-promotion'}});
  assert.equal(lot.grant_id,grant.id);assert.equal(lot.charge_id,null);
  const wallet=await beans.wallet(owner);assert.equal(wallet.withdrawableBeans,1500);assert.deepEqual(wallet.withdrawableBreakdown,{paid:0,promotion:1500});
@@ -216,7 +219,7 @@ test('FIN-02: one failing charge reconciliation is reported and the rest of the 
 test('received beans, paid or promotion, become withdrawable 7 days after the tip, not after the charge',async()=>{
  const [owner,sender]=[randomUUID(),randomUUID()];ids.push(owner,sender);for(const id of [owner,sender])await db.member.create({data:{id,email:id+'@example.invalid',name:'Hold fixture',nickname:'Hold fixture',preferred_username:id,email_verified:true}});await db.creator.create({data:{user_id:owner}});
  await beans.grant(admin,{memberId:sender,quantity:300,requestId:randomUUID(),reason:'보류 검증'});
- const at=Date.now();await tipNow(sender,owner,{quantity:300,requestId:randomUUID()});
+ const at=Date.now();await tipNow(sender,owner,{quantity:300,requestId:randomUUID(),creatorProvision:'2026-10-30.1'});
  const lots=await db.beanLot.findMany({where:{member_id:owner,bucket:'earned-promotion'}});assert.equal(lots.length,1);
  assert.ok(Math.abs(lots[0].release_at.getTime()-(at+7*86400000))<60000,'hold counts from the tip');
  assert.equal((await beans.wallet(owner)).withdrawableBeans,0,'a promotion tip is not withdrawable at once');

@@ -1,5 +1,11 @@
 # PROGRESS: crefans_server
 
+## 2026-10-30 콩 후원 시 크리에이터 제공 동의 (미배포, 커밋 완료·푸시 안 함)
+- 사용자 지시 "지금 하고": 받은 후원 목록에서 크리에이터가 후원자 닉네임·수량·메시지·일시·게시물을 보므로 구독과 같은 제3자 제공 동의를 받는다.
+- 코드: `creator-provision.ts TIP_PROVISION`(2026-10-30.1), `beans.tip` 버전 불일치·누락 400 TIP_PROVISION_CONSENT_REQUIRED, 새 후원마다 member_consents(kind tip-provision, tipId) 사본. 처리방침 8조에 후원 제공 문단 추가, 문서 version 2026-10-30.3. OpenAPI tips body에 creatorProvision.
+- 검증: platform-beans 30/30(동의 없음·구버전 거부, 후원 0건, 동의 사본 확인 추가), platform-legal 10/10, openapi 11/11. 대조: 동의 확인 제거·동의 기록 제거 각각 1건 실패, 복원 30/30.
+- 배포 전: 운영은 아직 signup-open-20261030(후원 동의 없음).
+
 ## 2026-10-30 초대 가입 개방: 법률문서 시행일·처리방침 보완·구독 시 크리에이터 제공 동의 (운영 배포 signup-open-20261030, 커밋 완료·푸시 안 함)
 - 계기: 사용자 회원가입 테스트에서 503 POLICY_NOT_PUBLISHED. 원인은 10-22부터 의도된 가입 차단(effectiveAt=null, blockers 3건).
 - 사용자 결정(클릭): 초대받은 이메일만 개방, 시행일 2026-10-30. 사용자 확인 사실: 국외이전 내용, 일반 콘텐츠 베타 검수 완료. Google Workspace는 직접 구매. 텔레그램 알림은 지금처럼 IP·식별자를 보내고 알려진 내용만 공개(국가·연락처 미공개라 제28조의8 항목을 완전히 채우지 못함, 사용자 수용). 파기 때 첨부 원본도 삭제. 구독 동의까지 만든 뒤 함께 개방.
