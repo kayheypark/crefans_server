@@ -1,0 +1,2 @@
+-- Operator second factor (TOTP), required by the 2025 amendment of the personal-information safety standard (art. 6(2), effective 2026-10-31).
+ALTER TABLE `admins` ADD COLUMN `totp_secret_encrypted` TEXT NULL, ADD COLUMN `totp_pending_encrypted` TEXT NULL, ADD COLUMN `totp_enabled_at` DATETIME(3) NULL, ADD COLUMN `totp_last_step` INTEGER NULL, ADD COLUMN `totp_recovery` JSON NULL, ADD COLUMN `totp_grace_until` DATETIME(3) NULL;

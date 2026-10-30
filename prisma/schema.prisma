@@ -419,6 +419,13 @@ model Posting {
   /// 수정 일시
   updated_at                DateTime       @updatedAt
   /// 개별 구매 허용 여부
+  /// 운영자 숨김(약관 8조). null이면 정상. 작성자 본인 외에는 목록·상세·미디어에서 제외
+  hidden_at                 DateTime?
+  hidden_reason             String?        @db.VarChar(500)
+  hidden_by                 String?        @db.VarChar(191)
+  /// 베타 사후 검수: 운영자가 확인한 시각. 작성자가 수정하면 다시 null(미검수)
+  reviewed_at               DateTime?
+  reviewed_by               String?        @db.VarChar(191)
   allow_individual_purchase Boolean        @default(false)
   /// 개별 구매 가격 (원)
   individual_purchase_price Decimal?       @db.Decimal(10, 0)
@@ -438,6 +445,7 @@ model Posting {
   medias                    PostingMedia[]
   views                     PostingView[]
 
+  @@index([status, is_deleted, reviewed_at, created_at], map: "postings_review_queue_idx")
   @@map("postings")
 }
 
@@ -495,6 +503,8 @@ model Comment {
   updated_at     DateTime      @updatedAt
   hidden Boolean @default(false)
   mentions Json?
+  /// Set when the author edits the body; shown as "수정됨".
+  edited_at DateTime?
   likes          CommentLike[]
   parent         Comment?      @relation("CommentToComment", fields: [parent_id], references: [id])
   children       Comment[]     @relation("CommentToComment")
@@ -659,8 +669,39 @@ model Admin {
   updated_at DateTime  @updatedAt
   /// 생성한 사용자 ID (상위 관리자)
   created_by String?
+  /// 메뉴별 권한 {menu:{view,create,update,delete}}. null이면 기존 역할 기본값
+  permissions Json?
+  /// 임시 비밀번호로 생성·초기화되어 첫 로그인 시 변경 필요
+  must_change_password Boolean @default(false)
+  /// 운영자 전용 비밀번호(scrypt). 팬·크리에이터 회원 계정과 분리
+  password_hash String? @db.VarChar(255)
+  /// 운영자 연락처
+  phone String @default("") @db.VarChar(32)
+  /// 2차 인증(TOTP, 2026-10-30): 암호화한 비밀값, 등록 대기 비밀값, 등록 시각, 마지막 사용 시간창, 복구코드 해시, 미등록 유예 종료
+  totp_secret_encrypted String? @db.Text
+  totp_pending_encrypted String? @db.Text
+  totp_enabled_at DateTime?
+  totp_last_step Int?
+  totp_recovery Json?
+  totp_grace_until DateTime?
+  sessions AdminSession[]
 
   @@map("admins")
+}
+
+/// 운영 콘솔 로그인 세션. 회원 세션(member_sessions)과 분리
+model AdminSession {
+  id           String   @id @default(uuid())
+  admin_id     String
+  access_hash  String   @unique @db.Char(64)
+  refresh_hash String   @unique @db.Char(64)
+  access_until DateTime
+  expires_at   DateTime
+  created_at   DateTime @default(now())
+  admin        Admin    @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+  @@index([admin_id])
+  @@index([expires_at])
+  @@map("admin_sessions")
 }
 
 /// 사용자 신고
@@ -968,6 +1009,7 @@ enum ReportReason {
   INAPPROPRIATE
   COPYRIGHT
   FRAUD
+  PRIVACY
   OTHER
 
   @@map("report_reasons")
@@ -1030,9 +1072,17 @@ model Member {
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
   identity_hash String? @unique @db.Char(64)
+  // Operator suspension (terms §8). suspended_until null with suspended_at set means indefinite.
+  suspended_at       DateTime?
+  suspended_until    DateTime?
+  suspension_reason  String?  @db.VarChar(500)
+  // Withdrawal (decision 2026-10-29): personal data is purged 30 days after withdrawn_at; purged_at marks completion.
+  withdrawn_at       DateTime?
+  purged_at          DateTime?
   sessions           MemberSession[]
   challenges         MemberChallenge[]
   @@index([nickname])
+  @@index([withdrawn_at, purged_at])
   @@map("members")
 }
 
@@ -1529,6 +1579,8 @@ model BeanCharge {
  receipt_reference String?
  received_amount Int?
  failure_code String?
+ refunded_quantity Int @default(0)
+ refunded_amount Int @default(0)
  created_at DateTime @default(now())
  updated_at DateTime @updatedAt
  @@index([member_id,created_at])
@@ -1545,8 +1597,11 @@ model BeanLot {
  reserved Int @default(0)
  release_at DateTime
  frozen Boolean @default(false)
+ expires_at DateTime?
+ expiry_noticed_at DateTime?
  created_at DateTime @default(now())
  @@index([member_id,bucket,created_at])
+ @@index([expires_at])
  @@index([charge_id])
  @@map("bean_lots")
 }
@@ -1628,4 +1683,142 @@ model BeanWithdrawalAuthorization {
  consumed_at DateTime?
  @@index([creator_id,expires_at])
  @@map("bean_withdrawal_authorizations")
+}
+
+// Advertising products are archived, never physically deleted. Paid order snapshots are immutable.
+model AdProduct {
+  id String @id @default(uuid())
+  name String @db.VarChar(100)
+  description String @db.Text
+  terms String @db.Text
+  placement String @default("featured_creator") @db.VarChar(40)
+  amount Int
+  duration_days Int
+  visible Boolean @default(false)
+  on_sale Boolean @default(false)
+  sort_order Int @default(0)
+  version Int @default(1)
+  deleted_at DateTime?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([deleted_at, visible, sort_order])
+  @@map("ad_products")
+}
+
+// Admin-managed beta invitations. Terms set here move to creator_financial_terms when the email signs up.
+model SignupInvite {
+  id String @id @default(uuid())
+  email String @unique @db.VarChar(191)
+  memo String @default("") @db.VarChar(100)
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  bean_withdrawal_fee_bps Int?
+  minimum_withdrawal_krw Int?
+  member_id String? @db.VarChar(191)
+  used_at DateTime?
+  revoked_at DateTime?
+  version Int @default(1)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([revoked_at, created_at])
+  @@map("signup_invites")
+}
+// Per-creator overrides. A null column follows the platform default at the time of each payment or withdrawal.
+model CreatorFinancialTerms {
+  member_id String @id @db.VarChar(191)
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  bean_withdrawal_fee_bps Int?
+  minimum_withdrawal_krw Int?
+  version Int @default(1)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@map("creator_financial_terms")
+}
+// Append-only history of creator_financial_terms. source: admin(console change), invite(copied at signup), backfill(set before history existed).
+model CreatorFinancialTermChange {
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  version Int
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  bean_withdrawal_fee_bps Int?
+  minimum_withdrawal_krw Int?
+  source String @db.VarChar(20)
+  changed_by String? @db.VarChar(191)
+  reason String @default("") @db.VarChar(500)
+  created_at DateTime @default(now())
+  @@unique([member_id, version])
+  @@map("creator_financial_term_changes")
+}
+
+// Append-only record of operator moderation (post hide/unhide, member suspend/unsuspend) for appeals.
+model ModerationAction {
+  id String @id @default(uuid())
+  target_type String @db.VarChar(20)
+  target_id String @db.VarChar(191)
+  action String @db.VarChar(30)
+  reason String @db.VarChar(500)
+  public_reason String? @db.VarChar(500)
+  until DateTime?
+  admin_id String @db.VarChar(191)
+  created_at DateTime @default(now())
+  @@index([target_type, target_id, created_at])
+  @@map("moderation_actions")
+}
+
+/// Member refund of unused purchased beans (2026-10-30): full within 7 days of payment, 10% deducted after (waived when the company is at fault).
+model BeanRefund {
+ id String @id @default(uuid())
+ request_key String @unique
+ charge_id String
+ member_id String
+ lot_id String
+ quantity Int
+ gross Int
+ deduction Int
+ amount Int
+ waived Boolean @default(false)
+ actor_id String
+ status String @default("processing") @db.VarChar(20)
+ failure_code String?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([charge_id])
+ @@index([status,updated_at])
+ @@map("bean_refunds")
+}
+/// Money a creator owes back after a refund or chargeback of income that was already paid out (D4).
+model CreatorReceivable {
+ id String @id @default(uuid())
+ creator_id String
+ kind String @db.VarChar(20)
+ source_id String
+ amount Int
+ status String @default("open") @db.VarChar(20)
+ note String @default("") @db.VarChar(500)
+ settled_by String?
+ settled_at DateTime?
+ created_at DateTime @default(now())
+ @@unique([kind,source_id,creator_id])
+ @@index([creator_id,status])
+ @@map("creator_receivables")
+}
+/// Mail outbox for member notices that are not billing notices (operator actions, bean expiry).
+model MemberNotice {
+ id String @id @default(uuid())
+ dedupe_key String @unique @db.VarChar(191)
+ member_id String @db.VarChar(191)
+ kind String @db.VarChar(40)
+ rows Json
+ path String @db.VarChar(191)
+ note String @db.Text
+ attempts Int @default(0)
+ retry_at DateTime @default(now())
+ locked_until DateTime?
+ completed_at DateTime?
+ outcome String? @db.VarChar(40)
+ created_at DateTime @default(now())
+ @@index([completed_at,retry_at])
+ @@map("member_notices")
 }
