@@ -7,6 +7,7 @@ import {Body,Controller,Get,Post,Param,Query,Req,UseGuards,HttpCode} from '@nest
 import {BeansService} from './beans.service';
 import {PlatformAuthGuard} from './platform-auth.guard';
 import {PlatformAdminGuard} from './admin.controller';
+import {Permit} from './admin-permissions';
 @Controller() @UseGuards(PlatformAuthGuard)
 export class BeansController {
  constructor(private beans:BeansService){}
@@ -14,6 +15,8 @@ export class BeansController {
  @Post('beans/charges') create(@Req() r:any,@Body() b:any){return this.beans.createCharge(r.user.sub,b);}
  @Get('beans/charges/:id') charge(@Req() r:any,@Param('id') id:string){return this.beans.charge(r.user.sub,id);}
  @Post('beans/charges/:id/payment-window') window(@Req() r:any,@Param('id') id:string){return this.beans.paymentWindow(r.user.sub,id);}
+ @Get('beans/charges/:id/refund-quote') refundQuote(@Req() r:any,@Param('id') id:string){return this.beans.refundQuote(r.user.sub,id);}
+ @Post('beans/charges/:id/refund') refund(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.refundCharge(r.user.sub,id,b);}
  @Post('beans/charges/:id/confirm') confirm(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.confirm(r.user.sub,id,b);}
  @Post('creators/:id/tips') tip(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.tip(r.user.sub,id,b);}
  @Get('beans/tips') tips(@Req() r:any,@Query() query:any){return this.beans.tips(r.user.sub,false,query.page,query);}
@@ -23,15 +26,19 @@ export class BeansController {
  @Post('studio/bean-withdrawals/verify') verify(@Req() r:any,@Body() b:any){return this.beans.authorize(r.user.sub,b);}
  @Post('studio/bean-withdrawals') withdraw(@Req() r:any,@Body() b:any){return this.beans.requestPayout(r.user.sub,b);}
 }
-@Controller('admin/beans') @UseGuards(PlatformAuthGuard,PlatformAdminGuard)
+@Controller('admin/beans') @UseGuards(PlatformAdminGuard)
 export class BeansAdminController {
  constructor(private beans:BeansService){}
- @Get('overview') overview(@Req() r:any,@Query('page') page:string){return this.beans.adminData(r.admin,page);}
- @Get('wallets/:id') wallet(@Req() r:any,@Param('id') id:string,@Query('page') page:string){return this.beans.adminWallet(r.admin,id,page);}
- @Post('promotions') grant(@Req() r:any,@Body() b:any){return this.beans.grant(r.admin,b);}
- @Post('charges/:id/receipt') receipt(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.receipt(r.admin,id,b);}
- @Post('withdrawals/:id/approve') async approve(@Req() r:any,@Param('id') id:string){await this.beans.payout(id,r.admin);return{message:'은행 지급 상태를 확인했습니다.'};}
- @Post('withdrawals/:id/reject') reject(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.rejectPayout(r.admin,id,b);}
+ @Get('overview') @Permit(['beans','view']) overview(@Req() r:any,@Query('page') page:string){return this.beans.adminData(r.admin,page);}
+ @Get('wallets/:id') @Permit(['beans','view']) wallet(@Req() r:any,@Param('id') id:string,@Query('page') page:string){return this.beans.adminWallet(r.admin,id,page);}
+ @Post('promotions') @Permit(['beans','create']) grant(@Req() r:any,@Body() b:any){return this.beans.grant(r.admin,b);}
+ @Post('charges/:id/receipt') @Permit(['beans','create']) receipt(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.receipt(r.admin,id,b);}
+ // Company-fault refunds (waived:true) skip the 10% deduction after 7 days; the reason is kept with the refund movement.
+ @Post('charges/:id/refund') @Permit(['beans','update']) refund(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.refundCharge(null,id,b,r.admin);}
+ @Get('receivables') @Permit(['beans','view']) receivables(@Req() r:any){return this.beans.receivables(r.admin);}
+ @Post('receivables/:id/settle') @Permit(['beans','update']) settle(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.settleReceivable(r.admin,id,b);}
+ @Post('withdrawals/:id/approve') @Permit(['beans','update']) async approve(@Req() r:any,@Param('id') id:string){await this.beans.payout(id,r.admin);return{message:'은행 지급 상태를 확인했습니다.'};}
+ @Post('withdrawals/:id/reject') @Permit(['beans','update']) reject(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.rejectPayout(r.admin,id,b);}
 }
 
 @Controller('beans')

@@ -1,10 +1,11 @@
+import {can} from './admin-permissions';
 import {appendAudit,contentDigest} from './audit';
 import {reject,text} from './http';
 
 export const settlementPending=(entry:any,now=new Date())=>entry.available_at>now||!entry.receipt_confirmed_at||entry.received_amount<Math.max(0,entry.net);
 // Confirmation is a manual PG/bank reconciliation record, never a claim of a bank API response.
 export async function confirmSettlementReceipt(db:any,admin:any,id:string,input:any){
- if(admin?.role!=='SUPER_ADMIN'||!admin.is_active)reject(403,'SUPER_ADMIN_REQUIRED','최고 관리자만 입금 대사를 기록할 수 있습니다.');
+ if(!can(admin,'revenue','create'))reject(403,'ADMIN_PERMISSION_REQUIRED','입금 대사를 기록할 권한이 없습니다.');
  const reference=text(input.reference,191),reason=text(input.reason,500),receivedAt=new Date(input.receivedAt);
  if(!Number.isSafeInteger(input.amount)||input.amount<1||!Number.isFinite(receivedAt.getTime())||receivedAt>new Date())reject(400,'INVALID_RECEIPT','입금 금액과 실제 입금 시각을 확인해주세요.');
  return db.$transaction(async tx=>{

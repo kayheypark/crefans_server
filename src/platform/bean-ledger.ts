@@ -10,15 +10,16 @@ export async function ensureBeanWallet(tx:any,memberId:string){
  for(const bucket of beanBuckets)await tx.beanAccount.upsert({where:{wallet_id_bucket:{wallet_id:wallet.id,bucket}},create:{id:randomUUID(),wallet_id:wallet.id,bucket},update:{}});
  return wallet;
 }
-export function beanCashQuote(quantity:number){
+export function beanCashQuote(quantity:number,feeBps:number=beanPolicy.withdrawalFeeBps){
  if(!Number.isSafeInteger(quantity)||quantity<1||quantity>100000000)reject(400,'INVALID_BEAN_QUANTITY','콩 수량을 확인해주세요.');
- const gross=BigInt(quantity)*BigInt(beanPolicy.krwPerBean),fee=gross*BigInt(beanPolicy.withdrawalFeeBps)/BigInt(10000);
- return{quantity,grossKrw:gross.toString(),feeKrw:fee.toString(),netKrw:(gross-fee).toString(),feeBps:beanPolicy.withdrawalFeeBps};
+ const gross=BigInt(quantity)*BigInt(beanPolicy.krwPerBean),fee=gross*BigInt(feeBps)/BigInt(10000);
+ return{quantity,grossKrw:gross.toString(),feeKrw:fee.toString(),netKrw:(gross-fee).toString(),feeBps};
 }
-export function beanWithdrawalQuote(quantity:number,bucket:string){
- const quote=beanCashQuote(quantity);
+// terms carries a creator's own fee/minimum (signup-invites withdrawalTerms); the platform bean policy applies otherwise.
+export function beanWithdrawalQuote(quantity:number,bucket:string,terms:{beanWithdrawalFeeBps:number;minimumWithdrawalBeans:number}={beanWithdrawalFeeBps:beanPolicy.withdrawalFeeBps,minimumWithdrawalBeans:beanPolicy.minimumWithdrawalBeans}){
+ const quote=beanCashQuote(quantity,terms.beanWithdrawalFeeBps);
  if(!beanPolicy.withdrawableBuckets.some(allowed=>allowed===bucket))reject(403,'BEAN_NOT_WITHDRAWABLE','후원받은 일반콩과 프로모션콩만 출금할 수 있습니다.');
- if(quantity<beanPolicy.minimumWithdrawalBeans)reject(400,'BEAN_WITHDRAWAL_MINIMUM','최소 출금 신청액은 수수료 차감 전 100,000원(1,000콩)입니다.');
+ if(quantity<terms.minimumWithdrawalBeans)reject(400,'BEAN_WITHDRAWAL_MINIMUM',`최소 출금 신청액은 수수료 차감 전 ${(terms.minimumWithdrawalBeans*beanPolicy.krwPerBean).toLocaleString('ko-KR')}원(${terms.minimumWithdrawalBeans.toLocaleString('ko-KR')}콩)입니다.`);
  return quote;
 }
 export async function postBeanMovement(db:any,input:{requestKey:string;kind:string;reason:string;actorId:string;referenceId?:string;entries:{accountId:string;delta:number}[]}){
