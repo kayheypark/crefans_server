@@ -3,7 +3,7 @@
 운영 최신 상태(2026-10-25): beans-20261025로 API/worker·팬 프론트·독립 콘솔을 배포했다. 수수료20%/보류7일 version2,21migration·콩 기능 on·BETA_MODE=true,실판매/실출금/광고메일 off다. 초기 로컬검수/설계 당시의 미배포 기록과 구분하며 자세한 변경·오류수정·운영 검증은 [배포 증거](../../crefans_front/docs/audit/bean-deployment-20261025.json)를 따른다.
 
 
-최신 정책 구현(2026-10-25): [platform-api.md](./platform-api.md#확정-베타-정책-구현-2026-10-25)의 초대·일반 콘텐츠·테스트 결제, 신규 미사용7일 환불, 갱신24시간3회 추가, PG 입금 대사/최소1만원/수요일 신규 지급, 광고 동의·수신거부·발송 큐와 공통 이용안내를 적용했다. DB 수수료20%/보류7일은 운영 version2로 발행했다. 베타 관련2개와 콩2개 migration까지 운영21개 적용했다. 실제 SMTP/PG/은행 금융 검증은 이번 배포에서 실행하지 않았다. 약관은 코드 초안을 갱신했지만 signupReady 차단 조건을 유지한다.
+최신 정책 구현(2026-10-25): [platform-api.md](./platform-api.md#확정-베타-정책-구현-2026-10-25)의 초대·일반 콘텐츠·테스트 결제, 신규 미사용7일 환불, 갱신24시간3회 추가, PG 입금 대사/최소10만원(2026-10-27 상향)/수요일 신규 지급, 광고 동의·수신거부·발송 큐와 공통 이용안내를 적용했다. DB 수수료20%/보류7일은 운영 version2로 발행했다. 베타 관련2개와 콩2개 migration까지 운영21개 적용했다. 실제 SMTP/PG/은행 금융 검증은 이번 배포에서 실행하지 않았다. 약관은 코드 초안을 갱신했지만 signupReady 차단 조건을 유지한다.
 
 역할별 출시 검수 기준은 프론트 `docs/release-test-scenarios.md`에 있다. 해당 검수의 미실행/차단 항목을 기존 로컬 테스트 결과로 통과 처리하지 않는다.
 
@@ -318,3 +318,17 @@ CDN구성:4명Pro15달러;40명100분Business200달러(요청10M초과),300분Pr
 
 
 2026-10-26 후원 분류 표시: 게시물 제목 snapshot과 읽기 전용 원장/출금 출처 보강을 구현했다. 스튜디오와 별도 콘솔은 게시물/프로필별 일반·프로모션 수량과 출금별 실제 배정량을 표시한다. 기존 금액·원장·수수료 정책 변경 없음. 상세 필드·기존 이력 fallback은 [API 계약](./platform-api.md)의 후원 대상·출금 출처 절을 따른다. 구현 검증은 [당시 실행 증거](../../crefans_front/docs/audit/tip-attribution-20261026.json), API/worker/프론트/콘솔 및 migration의 운영 반영은 [배포 증거](../../crefans_front/docs/audit/tip-attribution-deployment-20261026.json)에 기록한다. 운영 실이력이 없어 금융 종단 검증은 격리 DB·공급사 대역 범위이며 실제 송금은 실행하지 않았다.
+
+## 광고상품 확장 (2026-10-29, 부분 구현·미배포)
+
+완료 범위는 `prisma/schema.prisma`의 AdProduct, `src/platform/advertising-catalog.ts`의 입력/행 잠금/version/소프트 삭제/감사, `advertising.controller.ts`의5개 조회·관리 API다. 전용 migration은 격리 QA DB에만 적용했다. front는 공용 상품 화면과 목업 구매, admin은 권한별 상품 CRUD를 제공한다.
+
+미구현 범위는 실제 주문·결제·기간·매출이다. 사용자에게 ① 토스 단건 카드결제 vs 콩 결제 ② 즉시 시작·추가 구매 기간 연장 vs 운영자 확인 후 시작을 질문했고 답변은 아직 없다. 기존 수동 Creator.promoted는 그대로이며 구매를 통해 켜지지 않는다. 상품 삭제/수정 이후에도 구매 당시 조건을 보존하려면 별도 불변 주문 snapshot과 기간 모델이 필요하며 아직 생성하지 않았다. 금액·취소 정책은 사업자 입력으로 남기고 예시 상품을 DB에 넣지 않았다.
+
+후속 구현의 공식 근거(확인일2026-10-29):
+
+- [토스 결제 연동](https://docs.tosspayments.com/guides/v2/get-started/payment-flow), [API 명세](https://docs.tosspayments.com/reference): 서버가 주문과 금액을 저장·대조한 뒤 승인, 인증 리다이렉트만으로 구매 완료/광고를 부여하지 않는다. 재시도와 결과불명은 주문별 멱등 요청 및 PG 조회로 확인할 예정. 실제 공급사 검증은 아직 없음.
+- [OWASP Transaction Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html): 중요 거래 정보는 서버에서 결정·검증. 결제 방식 선택 후 주문 snapshot/소유자 확인을 구현해야 한다.
+- [OWASP Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html): 기본 거부·요청마다 권한 검사. 상품 API는 회원/운영자 세션 분리와 advertising 메뉴 권한을 실제 HTTP로 검증했다.
+
+검증: server23/23(광고5·운영자7·OpenAPI11), front382/382·브라우저6/6, admin8/8·브라우저4/4. 브라우저 API 대역과 실제 로컬 격리 MySQL 검증을 구분한다. 상품 관리 검사가 결제 기능의 완성을 증명하지 않는다. [전역 증거](../../crefans_front/docs/audit/advertising-20261029.json), 각 저장소 `.local/advertising-20261029/`에 실행 로그.

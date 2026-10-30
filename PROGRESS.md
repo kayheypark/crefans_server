@@ -1,5 +1,376 @@
 # PROGRESS: crefans_server
 
+## 2026-10-30 콩 환불 동결 핫픽스 (운영 배포: refund-hotfix-20261030, 미커밋)
+- 원인(오후 night-work 1순위, 격리 DB 재현): 우리 부분취소로 토스 상태가 PARTIAL_CANCELED/CANCELED가 되면 `beans.service.ts` applyProvider가 무조건 freezeCharge → 충전 disputed·후원받은 lot 동결·미수금.
+- 수정(server `src/platform/beans.service.ts`): 취소액(totalAmount−balanceAmount) ≤ refunded_amount+처리 중 환불액이면 정상, 넘을 때만 동결. 결과 불명 환불 대사(tick `beans-refund`, `reconcileRefund`: PG 기록에 취소가 있으면 완료, 없으면 같은 멱등키 `bean-refund-${id}`로 재요청). 완료·복원은 bean_refunds 행 FOR UPDATE 후 processing 재확인(동시 처리 1회). 같은 requestId 재요청이 failed면 409 BEAN_REFUND_FAILED. 환불은 판매 승인과 분리(`keyEnvironment`). front: `beanRefundOutcome`(lib/crefans/bean-refund.ts)으로 done만 "환불했어요", processing은 "확인하고 있어요", 확정 거절 시 새 requestId. admin Beans.tsx: 처리 중 표시·확정 거절 시 새 requestId.
+- 검증(14:52 KST): server platform-beans 28/28(2회), 신규 3테스트(모니터 정상 유지·외부 취소는 동결 / 대사 완료·재요청·동시 2회 1회 반영·거절 후 409 / 판매 승인 off에도 환불). 대조 4종(옛 판정·재확인 제거·판매 승인 의존·failed 재요청) 모두 실패 확인 후 원복. front check 418/418(대조 1종), e2e 14/14. admin npm test 8/8, e2e 21/21(신규 1, 대조 2종).
+- 배포(14:5x KST): API/worker/admin/front, 마이그레이션 없음, DB·proxy 보존. 운영 확인: health 200, 비로그인 refund-quote 401, 베타 목업 환불 흐름 정상·오류 0. 이미지 정리 로컬·운영 각 3개.
+- 미확인: 실제 토스 부분취소. 이미 동결된 충전 여부는 사용자 결정(2026-10-30 "안해도됨")으로 운영 DB를 조회하지 않음 — 베타 테스트 결제라 환불 사용자가 없다고 판단. 동결 문의가 오면 수동 복구.
+
+## 2026-10-30 오후 night-work 조사 문서 (문서만, 코드 변경 없음)
+- 위치: `crefans_front/.local/night-work/2026-10-30-1414.md` (14:14~14:32, 결정 질문 K1~K14).
+- 상위: ① 정상 콩 환불 뒤 PG 감시가 충전을 차지백으로 동결(pilot-followups 회귀, 재현) ② 안전성 확보조치 유예 조항 10/31 시행 — 운영자 2차 인증 없음 ③ 콩 환불 processing 대사 없음·프론트/콘솔이 실패를 완료로 안내 ④ 운영 코드 미커밋·가이드 git 없음 ⑤ 운영 IP 요청량 제한 없음 ⑥ 원천징수 의무 가능성 vs 세금 문구.
+
+## 2026-10-30 약관 초안 시행 전 개발 3묶음 (운영 배포 pilot-followups-20261030·미커밋)
+- 배포(2026-10-30 KST 사용자 "배포"): API/worker/admin/front `pilot-followups-20261030`, 마이그레이션 `20261030200000_pilot_followups` 운영 적용(배포 스크립트가 직전 mysqldump 백업), DB·proxy 컨테이너 보존. 폴더 `crefans_front/.local/pilot-followups-deploy-20261030/`(server 15·admin 4·front 18 파일). 운영 확인: 비로그인 refund-quote·admin receivables 401, health 200, 베타 목업 충전 내역 환불 신청 버튼 10·대화상자, 충전 화면 10%·5년 안내, 콘솔 로그인 안내 문구 없음, 페이지 오류 0. 이미지 정리 로컬·운영 완료. 미확인: 운영 worker의 새 작업(member-notices·bean-expiry·receivables) 실행 결과(운영 DB/로그 읽기는 권한 정책상 하지 않음), 실제 토스 부분취소·메일 발송.
+- 사용자 결정(클릭): 콩 환불은 지갑에서 직접 신청·자동 처리, 유효기간 5년은 충전콩(결제일)·프로모션콩(지급일) 모두, 크리에이터 탈퇴 전 최소액 미만도 전액 출금 허용, 게시물·댓글 숨김·이용 제한은 앱 알림+메일·공개 사유 필수.
+- 서버(crefans_server): 마이그레이션 `20261030200000_pilot_followups`(bean_charges.refunded_*, bean_lots.expires_at/expiry_noticed_at+기존 lot 5년 채움, moderation_actions.public_reason, bean_refunds·creator_receivables·member_notices). 콩 환불 API(refund-quote/refund, 운영자 회사 귀책 면제)·토스 부분취소(cancelAmount, 공식 문서 2026-10-30 확인), 만료 30일 전 1회 알림·메일과 만료 처리(회사 expired 계정), 만료 콩 사용 제외. 미수금: 멤버십 환불 후 가용 음수분 기록·이후 수익으로 자동 정산, 콩 차지백 시 paid 지급분 기록·운영자 정산 전 콩 출금 차단, 정산 알림. 운영 조치 publicReason 필수+앱 알림(운영 안내)+메일 큐. 크리에이터 탈퇴 조건(판매 중·구독 기간·미수금·남은 수익)과 closing 전액 출금(멤버십·콩). 30일 파기에 DM 양방향·문의·본인확인 해시. 신규 경로 5개(OpenAPI 163).
+- 프론트(crefans_front, 서브에이전트 구현 후 직접 재검증): 지갑 충전 내역 환불 신청 대화상자(공제·환불액·카드 3~4영업일 안내), 만료 예정 줄, 충전 화면 환불·유효기간 안내, 스튜디오 미수금·탈퇴 준비 안내와 "탈퇴 전 전액 출금"(조건 충족 시만), 탈퇴 창 크리에이터 조건 안내. 목업 콩 모델의 무한 재렌더 기존 버그 1줄 수정. 목업 한계: 콩 출금의 미수금 차단·목업 탈퇴 조건은 미반영.
+- 콘솔(crefans_admin, 서브에이전트 구현 후 직접 재검증): 게시물 숨김·회원 제한·댓글 숨김에 "당사자에게 보일 사유" 필수, 이력에 공개 사유, 콩 충전 환불(회사 귀책 체크), 미수금 섹션·콩 미수금 정산 완료. 로그인 화면의 "운영자 전용 계정…" 안내 문구 제거(사용자 요청).
+- 검증(2026-10-30 13:07 KST): server 신규 platform-pilot-followups 4/4, platform-beans 25/25(3회 연속), moderation 7/7, comment-social 6/6, openapi 11/11, 비통합 전체 42파일 중 41 통과(실패 1 = 기존 낡은 platform-beta-cohort). 서버 대조 6종(조치 알림·구독 기간·멤버십 미수금·DM 파기·10% 공제·만료 사용 제외) 모두 실패 확인 후 원복. e2e DB와 schema diff: 신규 테이블·컬럼 차이 없음(기존 콩 FK 표기 차이만). front tsc·check 417/417·e2e 25/25(에이전트 대조 4종), admin tsc·npm test 8/8·e2e 23/23(에이전트 대조 12종), 문서검사 PASS. 로컬 개발 DB(127.0.0.1:3307 crefans_platform_dev)에 신규 마이그레이션 적용(테스트가 그 DB를 직접 씀). 테스트 정리 보완: 콩 테스트의 만료 이동 되돌리기, 8번 테스트 차지백 미수금 정산.
+- 미검증: 실제 토스 부분취소(테스트 키 포함) 호출, 실제 메일 발송, 운영 반영. 약관 초안(`crefans_server/docs/terms-draft-20261030.md`)의 시행 전 개발 상태를 갱신(통신판매업 번호·등급 변경 남음).
+
+## 2026-10-30 /pilot-work 정책 동기화 (운영 배포: pilot-sync-20261030 + 가이드 pilot-sync-20261030, 미커밋)
+- 조사: 읽기 전용 3갈래(콩·정산/세무/약관·댓글/알림). 주의: 조사 지시 오류로 나온 "후원받은 프로모션콩 출금 불가"는 오탐 — 10/26 승인대로 후원받은 프로모션콩은 출금 가능(회사 부담), 운영자 직접 지급분만 불가. 상호 '좋아하는일해야지'도 정상.
+- 합의(사용자 클릭): ① 약관·운영정책·처리방침은 한 번에 새 버전 초안만(`crefans_server/docs/terms-draft-20261030.md`, 운영 미반영, 시행 전 개발 표시) ② 세금 문구 = "크레팬스는 정산 금액에서 세금을 떼지 않으며, 소득 신고·납부는 크리에이터 본인이 합니다." ③ 후원받은 콩(일반·프로모션) 보류 = 후원 시점+7일 ④ 댓글·알림 안내 전부 ⑤ 권리침해·불법촬영물·저작권 신고 접수 = 대표 박경호·khpark@crefans.com ⑥ 서버·프론트·콘솔 배포+가이드 반영.
+- 반영: server `beanPolicy.tipHoldDays=7`, `beans.service.ts` tip lot release_at=후원+7일(이전엔 충전 lot 상속, 후원 프로모션콩 즉시 출금 가능했음). 세금 문구: front support.ts·creator-payout-policy.ts·ServiceGuidePage.tsx, guide payouts·payout-setup·income-scenarios·service-introduction.mdx, 소개서 HTML+PDF 재생성(13쪽 경계검사). 보류 문구: 스튜디오 출금 안내·가이드·소개서·콘솔 초대 툴팁·platform-api.md·admin README. 댓글·알림: 알림 탭 고정 목록 멤버십·댓글·메시지·새 게시물, 알림 설정 안내, FAQ 4문항, 서비스 안내, 가이드 4문서(게시물·메시지/알림·커뮤니티·고객센터), types·preview-pages 태그 10명.
+- 검증(2026-10-30 KST): server platform-beans 22/22(신규 "후원 후 7일" 테스트; 기존 지급 테스트는 7일 경과 헬퍼), 대조(옛 상속 규칙으로 되돌리면 신규 테스트 실패) 확인. front check 406/406, e2e comment-social·comment-edit-delete·beans·promotion-payout 21/21, 알림 탭 대조 실패 확인. admin tsc·invites e2e 3/3. 문서검사 PASS(초안 manifest 등록). 가이드 격리 빌드(Node 22.23.4)·check:guides 0, 결과물에 '원천징수' 없음.
+- 배포: API/worker/admin/front pilot-sync-20261030(마이그레이션 없음, DB·proxy 보존), 가이드 정적 102파일(8페이지·PDF·검색색인 변경, 44파일 SHA 일치, 6컨테이너·Caddy 불변, 원복 guide-before-pilot-sync-20261030). 운영 확인: 알림 탭 4종, FAQ 댓글·차단·세금 새 문구(원천징수 없음), 스튜디오 "후원 후 7일 보류", 가이드 payouts 새 문구, health 200. 가이드 capture_before의 이전 릴리스 경로를 bean-wording으로 고친 뒤 실행(첫 시도는 사전검사에서 중단, 변경 없음).
+- 미결(약관 초안 시행 전 개발): 콩 환불·유효기간·만료 안내, 지급 후 미수금, 조치 알림·공개 사유, 크리에이터 탈퇴 조건, 메시지·문의·CI 해시 파기, 등급 변경, 통신판매업 신고 후 번호 표시. 지급자 원천징수 의무는 세무사 확인 전 미확정. 댓글 요청량 제한(분당5·시간당60)은 미구현. service-hierarchy.md(사용자 원문 계층도)의 알림 분류는 손대지 않음.
+
+## 2026-10-30 D9 댓글 묶음 + 답글의 답글 — 운영 배포 완료 comment-social-20261030 (미커밋)
+- 배포(2026-10-30 10:42 KST): API/worker/admin/front `comment-social-20261030`, 마이그레이션 없음("No pending migrations"), DB·proxy 보존. 폴더 `crefans_front/.local/comment-social-deploy-20261030/`(source-delta: server 6·admin 1·front 10 파일, next-env.d.ts는 e2e 생성물이라 제외). 운영 확인: 비로그인 mention-candidates·reports·admin 댓글 숨김 401, health 200, 베타 /preview/post/morning 태그 링크 21·댓글 신고 버튼 8·답글의 답글 버튼 3·"@하" 태그 후보 4·페이지 오류 0(live-preview.png). 이미지 정리 로컬·운영 각 3개 삭제·오류 0. 실회원 계정 실사용은 미확인.
+- 차단: 게시물 작성자가 차단한 회원은 새 댓글·답글 403 COMMENT_BLOCKED, 기존 댓글은 유지.
+- 알림(type comment, 목록 분류 '댓글'): 댓글→게시물 작성자, 답글→원 댓글 작성자(스튜디오 답글 포함), 태그→태그된 사람. 1인 1건, 작성자 본인·차단 관계 제외. bootstrap 알림 type은 한글 분류명으로 변환(subscription→멤버십, message→메시지, content→새 게시물, comment→댓글) — 이전엔 영어 값이 칩으로 보였음.
+- 멘션: 서버가 본문 "@이름"에서 판별(게시물 작성자 페이지 이름·닉네임 + 보이는 댓글 작성자, 같은 이름 2명 이상·본인 제외, 최대 10). 수정 시 재판별. GET /posts/:id/mention-candidates({name,image}, 열람 기록 없음). 프론트: "@" 입력 시 목록(↑↓·Enter/Tab·Esc, 모바일은 입력창 위), 본문 안 파란 링크(/creator/:id). 팬 화면 칩 목록 대신 본문 표시(스튜디오 칩은 그대로).
+- 댓글 신고: POST /reports kind=COMMENT, 댓글 행 "신고" + 사유 대화상자. 콘솔 신고 목록에 댓글 내용, "댓글 숨기고 처리 완료". POST/GET /admin/comments/:id/moderation(숨김 시 목록 제외·댓글 수 감소).
+- 결정(D9): 해지 회원 자기 댓글 삭제는 선택 안 됨(현행 유지).
+- 검증(2026-10-30 10:25 KST): server tests/platform-comment-social 6/6, moderation 7/7, studio-replies 5/5, beta-policy 11/11, openapi 11/11(158 경로). 대조 5종(차단·작성자 제외·동명 태그·숨김 신고·스튜디오 알림) 모두 실패 확인 후 원복. front check 406/406, e2e comment-social 4 + comment-edit-delete 4, 대조 4종(링크·신고 버튼·모바일 위치·Enter 선택) 실패 확인. admin e2e 7/7(신고 숨김 대조 1종 실패 확인), typecheck·lint·npm test 8/8. docs check PASS.
+- 미검증: 실제 iPhone 한글 IME에서의 "@" 목록 동작(Playwright는 IME 조합 미재현), 운영 DB 반영.
+- 근거: server `src/platform/service.ts`(addComment·resolveMentions·mentionCandidates·report), `moderation.ts`(moderateComment), `studio.service.ts`(createReply 알림); front `components/crefans/CommentMention.tsx`, `SocialPages.tsx`, `CommentComposer.tsx`; admin `src/components/console/Console.tsx`.
+
+## 2026-10-30 night-work 조사 문서 (문서만, 코드 변경 없음)
+- 위치: `crefans_front/.local/night-work/2026-10-30-0714.md` (07:14~07:48, 주제 39, 결정 질문 D1~D11).
+- 상위: 서버 밖 DB 백업 없음 / 멤버십 PG 입금 대사 화면 없음(공개 후 수익이 출금 가능으로 안 넘어감) / 불법촬영물·권리침해·저작권 수령인 절차 없음 / 지급 후 환불 회수 장치 없음·후원 콩이 충전일 보류 승계 / 원천징수·통신판매업 미비 / 콩 실판매 전 약관·고지·환불·잔액 집계 필요 / 운영자 2차 인증·내부 관리계획 없음 / 크리에이터 탈퇴·파기 범위 / 댓글 차단·신고·열람기록·알림 / 옛 화면 경로 노출.
+
+## 2026-10-30 회원 댓글 수정·삭제 API (운영 배포: comment-edit-20261030, 미커밋)
+- 운영 배포(2026-10-30 06:55 KST, comment-edit-20261030): API·worker·콘솔·프론트 교체, 마이그레이션 20261030140000_comment_edited 적용(로그 확인), DB 백업 /opt/crefans-backup-comment-edit-20261030. 확인: 로그인 없는 댓글 DELETE 401, beta /preview/post/morning에서 이탤릭 삭제 표시·수정됨·수정/삭제 버튼, 콘솔 CSS에 새 스낵바. 이미지 정리 로컬·운영 각 3개 삭제·오류 0. 근거 front `.local/comment-edit-deploy-20261030/`. 실회원 계정으로 댓글 수정·삭제는 아직 직접 확인하지 않았다. 폰트 되돌리기 스크립트(rollback-font.sh)는 이전 콘솔(스낵바·로딩 규칙 이전)로 돌아간다.
+- `PUT/DELETE /posts/:id/comments/:commentId`: 게시물 이용 권한 + 본인 댓글·답글만(403 NOT_COMMENT_AUTHOR, 404 COMMENT_NOT_FOUND). 수정은 1~1000자, 내용이 바뀔 때만 `comments.edited_at`. 삭제는 soft delete·comment_count 1회 감소. 목록 항목에 `edited`·`own`, 보이는 답글이 남은 삭제된 최상위 댓글은 `deleted:true` 자리표시(작성자·본문 비움). 삭제된 부모의 답글 조회 허용.
+- 마이그레이션 `20261030140000_comment_edited`(로컬 dev DB 적용). OpenAPI 계약·`docs/platform-api.md` 갱신.
+- 검증: platform-moderation 7/7(신규 7번), studio-replies 5, openapi 11, security 18. 대조: 작성자 검사 제거 시 2건 실패.
+- 남은 것: 프론트와 함께 운영 배포 승인 대기(마이그레이션 포함).
+
+## 2026-10-30 가입 전 개발 2~4(미검수 목록·신고 사유·탈퇴 후 파기) + 멤버십 콩 환산 철회 (운영 배포)
+
+- 배포 완료(사용자 "배포", 2026-10-30): `signup-prep-20261030` API·worker·admin·front. DB 백업 후 migration 4개(report_privacy_reason, post_review, member_purge, backfill_withdrawn) 적용. 운영 확인: 6컨테이너, 처리방침 2026-10-30.1·30일 파기 문구(beta·crefans.com), 프론트 빌드 '콩 상당' 0건·'개인정보 노출' 포함, 검수 API 비인증 차단. 폰트만 되돌리기 `sudo bash /opt/crefans-backup-signup-prep-20261030/rollback-font.sh`(대기 crefans-admin:signup-prep-plex-20261030). 기존 탈퇴자 30일 파기 기산일 = 이번 배포 시각. 증거 front `.local/signup-prep-deploy-20261030/`.
+
+- 미검수 목록(사용자 선택: 바로 공개+사후 숨김): migration `20261030090000_post_review` postings.reviewed_at/reviewed_by·인덱스. `POST /admin/posts/:id/review`(content.update), `GET /admin/posts?review=pending`(공개·미삭제·미숨김·미검수). 작성자 저장 시 reviewed_at 초기화(`studio.service.ts`), 숨김도 검수로 기록. 콘솔 콘텐츠 '검수 상태' 필터·'검수 완료' 버튼. 기존 게시물은 모두 미검수로 시작.
+- 신고 사유(사용자 선택: 기본 6개): migration `20261029190000_report_privacy_reason`(enum PRIVACY 추가). `POST /reports` reason 검증(INAPPROPRIATE·COPYRIGHT·SPAM·HARASSMENT·PRIVACY·OTHER, 생략 시 OTHER, 잘못된 값 400). 프론트 신고 창 라디오 6개(선택 전 신고 버튼 비활성, `lib/crefans/report-reasons.ts`), 콘솔 신고 목록 한글 사유.
+- 탈퇴 후 파기(사용자 선택: 게시물 삭제·댓글 익명화·30일 유예): migration `20261030100000_member_purge` members.withdrawn_at/purged_at. 탈퇴 시 withdrawn_at 기록·결제 카드 빌링키 즉시 해지 대상(기존 retryBilling). 잡 `member-purge`(`member-purge.ts`, 50건씩): 30일 경과 시 게시물 삭제, 회원 이메일·실명·닉네임('탈퇴한 사용자')·전화·사진·비밀번호·본인확인 해시·로그인 ID 제거, 크리에이터 프로필·핸들, 사용자 소개, 정산 계좌번호·예금주, 출금 PIN, 본인확인 실명, 가입 인증 기록 정리, 감사 로그. 댓글은 원문 유지·표시 익명화(기존). 주문·구독·출금·동의 기록은 회원 ID로 보존. 미디어 원본 삭제는 기존 MEDIA_DELETE 설정 따름(미연결). 이 기능 이전 탈퇴자: 사용자 결정(2026-10-30) '배포 시점부터 30일 후 파기' → migration `20261030110000_backfill_withdrawn`이 enabled=0·withdrawn_at 없음 회원의 withdrawn_at을 배포 시각으로 채움(사용자 확인: Cognito 미사용, 비활성화 경로는 탈퇴뿐). e2e DB 합성 4행으로 비활성 3건 선택·활성 제외 확인. 로컬 개발 DB의 이 migration 체크섬은 수정 후 다시 맞춤(운영 미적용).
+- 처리방침 7조를 실제 파기 절차로 갱신(30일 유예·파기 항목·게시물 삭제·댓글 익명 표시·첨부 원본 삭제 시점 별도), 문서 버전 2026-10-30.1. blocker '탈퇴·보유기간·실제 파기 절차 보완'은 사업자 확인 전까지 유지.
+- 사용자 지시로 '미구독 게시물 콩 참고 환산'(bean-notice-20261029로 운영 배포됨) 철회: PostMembershipNotice·membership-plans·bean-pricing·테스트를 커밋 상태(환산 이전)로 복원, CSS lockedMembershipPrice 제거, 전 저장소 '콩 상당/참고 환산' 0건. 대신 게시물 머리 둘째 줄에 `시각 · 멤버십 전용 · 월 ₩가격`(볼 수 있는 판매 중 최저가, 여러 개면 '부터'). AGENTS에 콩 환산 금지 규칙 추가.
+- 검증: server `platform-moderation` 6/6(검수 큐·작성자 수정 복귀·숨김=검수, 신고 사유, 30일 유예·파기 항목·댓글 익명 표시·1회 실행), 대조(수정 시 미검수 복귀 제거·유예 0일 각각 실패), legal 9/9, openapi 11/11(153경로), auth·admin-console·beans·security·signup-invites·studio-replies·finance·billing·payment-lifecycle 통과. admin typecheck·lint 오류 0·e2e moderation 4/4+control-heights 2/2. front check 399+social 29(머리줄 가격 신규).
+
+## 2026-10-29 관리자 게시물 숨김·회원 이용 제한 (가입 전 개발 1/4, 운영 배포)
+
+- 배포 완료(사용자 "지금 배포"): `moderation-20261029` API·worker·admin·front, DB 백업 후 migration `20261029180000_moderation` 적용. 첫 빌드에서 콘솔 린트(no-explicit-any) 실패 → 타입 지정 후 콘솔만 재빌드. 서버는 빌드 시점 사본 기준(이후 작업본의 신고 사유 변경은 제외). 운영 확인: 6컨테이너 정상, 조치 API 비로그인 401, 콘솔 번들에 운영 조치·이용 제한·조치 사유·애플 고딕 포함, 피드 200. 폰트만 되돌리기: `sudo bash /opt/crefans-backup-moderation-20261029/rollback-font.sh`(대기 이미지 crefans-admin:moderation-plex-20261029 보존). 증거 front `.local/moderation-deploy-20261029/`.
+
+- 약관 8조가 약속한 "게시물 비공개·계정 제한"이 없던 문제(가입 미시행 점검) 해결. migration `20261029180000_moderation`: postings.hidden_at/hidden_reason/hidden_by, members.suspended_at/suspended_until/suspension_reason, append-only `moderation_actions`(대상·조치·사유·기간·처리자·일시).
+- 서버 `src/platform/moderation.ts`(API 4개, content.update / members.update, 사유 필수, 감사 로그), `suspension.ts`. 숨김: `service.access()`에서 작성자 외 차단 + 피드·프로필·상세·저장목록 쿼리 `hidden_at:null`, 미디어 제한 대상, 게시물 후원 차단, 스튜디오 목록 `hiddenByOperator`. 제한: 세션 즉시 삭제, 로그인은 비밀번호 일치 후 403 ACCOUNT_SUSPENDED("이용이 제한된 계정입니다(…까지). 문의: khpark@crefans.com"), 토큰 검증·갱신 거부, 기간 지나면 자동 해제. 게시물은 회원 제한과 별개로 숨김.
+- 콘솔 `Moderation.tsx`: 콘텐츠 표 '운영 조치'(숨기기/해제·사유·이력), 회원 표 '이용 제한'(7일·30일·무기한·사유·이력). 조회 권한만 있으면 이력만. 권한표 설명 갱신. 프론트 스튜디오 게시물 목록에 '운영 정책에 따라 숨김'.
+- 검증: server 신규 `tests/platform-moderation.test.cjs` 3/3, 대조(숨김 검사 제거·제한 검사 제거 각각 1건 실패, 복구 후 통과), 관련 auth 3·auth-hardening 4·admin-console 12·admin-operators 7·beans 21·signup-invites 6·legal 8·openapi 11(152경로)·security 18 통과. `platform.integration`·`platform-access.integration`(별도 서버 필요 fetch failed)·`local-members`(전용 _test DB 필요)는 이 환경에서 실행 불가로 미검증. admin typecheck, e2e moderation 3/3+control-heights 2/2(스크린샷 확인). front check 401/401(신규 숨김 표시 테스트).
+- 미결: 신고 처리 화면에서 바로 숨기기 연결(현재 콘텐츠 표에서 별도), 이의제기 접수 경로, 정지 회원의 공개 프로필·게시물 노출 정책(현재 유지).
+
+## 2026-10-29 /pilot-work 합의: 베타 기간·콩 환불·보유기간·리전·개발 우선순위 (베타 문구 운영 배포: terms-text-20261029)
+
+- 일관성 점검에서 발견: 약관 2조·가입 안내·FAQ·이용안내는 "2주 베타", 가입 거절 알림은 "베타기간(~26년 11월)". 사용자 결정 → "2026년 11월까지"로 통일. 반영: `legal-documents.ts` 2조, `service.ts` signup guidance, front `support.ts` FAQ·`ServiceGuidePage.tsx`. `beta-policy.ts`의 `days:14`는 어디서도 쓰지 않는 값이라 그대로 둠(혼동 시 정리 후보). 약관 버전은 같은 미배포 릴리스의 2026-10-29.3에 포함.
+- 콩 환불 결정(조사 `docs/bean-refund-research-20261029.md`): 7일 내 미사용분 전액 철회, 7일 후 미사용분 10% 공제 환불(회사 귀책 면제), 사용분·지급 프로모션콩 제외, 유효기간 5년. 미구현 — 실결제 콩 판매(BEAN_LIVE_PAYMENTS_APPROVED) 전 충전 건별 사용량 추적·Toss 부분취소·약관/충전 화면 고지 구현 필요.
+- 탈퇴: 크리에이터 게시물 삭제, 다른 글의 댓글은 '탈퇴한 회원'으로 익명화, 계정 정보(이메일·실명·프로필) 30일 유예 후 파기, 거래기록은 법정 기간 별도 보관. 미구현.
+- 리전: 운영 로그·DB 백업 모두 서울 리전(오사카 백업·us-east-1 로그 계획 폐기). 처리방침 국외이전 표 정리 시 반영.
+- 가입 전 개발 순서(사용자 전부 선택): 관리자 게시물 숨김·회원 정지 → 베타 업로드 검수 → 신고 사유 분류 → 탈퇴 후 파기 작업. 아직 시작 안 함.
+- 검증: server legal 8/8·beta-policy 11/11·signup-mode 3/3, front check 400/400.
+
+## 2026-10-29 약관 6조 개별 합의 우선 조항 + 가입 미시행 3항목 점검 (운영 배포)
+
+- 배포 완료(사용자 "API·프론트·가이드 모두 배포"): `terms-text-20261029` API·worker·front. 기준 API terms-history·front bean-notice 소스에 server 2·front 7파일만 덮음. .env 이미지 2키·APP_RELEASE만 변경, admin·DB·proxy 유지. 운영 /api/v1/common에서 약관 2026-10-29.3·개별 합의 조항·'2026년 11월까지' 확인(beta·crefans.com). 가이드는 bean-wording-20261029로 별도 배포. 증거 front `.local/terms-text-deploy-20261029/`.
+
+- 사용자 선택: 개별 조건은 약관에 '개별 합의 우선' 조항으로 남김. `legal-documents.ts` 6조 끝에 "멤버십 판매 수수료율·정산 보류기간·콩 출금 수수료율·최소 출금 금액을 개별 합의한 경우 기본 기준보다 우선, 합의 후 새 구독 결제·새 출금 신청부터 적용·소급 없음, 변경 일시·내용·사유 기록, 스튜디오에서 확인" 추가. 문서 버전 2026-10-29.2 → .3. 검증: platform-legal 8/8(신규 1), openapi 11/11.
+- 가입 미시행 3항목(서브에이전트 읽기 전용 점검, 코드 근거): ① 탈퇴는 비활성화·세션 삭제뿐(`service.ts:104-117`), 이메일·실명·CI 해시·프로필·댓글·메시지·결제수단 잔존, 빌링키 삭제/토스 해지 없음, 만료 인증자료 정리 잡 없음, 감사로그 보유 문구(미확정)와 runtime 730일 예시 불일치, 거래기록 5년 분리 구조 없음. ② 국외이전: 오사카 백업 계획·CloudWatch/WAF us-east-1 계획이 처리방침에 없음, CloudFront 국가 목록·Google Workspace 리전·계약·Telegram DPA 미확인(사업자 확인 필요). ③ 성인 차단은 크리에이터 자가 플래그 기반(`studio.service.ts:18,23`), 미표시 업로드 차단 수단 없음, 관리자 게시물 숨김·계정 정지 API 없음(약관 8조 문구와 불일치), 신고 사유 'OTHER' 고정. 다음: 관리자 숨김·정지 기능, 베타 업로드 검수, 보유기간 표·백업/로그 리전 사업자 결정. blocker 해제는 사업자 승인 후에만.
+
+## 2026-10-29 크리에이터별 수수료·출금 조건 변경 이력 (운영 배포)
+
+- 배포 완료(사용자 "배포", 2026-10-29): `terms-history-20261029` API·worker·admin. 기준 API invites-terms·admin control-height 소스에 server 4·admin 2파일만 덮음. DB 백업 후 migration `20261029150000_creator_term_changes` 적용(기존 개별 조건은 backfill 1행). front·DB·proxy 컨테이너 유지, .env API_IMAGE·ADMIN_IMAGE·runtime APP_RELEASE만 변경. 운영 확인: 6컨테이너 정상, 초대·회원 조건 API 비로그인 401, 콘솔 번들에 변경 이력·변경 사유·시스템 기본값·멤버십 판매 수수료율·터치 44px 포함. 로그인 후 실제 저장·이력 표시는 미확인(운영자 비밀번호 필요). 백업 `/opt/crefans-backup-terms-history-20261029`, 증거 front `.local/terms-history-deploy-20261029/`.
+
+- 사용자 요청: 개인별 수수료 변경 이력을 쌓을 것. 운영 로그(감사)와 별도로 append-only 테이블 `creator_financial_term_changes`(member_id+version unique, 조건 4개, source admin/invite/backfill, changed_by 운영자 ID, reason, created_at) 추가. migration `20261029150000_creator_term_changes`가 이미 저장된 조건을 backfill 1행으로 옮김.
+- 기록: 콘솔 변경(`saveMemberTerms`)마다 같은 트랜잭션에서 1행, 변경 사유 필수(최대 500자). 초대 조건으로 가입하면 source invite·사유 "초대 조건 적용". 값이 같으면 저장·이력 없음. 조회 `GET /admin/members/:id/terms`의 `history`(최신 100건, 운영자 이름 포함).
+- 콘솔: 회원 조건 창에 변경 사유 입력(없으면 '조건 확인' 비활성), 확인 창에 사유 표시, 아래 '변경 이력' 표(일시·버전, 조건, 변경자·출처, 사유).
+- 검증: server invites 6/6(사유 필수 400, 이력 2행 순서·출처·변경자 이름·이전 값, 무변경 저장 시 이력 미추가), openapi 11/11. backfill SQL을 e2e DB 합성 1행에 실행해 값·출처 확인 후 삭제. 대조: 이력 기록 제거 시 1건 실패, 복구 후 통과. admin typecheck·check 8/8, e2e invites+control-heights 5/5(조건 창 실제 서버 응답 포함). 로컬 개발 DB에 migration 적용.
+
+## 2026-10-29 초대 등록·확인 창에 시스템 기본값 표시, 수수료 명칭 정리 (운영 배포)
+
+- 운영 배포: 위 terms-history-20261029 릴리스에 포함.
+
+- 사용자 요청(iPhone 화면 2장): 초대 등록·조건 확인 창에 현재 시스템 기본값이 보이지 않음. 서버 `/admin/invites` 응답에 `defaults`(플랫폼 수수료·보류일은 DB 금융 정책, 콩 수수료·최소 출금은 코드 기본값)를 추가하고, (콘솔) 조건 영역에 "현재 시스템 기본값: …" 한 줄, 입력 안내 "비우면 기본 N", 확인 창 "기본 20% → 15.5%"로 표시. 기본값이 미설정이면 "기본값(미설정)".
+- 용어: "멤버십 플랫폼 수수료율"이 크리에이터가 다른 멤버십을 살 때로 오해될 수 있어 "멤버십 판매 수수료율"로 바꾸고 "팬이 이 크리에이터의 멤버십을 결제할 때 플랫폼이 가져가는 비율" 설명 추가(회원 조건 창도 공통).
+- 검증: server invites 6/6(defaults 포함)·openapi 11/11, admin typecheck, e2e invites+control-heights 5/5, iPhone 13 에뮬레이션 스크린샷 확인. 운영 기본값 실제 수치는 운영 DB 조회 권한이 막혀 확인하지 못함(화면은 서버 값을 그대로 표시).
+
+## 2026-10-29 초대 회원 관리 + 크리에이터별 수수료·출금 조건 (운영 배포)
+
+- 배포 완료(사용자 "배포해", 2026-10-29): `invites-terms-20261029` API·worker·admin·front 한 릴리스. 기준 소스 API/front invite-notice, admin advertising에 변경 파일만 덮음(server 14·admin 5·front 5). DB 백업 후 migration `20261029120000_signup_invites` 적용(운영 29개, 두 테이블 0행). DB·proxy 유지, .env 이미지 3키·runtime APP_RELEASE만 변경. 운영 확인: beta·crefans.com 비초대 가입 코드 403, `/admin/invites` 비로그인 401, 콘솔 /console/invites 200·번들에 초대 화면 포함. 운영 로그인 후 실제 초대 등록·조건 저장은 미확인(운영자 비밀번호 필요). 첫 빌드 시 로컬 Docker 멈춤 → 강제 재시작 후 빌드, 운영 영향 없음. 이미지 보존 3개(로컬·운영 각 3개 삭제). 백업 `/opt/crefans-backup-invites-terms-20261029`, 증거 front `.local/invites-terms-deploy-20261029/`.
+
+- 사용자 요청: 관리자 화면에서 초대 회원 등록 + 해당 크리에이터의 수수료·출금 조건 설정. 사용자 결정(AskUserQuestion): 항목 4개(멤버십 플랫폼 수수료, 정산 보류일, 콩 출금 수수료, 최소 출금 금액), 변경은 이후 건부터만, 초대 등록과 회원 목록 양쪽에서 관리. 최소 출금 금액은 멤버십 정산 출금·콩 출금 공통(콩 1개=100원 환산)으로 해석.
+- DB: `signup_invites`(이메일 unique·메모·개별 조건 4개 nullable·used/revoked·version), `creator_financial_terms`(member_id PK, 4개 nullable=기본값). migration `20261029120000_signup_invites`.
+- 가입: `signup-policy.ts` `assertInvited` = env SIGNUP_EMAIL_ALLOWLIST 또는 활성 콘솔 초대. 인증 코드 요청·가입 제출 모두 적용. 가입 트랜잭션에서 `consumeInvite`가 초대를 소진하고 조건을 회원에게 복사, 그 사이 취소된 초대는 403으로 롤백.
+- 적용: `paymentPolicy(db,creatorId)`가 신규 구독 주문 스냅샷에 개별 수수료·보류일(creatorTermsVersion 포함)을 기록, 갱신 결제는 기존 스냅샷 유지(기존 전역 정책과 같은 방식). 멤버십 정산 출금 최소액(`finance.review`)과 콩 출금 견적(`beanWithdrawalQuote` 수수료·최소, payout fee_bps)은 신청 시점 조건. 스튜디오 응답에 `creatorTerms`(정산)·`policy`(콩) 개별값.
+- 관리자 API: `/admin/invites` CRUD(invites 메뉴 권한 신설), `/admin/members/:id/terms` GET/PUT. 조건 변경은 settings.update + 확인 문구 '정책 변경'(서버 검사), expectedVersion 충돌 409, 감사 로그에 전후 값(이메일은 해시만).
+- 검증(로컬 e2e DB, 파일별 순차): 신규 `tests/platform-signup-invites.test.cjs` 6/6. 영향 테스트 openapi 11, beta-policy 11, signup-mode 3, legal 7, auth 3, auth-hardening 4, bean-ledger 5, financial-policy 8, admin-operators 7, admin-console 12, advertising 5, beans 21, finance 9, billing 6, payment-lifecycle 41 모두 통과. 기존 테스트 수정: openapi 경로 수 142→148·콘솔 문서 49→55, legal 테스트 가짜 DB에 signupInvite 추가. 대조 실험: DB 초대 확인 제거 → 신규 테스트 실패, 개별 수수료 무시 → 실패, 복구 후 6/6. 로컬 개발 DB(127.0.0.1:3307)에 migrate deploy 적용. 프론트 docs check PASS(routes 148, migrations 29).
+- 미검증·남은 것: 실제 가입 완료까지의 E2E는 약관 미시행(POLICY_NOT_PUBLISHED)이라 불가 — 초대 소진은 함수 단위로 검증. 멤버십 상품 만들기 화면의 가격 안내(`membershipPriceHint`)는 아직 기본 20% 기준. 개별 조건은 크리에이터 약관 6조(기본 20%·7일·10만 원)와 다를 수 있어 별도 개별 합의서가 필요한지 사업자 결정 필요. 커밋·푸시 없음.
+
+## 2026-10-29 베타 가입 초대 확인을 약관 검사보다 먼저 + 안내 문구 (운영 배포)
+- 배포 완료(사용자 "해", 2026-10-29): API·worker·front `invite-notice-20261029` 한 릴리스. 기준 소스 API privacy-ci(214파일)·front signup-notice(684파일)에 auth.service.ts·signup-policy.ts·AccountPages.tsx 3파일만 덮어씀(매니페스트 차이 3파일만 확인). admin·DB·proxy 유지, .env 이미지 2키·runtime APP_RELEASE만 변경. 운영 확인: beta·crefans.com·www에 비초대 이메일로 `POST /api/v1/auth/signup/email/request` → 403 SIGNUP_INVITE_REQUIRED + 베타 안내 문구(배포 전 503 POLICY_NOT_PUBLISHED). beta /service/signup 브라우저에서 인증 코드 받기 → "가입 안내" 다이얼로그 표시·확인으로 닫힘. 운영 SIGNUP_EMAIL_ALLOWLIST 비어 있어 전원 안내 표시. 이미지 보존 3개 정리(로컬·운영 각 2개 삭제). 증거 front `.local/invite-notice-deploy-20261029/`.
+
+- 사용자 요청: 가입 화면에서 "인증 코드 받기"를 누르면 관리자가 지정한 이메일인지 먼저 확인하고, 아니면 "베타기간(~26년 11월)에는 사전 협의된 유저만 가입할 수 있습니다. 빠른 시일 내에 그랜드 오픈을 준비하겠습니다." 알림.
+- 변경: `signup-policy.ts` SIGNUP_INVITE_REQUIRED 문구를 위 문장으로(INVITE_REQUIRED_MESSAGE). `auth.service.ts` requestCode 순서를 이메일 형식 → 초대 확인 → 약관 시행 확인 → 발송 제한으로 변경(초대된 이메일은 여전히 약관 시행 전이면 POLICY_NOT_PUBLISHED). 가입 제출(signup)의 초대 확인은 기존과 같음.
+- "관리자 지정 이메일" = 운영 runtime.env `SIGNUP_EMAIL_ALLOWLIST`(쉼표 구분, 현재 비어 있음, BETA_MODE=true라 아무도 통과 못함). 관리자 콘솔 편집 기능은 없음.
+- 검증: legal 테스트를 초대 이메일 기준으로 갱신 + 비초대 이메일의 코드·문구 검사 추가. signup-mode·beta-policy·auth-hardening·mail 파일별 통과(같은 e2e DB 테스트 동시 실행 시 충돌 → 파일별 실행). 대조: dist에서 순서 원복 시 실패.
+- 위험: 약관 검사 전에 초대 여부가 응답돼 초대 이메일 여부를 추측할 수 있음(초대=503, 비초대=403). 베타 소수 명단이라 수용, 필요 시 IP 단위 제한 검토.
+
+## 2026-10-29 개인정보처리방침에 CI 명시 (KG이니시스 CI 기재 가이드, 운영 배포)
+
+- 근거: 이니시스 심사표 "개인정보처리방침 URL 세부사항" 시트 — 수집 항목에 "CI" 텍스트 필요, 미기재 시 카카오 인증서 미노출, 예시 "[암호화된 이용자 확인값(CI)]".
+- 변경(`src/platform/legal-documents.ts`, version 2026-10-29.2): 처리방침 2절에 본인확인 시 공급자로부터 받는 항목(이름·생년월일·성별·내외국인·휴대전화번호·암호화된 이용자 확인값(CI)·DI·인증 결과)과 실제 저장 범위(실명, CI 비가역 검증값, 만19세 여부, 인증 결과; 생년월일은 판단에만, 성별·내외국인·전화·DI 미저장)를 명시. 8절에 KG이니시스 통합인증과 연결 인증사 이용 예정과 처리 항목. 가입 안내(collection)에도 CI 명시. 저장 범위는 `auth.service.ts`·`identity-provider.ts`(name, identity HMAC, adultVerified) 기준.
+- 검증: 빌드 후 legal·signup-mode·beta-policy·mail 36 통과 + 신규 CI 문구 테스트(대조: dist에서 문구 제거 시 실패, 복원 시 통과).
+- 배포 완료(사용자 "배포"): API·worker privacy-ci-20261029만 교체(front/admin/DB/proxy 유지, 소스 211 일치). 운영 beta·crefans.com 처리방침에 "암호화된 이용자 확인값(CI)" 2곳, 버전 2026-10-29.2 확인. 증거 front `.local/privacy-ci-deploy-20261029/`. 심사표 13번 Y로 기입(남은 빈칸은 7번만). 이니시스 계약 확정 시 수탁 문구를 "예정"에서 확정으로 갱신.
+
+## 2026-10-29 고객지원 이메일 khpark@grade.im → khpark@crefans.com 일괄 변경 (코드만, 미배포)
+
+- 사용자 지시: 약관·서비스의 grade.im 이메일을 khpark@crefans.com으로 일괄 변경.
+- 변경: `src/platform/legal-documents.ts` 3곳(이용약관 운영자 정보, 처리방침 처리주체·권리 연락처) + 법률문서 version `2026-10-29.1`·updatedAt 2026-10-29(effectiveAt null·가입 미시행이라 기존 동의 영향 없음). `src/auth/local/mail/templates.ts` 메일 하단 연락처·replyTo. 테스트 `platform-beta-policy` 기대값. guide `help/contact.md`, `resources/service-introduction.mdx`(2), `brochure/service-introduction.html`(3). front `lib/content/business.ts` 주석.
+- 검증: `npm run build` 후 `CREFANS_E2E=true node --test` beta-policy·legal·mail-templates·signup-mode 36 통과. 대조: dist 템플릿을 옛 주소로 되돌리면 1건 실패, 복원 시 통과.
+- 미변경: 명함(`front public/brand/business-cards/khpark-front.png` 이미지와 `BusinessCard.tsx` alt)은 인쇄 디자인이라 재제작 필요, 감사 증거 JSON(과거 기록), 이니시스 심사표 담당자 이메일(문의 발신 주소).
+- 배포 완료(2026-10-29, 사용자 "지금 배포해"): API·worker legal-email-20261029(front 증거 `.local/legal-email-deploy-20261029/`), 가이드 정적 email-20261029(가이드 `.local/deploy-email-20261029/`). 운영 /api/v1/common 법률문서 3종 2026-10-29.1, grade.im 0.
+
+## 2026-10-29 crefans.com·www.crefans.com 서비스 전체 연결 (가이드 이동 해제, 운영 반영)
+
+- 저장소 `infra/platform/Caddyfile`을 운영본(sha256 5aa1a3d6…)과 맞췄다(서브도메인 3개·루트/www 앱 블록, 루트 가이드 이동 블록 삭제).
+- 심사표 7번 준비: 프론트 사이드바·설정 하단 사업자 정보 배포(front PROGRESS footer-business-20261029). 비로그인 모바일에는 미표시.
+- 사용자 결정: 심사표 결과 수신 URL ①②가 동작하도록 루트·www도 베타와 같은 서비스·API를 보여 준다. 같은 날 오전의 "루트→가이드 302"를 대체한다.
+- 적용: Caddyfile에서 루트 이동 블록 제거, 앱 블록 호스트에 crefans.com·www.crefans.com 추가. runtime.env `FRONTEND_ORIGINS`에 두 주소 추가, API·worker만 재생성. 다른 env 줄 변경 없음(diff). 백업 `/opt/crefans-backup-rootdomain-service-20261029`, 증거 front `.local/rootdomain-service-20261029/`.
+- 확인(6개 도메인 모두): http 308, 첫 화면 302→/service/feed, 피드 200, /api/v1/health 200, 자기 출처 로그인 요청 400(출처 통과), 외부 출처 403. 루트·www 인증서 Let's Encrypt 유지(2027-01-27). admin·guide 200, business 302. proxy·DB·admin·frontend 재시작 0.
+- 남은 일: `/api/v1/identity/inicis/result` 미구현(모든 도메인 404). 심사표 7번 하단 사업자 정보, 13번 처리방침 CI. 가이드는 guide.crefans.com으로만 접근.
+
+## 2026-10-29 심사용 서브도메인 www-stage·www-dev·www-local 개방 (운영 반영)
+
+- 사용자 요청: KG이니시스 심사용으로 세 주소를 외부에서 열고 로그인까지 되게. 서버 증설 없이 기존 EC2 한 대·같은 소스·같은 운영 DB를 쓴다(이름만 stage/dev/local).
+- 적용:
+  - Route 53 A 레코드 3개 추가(15.164.140.26, TTL 60). 기존 레코드 없음 확인 후 CREATE.
+  - Caddyfile 앱 블록에 세 호스트 추가(베타와 같은 화면·API, CloudFront 없이 직접). caddy validate → same-inode 덮어쓰기 → reload.
+  - runtime.env `FRONTEND_ORIGINS`에 세 주소 추가, API·worker만 재생성. 다른 env 줄은 그대로임을 diff로 확인.
+  - 백업 `/opt/crefans-backup-subdomain-review-20261029`. 증거 front `.local/subdomain-review-20261029/`.
+- 확인: 세 주소 모두 http 308→https, Let's Encrypt 인증서(2027-01-27 만료), /service/feed 200, /api/v1/health 200, 허용 출처 로그인 요청 400(입력 검증까지 통과), 외부 출처 403. beta·admin·guide 200, business 302, crefans.com→가이드 302 유지. proxy·DB·admin·frontend 컨테이너 유지, 재시작 0.
+- 쿠키 분리(사용자 요청): 운영에 `COOKIE_DOMAIN`이 없어 회원 쿠키(access/id/refresh)는 이미 Domain 없는 호스트 전용이다. www-dev와 beta의 Set-Cookie에 Domain 속성이 없음을 확인했다. 따라서 주소마다 로그인이 따로이며 코드 변경은 없다. `COOKIE_DOMAIN=.crefans.com`을 넣으면 공유되므로 넣지 않는다. 관리자 쿠키도 호스트 전용.
+- 남은 일: 세 주소 하단에 사업자 정보 표시(심사표 7번). 결과 수신 경로 `/api/v1/identity/inicis/result`는 미구현.
+
+## 2026-10-29 KG이니시스 신청서류 기입안 작성 (문서만)
+
+- 대표 준비 현황(2026-10-29): 사업자등록증 2026-09-12 발급본(~/Documents) 사용, 통장 사본(KB 사업자통장, 대표자 명의) 준비됨, 박경호 개인 인감도장 주문함 → 수령 후 주민센터 인감 신고·인감증명서 발급, 계약서 2부 같은 도장 날인. 심사표·로고는 이니시스 안내 메일에 회신, 서류는 우편.
+- 로고 완료: 심사표 14·15번 Y, 16·17번 파일명 기입(`좋아하는일해야지_834x192.png`). 남은 빈칸은 7번(하단 사업자 정보)·13번(처리방침 CI). 제출 묶음 `draft/submit/`에 xlsx·docx·PNG 2종.
+- 심사표 URL 수정(사업자 결정): 복수 사이트 Y, 서비스명=사업자명, 홈페이지 ① crefans.com ② www ③ beta ④ www-stage ⑤ www-dev ⑥ www-local(.crefans.com, ④~⑥ DNS 없음), 결과 수신 URL은 각 도메인 `/api/v1/identity/inicis/result`(미구현). 제출용 파일 `.local/inicis-reply-20261029/draft/submit/`.
+- **메일 전송 금지(2026-10-29 사용자 지시):** 이니시스 관련 메일·서류는 사용자가 직접 확인한 뒤 직접 보낸다. 에이전트는 Gmail 작성·발송·회신, 우편·계약 진행을 하지 않는다.
+- 사용자 결정: 본인확인(03)+간편인증(01) 신청, 전자서명 미신청. 업종 "커뮤니티", 오픈 일정 "추후 오픈". 사업자 정보는 사용자가 채팅으로 주면 로컬 기입본(`.local/inicis-reply-20261029/draft/`)에만 넣는다.
+- `docs/inicis-application-prep-20261029.md`: 심사자료 제출서 25항목·계약서 기입안, 제출 전 준비물, 제출 순서.
+- 발견한 제출 전 준비 사항: 서비스 하단 사업자 정보가 주석 처리된 자리표시값이라 심사표 7번(계약주체 일치)을 지금은 Y로 쓸 수 없다. 처리방침에 CI 기재가 없다(없으면 카카오 미노출). 결과 수신 URL은 제안 경로(`/api/v1/identity/inicis/result`)이며 미구현.
+- 로컬 기입본 작성(`.local/inicis-reply-20261029/draft/`): 심사표 xlsx(셀 XML만 수정, 이미지·서식·다른 시트 해시 동일, openpyxl로 값 재확인)와 계약서 docx(부칙·갑 정보·단가). 사업자 정보는 공개 약관 원문, 담당자 이메일은 사용자 Gmail의 이니시스 문의 발신 주소(읽기만).
+- 사업자 확인: 메이크샵 가계약 MID 메일은 크레팬스와 무관하고, 좋아하는일해야지의 서비스는 크레팬스(독립몰) 하나다. 결제 PG는 토스페이먼츠(사업자 확정), 이니시스는 인증 전용. 계약서 MID를 "추후발급"으로 기입했고 PG 미이용 사업자 절차(원본 우편 제출)로 진행한다.
+- 남은 일: 로고 PNG 2종, 푸터 사업자 정보·처리방침 CI 반영(배포는 별도 지시) 후 심사표 7·13·14·15·17번 채우기. 계약서 Word 인쇄 모양 확인. 발송·계약 없음, 커밋 없음.
+
+## 2026-10-29 KG이니시스 회신·계약 준비 목록 확인 (읽기 조사)
+
+- 사용자가 지정한 Chrome Gmail의 상품운영팀13:40 회신과 첨부 계약서·심사표3시트·FAQ를 읽었다. 기존 작성 중 초안은 수정하지 않았으며 외부 발송·계약·심사 제출·결제·운영DB쓰기 없음.
+- 최신 준비 목록과 조건은 `docs/inicis-identity-research-20261029.md` 상단에 추가. 회원가입은 본인확인03 우선, 간편/전자서명 별도선택. KG MID 미보유 시 원본2부 우편계약, 심사표/PNG2종 동시 준비, 계약 후 테스트정보, 약3주 예상 안내. 비공개 단가는 공개문서 대신 `.local/inicis-reply-20261029/private-quote.json` 보관.
+- 계약서 CI 즉시파기와 회신의 본인확인 보관 허용, 삼성/농협 인증서 표시, 청구일10일/10영업일, 서명 대체 서류명 불일치는 담당자 서면확인 필요로 구분. 기존 사전조사의 과도한 유일성/콜백메서드 단정은 재사용 금지 표시. 실제 본인확인 구현·개통·실인증 검증은 이번 범위 아님.
+- 증거 `.local/inicis-reply-20261029/research-evidence.json`, 원본3개 SHA·전체 추출·PDF1쪽 육안·공식2페이지 대조. DOCX 변환의 한글 폰트 누락은 한계로 기록하고 원본XML 본문/표로 읽음. 원본 파일 변경 없음. 공통 문서검사는 front `.local/event-guide-deploy-20261029/docs-checks.json` 참조. 기존 변경 보존, 커밋/푸시 없음.
+
+## 2026-10-29 루트 도메인 HTTPS (crefans.com, www.crefans.com → 가이드)
+
+- 증상: crefans.com과 www.crefans.com에 접속이 안 됐다. 원인은 Route 53에 두 이름의 A 레코드가 없던 것이다. 이름 해석에 실패해 브라우저가 계속 재시도했다.
+- 조치(사용자 요청: 루트 도메인은 가이드로 이동):
+  - Route 53에 두 A 레코드를 만들었다(15.164.140.26, TTL 60). 기존 MX·SPF·DKIM은 그대로 뒀다.
+  - Caddyfile에 `crefans.com, www.crefans.com` 블록을 추가했다. Let's Encrypt 자동 인증서, `https://guide.crefans.com/`으로 302, HSTS.
+  - 운영 proxy에서 검증한 뒤 same-inode로 덮어쓰고 reload했다. proxy 재시작은 없었다. 백업: `/opt/crefans-backup-rootdomain-20261029`.
+- 확인:
+  - http는 308로 https가 된다. https는 302로 가이드로 간다(경로가 있어도 가이드 첫 화면).
+  - 인증서: Let's Encrypt, 2027-01-27 만료, 자동 갱신.
+  - beta·admin·guide·business 모두 200, proxy 재시작 0.
+  - 로컬 맥은 DNS 부정 캐시 때문에 잠시 해석에 실패해서 `--resolve`로 확인했다.
+- 증거: front `.local/rootdomain-https-20261029/`.
+
+## 2026-10-29 KG이니시스 본인확인 사전조사 (코드 변경 없음)
+
+- 사용자 요청: 회원가입·본인인증 용도로 KG이니시스 도입을 조사. 결과는 `docs/inicis-identity-research-20261029.md`에 있다.
+- 결론:
+  - 공개 테스트 키가 없어 계약 전에는 실연동 테스트를 할 수 없다.
+  - 법적 본인확인은 `reqSvcCd=03`만 해당한다. PASS·카카오·네이버는 본인확인이 불가하고, 휴대폰 SMS는 별도 제휴다.
+  - 성인 판정은 `userBirthday`로 할 수 있다.
+  - 현재 어댑터 구조는 직접 연동으로 바꿔야 한다: 자동 제출 form, 서버 결과 조회, SEED 복호화, 20byte `mTxId` 컬럼.
+  - SEED는 Node 기본 설정에서 거부되고, 로컬에서는 legacy provider로만 동작했다.
+  - 청소년보호법 시행령 제17조에 따른 1년 재확인 필드가 필요하다.
+- 사업자 결정 대기: 공급사(이니시스·휴대폰 제휴·NICE 비교), 성인 업종 심사, 단가, 간편인증 인정 여부, 1년 재확인과 기존 회원 처리. 문의는 발송하지 않았다.
+- 추가 조사(같은 문서 하단):
+  - 네이버·토스·PASS·카카오를 한 창에서 지원하는 것은 이니시스 통합인증뿐이다(직접 또는 포트원).
+  - 포트원 헬프센터 기준으로 성인 업종은 네이버·토스·카카오 전면 불가, PASS 부분 가능이다.
+  - 계약 없이 운영할 수 있는 곳은 없다(포트원도 PG 계약 필수, 다날은 테스트 환경 없음).
+  - 가장 빠른 테스트는 토스인증 직접 연동이다(이메일 요청 후 가상 인물 테스트).
+  - 사업자 확정(2026-10-29): 크레팬스는 성인 업종이 아니다. 이니시스 통합인증(네 가지 모두)이 우선 후보가 됐다. 다만 19세 가입 제한과 민감 콘텐츠 기능을 신청서 설명과 맞춰야 한다.
+
+## 2026-10-29 WAF 적용 비용 조사 (보류)
+
+- WAF 읽기 전용 조회 결과:
+  - beta CloudFront Web ACL은 규칙 0개·기본 허용이고 로그 설정이 없다.
+  - admin·guide·business·원본은 EC2로 직접 연결돼 WAF를 거치지 않는다.
+  - 최근 30일 beta 트래픽: 요청 11만 건, 15.3GB.
+- 전부 CloudFront+WAF로 옮기는 비용(상세와 재개 순서는 `infra/platform/resilience-runbook.md` 7절):
+  - A안: 전부 Free, 월 약 0달러.
+  - B안(권장): beta만 Pro, 월 15달러.
+  - C안: 종량제, 월 약 7~8달러.
+- 사업자 결정: 문서로 저장하고 보류. 원본 우회 차단은 Caddy 비밀 헤더 검사가 필요하다(보안 그룹을 좁히면 인증서 갱신이 막힘).
+
+## 2026-10-29 보안 점검 항목 보완 (운영 반영 security-20261029, AWS 미적용)
+
+- 사용자 결정(2026-10-29): AWS 변경은 스크립트·절차만 준비, 콘솔 세션 12시간/유휴 1시간, 감사 로그 장기 보관 후 자동 삭제, 운영 배포는 별도 지시. 보관기간은 처음 제시한 1년이 아니라 730일로 정했다. 안전성 확보조치 기준 제8조의 2년 대상 여부를 확정하지 못했고 삭제는 되돌릴 수 없기 때문이다(`docs/operational-logging.md`).
+- AUTH-01 이메일 변경 요청에 현재 비밀번호(회원별 10분 5회). AUTH-02 회원·운영자 로그인 세션 생성 때 회원/운영자 행을 잠그고 검증한 해시와 비교(비밀번호 변경·재설정과 직렬화). AUTH-03 `ADMIN_ORIGINS` 분리·콘솔 경로와 관리자 쿠키에 Origin 필수(`middleware.ts::originGuard`), 콘솔 도메인에서 회원 auth 경로 제거. AUTH-04 비밀번호 설정 공통 계약 8~128자·앞뒤 공백 거부, 로그인은 이전 저장값(공백 trim/256자) 호환. AUTH-05 콘솔 절대 12시간·유휴 1시간·갱신 시 연장 없음.
+- FIN-01 토스 조회 오류(403 조회 제한 등)와 ALREADY_CANCELED_PAYMENT를 실패가 아닌 결과 불명으로 분류. FIN-02 콩 대사·출금 항목별 오류 격리, 환불/출금 배치 순환(updated_at). FIN-03 PIN 재설정 시 콩 출금 승인도 회수. FIN-04 결제 120일 이내 paid 멤버십을 분당 10건 공급사 재조회: 전액 취소면 환불과 같은 경로로 1회 정정, 부분취소·불일치는 운영 알림만.
+- OPS-02 watchdog 확장(결제/환불/콩 30분, 알림 적체 15분, 광고 메일 불명, 로그 정리 지연), worker tick 15분 정체 시 종료→재시작, API healthcheck. OPS-03 동의 안내 우선 발송. OPS-04 운영자 요청 기록은 감사 보관기간을 따르고 730일 미만 거부. WEB-01 HSTS·frame-ancestors(Caddy 4개 도메인). DEP-01 server audit 25→8(남은 것은 Nest 11 필요, SSE·TCP microservice·FileTypeValidator 미사용으로 해당 경로 없음).
+- 준비만: `infra/platform/resilience-runbook.md`(외부 백업·CloudWatch/Route53·CloudTrail·S3 버전관리·WAF COUNT), `backup-offsite.sh`(미실행), `restore-rehearsal.sh`(로컬 dev 덤프 통과, 깨진 덤프·해시 불일치 대조 실패 확인).
+- 검증: build 0, 전체 서버 테스트 361 중 355 통과·1 skip·5 실패. 실패 5건은 이번 변경과 무관(실 AWS opt-in 필요 1, 로컬 토스 키 설정으로 미설정 기대 2, 10-28 운영자 분리 후 갱신 안 된 기대값 2: beta-cohort 관리자 가드·integration /admin/documents 403→401). local-members 12/12. 신규 회귀 AUTH 4·FIN 4, 수정 전 동작으로 되돌린 빌드에서 AUTH-02/FIN-01/FIN-03 실패 확인. Caddy validate 통과. 로컬 dev DB에 운영과 같은 미적용 마이그레이션 3개 적용(삭제 대상 0행 확인).
+- 운영 반영 2026-10-29 `security-20261029`:
+  - 교체: API/worker·front. 유지: 콘솔 이미지(코드 변경 없음)·DB·proxy.
+  - runtime.env에 `ADMIN_ORIGINS`, `OPERATIONS_WATCHDOG_ENABLED=true`, `AUDIT_RETENTION_DAYS=730` 추가.
+  - compose.yml에 API healthcheck 추가. Caddyfile은 same-inode로 교체 후 validate·reload.
+  - 마이그레이션 변경 없음. 백업: `/opt/crefans-backup-security-20261029`.
+  - 운영 확인: 콘솔 로그인 팬 Origin 403·Origin 없음 403·콘솔 Origin 401, 콘솔 도메인 회원 auth 404, HSTS·frame-ancestors 확인, API healthy, 소스 해시 일치.
+  - 증거: front `docs/audit/security-deployment-20261029.json`. 커밋·푸시 없음.
+
+## 2026-10-29 보안·장애 대응 점검 (광고상품 배포 후, 개선 미적용)
+
+- 인증/권한·금융/미디어·장애복구 AI 검토 3개를 통합하고 운영/AWS 읽기와 격리 검증을 수행. 보고서: `crefans_front/docs/security-review-20261029.md`, 증거: `crefans_front/docs/audit/security-review-20261029.json` 및 프론트 `.local/security-review-20261029/`. 실제 외부 감사/공인 인증 아님.
+- P1: 지원 종료 Next14/패치 지연, 이메일 재인증 누락, 비밀번호 회수-로그인 경쟁, PG 조회 제한 오분류/외부 멤버십 취소 대사, 동일EBS 백업 의존, watchdog off/독립 감시 부재. 기타 PIN 콩승인 회수·배치 격리·Origin/비밀번호/세션·로그/미디어복원 보완을 기록. 실제 침해·이중 청구가 발생했다고 단정하지 않음.
+- 검증: 서버 빌드0·격리 E2E/대역100통과·1skip·0실패, 신규 메모리 재현/실패 대조 주 담당 재실행0, 관리자43업무경로 권한 및 누락 대조. 운영 GET9/9, 실행소스/28migration 대조, AWS/호스트 설정 읽기. front audit7/server25 package 경고(exit1), admin/guide0(exit0); 도달 가능한 공격 수와 구분. 문서검사 명령·최종 결과는 위 증거 JSON의 documentationValidation 참조.
+- 한계: 제품 보안 수정/운영 설정 변경·실제 로그인/외부 발송/금융/운영 공격·부하·복원은 미실행. Toss test, 베타·실은행/광고메일off 유지. 기존 미커밋 변경 보존, 커밋/푸시 없음. 다음: 보고서 P1 수정과 실패경로 회귀, 외부백업/복원·감시, RPO/RTO/보유정책 결정. Docker Desktop 종료 및 backend 없음 확인.
+
+## 2026-10-29 광고상품·공통 UI 운영 배포 (advertising-20261029)
+
+- 사용자 “운영배포후 보안 및 장애 대응 점검” 승인으로 front41·server8·admin7 파일만 직전 운영 소스에 반영. 새 DB 테이블 ad_products 1개, 총28 migration 해시 일치. 광고상품 등록/수정/노출·판매 개별 설정/소프트삭제 API·콘솔, 스튜디오 목록·목업 적용. 공통 하단 스낵바·모바일 갤러리 이미지 탭·포스팅 후원 플랫 동전도 함께 반영. 무관한 PSD/Finder 파일 제외.
+- 이전 로컬 검증 소스 해시 일치 확인, amd64 API/콘솔/프론트 순차 빌드 통과. 내부 소스·콘솔 실행 산출물 대조 후 약799MB 직접 스트리밍. 설정/DB 백업→migrate deploy→API/worker→admin→front. DB/proxy 컨테이너와 나머지 환경설정 보존. 백업 /opt/crefans-backup-advertising-20261029.
+- 운영검증: 6컨테이너 정상·재시작0, frontend669/API211/worker211 소스 해시 일치, HTTP10건(광고목록 비로그인401 포함). PC Chromium·iPhone WebKit 프론트18/18, 콘솔4/4 통과. 콘솔 및 서비스 쓰기는 브라우저 API대역으로 운영 DB에 저장하지 않음. 최초 콘솔 테스트 도구 중복 로드 실패는 콘솔 저장소 도구로 분리해 해결, 제품 코드 변경 없음.
+- 이미지 계획 보고 후 로컬·운영 각각 최신9개 보존, 이전 faq-payout(front)/operators(api/admin)3개씩 일반 삭제. DB/볼륨/강제삭제 없음. Mac Docker Desktop 종료 확인. 기존 dirty 변경 보존, 커밋·푸시 없음.
+- **실제 광고 구매·PG·자동 노출·매출 미구현이며 서비스 구매 비활성**. 결제수단·시작/연장 방식 사용자 선택 대기. 운영 비밀번호 로그인·실PG/송금/발송·실기기 미검증. guide 소개서 프레임 별도 미배포 변경은 이번에 포함하지 않음.
+- 근거: front docs/audit/advertising-deployment-20261029.json 및 .local/advertising-deploy-20261029/. 후속 보안 점검 결과는 별도 최신 절과 보고서에 기록.
+
+## 2026-10-29 광고상품 관리 API·소프트 삭제 (구매 처리 미완료·운영 미배포)
+
+- `AdProduct`/`ad_products`와 `20261029020000_ad_products` 마이그레이션 추가. 상품명·설명·구매/취소 안내·노출위치·VAT 포함 금액·일수·순서·visible/on_sale·version·deleted_at 관리. 공개 여부와 판매 여부 독립. 운영 상품/가격 시드 없음.
+- `/studio/advertising/products`는 회원 세션+크리에이터 검증 후 숨김·삭제 상품 제외. 관리자 목록/등록/수정/삭제는 `advertising` 메뉴의 view/create/update/delete 권한으로 구분. 수정/삭제 시 행 잠금과 expectedVersion으로 덮어쓰기 방지. 삭제는 deleted_at+숨김+판매중지만 적용하며 DB 행 보존. 운영자/IP/변경 전후 감사는 같은 DB 트랜잭션, 문구는 안전한 해시만 보관.
+- 검증: build, 격리 Homebrew MySQL3307 `crefans_platform_e2e`에 복사 스키마로 migration deploy 후 HTTP 광고상품5/5+기존 운영자7/7+Swagger11/11=23/23. 비로그인/팬/운영자 권한 없는 변경·잘못된 입력·숨김/판매중지 구분·삭제조회·동시 수정200/409·중복삭제 감사1회·원본 행 보존 확인. 최초 감사 timestamp 필드/Swagger 개수 기대값 오류 수정 후 통과. API 총142개(스튜디오45/콘솔49/공유 포함 팬67), 각 문서 분리 유지.
+- **실제 주문·결제·광고 노출기간·매출 연결 미구현**. 결제수단과 시작/연장 방식 사용자 선택 대기. 미확정 가격·취소 정책을 임의로 등록하지 않음. 로컬 일반 dev DB와 운영 DB 미변경, 실PG/이메일/텔레그램 미발송, 운영 배포·커밋·푸시 없음. 코드/공식 자료 근거는 `docs/platform-implementation.md`, 검증은 `.local/advertising-20261029/`, front `docs/audit/advertising-20261029.json`.
+
+## 미배포 개선 3건 운영 반영 (2026-10-29, 완료: studio-input-console-20261029)
+
+- 사용자 “배포해” 승인에 따라 스튜디오 답글 작성자·수정·삭제, 터치 입력 최소16px·수동 확대 허용, 콘솔 마이페이지 맨 아래 로그아웃을 반영. 운영 기준 front faq-payout / API·admin admin-accounts 사본에 front11·server3·admin2 파일만 덮었고 그 외 제품 소스 변경 없음. 이전 절의 미배포 상태는 이번 배포로 해소.
+- 검증: front check379/379, server build+답글·OpenAPI·운영자권한23/23, admin check8/8. amd64 3이미지 빌드·소스/레이어/라벨 대조, 콘솔 build-stage 소스59개와 실행 산출물122개 대조. 운영 front658·API/worker각208 소스 해시 일치. HTTP11건(9개200+신규답글 PUT/DELETE 비로그인401), 6컨테이너 정상·재시작0·DB/proxy ID 유지.
+- 운영 브라우저: 목업 답글3조건(모카/하늘·모바일/PC) 작성자 사진·이름·인증·등록→수정→삭제·취소·팬 버튼 미노출 확인. 입력13화면×4조건=52조합, 모바일106개16px 이상·가로넘침 없음·PC 글자 유지. 실서비스 로그인/가입4조건도 정상(모바일16px/PC13px). 콘솔 PC/모바일 로그아웃 마지막 요소·24px 간격·1회 요청·로그인 이동 확인(API는 브라우저 대역).
+- 운영 절차: capture→변경 파일만 사본 반영→preflight(약49.6GiB)→순차 빌드→소스 검증 후 약798MB 직접 스트리밍→DB/설정 백업→migrate deploy(27개·추가없음)→API/worker→admin→front→운영 검증. 백업 `/opt/crefans-backup-studio-input-console-20261029`. 베타/콩/실판매·송금·광고메일 플래그와 기존 migration 체크섬 유지, 배치 failures={}.
+- 정리: 로컬·운영 계획을 먼저 보고하고 최신3개씩(총9개) 보존, messages-back(front)/payout-policy(api)/console-drawer(admin) 3개씩 일반 삭제. 로컬에서 목록에 있지만 태그로 조회하지 못하는 현상을 확인(이미지가 삭제된 것은 아니었음, 원인은 미확정)해 보존 도구에 정확한 ID·단일 태그·동일 저장소 digest·미사용 조건의 fallback 추가. 정상5조건과 사용중 보호 제거 대조 실패 확인. 강제삭제·볼륨삭제 없음. 최종 운영 여유 약34.2GiB. 정리 후 6컨테이너 동일·정상 재확인, 빌드용 Mac Docker Desktop 종료 완료.
+- 최초 검사 실패/수정: Docker index ID와 플랫폼 manifest ID 직접 비교 실패는 빌드의 amd64 manifest·운영 tag ID·레이어·소스해시 일치 검사로 수정. React 자동생성 ID의 dev/prod 차이는 글자 비교에서 제외. 팬 프로필 모달의 옛 폭은 애니메이션 중 측정값이라 폭 동일 주장에서 제외하고 글자·넘침은 검증(다른12화면 폭 동일). 최초 실패 원본 보존. 전송 단계 분리 제안은 자동 승인 검토 거절되어 적용하지 않고 기존 ship→archive 필수 호출 유지. 제품 코드 재수정·재배포는 없었음.
+- 경계: 실제 iPhone 키보드/핀치·운영 비밀번호 로그인·운영 회원 답글 쓰기는 미실행. 권한/저장 검증은 로컬 격리MySQL, 운영 콘솔 내부는 API대역이며 운영 실계정 종단 검증으로 간주하지 않음. 커밋/푸시 없음, 기존 변경 보존. 다음: 실기기 검수·별도 승인 시 운영 계정 실사용 확인.
+- 증거: front `docs/audit/studio-input-console-deployment-20261029.json`, 상세 front `.local/studio-input-console-deploy-20261029/`. 공통 AGENTS 규약 유지, 보존 도구 fallback 경계만 추가. 문서 기록·검사 결과는 해당 폴더 docs-checks.json에 기록.
+
+## 스튜디오 답글 작성자 표시·수정·삭제 (2026-10-28, 운영 미배포)
+
+- 요청: 댓글 관리에서 내 답글에도 프로필 사진·이름을 표시하고 수정·삭제 제공. 기존 Avatar·CreatorName(긴 이름/인증 배지)·Dialog를 재사용하는 `StudioCommentReply`를 목업·실서비스·디자인 시스템에 연결. 작성자 표시, 수정 초안/실패 유지, 빈값·변경 없는 제출 차단, 삭제 확인·중복 제출 방지. 팬 답글에는 수정·삭제 없음.
+- 목업은 선택한 크리에이터의 활동명·사진·인증 여부를 사용(모카 로그인 포함). 서비스는 `CommunityReply.author/fromCreator`와 PUT/DELETE `/studio/comments/:id/replies/:replyId`에 연결. 서버가 게시물 소유자·답글 작성자·부모 관계·삭제 상태를 검증하고 소프트 삭제·댓글 수 1회 변경·감사를 같은 트랜잭션에서 처리. DB 마이그레이션 없음.
+- 검증: 프론트 `npm run check` 379/379(타입/레이어 포함), 서버 build 및 답글 HTTP·OpenAPI 16/16. 실제 로컬 격리 MySQL·회원 세션으로 타 계정/부모 불일치/삭제 대상/빈값 거절, 동시 삭제 200·404와 카운트 1회 감소 확인. Chromium 375/1280(모카), WebKit 375(하늘)에서 아바타 로드·등록→수정→삭제·취소 보존·팬 버튼 미노출·가로 넘침 없음·페이지 오류 없음 확인.
+- `feat/studio-comment-replies`에서 작업, 기존 미커밋 변경 보존. 운영 배포·커밋·푸시 미실행. 운영 반영 시 프론트와 신규 답글 API를 함께 반영해야 함. 근거·해시·범위: 프론트 `docs/audit/studio-comment-replies-20261028.json`, 각 리포 `.local/studio-replies-20261028/`. 문서 계약·표는 구현과 대조 후 갱신하며 docs:record는 문서 해시 기록일 뿐 제품 테스트 증명이 아님.
+
+
+## guide.crefans.com 프록시 블록 (2026-10-28, 운영 반영)
+
+- `infra/platform/Caddyfile`에 `{$GUIDE_DOMAIN:guide.crefans.com}` 정적 사이트 블록 추가(`/data/sites/guide`, proxy caddy 볼륨). 운영 Caddyfile을 같은 내용으로 교체 후 caddy reload(validate 선행, 실패 시 원복, 컨테이너 재시작 없음). Route 53 A 레코드 추가. 원본·검증은 `crefans_guide/PROGRESS.md`. 다른 서비스 응답 유지 확인.
+
+## 콩 테스트 5건 실패 원인 조사·테스트 수정 (2026-10-28)
+
+- 증상: `tests/platform-beans.test.cjs` 20건 중 출금 5건이 409 PAYOUT_BLOCKED("출처 결제 또는 프로모션 지급 확인이 필요합니다")로 실패. 운영 소스 사본에서도 동일.
+- 원인(확인): 테스트가 출금 처리 시각을 `2026-10-28T00:00:00Z`(수요일 09:00 KST)로 고정 전달(`beans.payout(id,admin,new Date(...))`, 고정 날짜 15곳). 반면 테스트 중 지급하는 프로모션콩은 `release_at=new Date()`(실제 현재). 2026-10-28 09:00 KST 이후 실행하면 고정 처리 시각이 콩 생성 시각보다 과거가 되어 `release_at>now` 조건에 걸림. 즉 달력 날짜에 묶인 테스트이며 10-28 오전 이전에는 통과했다.
+- 실험: 같은 파일의 고정 날짜만 "실행 시점 이후 다음 KST 수요일"(TUE/WED/THU 상대값)로 바꾼 임시 사본에서 20/20 통과, 원본은 5건 실패 그대로(대조). 임시 사본은 삭제.
+- 운영 영향: 없음. 관리자 승인(`beans.controller`)·워커는 `payout(id,admin)`으로 시각을 넘기지 않아 실제 현재 시각을 쓰므로 `release_at`(생성·결제 시점 기준)보다 과거가 되지 않는다. 일반콩 7일 보류 규칙은 의도대로 동작.
+- 수정(사용자 승인): `tests/platform-beans.test.cjs` 고정 날짜 15곳과 `tests/e2e-server.cjs`(프론트 E2E용 bean-pay·payout 제어) 2곳을 실행 시점 기준 다음 KST 수요일(TUE/WED/THU 상대값)로 변경. 제품 코드는 변경 없음.
+- 검증: 서버 콩 테스트 20/20 통과(수정 전 15/20), 프론트 `promotion-payout.spec` 3/3 통과(이전 날짜 의존 실패 해소). 같은 실행의 `beans.spec` 3건은 날짜와 무관한 후원 대화상자 변경 전 기대값 문제였고 프론트에서 별도 수정해 7/7 통과(프론트 PROGRESS).
+
+## 운영자 계정 분리 (2026-10-28, 운영 배포 완료)
+
+- 사용자 지시: 운영 콘솔 계정 테이블은 팬·크리에이터와 구분. `admins`에 password_hash·phone, 새 `admin_sessions`. `admin-auth.ts`(POST /admin/auth/login·refresh·logout, 쿠키 admin_access_token 1시간/admin_refresh_token 7일, HttpOnly·SameSite=Strict·호스트 전용, 이메일당 10분10회, 없는 이메일도 같은 해시 비용, 갱신 토큰 회전). `PlatformAdminGuard`는 운영자 세션만 인정(회원 가드 제거), API 문서 경로도 운영자 세션. 부운영자 생성은 회원 행을 만들지 않음. 만료 운영자 세션 정리 job, 부트스트랩 스크립트 `scripts/platform-admin.cjs --email --name --apply`(임시 비밀번호 1회 출력).
+- 마이그레이션 `20261028150000_admin_accounts`: 기존 운영자 비밀번호 해시·전화번호를 연결 회원에서 1회 복사(운영 최고관리자는 같은 비밀번호로 계속 로그인), 콘솔 전용 `op_` 회원만 삭제. 테스트 DB 트랜잭션에서 데이터 SQL 검증 후 롤백(복사·삭제 대상·실제 팬 계정 유지 확인).
+- 검증: build, admin-operators 7/7(회원 세션 401, 회원 비밀번호로 콘솔 불가, 운영자 비밀번호로 팬 로그인 불가, 갱신 토큰 1회용, 로그아웃 후 401 추가), admin-console 12/12, financial-policy 8/8, openapi 11/11(135개, adminSession 보안 스키마), beta-policy 11/11. 비운영자·비활성 운영자 응답이 403→401로 바뀐 기대값 갱신. 테스트 헬퍼 `tests/admin-session.cjs`.
+- 운영 배포 `admin-accounts-20261028`(API·worker·admin, 콘솔 직접 입력 모달·을/를 포함). 직전 `operators` 사본+server 11/admin 6파일. DB 덤프 백업 후 마이그레이션 적용(총27), frontend/DB/proxy 유지. 운영 읽기 확인(개수·여부만): 운영자1·활성1·비밀번호 보유1, 소유자 최고관리자·비밀번호 이관됨, 운영자 세션0(기존 회원 세션 로그인은 재로그인 필요). 남은 `op_` 접두 회원 1명은 콘솔 생성 형식이 아니고 오늘 생성도 아닌 일반 회원이라 유지(정상). 비로그인 /admin/me 401, 콘솔 로그인 화면 200. 운영자 실제 로그인은 비밀번호 입력 금지로 미확인. 보존 단계로 api promotion-payout·admin console-spacing 삭제(운영 여유 34.3GB). 증거 front `.local/admin-accounts-deploy-20261028/`. commit/push 없음.
+
+## 운영자·메뉴 권한 API (2026-10-28, 운영 배포 완료)
+
+- `admin-permissions.ts`(메뉴별 허용 동작, 기존 ADMIN/MODERATOR 범위 유지, `@Permit` 메타데이터), `PlatformAdminGuard` 기본 거부·임시 비밀번호 상태 차단, 콩·매출·로그·정책 내부 검사를 권한 검사로 교체. `admin-operators.ts`(운영자 목록·생성·수정·비활성화·임시 비밀번호 재발급, 마이페이지·비밀번호 변경). 마이그레이션 `20261028120000_admin_permissions`(admins.permissions JSON, must_change_password). 금융 정책 PUT은 confirmation '정책 변경' 필수. 이름 변경은 공개 닉네임을 바꾸지 않음. 근거·표는 `docs/platform-api.md` 최신 절.
+- 검증: build, 새 `tests/platform-admin-operators.test.cjs` 6/6(라우트 전수 권한 선언+없는 경우 가드 거부 대조, 입력 검증, 강제 변경, 권한 즉시 반영, 세션 종료, 감사에 임시 비밀번호 없음), admin-console 12/12, financial-policy 8/8(확인 문구 누락·오타 5종 거부 추가), openapi 11/11(132개), beta-policy 11/11. 거부 코드가 SUPER_ADMIN_REQUIRED→ADMIN_PERMISSION_REQUIRED로 바뀐 테스트 기대값 갱신. platform-beans 20중 5 실패는 변경 전 운영 소스 사본에서도 같은 5건 실패(기존, 이번 변경과 무관). platform.integration/access는 로컬 API(3001) 미실행으로 미검증.
+- 운영 배포 `operators-20261028`(API·worker·admin). DB 덤프 백업 후 마이그레이션 1건 적용(총26), frontend/DB/proxy 컨테이너 유지. 새 경로 비로그인 401(없는 경로 404), API 이미지 `@Permit` 33곳 확인. 운영 DB의 기존 최고관리자(kayheypark 계정) 이름·전화번호 반영과 최고관리자·활성 확인(감사 기록 남김, 활성 운영자 1명). 이미지 보존으로 api tip-attribution·admin promotion-payout 삭제(운영 여유 34.3GB). 증거 front `.local/operators-deploy-20261028/`. commit/push 없음.
+
+
+
+
+
+## 인프라·배포 현황 조사 (2026-10-28, 읽기 전용)
+
+- 구성: EC2 i-0c24409aae93555f2 t3a.medium(2vCPU/4GiB, ap-northeast-2a, 10-21 기동), EBS gp3 50GB 1개, EIP 15.164.140.26. Docker Compose `crefans-beta` 6컨테이너(proxy Caddy 128m, frontend 768m, api 512m, worker 384m(API 이미지), admin 384m, MySQL 8.0 1g), 로그 10MB 회전. 볼륨 database/media/caddy/private. DNS(Route53): beta→CloudFront(E2VCS3MVSGXSRC)→beta-origin(EC2), admin·business→EC2 직접. 미디어 S3 crefans-beta-media(인스턴스 역할). 외부 모니터 systemd timer.
+- 위험 발견: ① EBS 스냅샷0·AWS Backup0·DLM0 → DB 백업은 배포 때 같은 디스크 `/opt/crefans-backup-*`에만 존재(디스크 장애 시 함께 소실). ② `api.crefans.com` A레코드가 미연결 EIP 52.78.251.131을 가리킴(구형 잔재, 미연결 EIP 시간당 과금; 10월 서버 기동 전 VPC 0.12달러/일 원인 추정). ③ 구형 SG `crefans`(sg-053f1388977ca223b)가 3306을 0.0.0.0/0에 개방, 현재 연결 ENI 0개라 즉시 노출은 없으나 재사용 시 위험. 현재 SG crefans-beta는 22를 /32 2개, 80/443 공개. ④ 소스는 GitHub 미푸시 로컬 브랜치에서 빌드.
+- 배포 절차(현행): 운영 기준 소스 복사+변경 파일 덮기→SHA 대조→preflight→amd64 순차 빌드→이미지 내부 소스 대조→SSH 스트리밍 전송·load→deploy.sh(컨테이너 불변 확인·.env/DB 백업·이미지 태그만 교체·자동 롤백·DB/proxy 유지 확인)→운영 HTTP/브라우저 검증→보존 단계. 변경·삭제 없음.
+
+## 배포 디스크 부족·CI 파이프라인 조사 (2026-10-28, 조사만)
+
+- 사실: 운영 EC2 48GB 디스크·3.8GiB RAM·2 vCPU, 이미지 44개 중 사용 5개·회수 가능 29.8GB(front 26·api 11·admin 4 태그 누적). 로컬 맥 디스크 98% 사용. 원인은 배포마다 2.2GB front/1GB api 이미지를 남기고 자동 보존 규칙이 없는 것.
+- 공식 근거(확인 2026-10-28): Docker pruning 문서(기본은 dangling만, -a는 미사용 전체, until 필터; 자동 스케줄 권고 없음), BuildKit GC(daemon.json builder.gc defaultKeepStorage), Kamal prune(최근 5개 보존·나머지 삭제), AWS ECR lifecycle(imageCountMoreThan/sinceImagePushed, 24시간 내 만료), Gitea Actions(1.19+, GitHub Actions 대부분 호환, 별도 runner, 신뢰하지 않는 runner 금지), Gitea 패키지 cleanup rule(소유자별 keep most recent/패턴/일수, 컨테이너는 최신 1개 항상 보존), Jenkins(권장 RAM 4GB+·디스크 50GB+, Docker 사용 시 dind/CLI 이미지 별도).
+- 권장안(미결정): ① 즉시: 배포 스크립트에 성공·검증 후 저장소별 현재+직전 N개 태그만 남기는 보존 단계(사용 중 이미지·DB 볼륨 제외) ② 다음: 레지스트리 기반(빌드→push→서버 pull) + 레지스트리 보존 규칙 ③ UI/CI: Jenkins보다 Gitea+Gitea Actions가 저장소 UI·CI·레지스트리를 한 곳에서 제공하고 가벼움. 결정 필요: N 값, 레지스트리 위치(로컬 Gitea vs ECR 비용), CI 실행 위치(맥 디스크 98%), GitHub→Gitea 원격 전환 여부. 로컬 Gitea(localhost:3000)는 현재 꺼져 있음. 코드·배포 변경 없음.
+
+## 출금 최소액 10만원 운영 배포 (2026-10-28, 완료)
+
+- 사용자 배포 요청. 운영 기준(API promotion-payout-20261026, front moka-demo-button-deploy-20261027)에 검증된 변경만 덮어 `payout-policy-20261028` 배포: server 3파일(beta-policy 최소 100,000원, finance 오류문구, 약관 6조 "최소10만원부터"·version 2026-10-27.1), front 10파일(스튜디오 정산·출금 기준, 출금 확인 ₩0, 멤버십 예상 수익, 콩 수요일, 모바일 차단 화면 기준 표시, 목업 20%). admin·DB 스키마·migration·금융 데이터 변경 없음.
+- 빌드 소스 front656/server206 모두 로컬 검사 통과 트리와 SHA 일치, 이미지 내부 소스 대조·amd64. 운영 디스크 456MB→8.8GB 확보(현재·최근 롤백 보존, 로컬에 같은 ID가 있는 옛 이미지22개만 삭제, 볼륨 미접촉). 배포 전 컨테이너 불변 확인·.env/runtime.env/DB 덤프 백업 `/opt/crefans-backup-payout-policy-20261028`, DB/proxy/admin 컨테이너 유지.
+- 운영 확인: API·worker 최소 100,000원·문구·약관 버전, 플래그(BETA true·실송금/실판매 off·email-only)·migration25·DB 2000bps/7일 불변, 운영 PC 목업 스튜디오 기준·수수료 476,200·출금가능 962,800, 콩 수요일, 크리에이터 안내 10만 원, 모바일375 차단 화면 9개 기준·가로 넘침 없음. 증거 `crefans_front/.local/payout-policy-deploy-20261028/production-verification.json`.
+- 미검증: 실제 크리에이터 계정의 /service 출금 화면(로그인 필요, 베타 실송금 차단). 약관 버전 변경 고지 기간은 미결정. 커밋/푸시 없음.
+
+## 목업 모카 로그인 비공개 설정 전달 (2026-10-27)
+
+- 프론트 목업 로그인 배포 자동 검토가 클라이언트 비교값 공개를 거절해 서버 전용으로 변경. infra/platform/compose.yml에서 frontend에 CREFANS_PREVIEW_LOGIN_HASH만 선택 전달하고 runtime.env.example은 빈 자리와 설명 추가. API/worker에는 전달하지 않고 Nest 실제 회원 인증/DB 변경 없음. 비공개 설정 자체는 운영 .env에만 주입하고 로그/이미지에 포함하지 않음. 프론트 PROGRESS 및 docs/audit/moka-preview-deployment-20261027.json을 따른다. 운영 배포·목업 실로그인·공개 에셋 비밀값 미포함 검사 완료, Nest API/worker/admin/DB/proxy 유지 확인. 기존 미배포 출금/약관 변경 보존.
+
+
+## 명함 재생 제어 배포 문서 (2026-10-27)
+
+- 프론트 명함의 계속 보기/연락처/입장 링크를 제거하고 반가워요+중지/재생/다시보기 아이콘으로 변경하여 infra/platform/README.md의 조작 안내만 현행화. 서버 API/DB/Caddy 설정 변경 없음. 배포 과정의 용량 검사 실패로 미사용 과거 프론트 이미지를 로컬 동일 레이어 복구본 확인 후 제한 정리, 현재·직전 및 모든 컨테이너 사용 이미지/DB/볼륨 보존. 프론트 PROGRESS ‘명함 최소 UI·재생 제어’와 docs/audit/card-controls-20261027.json 참조.
+
+
+## 공개 명함 3D 연출 문서 반영 (2026-10-27)
+
+- 명함 프론트의 등장0.8초/뒷면1초/앞면 전환0.7초/이후 진행 막대5초 입장으로 변경되어 `infra/platform/README.md` 시간 안내만 현행화. 서버 런타임/API/DB/Caddy 설정 변경 없음. 프론트 배포·브라우저/시험 증거는 front PROGRESS의 ‘명함 3D 등장·뒤집기 및 진행 막대’ 및 `.local/business-card-animation-20261027/` 참조. 기존 미배포 출금 정책 작업 보존.
+
+
+## 공개 명함 도메인 (2026-10-27)
+
+- 요청: `business.crefans.com/card?who=khpark`에서 박경호 대표 핑크 명함 표시 후 서비스 소개 홈 이동, 운영 배포. 명함 이미지 로드 후5초, 계속 보기로 중지, 바로 보기로 즉시 고정 주소 `https://beta.crefans.com/service/landing` 이동. 임의 redirect 파라미터는 사용하지 않는다. 잘못된/누락/중복 who는 middleware404. 공개 업무 연락처·명함만 제공하고 회원/결제 데이터는 사용하지 않는다.
+- 구현: front `app/card/page.tsx`, `components/business-card/`, 명함 PNG와 두 공통 Provider의 구형 인증/테마 제외. server `infra/platform/Caddyfile`의 별도 business 호스트는 명함/관련 이미지/Next정적파일만 허용, 다른 경로404. Route53 A는 기존 EC2 원본 연결, Caddy HTTPS 자동 발급. 기존 관리 SSH 규칙 보존.
+- 검증: front check360/360(타입·레이어 포함). 신규5검사에서5초/중지/unknown·중복/캐시 이미지 처리 확인, 캐시 감지 제거 시 해당 시험 실패·원복 확인. 첫 운영 WebKit 캐시 이미지 자동 이동 실패를 발견하여 수정했고 최종 운영 검증은 아래 증거로 보완한다. 최초 교체 중 health 재시도에서502 한 번 발생 후 정상화, 무중단 보장은 하지 않는다.
+- 배포 범위: 기존 운영 source `notice-category-20261026`에서 명함 관련7파일만 반영. 미커밋 출금 최소액/약관/QA 산출물 변경은 배포에서 제외했고 원본 작업 파일은 보존. 회원 DB/API/worker/admin 컨테이너 및 금융/가입 정책 유지. 커밋/푸시 없음.
+- 최종 상태: `business-card-fix-20261027` 운영 배포 완료. HTTPS12검사·Chromium390/1280·WebKit390에서 자동 이동5.1~5.3초/중지/즉시 이동/가로 넘침 없음·pageerror0 확인. API/worker/admin/DB/proxy5개 컨테이너ID·재시작 수 보존. 최종 증거 front `docs/audit/business-card-20261027.json`. macOS의 DNS 이전 음성 캐시로 최종 검사는 공개/권한 DNS의 A를 명시해 연결했고 TLS검증은 유지했다. 공개 DNS5개 정상 및 Route53 INSYNC. 비공개 실행·소스해시·로그는 front `.local/business-card-fix-20261027/`, 최초 배포 이력은 `.local/business-card-20261027/`. 실제 인쇄물의 휴대폰 QR 스캔은 별도.
+
+
+
+## 출금 최소액 10만원 상향 (2026-10-27, 로컬)
+
+- 사용자 결정(2026-10-27): 출금 최소액을 "둘 다 10만원"으로. 콩 출금은 이미 1,000콩=총액100,000원이라 불변, 멤버십 원화 수익 출금 최소액만 10,000→100,000원. 화면 시험 실패 9건은 사용자가 허용(실패해도 됨)으로 결정.
+- 서버: `beta-policy.ts` minimumWithdrawal 100000, `finance.service.ts` 오류문구, 약관 `legal-documents.ts` 6조 "최소10만원부터"·version 2026-10-27.1·updatedAt 2026-10-27(effectiveAt=null 유지). 시험: platform-finance 금액×10과 경계시험(99,999 거부·100,000 허용) 추가, platform-provider-http 금액×20·PG 대사 완료 필드 추가·지급일을 수요일로 고정(기존에 금액·대사 필드·요일 3중으로 낡아 있었음), e2e-server fixture 200,000원.
+- 프론트: 스튜디오 출금 min/버튼/안내 100,000원, 목업 검사·문구, 크리에이터 안내 "최소 10만 원". 시험 crefans-finance·service.spec 금액 갱신. 문서 platform-api·platform-implementation·provider-contracts·beta-role-test-plan·service-api-binding·release-test-scenarios.
+- 검증(로그 `crefans_front/.local/min-withdrawal-20261027/`): server build0, 서버 12개 파일 97/97 PASS, 대조검사(최소액 10,000 원복 시 경계시험만 실패, 원복 SHA 확인), front check 355/355, E2E 기준4파일 17/17. 운영 배포·커밋 없음.
+- 주의: 운영 베타 가입자가 약관 2026-10-25.1에 동의했을 수 있다. 운영 반영 시 신규 버전 동의 흐름(POLICY_VERSION_CHANGED)과 크리에이터 대상 사전 고지 기간을 정해야 한다(공정위 시정 사례상 불리한 변경은 개별 통지·충분한 기간 필요, 근거 확인 2026-10-27 언론보도 수준이라 법령 원문 확인 필요). 10-27 QA 보고서의 INC-04는 이 변경 전 기록이다.
+
+## API 명세서 최신화 (2026-10-27)
+
+- 사용자 요청. 0d6044e 코드에서 DB 연결 없이 OpenAPI 생성(`.local/export-openapi-20261027.cjs`): 전체124·유저67·스튜디오42(전용26+공통16)·콘솔34(관리자31+공통3). `docs/platform-api.md` 경로 표는 124개와 누락/초과0으로 이미 일치했고, 개수 서술 3곳(100/56/37/26)만 갱신.
+- 검증: platform-openapi 시험(124/67/42/34 단언) R09 통과, front `npm run check:docs` 만료 확인 후 `docs:record`(스냅샷 수준, 시험 증명 아님)→PASS. 운영 Swagger 화면 개수는 열람하지 않음. 구형 docs/api-endpoints.md는 폐기 기록이라 미변경.
+- QA 재시험 중 로컬 dev DB에 migration8개를 적용했다(front PROGRESS 2026-10-27 참고). 커밋 없음.
+
 ## 미커밋 변경 정리 (2026-10-26)
 
 - 사용자 요청으로 feat/bean-support의 누적 소스·에셋·검증 문서 변경을 보존해 리포별 커밋으로 정리. 로컬 비밀 설정/실행 폴더는 제외하고 .DS_Store/TypeScript 빌드캐시는 파일을 삭제하지 않고 추적만 해제. AGENTS 규약 보존.

@@ -6,14 +6,26 @@
 
 | Method | 경로 | 근거 |
 | --- | --- | --- |
+| GET | `/api/v1/admin/advertising/products` | `src/platform/advertising.controller.ts::products` |
+| POST | `/api/v1/admin/advertising/products` | `src/platform/advertising.controller.ts::create` |
+| DELETE | `/api/v1/admin/advertising/products/:id` | `src/platform/advertising.controller.ts::remove` |
+| PUT | `/api/v1/admin/advertising/products/:id` | `src/platform/advertising.controller.ts::update` |
+| POST | `/api/v1/admin/auth/login` | `src/platform/admin-auth.ts::login` |
+| POST | `/api/v1/admin/auth/logout` | `src/platform/admin-auth.ts::logout` |
+| POST | `/api/v1/admin/auth/refresh` | `src/platform/admin-auth.ts::refresh` |
 | POST | `/api/v1/admin/beans/charges/:id/receipt` | `src/platform/beans.controller.ts::receipt` |
+| POST | `/api/v1/admin/beans/charges/:id/refund` | `src/platform/beans.controller.ts::refund` |
 | GET | `/api/v1/admin/beans/overview` | `src/platform/beans.controller.ts::overview` |
 | POST | `/api/v1/admin/beans/promotions` | `src/platform/beans.controller.ts::grant` |
+| GET | `/api/v1/admin/beans/receivables` | `src/platform/beans.controller.ts::receivables` |
+| POST | `/api/v1/admin/beans/receivables/:id/settle` | `src/platform/beans.controller.ts::settle` |
 | GET | `/api/v1/admin/beans/wallets/:id` | `src/platform/beans.controller.ts::wallet` |
 | POST | `/api/v1/admin/beans/withdrawals/:id/approve` | `src/platform/beans.controller.ts::approve` |
 | POST | `/api/v1/admin/beans/withdrawals/:id/reject` | `src/platform/beans.controller.ts::reject` |
 | POST | `/api/v1/admin/categories` | `src/platform/admin.controller.ts::category` |
 | POST | `/api/v1/admin/client-errors` | `src/platform/admin.controller.ts::clientError` |
+| GET | `/api/v1/admin/comments/:id/moderation` | `src/platform/moderation.ts::commentHistory` |
+| POST | `/api/v1/admin/comments/:id/moderation` | `src/platform/moderation.ts::comment` |
 | POST | `/api/v1/admin/creators/:id/promotion` | `src/platform/admin.controller.ts::promotion` |
 | PUT | `/api/v1/admin/creators/:id/verification` | `src/platform/admin.controller.ts::verification` |
 | GET | `/api/v1/admin/dashboard` | `src/platform/admin.controller.ts::dashboard` |
@@ -24,14 +36,35 @@
 | GET | `/api/v1/admin/financial-policy/history` | `src/platform/admin.controller.ts::financialPolicyHistory` |
 | GET | `/api/v1/admin/inquiries` | `src/platform/admin.controller.ts::inquiries` |
 | POST | `/api/v1/admin/inquiries/:id/reply` | `src/platform/admin.controller.ts::reply` |
+| GET | `/api/v1/admin/invites` | `src/platform/signup-invites.controller.ts::list` |
+| POST | `/api/v1/admin/invites` | `src/platform/signup-invites.controller.ts::create` |
+| DELETE | `/api/v1/admin/invites/:id` | `src/platform/signup-invites.controller.ts::revoke` |
+| PUT | `/api/v1/admin/invites/:id` | `src/platform/signup-invites.controller.ts::update` |
 | GET | `/api/v1/admin/logs` | `src/platform/admin.controller.ts::logs` |
 | GET | `/api/v1/admin/logs/:id` | `src/platform/admin.controller.ts::logDetail` |
 | POST | `/api/v1/admin/marketing/campaigns` | `src/platform/admin.controller.ts::campaign` |
 | GET | `/api/v1/admin/me` | `src/platform/admin.controller.ts::me` |
+| POST | `/api/v1/admin/me/password` | `src/platform/admin.controller.ts::password` |
+| GET | `/api/v1/admin/me/profile` | `src/platform/admin.controller.ts::profile` |
+| PUT | `/api/v1/admin/me/profile` | `src/platform/admin.controller.ts::saveProfile` |
+| POST | `/api/v1/admin/me/totp/enable` | `src/platform/admin-totp.ts::enable` |
+| POST | `/api/v1/admin/me/totp/setup` | `src/platform/admin-totp.ts::setup` |
 | GET | `/api/v1/admin/members` | `src/platform/admin.controller.ts::members` |
+| GET | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::memberHistory` |
+| POST | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::member` |
+| GET | `/api/v1/admin/members/:id/terms` | `src/platform/signup-invites.controller.ts::terms` |
+| PUT | `/api/v1/admin/members/:id/terms` | `src/platform/signup-invites.controller.ts::saveTerms` |
+| GET | `/api/v1/admin/operators` | `src/platform/admin.controller.ts::operators` |
+| POST | `/api/v1/admin/operators` | `src/platform/admin.controller.ts::createOperator` |
+| DELETE | `/api/v1/admin/operators/:id` | `src/platform/admin.controller.ts::deactivateOperator` |
+| PUT | `/api/v1/admin/operators/:id` | `src/platform/admin.controller.ts::updateOperator` |
+| POST | `/api/v1/admin/operators/:id/password-reset` | `src/platform/admin.controller.ts::resetOperator` |
 | GET | `/api/v1/admin/overview` | `src/platform/admin.controller.ts::overview` |
 | GET | `/api/v1/admin/payments` | `src/platform/admin.controller.ts::payments` |
 | GET | `/api/v1/admin/posts` | `src/platform/admin.controller.ts::posts` |
+| GET | `/api/v1/admin/posts/:id/moderation` | `src/platform/moderation.ts::postHistory` |
+| POST | `/api/v1/admin/posts/:id/moderation` | `src/platform/moderation.ts::post` |
+| POST | `/api/v1/admin/posts/:id/review` | `src/platform/moderation.ts::review` |
 | GET | `/api/v1/admin/reports` | `src/platform/admin.controller.ts::reports` |
 | POST | `/api/v1/admin/reports/:id/resolve` | `src/platform/admin.controller.ts::resolve` |
 | GET | `/api/v1/admin/revenue` | `src/platform/admin.controller.ts::revenue` |
@@ -50,6 +83,8 @@
 | GET | `/api/v1/beans/charges/:id` | `src/platform/beans.controller.ts::charge` |
 | POST | `/api/v1/beans/charges/:id/confirm` | `src/platform/beans.controller.ts::confirm` |
 | POST | `/api/v1/beans/charges/:id/payment-window` | `src/platform/beans.controller.ts::window` |
+| POST | `/api/v1/beans/charges/:id/refund` | `src/platform/beans.controller.ts::refund` |
+| GET | `/api/v1/beans/charges/:id/refund-quote` | `src/platform/beans.controller.ts::refundQuote` |
 | GET | `/api/v1/beans/tips` | `src/platform/beans.controller.ts::tips` |
 | GET | `/api/v1/beans/wallet` | `src/platform/beans.controller.ts::wallet` |
 | POST | `/api/v1/beans/webhook` | `src/platform/beans.controller.ts::webhook` |
@@ -95,7 +130,10 @@
 | GET | `/api/v1/posts/:id/comments` | `src/platform/controller.ts::comments` |
 | POST | `/api/v1/posts/:id/comments` | `src/platform/controller.ts::comment` |
 | GET | `/api/v1/posts/:id/comments-page` | `src/platform/controller.ts::commentPage` |
+| DELETE | `/api/v1/posts/:id/comments/:commentId` | `src/platform/controller.ts::deleteComment` |
+| PUT | `/api/v1/posts/:id/comments/:commentId` | `src/platform/controller.ts::editComment` |
 | PUT | `/api/v1/posts/:id/like` | `src/platform/controller.ts::like` |
+| GET | `/api/v1/posts/:id/mention-candidates` | `src/platform/controller.ts::mentionCandidates` |
 | PUT | `/api/v1/posts/:id/save` | `src/platform/controller.ts::save` |
 | GET | `/api/v1/profiles/:id` | `src/platform/controller.ts::profileData` |
 | GET | `/api/v1/profiles/:id/connections` | `src/platform/controller.ts::profileConnections` |
@@ -106,12 +144,15 @@
 | PUT | `/api/v1/studio/accounts/:id/default` | `src/platform/finance.controller.ts::defaultAccount` |
 | POST | `/api/v1/studio/accounts/:id/verify` | `src/platform/finance.controller.ts::verifyAccount` |
 | PUT | `/api/v1/studio/activity` | `src/platform/studio.controller.ts::activity` |
+| GET | `/api/v1/studio/advertising/products` | `src/platform/advertising.controller.ts::products` |
 | GET | `/api/v1/studio/bean-finance` | `src/platform/beans.controller.ts::studio` |
 | POST | `/api/v1/studio/bean-withdrawal-quotes` | `src/platform/beans.controller.ts::review` |
 | POST | `/api/v1/studio/bean-withdrawals` | `src/platform/beans.controller.ts::withdraw` |
 | POST | `/api/v1/studio/bean-withdrawals/verify` | `src/platform/beans.controller.ts::verify` |
 | PUT | `/api/v1/studio/comments-setting` | `src/platform/studio.controller.ts::comments` |
 | PUT | `/api/v1/studio/comments/:id` | `src/platform/studio.controller.ts::moderate` |
+| DELETE | `/api/v1/studio/comments/:id/replies/:replyId` | `src/platform/studio.controller.ts::deleteReply` |
+| PUT | `/api/v1/studio/comments/:id/replies/:replyId` | `src/platform/studio.controller.ts::updateReply` |
 | POST | `/api/v1/studio/comments/:id/reply` | `src/platform/studio.controller.ts::reply` |
 | GET | `/api/v1/studio/community` | `src/platform/studio.controller.ts::community` |
 | POST | `/api/v1/studio/content` | `src/platform/studio.controller.ts::saveContent` |
@@ -160,6 +201,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/following` | 팔로잉 목록 |
 | `/preview/followers` | 팔로워 목록 |
 | `/preview/payment-methods` | 결제수단 관리 |
+| `/preview/studio/advertising` | 광고상품 |
 | `/preview/studio/beans` | 콩 후원·출금 |
 | `/preview/studio` | 대시보드 |
 | `/preview/studio/start` | 크리에이터 시작하기 |
@@ -181,7 +223,10 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/studio/security` | 출금 PIN 설정 |
 | `/preview/studio/settings` | 크리에이터 설정 |
 | `/preview/events` | 이벤트 안내 |
-| `/preview/events/beta-first` | 크레팬스 오픈베타 감사 이벤트 |
+| `/preview/events/beta-feedback` | 네이버페이 1만원 상품권 이벤트 |
+| `/preview/events/beta-creator-advertising` | 주목할 크리에이터 광고상품 30일 이벤트 |
+| `/preview/events/beta-promotion-beans` | 프로모션 100콩 이벤트 |
+| `/preview/events/beta-founding-badge` | 원년멤버 한정판 뱃지 이벤트 |
 | `/preview/guide/fan` | 팬 이용안내 |
 | `/preview/guide/creator` | 크리에이터 이용안내 |
 | `/preview/reset-password` | 비밀번호 재설정 |
@@ -198,7 +243,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 ### front
 
-환경 키: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_ENV`, `NEXT_PUBLIC_APP_VERSION`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`, `NEXT_PUBLIC_LANDING_USE_ASSETS`, `NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY`
+환경 키: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_ENV`, `NEXT_PUBLIC_APP_VERSION`, `NEXT_PUBLIC_TOSS_CLIENT_KEY`, `NEXT_PUBLIC_LANDING_USE_ASSETS`, `NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY`, `CREFANS_PREVIEW_LOGIN_HASH`
 
 | 명령 | package.json 실행문 |
 | --- | --- |
@@ -222,7 +267,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 ### server
 
-환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`
+환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`
 
 | 명령 | package.json 실행문 |
 | --- | --- |
@@ -276,8 +321,21 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261026100000_profile_connections`
 - `20261026110000_post_tip_setting`
 - `20261026120000_tip_attribution`
+- `20261028120000_admin_permissions`
+- `20261028150000_admin_accounts`
+- `20261029020000_ad_products`
+- `20261029120000_signup_invites`
+- `20261029150000_creator_term_changes`
+- `20261029180000_moderation`
+- `20261029190000_report_privacy_reason`
+- `20261030090000_post_review`
+- `20261030100000_member_purge`
+- `20261030110000_backfill_withdrawn`
+- `20261030140000_comment_edited`
+- `20261030200000_pilot_followups`
+- `20261030230000_admin_totp`
 
-## Prisma 전체 정의 (73 models · 15 enums)
+## Prisma 전체 정의 (82 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -703,6 +761,13 @@ model Posting {
   /// 수정 일시
   updated_at                DateTime       @updatedAt
   /// 개별 구매 허용 여부
+  /// 운영자 숨김(약관 8조). null이면 정상. 작성자 본인 외에는 목록·상세·미디어에서 제외
+  hidden_at                 DateTime?
+  hidden_reason             String?        @db.VarChar(500)
+  hidden_by                 String?        @db.VarChar(191)
+  /// 베타 사후 검수: 운영자가 확인한 시각. 작성자가 수정하면 다시 null(미검수)
+  reviewed_at               DateTime?
+  reviewed_by               String?        @db.VarChar(191)
   allow_individual_purchase Boolean        @default(false)
   /// 개별 구매 가격 (원)
   individual_purchase_price Decimal?       @db.Decimal(10, 0)
@@ -722,6 +787,7 @@ model Posting {
   medias                    PostingMedia[]
   views                     PostingView[]
 
+  @@index([status, is_deleted, reviewed_at, created_at], map: "postings_review_queue_idx")
   @@map("postings")
 }
 
@@ -779,6 +845,8 @@ model Comment {
   updated_at     DateTime      @updatedAt
   hidden Boolean @default(false)
   mentions Json?
+  /// Set when the author edits the body; shown as "수정됨".
+  edited_at DateTime?
   likes          CommentLike[]
   parent         Comment?      @relation("CommentToComment", fields: [parent_id], references: [id])
   children       Comment[]     @relation("CommentToComment")
@@ -943,8 +1011,39 @@ model Admin {
   updated_at DateTime  @updatedAt
   /// 생성한 사용자 ID (상위 관리자)
   created_by String?
+  /// 메뉴별 권한 {menu:{view,create,update,delete}}. null이면 기존 역할 기본값
+  permissions Json?
+  /// 임시 비밀번호로 생성·초기화되어 첫 로그인 시 변경 필요
+  must_change_password Boolean @default(false)
+  /// 운영자 전용 비밀번호(scrypt). 팬·크리에이터 회원 계정과 분리
+  password_hash String? @db.VarChar(255)
+  /// 운영자 연락처
+  phone String @default("") @db.VarChar(32)
+  /// 2차 인증(TOTP, 2026-10-30): 암호화한 비밀값, 등록 대기 비밀값, 등록 시각, 마지막 사용 시간창, 복구코드 해시, 미등록 유예 종료
+  totp_secret_encrypted String? @db.Text
+  totp_pending_encrypted String? @db.Text
+  totp_enabled_at DateTime?
+  totp_last_step Int?
+  totp_recovery Json?
+  totp_grace_until DateTime?
+  sessions AdminSession[]
 
   @@map("admins")
+}
+
+/// 운영 콘솔 로그인 세션. 회원 세션(member_sessions)과 분리
+model AdminSession {
+  id           String   @id @default(uuid())
+  admin_id     String
+  access_hash  String   @unique @db.Char(64)
+  refresh_hash String   @unique @db.Char(64)
+  access_until DateTime
+  expires_at   DateTime
+  created_at   DateTime @default(now())
+  admin        Admin    @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+  @@index([admin_id])
+  @@index([expires_at])
+  @@map("admin_sessions")
 }
 
 /// 사용자 신고
@@ -1252,6 +1351,7 @@ enum ReportReason {
   INAPPROPRIATE
   COPYRIGHT
   FRAUD
+  PRIVACY
   OTHER
 
   @@map("report_reasons")
@@ -1314,9 +1414,17 @@ model Member {
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
   identity_hash String? @unique @db.Char(64)
+  // Operator suspension (terms §8). suspended_until null with suspended_at set means indefinite.
+  suspended_at       DateTime?
+  suspended_until    DateTime?
+  suspension_reason  String?  @db.VarChar(500)
+  // Withdrawal (decision 2026-10-29): personal data is purged 30 days after withdrawn_at; purged_at marks completion.
+  withdrawn_at       DateTime?
+  purged_at          DateTime?
   sessions           MemberSession[]
   challenges         MemberChallenge[]
   @@index([nickname])
+  @@index([withdrawn_at, purged_at])
   @@map("members")
 }
 
@@ -1813,6 +1921,8 @@ model BeanCharge {
  receipt_reference String?
  received_amount Int?
  failure_code String?
+ refunded_quantity Int @default(0)
+ refunded_amount Int @default(0)
  created_at DateTime @default(now())
  updated_at DateTime @updatedAt
  @@index([member_id,created_at])
@@ -1829,8 +1939,11 @@ model BeanLot {
  reserved Int @default(0)
  release_at DateTime
  frozen Boolean @default(false)
+ expires_at DateTime?
+ expiry_noticed_at DateTime?
  created_at DateTime @default(now())
  @@index([member_id,bucket,created_at])
+ @@index([expires_at])
  @@index([charge_id])
  @@map("bean_lots")
 }
@@ -1912,5 +2025,143 @@ model BeanWithdrawalAuthorization {
  consumed_at DateTime?
  @@index([creator_id,expires_at])
  @@map("bean_withdrawal_authorizations")
+}
+
+// Advertising products are archived, never physically deleted. Paid order snapshots are immutable.
+model AdProduct {
+  id String @id @default(uuid())
+  name String @db.VarChar(100)
+  description String @db.Text
+  terms String @db.Text
+  placement String @default("featured_creator") @db.VarChar(40)
+  amount Int
+  duration_days Int
+  visible Boolean @default(false)
+  on_sale Boolean @default(false)
+  sort_order Int @default(0)
+  version Int @default(1)
+  deleted_at DateTime?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([deleted_at, visible, sort_order])
+  @@map("ad_products")
+}
+
+// Admin-managed beta invitations. Terms set here move to creator_financial_terms when the email signs up.
+model SignupInvite {
+  id String @id @default(uuid())
+  email String @unique @db.VarChar(191)
+  memo String @default("") @db.VarChar(100)
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  bean_withdrawal_fee_bps Int?
+  minimum_withdrawal_krw Int?
+  member_id String? @db.VarChar(191)
+  used_at DateTime?
+  revoked_at DateTime?
+  version Int @default(1)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([revoked_at, created_at])
+  @@map("signup_invites")
+}
+// Per-creator overrides. A null column follows the platform default at the time of each payment or withdrawal.
+model CreatorFinancialTerms {
+  member_id String @id @db.VarChar(191)
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  bean_withdrawal_fee_bps Int?
+  minimum_withdrawal_krw Int?
+  version Int @default(1)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@map("creator_financial_terms")
+}
+// Append-only history of creator_financial_terms. source: admin(console change), invite(copied at signup), backfill(set before history existed).
+model CreatorFinancialTermChange {
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  version Int
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  bean_withdrawal_fee_bps Int?
+  minimum_withdrawal_krw Int?
+  source String @db.VarChar(20)
+  changed_by String? @db.VarChar(191)
+  reason String @default("") @db.VarChar(500)
+  created_at DateTime @default(now())
+  @@unique([member_id, version])
+  @@map("creator_financial_term_changes")
+}
+
+// Append-only record of operator moderation (post hide/unhide, member suspend/unsuspend) for appeals.
+model ModerationAction {
+  id String @id @default(uuid())
+  target_type String @db.VarChar(20)
+  target_id String @db.VarChar(191)
+  action String @db.VarChar(30)
+  reason String @db.VarChar(500)
+  public_reason String? @db.VarChar(500)
+  until DateTime?
+  admin_id String @db.VarChar(191)
+  created_at DateTime @default(now())
+  @@index([target_type, target_id, created_at])
+  @@map("moderation_actions")
+}
+
+/// Member refund of unused purchased beans (2026-10-30): full within 7 days of payment, 10% deducted after (waived when the company is at fault).
+model BeanRefund {
+ id String @id @default(uuid())
+ request_key String @unique
+ charge_id String
+ member_id String
+ lot_id String
+ quantity Int
+ gross Int
+ deduction Int
+ amount Int
+ waived Boolean @default(false)
+ actor_id String
+ status String @default("processing") @db.VarChar(20)
+ failure_code String?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([charge_id])
+ @@index([status,updated_at])
+ @@map("bean_refunds")
+}
+/// Money a creator owes back after a refund or chargeback of income that was already paid out (D4).
+model CreatorReceivable {
+ id String @id @default(uuid())
+ creator_id String
+ kind String @db.VarChar(20)
+ source_id String
+ amount Int
+ status String @default("open") @db.VarChar(20)
+ note String @default("") @db.VarChar(500)
+ settled_by String?
+ settled_at DateTime?
+ created_at DateTime @default(now())
+ @@unique([kind,source_id,creator_id])
+ @@index([creator_id,status])
+ @@map("creator_receivables")
+}
+/// Mail outbox for member notices that are not billing notices (operator actions, bean expiry).
+model MemberNotice {
+ id String @id @default(uuid())
+ dedupe_key String @unique @db.VarChar(191)
+ member_id String @db.VarChar(191)
+ kind String @db.VarChar(40)
+ rows Json
+ path String @db.VarChar(191)
+ note String @db.Text
+ attempts Int @default(0)
+ retry_at DateTime @default(now())
+ locked_until DateTime?
+ completed_at DateTime?
+ outcome String? @db.VarChar(40)
+ created_at DateTime @default(now())
+ @@index([completed_at,retry_at])
+ @@map("member_notices")
 }
 ```
