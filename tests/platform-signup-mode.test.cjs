@@ -4,7 +4,7 @@ const {randomUUID}=require('crypto'),{PrismaClient}=require('@prisma/client'),{C
 assert.equal(process.env.CREFANS_E2E,'true');
 assert.match(process.env.DATABASE_URL||'',/@127\.0\.0\.1:3307\/crefans_platform_dev$/);
 const {LegalDocumentsService}=require('../dist/src/platform/legal-documents');
-const {publishedCatalog}=require('./legal-fixture.cjs');
+const {publishedCatalog,blockedCatalog}=require('./legal-fixture.cjs');
 const {PlatformAuthService}=require('../dist/src/platform/auth.service');
 const {PlatformService}=require('../dist/src/platform/service');
 const {PlatformFinanceService}=require('../dist/src/platform/finance.service');
@@ -37,5 +37,5 @@ test('invite restriction applies to both mail and signup; deferred identity cann
  const client=auth(),data=await input(client),restricted=auth({SIGNUP_EMAIL_ALLOWLIST:'invited@example.invalid'}),sent=messages.length;
  await assert.rejects(restricted.requestCode(data.email),code('SIGNUP_INVITE_REQUIRED'));assert.equal(messages.length,sent);
  await assert.rejects(restricted.signup(data),code('SIGNUP_INVITE_REQUIRED'));
- const blocked=auth({},new LegalDocumentsService());await assert.rejects(blocked.requestCode(data.email),code('POLICY_NOT_PUBLISHED'));await assert.rejects(blocked.signup(data),code('POLICY_NOT_PUBLISHED'));assert.equal(await db.member.count({where:{email:data.email}}),0);
+ const blocked=auth({},Object.assign(new LegalDocumentsService(),{catalog:blockedCatalog}));await assert.rejects(blocked.requestCode(data.email),code('POLICY_NOT_PUBLISHED'));await assert.rejects(blocked.signup(data),code('POLICY_NOT_PUBLISHED'));assert.equal(await db.member.count({where:{email:data.email}}),0);
 });

@@ -25,7 +25,7 @@ after(async()=>{
  if(process.env.PLATFORM_BROWSER_TEST==='true'&&app){
   await db.member.update({where:{id:fan},data:{password_hash:await hashPassword('BillingTest123!')}});
   await db.creator.update({where:{user_id:creator},data:{handle:'billing-'+creator.slice(0,8),display_name:'결제 검증 크리에이터'}});
-  const finance=app.get(PlatformFinanceService),registration=await finance.startRegistration(fan,{});await finance.addMethod(fan,{...registration,authKey:'browser-test'});const pending=await finance.createOrder(fan,{planId:plan.id,requestId:randomUUID()});
+  const finance=app.get(PlatformFinanceService),registration=await finance.startRegistration(fan,{});await finance.addMethod(fan,{...registration,authKey:'browser-test'});const pending=await finance.createOrder(fan,{planId:plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'});
   console.log('BROWSER_FIXTURE '+JSON.stringify({email:fan+'@example.invalid',orderId:pending.id,creatorId:creator}));
   await new Promise(resolve=>{process.once('SIGTERM',resolve);process.once('SIGINT',resolve);});
  }
@@ -37,7 +37,7 @@ test('v1 card authorization binds session and state, publishes masked card witho
  const result=await api('/billing/methods',{...registration.data,authKey:'test-auth'});assert.equal(result.success,true);card=registration.data.registrationId;const common=await api('/common');assert.ok(common.data.paymentMethods.some(m=>m.id===card&&m.description==='•••• 789*'));assert.ok(!JSON.stringify(common).includes('http-billing-'));
 });
 test('v1 checkout uses server price and isolates member order ownership',async()=>{
- const requestId=randomUUID(),created=await api('/checkout',{planId:plan.id,requestId,amount:1});assert.equal(created.data.amount,10000);order=created.data.id;assert.equal((await api('/checkout',{planId:plan.id,requestId})).data.id,order);assert.equal((await api('/checkout/'+order,undefined,other)).status,404);assert.equal((await api('/checkout/'+order+'/pay',{},other)).status,404);
+ const requestId=randomUUID(),created=await api('/checkout',{planId:plan.id,requestId,creatorProvision:'2026-10-30.1',amount:1});assert.equal(created.data.amount,10000);order=created.data.id;assert.equal((await api('/checkout',{planId:plan.id,requestId,creatorProvision:'2026-10-30.1'})).data.id,order);assert.equal((await api('/checkout/'+order,undefined,other)).status,404);assert.equal((await api('/checkout/'+order+'/pay',{},other)).status,404);
 });
 test('v1 approval creates real DB subscription, payment history and creator revenue once',async()=>{
  const result=await api('/checkout/'+order+'/pay',{});assert.equal(result.success,true);assert.equal(result.data.order.status,'paid');await api('/checkout/'+order+'/pay',{});assert.equal(charges,1);subscription=await db.subscription.findFirstOrThrow({where:{subscriber_id:fan}});const boot=await api('/bootstrap');assert.ok(boot.data.subscriptions.some(s=>s.planId===plan.id));assert.ok(boot.data.data.paymentHistory.some(p=>p.orderId===order&&p.paymentStatus==='paid'));assert.equal((await api('/studio/finance',undefined,creator)).data.summary.net,9000);
@@ -53,7 +53,7 @@ test('card deletion revokes encrypted key and reflected payment history remains 
 });
 test('v1 refund eligibility and direct media GET/HEAD cannot bypass usage tracking',async()=>{
  const registration=await api('/billing/registrations',{});assert.equal((await api('/billing/methods',{...registration.data,authKey:'test-media-auth'})).success,true);
- const created=await api('/checkout',{planId:plan.id,requestId:randomUUID()}),id=created.data.id;assert.equal((await api('/checkout/'+id+'/pay',{})).success,true);
+ const created=await api('/checkout',{planId:plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'}),id=created.data.id;assert.equal((await api('/checkout/'+id+'/pay',{})).success,true);
  assert.equal((await api('/checkout/'+id+'/refund-eligibility',undefined,null)).status,401);assert.equal((await api('/checkout/'+id+'/refund-eligibility',undefined,other)).status,404);assert.equal((await api('/checkout/'+id+'/refund-eligibility')).data.eligible,true);
  const media=await db.media.create({data:{user_sub:creator,type:'IMAGE',original_name:'test.webp',file_name:randomUUID(),file_size:1,mime_type:'image/webp',original_url:'/api/v1/media/test/file',s3_upload_key:'local/test',processing_status:'COMPLETED'}});
  const post=await db.posting.create({data:{user_sub:creator,title:'미디어 권한',content:'본문',is_membership:true,access_plan_id:plan.id,status:'PUBLISHED',medias:{create:{media_id:media.id}}}});

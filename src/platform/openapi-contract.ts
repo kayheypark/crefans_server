@@ -122,7 +122,7 @@ add('get','billing/config','결제수단','Toss 공개 SDK 설정',{response:ref
 add('post','billing/registrations','결제수단','카드 등록 시도 생성',{body:object({returnPath:str('/service/payment-methods 또는 본인 checkout 경로')}),response:ref('Registration'),description:'30분 유효. 카드번호/CVC를 이 서버로 보내지 않습니다.'});
 add('post','billing/methods','결제수단','빌링키 발급·카드 등록 완료',{body:object({registrationId:str(),state:secret('카드 등록 state'),authKey:secret('Toss 인증 결과. 최초 요청 시 필요, 재처리는 서버 저장값 사용'),customerKey:str()},['registrationId','state']),response:object({message:str(),returnPath:str()})});
 add('put','billing/methods/{id}','결제수단','기본 카드 지정·카드 삭제',{body:object({operation:enumeration('default','delete')},['operation'])});
-add('post','checkout','결제·구독','멤버십 주문 생성',{body:object({planId:str(),requestId:maxString(100,'동일 작업 재시도에 같은 값을 사용')},['planId','requestId']),response:ref('Order')});
+add('post','checkout','결제·구독','멤버십 주문 생성',{body:object({planId:str(),requestId:maxString(100,'동일 작업 재시도에 같은 값을 사용'),creatorProvision:str()},['planId','requestId','creatorProvision']),response:ref('Order'),description:'creatorProvision은 크리에이터 정보 제공 동의 문서 버전(creator-provision.ts, 현재 2026-10-30.1). 다르거나 없으면 400 CREATOR_PROVISION_CONSENT_REQUIRED. 새 주문마다 member_consents(kind creator-provision)에 동의 사본 1행.'});
 add('get','checkout/{id}','결제·구독','내 주문 조회',{response:ref('Order')});
 add('post','checkout/{id}/retry','결제·구독','실패한 최초 주문 재시도 준비',{response:ref('Order')});
 add('post','checkout/{id}/payment-window','결제·구독','단건결제 창 설정',{response:object({clientKey:str(),customerKey:str(),orderId:str(),orderName:str(),amount:money}),description:'한 달 단건 결제로 고정합니다. 정기결제 등록이 아닙니다.'});

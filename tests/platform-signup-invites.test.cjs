@@ -4,6 +4,8 @@ process.env.BETA_MODE='true';process.env.SIGNUP_EMAIL_ALLOWLIST='';
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),{randomUUID,randomBytes}=require('node:crypto'),{PrismaClient}=require('@prisma/client');
 const source=process.env.DATABASE_URL;assert.match(source||'',/@127\.0\.0\.1:3307\/crefans_platform_dev$/);const url=new URL(source);url.pathname='/crefans_platform_e2e';process.env.DATABASE_URL=url.toString();
 const {NestFactory}=require('@nestjs/core'),{PlatformModule}=require('../dist/src/platform/module'),{cookieParser}=require('../dist/src/platform/middleware'),{EnvelopeInterceptor,PlatformExceptionFilter}=require('../dist/src/platform/http'),{requestContext}=require('../dist/src/platform/request-context');
+// The invite check is tested in front of an open item, so no verification mail is sent (signup itself opened 2026-10-30).
+{const {LegalDocumentsService}=require('../dist/src/platform/legal-documents');LegalDocumentsService.prototype.catalog=require('./legal-fixture.cjs').blockedCatalog;}
 const {consumeInvite,withdrawalTerms}=require('../dist/src/platform/signup-invites'),{paymentPolicy}=require('../dist/src/platform/financial-policy'),{beanWithdrawalQuote}=require('../dist/src/platform/bean-ledger');
 const db=new PrismaClient(),tag=randomBytes(4).toString('hex'),mail=n=>`${n}-${tag}@invite.test.invalid`,memberId=randomUUID(),admins=[],cookies={};let app,origin,release;
 const terms={platformFeeBps:1500,settlementHoldDays:3,beanWithdrawalFeeBps:1000,minimumWithdrawalKrw:50000};

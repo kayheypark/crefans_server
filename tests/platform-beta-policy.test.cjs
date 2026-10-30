@@ -15,7 +15,7 @@ const legal=new LegalDocumentsService();legal.catalog=publishedCatalog;const ser
 let policy,history,release,plan,app,origin,admin,charges=0,cancels=0,decline=false;
 const provider={configForClient:()=>({clientKey:'test_ck_local'}),decrypt:x=>x,charge:async(_a,_b,o)=>{charges++;if(decline)reject(400,'PAYMENT_FAILED','Synthetic decline');const r={status:'DONE',orderId:o.attempts?o.id+'_'+o.attempts:o.id,totalAmount:o.amount,paymentKey:'test-'+o.id+'-'+o.attempts};approved.set(r.orderId,r);return r;},lookup:async id=>approved.get(id),cancel:async key=>{cancels++;const prior=[...approved.values()].find(p=>p.paymentKey===key);const r={...prior,status:'CANCELED',balanceAmount:0};approved.set(r.orderId,r);return r;}};
 const finance=new PlatformFinanceService(service,provider,config,{transfer:async()=>{throw Error('Real bank must not be invoked');}}),code=c=>e=>e.getResponse?.().code===c;
-async function buy(member){const o=await finance.createOrder(member,{planId:plan.id,requestId:randomUUID()});await finance.pay(member,o.id);return db.checkoutOrder.findUniqueOrThrow({where:{id:o.id}});}
+async function buy(member){const o=await finance.createOrder(member,{planId:plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'});await finance.pay(member,o.id);return db.checkoutOrder.findUniqueOrThrow({where:{id:o.id}});}
 async function choice(member,enabled){return db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;await recordMarketingChoice(tx,member,enabled,'test',legal.signup().documents.marketing);});}
 before(async()=>{
  release=await require('./e2e-db-lock.cjs').lockE2EDatabase(source);

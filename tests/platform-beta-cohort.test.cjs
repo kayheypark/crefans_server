@@ -26,7 +26,7 @@ before(async()=>{
  for(let i=1;i<=12;i++){
   const role=`S${String(i).padStart(2,'0')}`,creator=i<=2?'C2':'C10',rank=i<=2?i:i<=6?1:i<=10?2:3;
   await db.billingMethod.create({data:{member_id:ids[role],customer_key:randomUUID(),billing_key_encrypted:'test-only',label:'Test',last_four:'1234',is_default:true}});
-  const order=await finance.createOrder(ids[role],{planId:plans[creator][rank-1].id,requestId:randomUUID()});
+  const order=await finance.createOrder(ids[role],{planId:plans[creator][rank-1].id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'});
   await finance.pay(ids[role],order.id);await finance.pay(ids[role],order.id);
   edges.push({role,creator,rank,order:order.id,sub:await db.subscription.findFirstOrThrow({where:{subscriber_id:ids[role]}})});
  }

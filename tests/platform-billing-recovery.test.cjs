@@ -17,7 +17,7 @@ async function fixture(overrides={}){
   charge:async(key,customer,order)=>{calls.push({key,customer,order});const externalId=order.attempts?order.id+'_'+order.attempts:order.id;const response={status:'DONE',totalAmount:order.amount,orderId:externalId,paymentKey:'test-'+externalId};approved.set(externalId,response);return response;},
   lookup:async id=>approved.get(id),cancel:async key=>{const r=[...approved.values()].find(r=>r.paymentKey===key);const result={...r,status:'CANCELED',balanceAmount:0};approved.set(result.orderId,result);return result;},...overrides};
  const finance=new PlatformFinanceService(new PlatformService(db),provider,new ConfigService(settings),{});
- const order=await finance.createOrder(fan,{planId:plan.id,requestId:randomUUID()});
+ const order=await finance.createOrder(fan,{planId:plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'});
  return{creator,fan,plan,card,provider,finance,order,approved,calls};
 }
 async function due(f){const sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});const past=new Date(Date.now()-60000);return db.subscription.update({where:{id:sub.id},data:{ended_at:past,next_billing_date:past}});}
@@ -47,7 +47,7 @@ test('lost card blocks further charges across worker ticks and exposes only a sa
  const card=await db.billingMethod.findUniqueOrThrow({where:{id:f.card.id}});assert.ok(card.unavailable_at);assert.equal(card.unavailable_reason,'INVALID_CARD_LOST_OR_STOLEN');
  const service=new PlatformService(db),common=await service.common(f.fan);assert.equal(common.paymentMethods[0].requiresUpdate,true);assert.ok(!JSON.stringify(common).includes('LOST_OR_STOLEN'));
  const boot=await service.bootstrap(f.fan);assert.equal(boot.subscriptions[0].status,'expired');assert.equal(boot.subscriptions[0].billingIssue,'action_required');assert.equal(boot.subscriptions[0].renewalPending,true);
- await assert.rejects(f.finance.method(f.fan,f.card.id,'default'),code('PAYMENT_METHOD_UNAVAILABLE'));await assert.rejects(f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID()}),code('ALREADY_SUBSCRIBED'));
+ await assert.rejects(f.finance.method(f.fan,f.card.id,'default'),code('PAYMENT_METHOD_UNAVAILABLE'));await assert.rejects(f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'}),code('ALREADY_SUBSCRIBED'));
  assert.equal(await db.billingNotice.count({where:{member_id:f.fan,kind:'payment-failed'}}),1);assert.equal(await db.platformOperationalEvent.count({where:{dedupe_key:`renewal.failed:${f.renewal.id}:0`}}),1);
 });
 test('new default card recovers one failed renewal and one entitlement, never the old card',async()=>{
@@ -64,7 +64,7 @@ test('recovery deadline ends renewal once without charging and does not revive o
  const card=await replacement(f);await f.finance.method(f.fan,card.id,'default');f.provider.charge=f.normal;await f.finance.renew(f.sub.id);assert.equal(f.calls.length,1);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.renewal.id}})).status,'cancelled');
 });
 test('stopped card cannot purchase a different plan, foreign member cannot replace the card',async()=>{
- const f=await failedRenewal(),card=await replacement(f);await assert.rejects(f.finance.method(f.creator,card.id,'default'),code('METHOD_NOT_FOUND'));await f.finance.cancelSubscription(f.fan,f.creator);const order=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID()});await assert.rejects(f.finance.pay(f.fan,order.id),code('PAYMENT_METHOD_UNAVAILABLE'));assert.equal(f.declines,1);
+ const f=await failedRenewal(),card=await replacement(f);await assert.rejects(f.finance.method(f.creator,card.id,'default'),code('METHOD_NOT_FOUND'));await f.finance.cancelSubscription(f.fan,f.creator);const order=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'});await assert.rejects(f.finance.pay(f.fan,order.id),code('PAYMENT_METHOD_UNAVAILABLE'));assert.equal(f.declines,1);
 });
 test('unknown approval still reconciles original key after a default card change without double charge',async()=>{
  const f=await fixture();await f.finance.pay(f.fan,f.order.id);f.sub=await due(f);const original=f.provider.charge;f.provider.charge=async(...args)=>{await original(...args);reject(503,'PAYMENT_UNCERTAIN','연결 단절');};await assert.rejects(f.finance.renew(f.sub.id),code('PAYMENT_UNCERTAIN'));

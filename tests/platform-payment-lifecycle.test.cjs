@@ -19,7 +19,7 @@ async function fixture(overrides={}){
   charge:async(key,customer,order)=>{calls.push({key,customer,order});const externalId=order.attempts?order.id+'_'+order.attempts:order.id;const response={status:'DONE',totalAmount:order.amount,orderId:externalId,paymentKey:'test-'+externalId};approved.set(externalId,response);return response;},
   lookup:async id=>approved.get(id),cancel:async key=>{const r=[...approved.values()].find(r=>r.paymentKey===key);const result={...r,status:'CANCELED',balanceAmount:0};approved.set(result.orderId,result);return result;},...overrides};
  const finance=new PlatformFinanceService(new PlatformService(db),provider,new ConfigService(settings),{});
- const order=await finance.createOrder(fan,{planId:plan.id,requestId:randomUUID()});
+ const order=await finance.createOrder(fan,{planId:plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'});
  return{creator,fan,plan,card,provider,finance,order,approved,calls};
 }
 async function due(f){const sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});const past=new Date(Date.now()-60000);return db.subscription.update({where:{id:sub.id},data:{ended_at:past,next_billing_date:past}});}
@@ -56,7 +56,7 @@ test('simultaneous same-order payments call the provider once and create one ent
  assert.equal(f.calls.length,1);assert.equal(await db.subscription.count({where:{subscriber_id:f.fan}}),1);assert.equal(await db.revenueEntry.count({where:{order_id:f.order.id}}),1);
 });
 test('different orders for the same creator cannot produce two subscription charges',async()=>{
- const f=await fixture(),second=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID()}),g=gate(),original=f.provider.charge;f.provider.charge=async(...args)=>{g.enter();await g.wait;return original(...args);};const first=f.finance.pay(f.fan,f.order.id);await g.entered;
+ const f=await fixture(),second=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'}),g=gate(),original=f.provider.charge;f.provider.charge=async(...args)=>{g.enter();await g.wait;return original(...args);};const first=f.finance.pay(f.fan,f.order.id);await g.entered;
  try{await assert.rejects(f.finance.pay(f.fan,second.id),code('PAYMENT_IN_PROGRESS'));}finally{g.release();}await first;await assert.rejects(f.finance.pay(f.fan,second.id),code('ALREADY_SUBSCRIBED'));assert.equal(f.calls.length,1);
 });
 test('approval followed by a lost response reconciles without another charge',async()=>{
@@ -76,14 +76,14 @@ test('mismatched amount, order or payment key never grants paid access',async()=
  for(const bad of[{totalAmount:1},{orderId:'forged'},{paymentKey:null}]){const f=await fixture();f.provider.charge=async(_k,_c,o)=>({status:'DONE',orderId:o.id,totalAmount:o.amount,paymentKey:'test',...bad});await assert.rejects(f.finance.pay(f.fan,f.order.id),code('PAYMENT_UNCERTAIN'));assert.equal(await db.subscription.count({where:{subscriber_id:f.fan}}),0);assert.equal(await db.revenueEntry.count({where:{order_id:f.order.id}}),0);}
 });
 test('foreign orders and cards are rejected and client amount does not override a server snapshot',async()=>{
- const f=await fixture();const foreign=await fixture();const copy=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID(),amount:1});assert.equal(copy.amount,10000);
+ const f=await fixture();const foreign=await fixture();const copy=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1',amount:1});assert.equal(copy.amount,10000);
  await assert.rejects(f.finance.order(foreign.fan,f.order.id),code('ORDER_NOT_FOUND'));await assert.rejects(f.finance.pay(foreign.fan,f.order.id),code('ORDER_NOT_FOUND'));await assert.rejects(f.finance.refund(foreign.fan,f.order.id),code('ORDER_NOT_FOUND'));await assert.rejects(f.finance.pay(f.fan,f.order.id,foreign.card.id),code('PAYMENT_METHOD_REQUIRED'));assert.equal(f.calls.length,0);
 });
 test('idempotent order keys cannot be repurposed by another account or plan',async()=>{
- const f=await fixture(),key=randomUUID(),a=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:key}),b=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:key});assert.equal(a.id,b.id);await assert.rejects(f.finance.createOrder(f.creator,{planId:f.plan.id,requestId:key}),code('IDEMPOTENCY_CONFLICT'));
+ const f=await fixture(),key=randomUUID(),a=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:key,creatorProvision:'2026-10-30.1'}),b=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:key,creatorProvision:'2026-10-30.1'});assert.equal(a.id,b.id);await assert.rejects(f.finance.createOrder(f.creator,{planId:f.plan.id,requestId:key,creatorProvision:'2026-10-30.1'}),code('IDEMPOTENCY_CONFLICT'));
 });
 test('expired order, self-subscription and unavailable plan are blocked before provider charge',async()=>{
- const f=await fixture();await assert.rejects(f.finance.createOrder(f.creator,{planId:f.plan.id,requestId:randomUUID()}),code('SELF_SUBSCRIPTION'));await db.checkoutOrder.update({where:{id:f.order.id},data:{expires_at:new Date(0)}});await assert.rejects(f.finance.pay(f.fan,f.order.id),code('ORDER_EXPIRED'));await db.membershipItem.update({where:{id:f.plan.id},data:{is_active:false}});await assert.rejects(f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID()}),code('PLAN_UNAVAILABLE'));assert.equal(f.calls.length,0);
+ const f=await fixture();await assert.rejects(f.finance.createOrder(f.creator,{planId:f.plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'}),code('SELF_SUBSCRIPTION'));await db.checkoutOrder.update({where:{id:f.order.id},data:{expires_at:new Date(0)}});await assert.rejects(f.finance.pay(f.fan,f.order.id),code('ORDER_EXPIRED'));await db.membershipItem.update({where:{id:f.plan.id},data:{is_active:false}});await assert.rejects(f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'}),code('PLAN_UNAVAILABLE'));assert.equal(f.calls.length,0);
 });
 test('renewal preserves agreed price, benefits and fee snapshot despite later plan and fee changes',async()=>{
  const f=await fixture();await f.finance.pay(f.fan,f.order.id);const sub=await due(f);await db.membershipItem.update({where:{id:f.plan.id},data:{price:20000,benefits:'["새 혜택"]'}});f.finance.config=new ConfigService({...settings,PLATFORM_FEE_BPS:'5000'});await f.finance.renew(sub.id);const renewed=await db.checkoutOrder.findFirstOrThrow({where:{subscription_id:sub.id,NOT:{id:f.order.id}}});assert.equal(renewed.amount,10000);assert.deepEqual(renewed.snapshot.benefits,['혜택']);assert.equal(renewed.snapshot.platformFeeBps,1000);assert.equal((await db.revenueEntry.findUniqueOrThrow({where:{order_id:renewed.id}})).fees,1000);
@@ -208,4 +208,13 @@ test('FIN-04: a paid membership cancelled at the provider is reversed once; part
  assert.equal(await g.finance.reconcilePaid(g.order.id),0);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:g.order.id}})).status,'paid');
  assert.equal(await db.platformOperationalEvent.count({where:{dedupe_key:'reconcile-paid:'+g.order.id+':PARTIAL_CANCELED:5000'}}),1);
  await db.platformOperationalEvent.deleteMany({where:{dedupe_key:{in:['external-cancel:'+f.order.id,'reconcile-paid:'+g.order.id+':PARTIAL_CANCELED:5000']}}});
+});
+test('a new order needs consent to show the subscriber to the creator, and keeps a copy of what was agreed',async()=>{
+ const f=await fixture(),before=await db.checkoutOrder.count({where:{member_id:f.fan}});
+ for(const creatorProvision of [undefined,'','2026-10-01.0'])await assert.rejects(f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID(),creatorProvision}),code('CREATOR_PROVISION_CONSENT_REQUIRED'));
+ assert.equal(await db.checkoutOrder.count({where:{member_id:f.fan}}),before,'no order without consent');
+ await db.checkoutOrder.update({where:{id:f.order.id},data:{status:'canceled'}});await db.subscription.deleteMany({where:{subscriber_id:f.fan}});
+ const order=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'});
+ const consent=await db.memberConsent.findFirstOrThrow({where:{member_id:f.fan,kind:'creator-provision',document_snapshot:{path:'$.orderId',equals:order.id}}});
+ assert.equal(consent.document_id,'code:creator-provision:2026-10-30.1');assert.equal(consent.document_snapshot.creatorId,f.creator);assert.match(consent.document_snapshot.items,/닉네임/);
 });

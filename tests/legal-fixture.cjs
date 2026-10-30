@@ -8,10 +8,12 @@ function publishedCatalog(){
  }
  return c;
 }
+// The source catalog with an open item again: keeps the signup gate itself under test now that signup is open.
+function blockedCatalog(){const c=sourceCatalog.call(new LegalDocumentsService());c.blockers=['검증용 미해결 항목'];return c;}
 function installTestLegal(){
  assert.equal(process.env.CREFANS_E2E,'true');
  assert.match(process.env.DATABASE_URL||'',/@127\.0\.0\.1:3307\/crefans_platform_(dev|e2e)(\?|$)/);
  LegalDocumentsService.prototype.catalog=publishedCatalog;
  return new LegalDocumentsService();
 }
-module.exports={publishedCatalog,installTestLegal};
+module.exports={publishedCatalog,blockedCatalog,installTestLegal};

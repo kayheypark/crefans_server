@@ -4,10 +4,16 @@ const {ConfigService}=require('@nestjs/config');
 const {LegalDocumentsService}=require('../dist/src/platform/legal-documents');
 const {PlatformAuthService}=require('../dist/src/platform/auth.service');
 const {PlatformService}=require('../dist/src/platform/service');
-const {publishedCatalog}=require('./legal-fixture.cjs');
+const {publishedCatalog,blockedCatalog}=require('./legal-fixture.cjs');
 const error=code=>e=>e.getResponse().code===code;
-test('public legal documents remain readable while unresolved processing prevents signup, including E2E env',async()=>{
- const legal=new LegalDocumentsService();assert.equal(legal.signup().published,false);assert.equal(legal.signup().documentsPublished,true);assert.equal(legal.signup().signupReady,false);for(const d of Object.values(legal.catalog().documents)){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,null);assert.doesNotMatch(d.version,/draft/);}
+test('the released documents take effect on 2026-10-30 with no open items (2026-10-30 /pilot-work)',()=>{
+ const source=new LegalDocumentsService();assert.deepEqual(source.catalog().blockers,[]);assert.equal(source.signup().signupReady,true);
+ for(const d of [...Object.values(source.catalog().documents),source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
+ const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
+ for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
+});
+test('an open item still blocks signup while the documents stay readable, including E2E env',async()=>{
+ const legal=new LegalDocumentsService();legal.catalog=blockedCatalog;assert.equal(legal.signup().published,false);assert.equal(legal.signup().documentsPublished,true);assert.equal(legal.signup().signupReady,false);
  assert.throws(()=>legal.consents({}),error('POLICY_NOT_PUBLISHED'));
  // An invited email still waits for published terms; a non-invited email gets the beta notice first.
  // No console invite exists for the stranger, so only the env allowlist can admit it.

@@ -1,5 +1,14 @@
 # PROGRESS: crefans_server
 
+## 2026-10-30 초대 가입 개방: 법률문서 시행일·처리방침 보완·구독 시 크리에이터 제공 동의 (운영 배포 signup-open-20261030, 커밋 완료·푸시 안 함)
+- 계기: 사용자 회원가입 테스트에서 503 POLICY_NOT_PUBLISHED. 원인은 10-22부터 의도된 가입 차단(effectiveAt=null, blockers 3건).
+- 사용자 결정(클릭): 초대받은 이메일만 개방, 시행일 2026-10-30. 사용자 확인 사실: 국외이전 내용, 일반 콘텐츠 베타 검수 완료. Google Workspace는 직접 구매. 텔레그램 알림은 지금처럼 IP·식별자를 보내고 알려진 내용만 공개(국가·연락처 미공개라 제28조의8 항목을 완전히 채우지 못함, 사용자 수용). 파기 때 첨부 원본도 삭제. 구독 동의까지 만든 뒤 함께 개방.
+- 공식 근거(확인 2026-10-30): 개인정보 보호법 제28조의8(시행 2026-09-11, 법률 제21445호) ①3호 가목·②1~5호; AWS 계약 당사자 Amazon Web Services Korea LLC(aws.amazon.com/legal/aws-contracting-party), aws-korea-privacy@amazon.com; Lambda@Edge는 시청자 가까운 위치 실행·로그는 실행 리전; Google Workspace APAC 계약 법인 Google Asia Pacific Pte. Ltd.(cloud.google.com/terms/google-entity), 처리 국가는 Google 시설 국가(Cloud DPA 10.1, datacenters.google/locations), Gmail 로그 6개월; Telegram Messenger Inc.(telegram.org/privacy), 한국 가입자 저장국 미공개, Bot API deleteMessage 48시간 제한. 제17조①2호가 제15조①4호(계약)를 제외해 크리에이터 제공은 동의로 처리.
+- 코드: `legal-documents.ts` version 2026-10-30.2, effectiveAt 2026-10-30, blockers []. 처리방침 1·7·8·9·11·14조와 가입 안내의 '시행 전/아직' 문구를 실제 값으로 교체(파기 30일·즉시 삭제, 첨부 7일 이내, 문의 3년, 접속 기록 7일, 감사 2년, 운영 알림 30일, 백업 7일, 국외 이전 3사). `creator-provision.ts` + `finance.createOrder`: creatorProvision 버전 불일치·누락 400 CREATOR_PROVISION_CONSENT_REQUIRED, 새 주문마다 member_consents(kind creator-provision) 사본. `member-purge.purgeMember`: 게시물 첨부(posting_medias) 연결 해제 → 매일 미디어 정리가 원본 삭제. 운영 runtime.env MEDIA_DELETE_ENABLED=true, MEDIA_ORPHAN_GRACE_DAYS=7(배포 스크립트가 설정, 롤백 시 복원).
+- 테스트: 가입 차단 검사는 `legal-fixture.blockedCatalog`로 유지(platform-legal 10, signup-mode 3, signup-invites 6). payment-lifecycle 42(동의 필수·기록 신규), member-erase 4(첨부 해제 신규), openapi 11, billing-recovery 26, financial-policy 8, finance 9, beta-policy 11, payment-http 7, pilot-followups 4, beans 30. 대조: 동의 확인 제거·동의 기록 제거·첨부 해제 제거 각각 실패. 기존 실패(변경 전 HEAD에서도 동일): platform.integration 13/13(fetch failed), beta-cohort 1/3.
+- 배포: `crefans_front/.local/signup-open-deploy-20261030/`, ship 첫 실행은 ship.py 문법 오류로 원격 작업 전 중단 → 수정 후 exit 0. 배포 스크립트가 bootstrap signupReady=true와 api·worker의 MEDIA 설정을 확인. 외부 확인: signupReady True, 처리방침 2026-10-30.2에 3사 법인명·첨부 7일 문구, '시행 전' 없음, 비로그인 POST /checkout 401. 이미지 정리 로컬·운영 보존9·삭제3·오류0.
+- 미확인·남은 일: 운영 첫 미디어 정리 실행 결과와 S3 삭제 권한(정리 작업이 기존 고아 첨부도 지움). 실제 초대 가입 1건 완주. 콩 후원도 받은 후원 목록에서 크리에이터가 후원자 닉네임을 보므로 같은 제3자 제공 동의가 필요할 수 있음(미구현). 기존 구독(동의 이전)은 사본 없음.
+
 ## 2026-10-30 운영 콘솔 회원 즉시 삭제 (운영 배포 member-erase-20261030, 커밋 완료·푸시 안 함)
 - 사용자 결정(클릭): 즉시 파기(30일 유예 없음), 남은 거래가 있으면 거부, 최고 관리자만, 서버·콘솔 배포+커밋.
 - 계기: kayheypark@gmail.com 초대가 `signup-invites.ts` MEMBER_EXISTS로 막힘(어느 상태든 같은 이메일 회원 행이 있으면 거부). 삭제하면 이메일이 `withdrawn-<id>@deleted.invalid`로 바뀌어 재초대 가능.
