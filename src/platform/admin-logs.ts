@@ -1,9 +1,10 @@
+import {can} from './admin-permissions';
 import {isIP} from 'node:net';
 import {auditCategories,safeAuditData} from './audit';
 import {adminPage,revenuePeriod} from './admin-console';
 import {reject,text} from './http';
 
-function logAdmin(admin:any){if(!['ADMIN','SUPER_ADMIN'].includes(admin?.role))reject(403,'LOG_ADMIN_REQUIRED','운영 로그 조회 권한이 필요합니다.');}
+function logAdmin(admin:any){if(!can(admin,'logs','view'))reject(403,'LOG_ADMIN_REQUIRED','운영 로그 조회 권한이 필요합니다.');}
 function filter(query:any,key:string,max=191){if(query[key]===undefined||query[key]==='')return undefined;const value=text(query[key],max);if(!/^[a-zA-Z0-9_.:-]+$/.test(value))reject(400,'INVALID_LOG_FILTER','로그 검색값을 확인해주세요.');return value;}
 export function auditView(row:any){return{id:row.id,category:row.category,action:row.action,level:row.level,actorId:row.actor_id,actorRole:row.actor_role,ip:row.ip,peerIp:row.peer_ip,requestId:row.request_id,jobId:row.job_id,entityId:row.entity_id,sourceId:row.source_id,release:row.release,environment:row.environment,status:row.status_code,durationMs:row.duration_ms,at:row.occurred_at,metadata:safeAuditData(row.metadata as Record<string,unknown>)};}
 export async function adminLogs(db:any,admin:any,query:any){

@@ -5,8 +5,12 @@ import {LocalMemberService} from '../auth/local/local-member.service';
 import {reportClientError} from './client-errors';
 import {adminLogs,adminLogDetail} from './admin-logs';
 import {actorContext,auditChange,contentDigest,appendAudit} from './audit';
-import {Body,CanActivate,Controller,ExecutionContext,Get,Injectable,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
-import {PlatformAuthGuard} from './platform-auth.guard';
+import {Body,CanActivate,Controller,Delete,ExecutionContext,Get,Injectable,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
+import {Reflector} from '@nestjs/core';
+import {ADMIN_PERMISSION,AdminRule,Permit,effectivePermissions,requirePermission,requireSuperAdmin} from './admin-permissions';
+import {changeMyPassword,createOperator,listOperators,myProfile,resetOperatorPassword,updateMyProfile,updateOperator} from './admin-operators';
+import {digest} from '../auth/local/credentials';
+import {ADMIN_ACCESS_COOKIE,adminFromAccess} from './admin-auth';
 import {PlatformService} from './service';
 import {policyView,updateFinancialPolicy} from './financial-policy';
 import {reject,text} from './http';
@@ -15,38 +19,61 @@ import {adminDashboard} from './admin-dashboard';
 import {adminRevenue,adminOverview,adminMembers,adminPosts,adminPayments,adminWithdrawals} from './admin-console';
 @Injectable()
 export class PlatformAdminGuard implements CanActivate{
- constructor(private service:PlatformService){}
- async canActivate(ctx:ExecutionContext){const req=ctx.switchToHttp().getRequest();const admin=await this.service.db.admin.findUnique({where:{user_sub:req.user.sub}});if(!admin?.is_active)reject(403,'ADMIN_REQUIRED','관리자 권한이 필요합니다.');req.admin=admin;actorContext(req.user,admin.role);return true;}
+ constructor(private service:PlatformService,private reflector:Reflector){}
+ async canActivate(ctx:ExecutionContext){const req=ctx.switchToHttp().getRequest();
+  // Operator session only; a fan/creator member session never grants console access.
+  const admin=await adminFromAccess(this.service.db,req.cookies?.[ADMIN_ACCESS_COOKIE]);if(!admin)reject(401,'UNAUTHORIZED','운영자 로그인이 필요합니다.');req.admin=admin;req.user={sub:admin.user_sub};actorContext(req.user,admin.role);
+  // Deny by default: every admin route declares the menu/action it needs.
+  // Express middleware (API docs) has no route handler: any active operator with a changed password.
+  const handler=ctx.getHandler?.(),rule=handler?this.reflector.getAllAndOverride<AdminRule>(ADMIN_PERMISSION,[handler,ctx.getClass()]):'any';
+  if(!rule)reject(403,'ADMIN_PERMISSION_REQUIRED','이 작업을 할 권한이 없습니다.');
+  if(rule==='self')return true;
+  // Past the 7-day grace an operator without TOTP can only reach their own enrollment ('self') routes.
+  if(!admin.totp_enabled_at&&admin.totp_grace_until&&admin.totp_grace_until<new Date())reject(403,'TOTP_ENROLLMENT_REQUIRED','2차 인증(OTP)을 등록해야 콘솔을 쓸 수 있습니다.');
+  if(admin.must_change_password)reject(403,'PASSWORD_CHANGE_REQUIRED','임시 비밀번호를 먼저 변경해주세요.');
+  if(rule==='any')return true;
+  if(rule==='super')requireSuperAdmin(admin);else requirePermission(admin,rule[0],rule[1]);
+  return true;}
 }
-@Controller('admin') @UseGuards(PlatformAuthGuard,PlatformAdminGuard)
+@Controller('admin') @UseGuards(PlatformAdminGuard)
 export class PlatformAdminController{
  constructor(private service:PlatformService,private limiter:LocalMemberService,private marketing:MarketingService,private beans:BeansService){}
- @Post('marketing/campaigns') campaign(@Body() body:any,@Req() req:any){return this.marketing.queue(req.admin,body);}
- @Post('client-errors') clientError(@Body() body:any){return reportClientError(this.service.db,this.limiter,body,'console');}
- @Get('logs') logs(@Query() query:any,@Req() req:any){return adminLogs(this.service.db,req.admin,query);}
- @Get('logs/:id') logDetail(@Param('id') id:string,@Req() req:any){return adminLogDetail(this.service.db,req.admin,id);}
- @Get('me') me(@Req() req:any){return{id:req.admin.id,name:req.admin.name,role:req.admin.role,beanSupport:this.beans.available()};}
- @Get('dashboard') dashboard(@Query() query:any,@Req() req:any){return adminDashboard(this.service.db,req.admin,query);}
- @Get('overview') overview(){return adminOverview(this.service.db);}
- @Get('revenue') revenue(@Query() query:any,@Req() req:any){return adminRevenue(this.service.db,req.admin,query);}
- @Get('members') members(@Query() query:any){return adminMembers(this.service.db,query);}
- @Get('posts') posts(@Query() query:any){return adminPosts(this.service.db,query);}
- @Get('payments') payments(@Query() query:any,@Req() req:any){return adminPayments(this.service.db,req.admin,query);}
- @Get('withdrawals') withdrawals(@Query() query:any,@Req() req:any){return adminWithdrawals(this.service.db,req.admin,query);}
- @Post('revenue/:id/receipt') receipt(@Param('id') id:string,@Body() body:any,@Req() req:any){return confirmSettlementReceipt(this.service.db,req.admin,id,body);}
- @Get('financial-policy') async financialPolicy(@Req() req:any){if(req.admin.role!=='SUPER_ADMIN')reject(403,'SUPER_ADMIN_REQUIRED','최고 관리자만 금융 정책을 조회할 수 있습니다.');return policyView(await this.service.db.financialPolicy.findUnique({where:{id:'platform'}}));}
- @Put('financial-policy') setFinancialPolicy(@Body() body:any,@Req() req:any){return updateFinancialPolicy(this.service.db,req.admin,body);}
- @Get('financial-policy/history') async financialPolicyHistory(@Req() req:any){if(req.admin.role!=='SUPER_ADMIN')reject(403,'SUPER_ADMIN_REQUIRED','최고 관리자만 금융 정책 이력을 조회할 수 있습니다.');return this.service.db.financialPolicyChange.findMany({orderBy:{version:'desc'},take:100});}
+ @Post('marketing/campaigns') @Permit('super') campaign(@Body() body:any,@Req() req:any){return this.marketing.queue(req.admin,body);}
+ @Post('client-errors') @Permit('self') clientError(@Body() body:any){return reportClientError(this.service.db,this.limiter,body,'console');}
+ @Get('logs') @Permit(['logs','view']) logs(@Query() query:any,@Req() req:any){return adminLogs(this.service.db,req.admin,query);}
+ @Get('logs/:id') @Permit(['logs','view']) logDetail(@Param('id') id:string,@Req() req:any){return adminLogDetail(this.service.db,req.admin,id);}
+ @Get('me') @Permit('self') me(@Req() req:any){return{id:req.admin.id,name:req.admin.name,role:req.admin.role,mustChangePassword:req.admin.must_change_password,totp:{enabled:!!req.admin.totp_enabled_at,graceUntil:req.admin.totp_enabled_at?null:req.admin.totp_grace_until,recoveryCodesLeft:Array.isArray(req.admin.totp_recovery)?req.admin.totp_recovery.length:0},permissions:effectivePermissions(req.admin),beanSupport:this.beans.available()};}
+ @Get('me/profile') @Permit('self') profile(@Req() req:any){return myProfile(this.service.db,req.admin);}
+ @Put('me/profile') @Permit('self') saveProfile(@Body() body:any,@Req() req:any){if(req.admin.must_change_password)reject(403,'PASSWORD_CHANGE_REQUIRED','임시 비밀번호를 먼저 변경해주세요.');return updateMyProfile(this.service.db,req.admin,body);}
+ @Post('me/password') @Permit('self') async password(@Body() body:any,@Req() req:any){await this.limiter.limit('admin-password:'+req.admin.id,5,600);return changeMyPassword(this.service.db,req.admin,body,req.cookies?.[ADMIN_ACCESS_COOKIE]?digest(req.cookies[ADMIN_ACCESS_COOKIE]):undefined);}
+ @Get('operators') @Permit('super') operators(){return listOperators(this.service.db);}
+ @Post('operators') @Permit('super') createOperator(@Body() body:any,@Req() req:any){return createOperator(this.service.db,req.admin,body);}
+ @Put('operators/:id') @Permit('super') updateOperator(@Param('id') id:string,@Body() body:any,@Req() req:any){return updateOperator(this.service.db,req.admin,id,body);}
+ @Post('operators/:id/password-reset') @Permit('super') resetOperator(@Param('id') id:string,@Req() req:any){return resetOperatorPassword(this.service.db,req.admin,id);}
+ @Delete('operators/:id') @Permit('super') deactivateOperator(@Param('id') id:string,@Req() req:any){return updateOperator(this.service.db,req.admin,id,{isActive:false});}
+ @Get('dashboard') @Permit(['overview','view']) dashboard(@Query() query:any,@Req() req:any){return adminDashboard(this.service.db,req.admin,query);}
+ @Get('overview') @Permit(['overview','view']) overview(){return adminOverview(this.service.db);}
+ @Get('revenue') @Permit(['revenue','view']) revenue(@Query() query:any,@Req() req:any){return adminRevenue(this.service.db,req.admin,query);}
+ @Get('members') @Permit(['members','view']) members(@Query() query:any){return adminMembers(this.service.db,query);}
+ @Get('posts') @Permit(['content','view']) posts(@Query() query:any){return adminPosts(this.service.db,query);}
+ @Get('payments') @Permit(['revenue','view']) payments(@Query() query:any,@Req() req:any){return adminPayments(this.service.db,req.admin,query);}
+ @Get('withdrawals') @Permit(['revenue','view']) withdrawals(@Query() query:any,@Req() req:any){return adminWithdrawals(this.service.db,req.admin,query);}
+ @Post('revenue/:id/receipt') @Permit(['revenue','create']) receipt(@Param('id') id:string,@Body() body:any,@Req() req:any){return confirmSettlementReceipt(this.service.db,req.admin,id,body);}
+ @Get('financial-policy') @Permit(['settings','view']) async financialPolicy(){return policyView(await this.service.db.financialPolicy.findUnique({where:{id:'platform'}}));}
+ @Put('financial-policy') @Permit(['settings','update']) setFinancialPolicy(@Body() body:any,@Req() req:any){return updateFinancialPolicy(this.service.db,req.admin,body);}
+ @Get('financial-policy/history') @Permit(['settings','view']) async financialPolicyHistory(){return this.service.db.financialPolicyChange.findMany({orderBy:{version:'desc'},take:100});}
 
- @Get('inquiries') inquiries(){return this.service.db.supportTicket.findMany({orderBy:{created_at:'desc'},take:100});}
- @Post('inquiries/:id/reply') async reply(@Param('id') id:string,@Body('reply') reply:string,@Req() req:any){const value=text(reply,10000);await this.service.db.$transaction(async tx=>{const before=await tx.supportTicket.findUniqueOrThrow({where:{id}});await tx.supportTicket.update({where:{id},data:{reply:value,status:'answered'}});await enqueueOperation(tx,'admin.inquiry_replied',{memberId:req.admin.user_sub,targetId:id},undefined,auditChange({status:before.status,contentHash:contentDigest(before.reply)},{status:'answered',contentHash:contentDigest(value)}));});return{message:'답변을 저장했습니다.'};}
- @Get('reports') reports(){return this.service.db.userReport.findMany({where:{status:'PENDING'},orderBy:{created_at:'asc'},take:100});}
- @Post('reports/:id/resolve') async resolve(@Param('id') id:string,@Body() body:any,@Req() req:any){if(!['RESOLVED','REJECTED'].includes(body.status))reject(400,'INVALID_INPUT','처리 상태를 확인해주세요.');const note=text(body.note,2000);await this.service.db.$transaction(async tx=>{const changed=await tx.userReport.updateMany({where:{id,status:'PENDING'},data:{status:body.status,admin_id:req.admin.id,admin_note:note,resolved_at:new Date()}});if(changed.count!==1)reject(409,'REPORT_ALREADY_PROCESSED','이미 처리되었거나 존재하지 않는 신고입니다.');await enqueueOperation(tx,'admin.report_resolved',{memberId:req.admin.user_sub,targetId:id,status:body.status,previousStatus:'PENDING'});});return{message:'신고를 처리했습니다.'};}
- @Get('documents') documents(){return this.service.db.serviceDocument.findMany({where:{kind:{in:['faq','notice']}},orderBy:{updated_at:'desc'},take:100});}
- @Post('documents') async document(@Body() body:any,@Req() req:any){if(req.admin.role==='MODERATOR')reject(403,'ADMIN_REQUIRED','문서 게시 권한이 필요합니다.');if(!['faq','notice'].includes(body.kind)||typeof body.published!=='boolean'||!body.content||JSON.stringify(body.content).length>100000)reject(400,'INVALID_DOCUMENT','문서 내용을 확인해주세요.');const data={kind:body.kind,title:text(body.title,200),content:body.content,published:body.published,pinned:body.pinned===true,category:text(body.category||'',50,false)};const d=await this.service.db.$transaction(async tx=>{const before=body.id?await tx.serviceDocument.findUnique({where:{id:body.id}}):null;if(before&&!['faq','notice'].includes(before.kind))reject(400,'CODE_MANAGED_DOCUMENT','약관과 개인정보처리방침은 코드 배포로만 변경합니다.');const saved=body.id?await tx.serviceDocument.update({where:{id:body.id},data}):await tx.serviceDocument.create({data});await enqueueOperation(tx,'admin.document_saved',{memberId:req.admin.user_sub,targetId:saved.id,status:saved.published?'published':'draft'},undefined,auditChange(before?{...before,titleHash:contentDigest(before.title),contentHash:contentDigest(before.content)}:null,{...data,titleHash:contentDigest(data.title),contentHash:contentDigest(data.content)}));return saved;});return{id:d.id,message:'문서를 저장했습니다.'};}
- @Post('categories') async category(@Body() body:any,@Req() req:any){if(req.admin.role==='MODERATOR')reject(403,'ADMIN_REQUIRED','관리자 권한이 필요합니다.');const name=text(body.name,40);await this.service.db.$transaction(async tx=>{const before=await tx.creatorCategory.findUnique({where:{name}});const saved=await tx.creatorCategory.upsert({where:{name},create:{name},update:{is_active:body.active!==false}});await appendAudit(tx,{category:'admin',action:'admin.category_saved',entityId:String(saved.id),data:auditChange(before,{is_active:saved.is_active})});});return{message:'분야를 저장했습니다.'};}
- @Put('creators/:id/verification') async verification(@Param('id') id:string,@Body('isVerified') isVerified:boolean,@Req() req:any){
-  if(!['ADMIN','SUPER_ADMIN'].includes(req.admin.role))reject(403,'ADMIN_REQUIRED','크리에이터 인증 관리 권한이 필요합니다.');
+ @Get('inquiries') @Permit(['support','view']) inquiries(){return this.service.db.supportTicket.findMany({orderBy:{created_at:'desc'},take:100});}
+ @Post('inquiries/:id/reply') @Permit(['support','update']) async reply(@Param('id') id:string,@Body('reply') reply:string,@Req() req:any){const value=text(reply,10000);await this.service.db.$transaction(async tx=>{const before=await tx.supportTicket.findUniqueOrThrow({where:{id}});await tx.supportTicket.update({where:{id},data:{reply:value,status:'answered'}});await enqueueOperation(tx,'admin.inquiry_replied',{memberId:req.admin.user_sub,targetId:id},undefined,auditChange({status:before.status,contentHash:contentDigest(before.reply)},{status:'answered',contentHash:contentDigest(value)}));});return{message:'답변을 저장했습니다.'};}
+ @Get('reports') @Permit(['content','view']) async reports(){const rows=await this.service.db.userReport.findMany({where:{status:'PENDING'},orderBy:{created_at:'asc'},take:100});
+  // A comment report carries the comment itself so the operator can judge and hide it from the same row.
+  const comments=await this.service.db.comment.findMany({where:{id:{in:rows.filter(r=>r.target_type==='COMMENT').map(r=>r.target_id)}},select:{id:true,content:true,posting_id:true,author_id:true,hidden:true,is_deleted:true}});
+  return rows.map(r=>r.target_type==='COMMENT'?{...r,comment:comments.find(c=>c.id===r.target_id)||null}:r);}
+ @Post('reports/:id/resolve') @Permit(['content','update']) async resolve(@Param('id') id:string,@Body() body:any,@Req() req:any){if(!['RESOLVED','REJECTED'].includes(body.status))reject(400,'INVALID_INPUT','처리 상태를 확인해주세요.');const note=text(body.note,2000);await this.service.db.$transaction(async tx=>{const changed=await tx.userReport.updateMany({where:{id,status:'PENDING'},data:{status:body.status,admin_id:req.admin.id,admin_note:note,resolved_at:new Date()}});if(changed.count!==1)reject(409,'REPORT_ALREADY_PROCESSED','이미 처리되었거나 존재하지 않는 신고입니다.');await enqueueOperation(tx,'admin.report_resolved',{memberId:req.admin.user_sub,targetId:id,status:body.status,previousStatus:'PENDING'});});return{message:'신고를 처리했습니다.'};}
+ @Get('documents') @Permit(['support','view']) documents(){return this.service.db.serviceDocument.findMany({where:{kind:{in:['faq','notice']}},orderBy:{updated_at:'desc'},take:100});}
+ @Post('documents') @Permit(['support','view']) async document(@Body() body:any,@Req() req:any){requirePermission(req.admin,'support',body?.id?'update':'create');if(!['faq','notice'].includes(body.kind)||typeof body.published!=='boolean'||!body.content||JSON.stringify(body.content).length>100000)reject(400,'INVALID_DOCUMENT','문서 내용을 확인해주세요.');const data={kind:body.kind,title:text(body.title,200),content:body.content,published:body.published,pinned:body.pinned===true,category:text(body.category||'',50,false)};const d=await this.service.db.$transaction(async tx=>{const before=body.id?await tx.serviceDocument.findUnique({where:{id:body.id}}):null;if(before&&!['faq','notice'].includes(before.kind))reject(400,'CODE_MANAGED_DOCUMENT','약관과 개인정보처리방침은 코드 배포로만 변경합니다.');const saved=body.id?await tx.serviceDocument.update({where:{id:body.id},data}):await tx.serviceDocument.create({data});await enqueueOperation(tx,'admin.document_saved',{memberId:req.admin.user_sub,targetId:saved.id,status:saved.published?'published':'draft'},undefined,auditChange(before?{...before,titleHash:contentDigest(before.title),contentHash:contentDigest(before.content)}:null,{...data,titleHash:contentDigest(data.title),contentHash:contentDigest(data.content)}));return saved;});return{id:d.id,message:'문서를 저장했습니다.'};}
+ @Post('categories') @Permit(['content','view']) async category(@Body() body:any,@Req() req:any){requirePermission(req.admin,'content',body?.active===undefined?'create':'update');const name=text(body.name,40);await this.service.db.$transaction(async tx=>{const before=await tx.creatorCategory.findUnique({where:{name}});const saved=await tx.creatorCategory.upsert({where:{name},create:{name},update:{is_active:body.active!==false}});await appendAudit(tx,{category:'admin',action:'admin.category_saved',entityId:String(saved.id),data:auditChange(before,{is_active:saved.is_active})});});return{message:'분야를 저장했습니다.'};}
+ @Put('creators/:id/verification') @Permit(['members','update']) async verification(@Param('id') id:string,@Body('isVerified') isVerified:boolean,@Req() req:any){
   if(typeof isVerified!=='boolean')reject(400,'INVALID_INPUT','인증 여부를 확인해주세요.');
   await this.service.db.$transaction(async tx=>{
    await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${id} FOR UPDATE`;
@@ -58,5 +85,5 @@ export class PlatformAdminController{
   });
   return{message:isVerified?'인증 배지를 부여했습니다.':'인증 배지를 해제했습니다.',isVerified};
  }
- @Post('creators/:id/promotion') async promotion(@Param('id') id:string,@Body('promoted') promoted:boolean,@Req() req:any){if(req.admin.role==='MODERATOR'||typeof promoted!=='boolean')reject(403,'ADMIN_REQUIRED','광고 설정 권한이 필요합니다.');await this.service.db.$transaction(async tx=>{const before=await tx.creator.findUniqueOrThrow({where:{user_id:id}});await tx.creator.update({where:{user_id:id},data:{promoted}});await appendAudit(tx,{category:'admin',action:'admin.promotion_changed',entityId:id,data:auditChange(before,{promoted})});});return{message:'노출 설정을 저장했습니다.'};}
+ @Post('creators/:id/promotion') @Permit(['members','update']) async promotion(@Param('id') id:string,@Body('promoted') promoted:boolean,@Req() req:any){if(typeof promoted!=='boolean')reject(400,'INVALID_INPUT','광고 설정 값을 확인해주세요.');await this.service.db.$transaction(async tx=>{const before=await tx.creator.findUniqueOrThrow({where:{user_id:id}});await tx.creator.update({where:{user_id:id},data:{promoted}});await appendAudit(tx,{category:'admin',action:'admin.promotion_changed',entityId:id,data:auditChange(before,{promoted})});});return{message:'노출 설정을 저장했습니다.'};}
 }
