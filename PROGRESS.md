@@ -1,5 +1,14 @@
 # PROGRESS: crefans_server
 
+## 2026-10-30 /pilot-work K2~K14 합의·반영 (운영 배포 totp-pilot-20261030 + 가이드, 커밋 완료·푸시 안 함)
+- 결정: 운영자 TOTP 즉시(미등록 7일 유예) / 세금 문구 중립("세금 처리 방식(원천징수 여부 포함)은 정식 정산 전에 안내합니다.") / 콩 10% 공제·만료 소멸은 현행 유지 / 처리방침 개정은 약관 초안에 묶음 / 탈퇴자 문의 3년 보존·DM 상대방 쪽 보존 / 콩 미수금만 콩 출금 차단 / 백업 최대 7일 / 탈퇴 시 충전콩은 지갑 환불 안내(프로모션콩 소멸) / 멤버십은 중개 구조 유지+고지 보강 / 다음: 요청량 제한 → 옛 경로 리다이렉트 → 덤프 정리 자동화·배포 전 테스트.
+- 반영: server TOTP(`admin-totp-core.ts`·`admin-totp.ts`, 마이그레이션 `20261030230000_admin_totp`, 로그인 2단계·복구코드·재사용 거부·5분 5회 제한·유예 후 self 경로만), 콩 미수금만 콩 출금 차단, 탈퇴 시 콩 버킷별 안내, 파기(DM 보존·문의 3년 후 삭제·CI 해시 삭제). admin TOTP 화면(로그인 2단계·등록·복구코드·유예 배너·403 이동). front 탈퇴 창(크리에이터 조건은 크리에이터에게만, 충전 내역 환불 링크), 콩 미수금 시 출금 버튼 비활성, 세금 문구. guide 콩 환불·유효기간, 미수금·탈퇴 전 출금, 저작권 수령인(전화·주소)·임시조치 안내, 세금 문구, 소개서 PDF 재생성. 덤프 정리 스크립트 `crefans_front/infra/platform/backup-retention.py`(운영 계획 실행: 21개 142MB 모두 7일 이내 → 삭제 0). 런북 백업 리전 서울. 약관 초안 13~18번·법령 원문 확인 절.
+- 법령 원문(첨부 다운로드·추출, 2026-10-30): 표준약관 제3조제4항 7일/불리 30일, 소분기준 별표Ⅱ에 충전 캐시 환급 공제 근거 없음(10%는 구독 해지), 신유형 상품권 표준약관 제5·7·8조(90/95%·5년), 시행령 별표(유료 판매 주목적 제외 가능), 통신판매업 면제 50회 미만·간이과세자.
+- 검증(2026-10-30 KST): server 관련 10파일 전부 통과(admin-totp 3·beans 30·pilot-followups 4·openapi 11·admin-operators 7·admin-console 12·auth-hardening 4·moderation 7·finance 9·beta-policy 11·jobs 2), 대조 TOTP 3종·미수금/탈퇴/파기 3종 실패 확인. front check 419/419(탈퇴 창 대조), e2e 15/15. admin npm test 11/11, e2e 25/25(에이전트 대조 8종). 문서검사 PASS, 가이드 격리 빌드·check 통과.
+- 배포: API/worker/admin/front(마이그레이션 admin_totp 적용, DB·proxy 보존), 가이드 정적(44파일 SHA 일치). 운영 확인: health 200, 콘솔 로그인 200, 비로그인 TOTP 등록 401. 이미지 정리 각 3개.
+- 커밋: front 8·server 8·admin 3 커밋(파일 단위 목적별), 가이드 `git init`(main) 첫 커밋. 현재 브랜치 이름(feat/iphone-input-zoom 등)은 내용과 다름 — 정리 미결. 푸시 안 함. 커밋 제외: front 루트 스크린샷·prod.json·output/pdf(QA 산출물).
+- 미확인·남은 일: 실제 인증 앱으로 운영 콘솔 TOTP 등록(사용자 직접, 7일 유예), 실제 토스 부분취소·메일 발송, 덤프 정리의 정기 실행(다음 묶음), 원천징수 세무 확정.
+
 ## 2026-10-30 콩 환불 동결 핫픽스 (운영 배포: refund-hotfix-20261030, 미커밋)
 - 원인(오후 night-work 1순위, 격리 DB 재현): 우리 부분취소로 토스 상태가 PARTIAL_CANCELED/CANCELED가 되면 `beans.service.ts` applyProvider가 무조건 freezeCharge → 충전 disputed·후원받은 lot 동결·미수금.
 - 수정(server `src/platform/beans.service.ts`): 취소액(totalAmount−balanceAmount) ≤ refunded_amount+처리 중 환불액이면 정상, 넘을 때만 동결. 결과 불명 환불 대사(tick `beans-refund`, `reconcileRefund`: PG 기록에 취소가 있으면 완료, 없으면 같은 멱등키 `bean-refund-${id}`로 재요청). 완료·복원은 bean_refunds 행 FOR UPDATE 후 processing 재확인(동시 처리 1회). 같은 requestId 재요청이 failed면 409 BEAN_REFUND_FAILED. 환불은 판매 승인과 분리(`keyEnvironment`). front: `beanRefundOutcome`(lib/crefans/bean-refund.ts)으로 done만 "환불했어요", processing은 "확인하고 있어요", 확정 거절 시 새 requestId. admin Beans.tsx: 처리 중 표시·확정 거절 시 새 requestId.
