@@ -1,5 +1,18 @@
 # PROGRESS: crefans_server
 
+## 2026-10-31 /pilot-work: 소개서·가이드 동기화 결정 반영 (운영 배포 guide-sync-20261031 + 가이드 guide-sync-20261031, 커밋 완료·푸시 안 함)
+- 근거: night-work `crefans_front/.local/night-work/2026-10-30-2213.md`. 사용자 결정(클릭): 약관 개정 바로 공지·30일 뒤 시행, 세금은 가이드에 개정 예정 주석, 비구독 전용 게시물 후원 막기, 신고자 결과 앱 알림, 앱 FAQ·안내 보강, 가이드 원본 해시+숫자 대조, 명칭 '오픈베타(가입은 초대 이메일)', 약관에서 '17개' 삭제, 이벤트 일정 미정 유지(유효기간 문장만), 콘솔 공지로 게시까지, 배포+커밋.
+- 서버: `legal-documents.ts` 2026-11-30 시행 개정판(약관 1·2·6·8·9조 수정, 11조 콩 신설, 운영정책 신고 절) — `catalog(now)`가 KST 시행일 전에는 `upcoming`으로, 당일부터 terms·policy로 자동 교체. 처리방침은 그대로. `/common` legal에 `terms-next`·`policy-next`. `beans.tip` 볼 수 없는 게시물 403 POST_ACCESS_REQUIRED. 신고 처리 시 신고자 앱 알림(type moderation, 내부 메모 미포함). 공지 원문 `infra/platform/notices/terms-20261130.json`(배포 스크립트가 검증 후 id 고정 upsert, 덮어쓰지 않음).
+- 검증(로컬 격리 DB): legal 11/11(시행일 전환 신규), beans 31/31(전용 게시물 거부 신규), admin-console 12/12(신고자 알림 신규), signup-mode 3, signup-invites 6, openapi 11, payment-lifecycle 42, member-erase 4, pilot-followups 4. 대조(dist 변조): 후원 열람 검사 제거·신고자 알림 제거·시행일 전환 제거 각 1건 실패.
+- 배포: 처음 만든 폴더는 기준이 tip-consent였는데 운영이 Codex 세션의 bean-tip-filter-20261030(미커밋 후원 필터 작업)이라 그대로 배포하면 되돌림 → 폐기(`crefans_front/.local/guide-sync-deploy-20261031-aborted-wrong-baseline`)하고 bean-tip-filter 소스 위에 이 세션 파일만 덮어 재빌드(`guide-sync-deploy-20261031`). exit 0, 공지 `notice-terms-20261130` 게시. 외부 확인: terms 2026-10-30.3, terms-next 2026-11-30, 공지 노출, 공지 페이지 200.
+- 사고·복구: PROGRESS 갱신 스크립트가 파일을 비운 뒤 읽어(파이썬 평가 순서) 이 파일이 0바이트가 됨. 커밋본(HEAD) + Codex 미커밋 항목 5건(프론트 PROGRESS와 Codex 기록 `~/.codex/sessions/2026/10/29/rollout-…01a1868d…jsonl`의 동일 문구)으로 복원, 복원 직후 diff가 삽입 33줄뿐임을 확인.
+- 커밋 분리: Codex 세션의 미커밋 변경(bean-history.ts, openapi-contract.ts, beans.service.ts의 sourceType 필터, 후원 필터 테스트, PROGRESS 항목)은 커밋하지 않음. beans.service.ts·platform-beans 테스트·PROGRESS는 HEAD+이 세션 변경만 커밋.
+- 남은 것: 약관 개정안 행 6(등급 변경)·18(임시조치 30일 법령 문구)은 기능·법률 확인 후. 처리방침 개정 행 13~15 미반영. 세무사 확인 전 세금 문구는 중립 유지.
+
+## 2026-10-30 밤 night-work: 소개서·가이드 ↔ 정책·코드 동기화 조사 (문서만, 코드 변경 없음)
+- 문서: `crefans_front/.local/night-work/2026-10-30-2213.md` (22:13~22:21, 범위 소진으로 조기 종료).
+- 숫자·소개서 수익 계산은 코드와 일치. 상위: 콩 규칙이 시행 약관에 없음(개정 공지 시점 결정), 구독·후원 제공 동의·보관 기간·즉시 삭제·재가입 30일 제한이 가이드·앱 FAQ에 없음, 세금 문구 약관 불일치, 전용 게시물 비구독자 후원 가능(가이드와 다름), 회사 귀책 환불은 운영자만, 가이드 검사가 원본 변경을 감지 못함, `FinancePages.tsx:67` 최소 출금 하드코딩. 결정 필요 9건은 문서 요약 참조.
+
 ## 2026-10-30 콩 후원 시 크리에이터 제공 동의 (운영 배포 tip-consent-20261030, 커밋 완료·푸시 안 함)
 - 사용자 지시 "지금 하고": 받은 후원 목록에서 크리에이터가 후원자 닉네임·수량·메시지·일시·게시물을 보므로 구독과 같은 제3자 제공 동의를 받는다.
 - 코드: `creator-provision.ts TIP_PROVISION`(2026-10-30.1), `beans.tip` 버전 불일치·누락 400 TIP_PROVISION_CONSENT_REQUIRED, 새 후원마다 member_consents(kind tip-provision, tipId) 사본. 처리방침 8조에 후원 제공 문단 추가, 문서 version 2026-10-30.3. OpenAPI tips body에 creatorProvision.

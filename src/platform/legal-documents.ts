@@ -4,7 +4,7 @@ import {reject} from './http';
 
 export type LegalSection={title:string;body:string;links?:{label:string;href:string}[]};
 export type LegalDocument={title:string;version:string;updatedAt:string;publishedAt?:string;effectiveAt:string|null;status:'draft'|'published';notice?:string;sections:LegalSection[]};
-export type LegalCatalog={documents:Record<'terms'|'privacy'|'policy',LegalDocument>;collection:LegalDocument;marketing:LegalDocument;blockers:string[]};
+export type LegalCatalog={documents:Record<'terms'|'privacy'|'policy',LegalDocument>;collection:LegalDocument;marketing:LegalDocument;blockers:string[];upcoming?:{effectiveAt:string;documents:Record<'terms'|'policy',LegalDocument>}};
 
 // Legal text is a reviewed code release, never editable through ServiceDocument/admin.
 // Public availability is separate from permission to accept signup consents.
@@ -57,9 +57,35 @@ const catalog:LegalCatalog={documents:{terms,privacy,policy:document('운영정�
  {title:'신고와 이의제기',body:'게시물·메시지의 신고 기능과 고객센터 문의로 문제를 알릴 수 있습니다. 운영자는 확인된 사실과 긴급성을 검토하여 보호 조치를 취하고, 잘못된 제한에 대해 검토를 요청할 수 있도록 합니다. 초기 베타에서는 일반 콘텐츠만 제공합니다. 성인 콘텐츠는 법률·본인/연령 확인·공급사 확인 후 별도 개방합니다. 고객지원은 사이트 문의와 이메일로 평일10~18시 운영하며2영업일 내 첫 답변을 목표로 합니다. 긴급한 권리 침해와 법정 처리 의무는 별도로 대응합니다.'},
 ])},collection,marketing,blockers:[]};
 
+// 2026-11-30 revision of the terms and the operating policy (notice posted 2026-10-30, 30 days ahead because some changes are
+// unfavourable: bean refund deduction, expiry, receivables, creator closing). Source: docs/terms-draft-20261030.md rows 1-5, 7-11
+// (row 6 grade change and row 18 temporary-measure wording wait for features/legal check). The privacy policy is unchanged.
+export const NEXT_TERMS_EFFECTIVE='2026-11-30';
+const nextVersion='2026-11-30.1';
+const revise=(doc:LegalDocument,edits:Record<string,Array<[string,string]>>,extra:LegalSection[]=[]):LegalDocument=>{
+ const sections=doc.sections.map(sec=>{let body=sec.body;for(const [from,to] of edits[sec.title]||[]){if(!body.includes(from))throw Error(`Legal revision anchor missing in ${sec.title}`);body=body.replace(from,to);}return{...sec,body};});
+ return{...doc,version:nextVersion,updatedAt:'2026-10-30',publishedAt:'2026-10-30',effectiveAt:NEXT_TERMS_EFFECTIVE,notice:'2026년 10월 30일 공지했고 2026년 11월 30일부터 적용합니다. 오픈베타 기간에는 사전 협의된 초대 이메일로 가입하며, 실제 결제와 정산 송금은 준비를 마친 뒤 시작합니다.',sections:[...sections,...extra]};
+};
+const nextTerms=revise(terms,{
+ '1. 목적과 적용 범위':[['통신판매업 신고번호는 확인 중이며, 유료 서비스 개시 전에 신고·표시 의무 적용 여부와 실제 정보를 확인합니다. 신규 이용계약 체결은 가입 개방 후 별도 동의를 받아 진행합니다. 크리에이터가 판매자이고 크레팬스가 중개·결제·정산을 제공하는 기본안이며 실제 PG·세무 및 계약상 역할을 확인한 뒤 유료 운영합니다.','회사는 유료 서비스 개시 전에 통신판매업을 신고하고 신고번호를 이 조와 서비스 하단 사업자 정보에 표시합니다. 크레팬스는 크리에이터 멤버십 거래의 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다. 콩은 크레팬스가 직접 판매합니다.']],
+ '2. 가입과 계정 관리':[['초기 베타는 초대된 17개 계정부터 일반 콘텐츠로 2026년 11월까지 운영하며, 준비 완료 후 시작일을 안내합니다.','오픈베타 기간(2026년 11월까지)에는 사전 협의된 초대 이메일로 가입하며 일반 콘텐츠만 제공합니다.']],
+ '6. 크리에이터 수수료·정산·출금':[['크리에이터 본인의 세금과 법정 원천징수는 별도입니다.','세금 처리 방식(원천징수 여부 포함)은 정식 정산 전에 안내합니다.'],
+  ['전액 환불이 완료되면 해당 결제의 수수료와 수익도 함께 취소합니다.','전액 환불이 완료되면 해당 결제의 수수료와 수익도 함께 취소합니다. 이미 출금된 수익에 결제 취소·환불·카드사 이의제기가 생기면 그 금액을 미수금으로 기록해 이후 정산에서 차감하고 크리에이터에게 알립니다. 미수금이 남아 있으면 출금과 탈퇴가 제한될 수 있습니다.'],
+  ['초기 이체 수수료는 플랫폼이 부담합니다.','초기 이체 수수료는 플랫폼이 부담합니다. 후원받은 콩은 후원 후 7일이 지나야 출금을 신청할 수 있고, 일반콩은 충전 대금의 실제 입금 확인도 필요합니다.']],
+ '8. 신고·이용 제한·이의제기':[['이용자는 게시물과 메시지의 신고 기능 또는 고객센터를 통해 권리 침해와 위법 행위를 알릴 수 있습니다.','이용자는 게시물·댓글·메시지의 신고 기능 또는 고객센터를 통해 권리 침해와 위법 행위를 알릴 수 있습니다. 권리 침해·불법촬영물·저작권 침해 신고는 대표 박경호(khpark@crefans.com)가 이메일로 접수합니다. 신고를 처리하면 신고한 회원에게 앱 알림으로 검토 결과를 알립니다.'],
+  ['제한 사유와 이의제기 방법은 가능한 범위에서 당사자에게 안내합니다.','게시물·댓글을 숨기거나 이용을 제한하면 앱 알림과 이메일로 공개 사유와 이의제기 방법을 당사자에게 알립니다. 크리에이터가 차단한 회원은 그 크리에이터에게 메시지를 보내거나 그 게시물에 새 댓글·답글을 달 수 없으며, 이미 쓴 댓글은 남습니다.']],
+ '9. 서비스 변경·장애·탈퇴':[['자동 갱신 구독이나 처리 중인 출금이 있으면 먼저 정리해야 할 내역을 안내합니다.','자동 갱신 구독, 처리 중인 출금, 남은 충전콩(먼저 환불 신청)이나 후원받은 콩(먼저 출금)이 있으면 먼저 정리해야 할 내역을 안내하며, 남은 프로모션콩은 탈퇴하면 소멸합니다. 유료 구독자가 있는 크리에이터는 판매를 먼저 중단하고, 이미 결제된 구독 기간이 모두 끝나고 미지급 수익·미수금 정산이 끝난 뒤 탈퇴할 수 있습니다.']],
+},[{title:'11. 콩',body:'콩은 크리에이터 후원에만 쓰며 멤버십·콘텐츠 이용권이 아닙니다. 프로모션콩이 있으면 먼저 사용합니다. 후원은 게시물 열람 권한을 제공하지 않으며, 볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다.\n충전 후 7일 이내 쓰지 않은 콩은 전액 청약철회할 수 있고, 7일이 지난 뒤 쓰지 않은 콩은 10%를 공제하고 환불합니다. 회사 귀책 사유가 있으면 고객센터 요청에 따라 공제하지 않고 환불합니다. 사용한 콩과 운영자가 지급한 프로모션콩은 환불·출금 대상이 아닙니다.\n충전콩은 결제일, 운영자가 지급한 프로모션콩은 지급일로부터 5년간 쓸 수 있으며, 만료 30일 전에 알리고 만료되면 남은 콩은 소멸합니다.'}]);
+const nextPolicy=revise(catalog.documents.policy,{
+ '신고와 이의제기':[['게시물·메시지의 신고 기능과 고객센터 문의로 문제를 알릴 수 있습니다.','게시물·댓글·메시지의 신고 기능과 고객센터 문의로 문제를 알릴 수 있습니다. 권리 침해·불법촬영물·저작권 침해 신고는 대표 박경호(khpark@crefans.com)가 이메일로 접수하며, 신고를 처리하면 신고한 회원에게 앱 알림으로 결과를 알립니다. 크리에이터가 차단한 회원은 그 크리에이터에게 메시지와 새 댓글을 보낼 수 없습니다.'],['초기 베타에서는 일반 콘텐츠만 제공합니다.','오픈베타에서는 일반 콘텐츠만 제공합니다.']],
+});
+const nextCatalog:LegalCatalog={...catalog,documents:{...catalog.documents,terms:nextTerms,policy:nextPolicy}};
+const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+
 @Injectable()
 export class LegalDocumentsService {
- catalog():LegalCatalog{return structuredClone(catalog);}
+ // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
+ catalog(now=new Date()):LegalCatalog{return structuredClone(kstDate(now)>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=new Date().toISOString().slice(0,10));

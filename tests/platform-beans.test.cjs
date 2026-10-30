@@ -81,6 +81,8 @@ test('post tips count unique supporters and exclude creator-wide tips',async()=>
  try{
   for(const memberId of [supporterA,supporterB])await beans.grant(admin,{memberId,quantity:10,requestId:randomUUID(),reason:'Isolated supporter count test'});
   const input={postId:post.id,quantity:1,requestId:randomUUID(),message:'Post support'};
+  const locked=await db.posting.create({data:{user_sub:creator,title:'Members only',content:'Synthetic',is_public:true,is_membership:true,status:'PUBLISHED'}});
+  try{await assert.rejects(beans.tip(supporterA,creator,{...input,postId:locked.id,requestId:randomUUID()}),code('POST_ACCESS_REQUIRED'));assert.equal(await db.beanTip.count({where:{post_id:locked.id}}),0,'a tip never unlocks a post, so locked posts take none');}finally{await db.posting.delete({where:{id:locked.id}});}
   const a=await beans.tip(supporterA,creator,input);assert.equal(a.supporterCount,1);
   assert.equal((await beans.tip(supporterA,creator,input)).id,a.id);
   assert.equal((await beans.tip(supporterA,creator,{...input,requestId:randomUUID()})).supporterCount,1);

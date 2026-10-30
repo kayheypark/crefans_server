@@ -65,3 +65,11 @@ test('privacy policy describes the actual withdrawal purge: 30-day grace, erased
  assert.match(body,/탈퇴 후 30일 동안은/);assert.match(body,/작성한 게시물을 삭제합니다/);assert.match(body,/“탈퇴한 사용자”로 표시/);
  assert.doesNotMatch(body,/회원 정보 전체를 파기하지 않습니다/);
 });
+test('the 2026-11-30 revision is published as upcoming and replaces the terms and policy on that KST date only',()=>{
+ const legal=new LegalDocumentsService(),before=legal.catalog(new Date('2026-11-29T23:59:00+09:00')),after=legal.catalog(new Date('2026-11-30T00:00:00+09:00'));
+ assert.equal(before.documents.terms.version,'2026-10-30.3');assert.equal(before.upcoming.effectiveAt,'2026-11-30');assert.equal(before.upcoming.documents.terms.version,'2026-11-30.1');
+ assert.equal(after.documents.terms.version,'2026-11-30.1');assert.equal(after.documents.policy.version,'2026-11-30.1');assert.equal(after.upcoming,undefined);
+ assert.equal(after.documents.privacy.version,before.documents.privacy.version,'privacy policy is not part of this revision');
+ const terms=JSON.stringify(after.documents.terms);for(const added of ['11. 콩','10%를 공제','미수금','세금 처리 방식(원천징수 여부 포함)','신고한 회원에게 앱 알림','볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다','오픈베타'])assert.ok(terms.includes(added),added);
+ for(const removed of ['17개 계정','법정 원천징수는 별도'])assert.ok(!terms.includes(removed),removed);
+});

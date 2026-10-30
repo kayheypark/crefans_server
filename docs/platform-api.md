@@ -41,7 +41,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /health | 공개; DB 준비 상태와 version |
 | GET | /bootstrap | 선택 인증; 현재 사용자·팬 화면 데이터·계정 설정 |
 | GET | /session | 회원; 세션 유효 여부 |
-| GET | /common | 선택 인증; 공지·FAQ·정책·내 결제수단 |
+| GET | /common | 선택 인증; 공지·FAQ·정책·내 결제수단 legal에 시행 전 개정본이 있으면 `terms-next`·`policy-next` 키로 함께 준다(2026-11-30 시행본, KST 시행일에 terms·policy로 자동 교체). |
 | POST | /auth/signup/email/request | email; 6자리 코드, 10분 유효·180초 재요청 제한 |
 | POST | /auth/signup/email/verify | email, code; 일회용 email proof |
 | POST | /identity/start | purpose=signup 또는 withdrawal-pin; attemptId/state/redirectUrl |
@@ -175,7 +175,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /admin/inquiries | 문의 조회 |
 | POST | /admin/inquiries/:id/reply | 문의 답변 |
 | GET | /admin/reports | 신고 조회. 댓글 신고는 `comment:{content,posting_id,author_id,hidden,is_deleted}` 포함 |
-| POST | /admin/reports/:id/resolve | 신고 처리 |
+| POST | /admin/reports/:id/resolve | 신고 처리 처리하면 신고자에게 앱 알림(type moderation: 처리 완료 "검토하고 조치했습니다" / 기각 "위반을 확인하지 못했습니다", 내부 메모 미포함, 2026-10-31). |
 | GET | /admin/documents | 공지·FAQ 조회(약관·개인정보는 코드 원본) |
 | POST | /admin/documents | 공지·FAQ 등록·수정. 코드 관리 법률문서 변경 거부 |
 | POST | /admin/marketing/campaigns | 활성 SUPER_ADMIN; campaignId/subject/body/memberIds(최대100), 현재 증빙 동의자만 중복 없는 광고 대기열 등록. 법률문서 발행·서명키 필요 |
@@ -335,7 +335,7 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | POST | /beans/charges/:id/confirm | paymentKey/orderId/amount 검증, PG lookup/confirm, 원주문 lease·1회 lot/원장; 불확실 결과는 재조회 |
 | GET | /beans/charges/:id/refund-quote | 본인 충전의 미사용 충전콩 환불 예상(quantity·gross·deduction·amount·fullRefundWindow). 결제 후 7일 이내 전액, 이후 10% 공제(beanPolicy.refundFullDays·refundDeductionBps). 프로모션콩·사용분·만료분 제외 |
 | POST | /beans/charges/:id/refund | requestId 멱등. lot 예약 후 토스 부분취소(cancelAmount) → 성공 시 원장 purchased→회사 stock, 충전 refunded_quantity/amount 누적. PG 거절은 콩 복원(failed), 결과 불명은 processing 유지(BEAN_REFUND_IN_PROGRESS로 재시도 차단) |
-| POST | /creators/:id/tips | 세션 후원자·활성 크리에이터 회원ID, quantity/requestId/message(선택500자)/postId(선택), 본인후원 불가·프로모션 우선·출처 보존; 구독권 미부여 |
+| POST | /creators/:id/tips | 세션 후원자·활성 크리에이터 회원ID, quantity/requestId/message(선택500자)/postId(선택), 본인후원 불가·프로모션 우선·출처 보존; 구독권 미부여 postId 게시물은 후원자가 볼 수 있어야 한다(service.access, 아니면 403 POST_ACCESS_REQUIRED, 2026-10-31). |
 | GET | /beans/tips | 필터 후 보낸 후원20건·page·total, from/to/q, 본인만 (후속 필터는 로컬 반영) |
 | POST | /beans/webhook | 공개 접수200, IP별30회/분, UUID 주문 재조회 대기만 변경; 본문으로 승인/지갑 수정 불가 |
 | GET | /studio/bean-finance | 크리에이터 지갑/받은 후원/실입금·보류 완료 가용수량/출금/검증계좌/PIN 상태, page |
