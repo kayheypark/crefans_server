@@ -125,3 +125,20 @@ sudo docker compose -p crefans-beta -f compose.yml -f compose.beta.yml -f compos
 현재 운영은 beans-20261025, BEAN_LEDGER_ENABLED=true/BETA_MODE=true이며 live 판매·실출금·광고메일은 false다. 이전 준비 단계의 기본 off와 구분한다.17→21migration과 회사초기1억, DB 수수료20%/보류7일 version2,HTTP16/브라우저6·배치정상/원장균형/실행소스747파일을 확인했다. 실제 판매승인·법정환급/약관·은행 검증은 남아 있다. 배포 증거: 프론트 docs/audit/bean-deployment-20261025.json.
 
 배포시 주의: `API_IMAGE=new compose ...`처럼 sudo 앞의 쉘 환경만 바꾸면 sudo가 제거하여 구버전으로 실행될 수 있다. `sudo -n env API_IMAGE=검증태그 docker compose ... run --rm --no-deps -T --interactive=false api npx prisma migrate deploy`처럼 명시한다. bash stdin으로 스크립트를 전달할 때 compose run이 나머지 명령을 읽지 않도록 비대화형을 사용한다(의도적인 node heredoc 전달은 예외). 새 이미지의 migration 파일 수와 실제 DB 완료 수/회사원장/worker-health를 함께 대조하며 HTTP200만으로 완료로 판단하지 않는다. 롤백은 앱/설정만 복구하고 추가원장·정책감사는 보존한다.
+
+### 공개 명함 도메인 (2026-10-27)
+
+`BUSINESS_DOMAIN` 기본값은 `business.crefans.com`이다. Route53의 A 레코드는 기존 EC2 원본을 가리키며 Caddy가 HTTPS 인증서를 관리한다. `/`는 `/card?who=khpark`로302, `/card`·`/_next/static/*`·`/brand/business-cards/*`만 기존 frontend로 전달하며 API 및 다른 경로는404다. 회원 세션/API·기존 beta CloudFront 경로는 추가하지 않는다. 프론트 명함은 양면 로드·3D 등장(0.8초)·뒷면 유지(1초)·앞면 전환(0.7초) 후 진행 막대가5초 동안 흐르면 고정된 beta 서비스 소개 페이지로 이동한다. 진행 막대 오른쪽의 중지·재생·다시보기 아이콘으로 전체 연출과 자동 입장을 제어한다. 프론트 릴리스와 Caddyfile을 함께 검증·백업하고, 문제 시 이전 프론트 이미지와 Caddyfile을 함께 복구한다.
+
+## 배포 이미지 보존 (2026-10-28)
+
+배포마다 front 약2.2GB·API 약1GB 이미지가 누적되어 운영(48GB)과 빌드 맥 디스크가 반복 부족해졌다. 배포·운영 검증이 끝나면 프론트 저장소의 `infra/platform/image-retention.py`로 저장소별 최신 3개(현재+직전2)와 컨테이너 사용 중·`--protect` 태그만 남긴다. 기본은 계획 출력, `--apply`일 때만 `docker rmi <tag>`(강제 없음)로 지우며 다른 이미지·볼륨·DB·빌드 캐시는 건드리지 않는다. 로컬에도 같은 3개를 남겨 운영 롤백 이미지를 다시 보낼 수 있게 한다. `--self-test`에 사용 중 보호 제거·보존 개수 변경 대조 검사가 있다.
+
+근거 확인일 2026-10-28: [Docker pruning](https://docs.docker.com/engine/manage-resources/pruning/)(기본 정리는 dangling만, 자동 스케줄 권고 없음), [Kamal prune](https://kamal-deploy.org/docs/commands/prune)(최근 5개 보존 관행), [ECR lifecycle](https://docs.aws.amazon.com/AmazonECR/latest/userguide/LifecyclePolicies.html)(imageCountMoreThan). 레지스트리 기반 배포·Gitea Actions 도입은 미결정.
+
+
+### 로컬 Docker 태그 조회 실패 대응 (2026-10-29)
+
+일부 이전 로컬 이미지가 목록·ID 조회에는 있지만 태그 조회는 `No such image`로 실패했다. 원인은 미확정이다. 보존 도구는 이 오류에 한해 계획과 정확히 같은 ID, 해당 태그 하나만 보유, 다른 저장소 digest 없음, 현재 컨테이너 미사용을 확인한 뒤 ID로 일반 `docker rmi`를 실행한다. 다른 오류·추가 태그·사용 중이면 거부하며 `--force`는 사용하지 않는다. 계획 출력·사용자 보고·최신3개 보존 규칙은 같다. 자체검사5조건과 사용중 보호를 없앤 대조 실패를 확인했다.
+
+근거: [Docker image rm](https://docs.docker.com/reference/cli/docker/image/rm/), 확인2026-10-29. 공식 CLI는 태그·ID·digest 삭제를 지원하며 여러 태그의 ID 강제삭제는 하지 않는다. 실행 증거는 front `.local/studio-input-console-deploy-20261029/`와 `docs/audit/studio-input-console-deployment-20261029.json`.
