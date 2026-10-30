@@ -1,7 +1,8 @@
 import {ensureBeanWallet} from './bean-ledger';
 import {recordMarketingChoice} from './marketing.service';
 import {LegalDocumentsService} from './legal-documents';
-import {signupPolicy} from './signup-policy';
+import {INVITE_REQUIRED_MESSAGE,signupPolicy} from './signup-policy';
+import {consumeInvite} from './signup-invites';
 import {actorContext,observeAudit,safeError} from './audit';
 import {enqueueOperation} from './operations-events';
 import {Injectable} from '@nestjs/common';
@@ -10,15 +11,18 @@ import {randomBytes,randomInt,randomUUID,createHmac} from 'crypto';
 import {PrismaService} from '../prisma/prisma.service';
 import {LocalMemberService} from '../auth/local/local-member.service';
 import {MemberMailService} from '../auth/local/member-mail.service';
-import {digest,hashPassword,normalizeEmail} from '../auth/local/credentials';
+import {assertNewPassword,digest,hashPassword,normalizeEmail} from '../auth/local/credentials';
 import {reject,text} from './http';
+// Sign-in accepts any value a past contract could have stored (reset allowed up to 256 characters).
+const signInPassword=(value:unknown)=>{if(typeof value!=='string'||!value||value.length>256)reject(400,'INVALID_INPUT','입력값을 확인해주세요.');return value as string;};
 @Injectable()
 export class PlatformAuthService {
  constructor(private db:PrismaService,private local:LocalMemberService,private mail:MemberMailService,private config:ConfigService,private legal:LegalDocumentsService=new LegalDocumentsService()){}
  private email(value:unknown){const email=normalizeEmail(text(value,191));if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))reject(400,'INVALID_EMAIL','이메일을 확인해주세요.');return email;}
  private codeHash(email:string,code:string){return createHmac('sha256',this.config.get('LOCAL_AUTH_SECRET')).update(`${email}:${code}`).digest('hex');}
  async requestCode(raw:string){
-   this.legal.requirePublished();const email=this.email(raw);signupPolicy(this.config).assertEmail(email);await this.local.limit(`signup-email:${email}`,10,3600);
+   // The invitation check answers first so non-invited visitors see the beta notice; invited emails still wait for published terms.
+   const email=this.email(raw);await signupPolicy(this.config).assertInvited(email,this.db);this.legal.requirePublished();await this.local.limit(`signup-email:${email}`,10,3600);
    if(await this.db.member.findUnique({where:{email}}))reject(409,'EMAIL_IN_USE','이미 가입한 이메일입니다.');
    const code=String(randomInt(0,1000000)).padStart(6,'0'),now=new Date();
    await this.db.$transaction(async tx=>{
@@ -38,9 +42,9 @@ export class PlatformAuthService {
    if(!result.count)reject(400,'INVALID_CODE','인증 코드가 일치하지 않습니다.');return{message:'이메일 인증이 완료되었습니다.',proof};
  }
  async identity(){reject(503,'PASS_NOT_CONFIGURED','PASS 본인인증 공급자 설정이 필요합니다.');}
- async signup(input:any){const email=this.email(input.email),password=text(input.password,128),nickname=text(input.nickname,40);
-   if(password.length<8||input.terms!==true||input.privacy!==true)reject(400,'INVALID_INPUT','비밀번호와 필수 동의를 확인해주세요.');
-   const policy=signupPolicy(this.config);policy.assertEmail(email);
+ async signup(input:any){const email=this.email(input.email),nickname=text(input.nickname,40);
+   if(input.terms!==true||input.privacy!==true)reject(400,'INVALID_INPUT','비밀번호와 필수 동의를 확인해주세요.');const password=assertNewPassword(input.password);
+   const policy=signupPolicy(this.config);await policy.assertInvited(email,this.db);
    if(!policy.identityRequired&&input.ageAcknowledged!==true)reject(400,'AGE_ACKNOWLEDGEMENT_REQUIRED','만 19세 이상 가입 조건을 확인해주세요.');
    const password_hash=await hashPassword(password);
    await this.db.$transaction(async tx=>{
@@ -55,12 +59,14 @@ export class PlatformAuthService {
        identity_hash=proof.identity_hash;verifiedName=text(proof.verified_name,80);
      }
      const consents=this.legal.consents(input);const member=await tx.member.create({data:{id:randomUUID(),email,password_hash,name:verifiedName,nickname,preferred_username:randomBytes(7).toString('hex'),email_verified:true,status:'CONFIRMED',identity_hash}});
+     // A console invite revoked after the check above must not still let this email in.
+     if(!await consumeInvite(tx,email,member.id)&&policy.inviteOnly&&!policy.listed(email))reject(403,'SIGNUP_INVITE_REQUIRED',INVITE_REQUIRED_MESSAGE);
      if(this.config.get('BEAN_LEDGER_ENABLED')==='true')await ensureBeanWallet(tx,member.id);
      await tx.accountPreference.create({data:{member_id:member.id,marketing_alert:false}});
      await tx.memberConsent.createMany({data:consents.filter(c=>c.kind!=='marketing').map(c=>({...c,member_id:member.id}))});if(input.marketing===true)await recordMarketingChoice(tx,member.id,true,'signup',this.legal.signup().documents.marketing);await tx.signupChallenge.delete({where:{email}});await enqueueOperation(tx,'member.signup',{memberId:member.id},`member.signup:${member.id}`);
    });return{message:'회원가입이 완료되었습니다.'};
  }
  async logout(access?:string,refresh?:string){if(access){try{actorContext(await this.local.validateToken(access));}catch{}}if(access)await this.local.signOut(access);if(refresh){const session=await this.db.memberSession.findUnique({where:{refresh_hash:digest(refresh)}});if(session)await this.db.memberSession.deleteMany({where:{member_id:session.member_id}});}await observeAudit(this.db,{category:'auth',action:'auth.logout',data:{outcome:'completed'}});return{message:'로그아웃했습니다.'};}
- async login(input:any){try{const tokens=await this.local.signIn(this.email(input.email),text(input.password,128),async()=>null,async()=>null,async()=>null);actorContext(await this.local.validateToken(tokens.accessToken));await observeAudit(this.db,{category:'auth',action:'auth.login',data:{outcome:'success'}});return tokens;}catch(error){await observeAudit(this.db,{category:'auth',action:'auth.login',level:'warning',data:{outcome:'failure',...safeError(error)}});throw error;}}
+ async login(input:any){try{const tokens=await this.local.signIn(this.email(input.email),signInPassword(input.password),async()=>null,async()=>null,async()=>null);actorContext(await this.local.validateToken(tokens.accessToken));await observeAudit(this.db,{category:'auth',action:'auth.login',data:{outcome:'success'}});return tokens;}catch(error){await observeAudit(this.db,{category:'auth',action:'auth.login',level:'warning',data:{outcome:'failure',...safeError(error)}});throw error;}}
  async refresh(token:string){try{const result=await this.local.refreshToken(token);actorContext(await this.local.validateToken(result.accessToken));await observeAudit(this.db,{category:'auth',action:'auth.refresh',data:{outcome:'success'}});return result;}catch(error){await observeAudit(this.db,{category:'auth',action:'auth.refresh',level:'warning',data:{outcome:'failure',...safeError(error)}});throw error;}}
 }
