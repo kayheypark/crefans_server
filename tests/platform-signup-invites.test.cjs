@@ -49,3 +49,31 @@ test('member terms edits need a version match, permission and phrase; clearing a
  assert.equal((await api(path,'owner',{...next,expectedVersion:2,confirmation:'정책 변경',reason:'같은 값'},'PUT')).data.message,'변경된 조건이 없습니다.');
  assert.equal(await db.creatorFinancialTermChange.count({where:{member_id:memberId}}),2,'an unchanged save adds no history');
  assert.equal((await api(`/admin/members/${randomUUID()}/terms`,'owner')).status,404);});
+test('re-inviting a revoked email with blank terms needs no phrase; the old custom terms are not carried over',async()=>{const email=mail('reinvite');
+ // 2026-10-31 operator report: a revoked invite that once had custom terms blocked a plain re-invite with "확인 문구" and the console never asked for it.
+ const made=await api('/admin/invites','owner',{email,...terms,confirmation:'정책 변경'});assert.equal(made.status,201,made.errorMessage);
+ assert.equal((await api('/admin/invites/'+made.data.invite.id,'owner',{expectedVersion:1},'DELETE')).status,200);
+ const plain=await api('/admin/invites','inviter',{email,memo:'수기 재초대'});assert.equal(plain.status,201,plain.errorCode);assert.equal(plain.data.invite.id,made.data.invite.id);
+ assert.deepEqual(plain.data.invite.terms,{platformFeeBps:null,settlementHoldDays:null,beanWithdrawalFeeBps:null,minimumWithdrawalKrw:null},'revoked terms must not come back');
+ assert.equal((await api('/admin/invites/'+plain.data.invite.id,'owner',{expectedVersion:plain.data.invite.version},'DELETE')).status,200);
+ assert.equal((await api('/admin/invites','owner',{email,...terms})).errorCode,'CONFIRMATION_REQUIRED','custom terms on a re-invite still need the phrase');});
+
+test('a withdrawn member can be invited again: the used invite is reissued and the email and identity value are released',async()=>{
+ // 2026-10-31 user request: after self-withdrawal or a console erase the same email must be invitable again.
+ const cases=[];
+ try{
+  for(const kind of ['self','erased','active']){
+   const email=mail('rejoin-'+kind),id=randomUUID(),identity=randomBytes(32).toString('hex');cases.push(id);
+   await db.member.create({data:{id,email,nickname:'재가입',name:'재가입',preferred_username:'rj'+kind+tag,email_verified:true,status:'CONFIRMED',identity_hash:identity,
+    ...(kind==='self'?{enabled:false,withdrawn_at:new Date()}:kind==='erased'?{enabled:false,withdrawn_at:new Date(),purged_at:new Date(),email:`withdrawn-${id}@deleted.invalid`,identity_hash:null}:{})}});
+   await db.signupInvite.create({data:{email,memo:'첫 초대',used_at:new Date(),member_id:id}});
+   const again=await api('/admin/invites','inviter',{email,memo:'재초대'});
+   if(kind==='active'){assert.equal(again.errorCode,'MEMBER_EXISTS','a member who has not withdrawn keeps the email');continue;}
+   assert.equal(again.status,201,`${kind}: ${again.errorCode} ${again.errorMessage}`);assert.equal(again.data.invite.status,'active');assert.equal(again.data.invite.memberId,null);
+   assert.equal((await code(email)).errorCode,'POLICY_NOT_PUBLISHED',kind+': the reissued invite opens signup again');
+   const old=await db.member.findUniqueOrThrow({where:{id}});assert.notEqual(old.email,email);assert.equal(old.identity_hash,null,'the same person can verify again');
+   if(kind==='self'){assert.equal(old.purged_at,null,'other personal data still waits for the 30-day purge');assert.equal(old.nickname,'재가입');}
+   assert.equal(await db.platformAuditLog.count({where:{entity_id:again.data.invite.id,action:'admin.signup_invite_reissued'}}),1);
+  }
+ }finally{await db.platformAuditLog.deleteMany({where:{entity_id:{in:cases}}});await db.member.deleteMany({where:{id:{in:cases}}});}
+});

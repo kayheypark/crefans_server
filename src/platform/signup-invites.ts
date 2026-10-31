@@ -49,15 +49,23 @@ export async function saveInvite(db:any,admin:any,id:string|undefined,input:any)
   let before:any=null;
   if(id){await tx.$queryRaw`SELECT id FROM signup_invites WHERE id=${id} FOR UPDATE`;before=await tx.signupInvite.findUnique({where:{id}});if(!before)reject(404,'INVITE_NOT_FOUND','초대를 찾을 수 없습니다.');if(before.revoked_at)reject(409,'INVITE_REVOKED','취소된 초대입니다. 같은 이메일로 다시 초대해주세요.');if(input?.expectedVersion!==before.version)reject(409,'INVITE_CHANGED','다른 운영자가 초대를 변경했습니다. 다시 불러와주세요.');}
   else{
-   if(await tx.member.findFirst({where:{email:email!},select:{id:true}}))reject(409,'MEMBER_EXISTS','이미 가입한 이메일입니다. 회원·크리에이터 메뉴에서 조건을 설정해주세요.');
+   const holder=await tx.member.findFirst({where:{email:email!},select:{id:true,withdrawn_at:true}});
+   if(holder&&!holder.withdrawn_at)reject(409,'MEMBER_EXISTS','이미 가입한 이메일입니다. 회원·크리에이터 메뉴에서 조건을 설정해주세요.');
+   // 2026-10-31: a withdrawn member may be invited again before the 30-day purge. Only the email and the CI-derived
+   // duplicate-signup value are released now (both unique); the rest of the account still waits for the purge job.
+   if(holder){await tx.member.update({where:{id:holder.id},data:{email:`withdrawn-${holder.id}@deleted.invalid`,identity_hash:null}});await appendAudit(tx,{category:'admin',action:'member.email_released',entityId:holder.id,data:{memberId:holder.id}});}
    await tx.$queryRaw`SELECT id FROM signup_invites WHERE email=${email} FOR UPDATE`;before=await tx.signupInvite.findUnique({where:{email:email!}});
-   if(before&&!before.revoked_at)reject(409,'INVITE_EXISTS','이미 초대된 이메일입니다.');
+   if(before&&!before.revoked_at&&!before.used_at)reject(409,'INVITE_EXISTS','이미 초대된 이메일입니다.');
+   // An invite used by a member who has since withdrawn (or been erased) is reissued; otherwise the member still holds it.
+   if(before?.used_at&&!(before.member_id&&(await tx.member.findUnique({where:{id:before.member_id},select:{withdrawn_at:true}}))?.withdrawn_at))reject(409,'INVITE_USED','가입을 마친 초대입니다. 회원·크리에이터 메뉴에서 조건을 변경해주세요.');
   }
-  if(before?.used_at)reject(409,'INVITE_USED','가입을 마친 초대입니다. 회원·크리에이터 메뉴에서 조건을 변경해주세요.');
-  if(!sameTerms(before,terms)&&(hasTerms(terms)||hasTerms(before)))assertTermsChange(admin,input);
+  if(id&&before?.used_at)reject(409,'INVITE_USED','가입을 마친 초대입니다. 회원·크리에이터 메뉴에서 조건을 변경해주세요.');
+  // A revoked or reissued invite's terms are no longer in effect: re-inviting that email is judged like a new invite.
+  const reissued=!id&&!!before?.used_at,current=!id&&(before?.revoked_at||reissued)?null:before;
+  if(!sameTerms(current,terms)&&(hasTerms(terms)||hasTerms(current)))assertTermsChange(admin,input);
   // A revoked email that is invited again reuses its row so the email stays unique.
-  const saved=before?await tx.signupInvite.update({where:{id:before.id},data:{memo,...terms,revoked_at:null,version:{increment:1}}}):await tx.signupInvite.create({data:{email:email!,memo,...terms}});
-  await appendAudit(tx,{category:'admin',action:before&&!id?'admin.signup_invite_restored':before?'admin.signup_invite_updated':'admin.signup_invite_created',entityId:saved.id,data:auditChange(inviteAudit(before),inviteAudit(saved)!)});
+  const saved=before?await tx.signupInvite.update({where:{id:before.id},data:{memo,...terms,revoked_at:null,...(reissued?{used_at:null,member_id:null}:{}),version:{increment:1}}}):await tx.signupInvite.create({data:{email:email!,memo,...terms}});
+  await appendAudit(tx,{category:'admin',action:reissued?'admin.signup_invite_reissued':before&&!id?'admin.signup_invite_restored':before?'admin.signup_invite_updated':'admin.signup_invite_created',entityId:saved.id,data:auditChange(inviteAudit(before),inviteAudit(saved)!)});
   return{invite:inviteView(saved),message:'초대를 저장했습니다.'};
  });
 }
