@@ -17,6 +17,7 @@ import {policyView,updateFinancialPolicy} from './financial-policy';
 import {reject,text} from './http';
 import {enqueueOperation} from './operations-events';
 import {adminDashboard} from './admin-dashboard';
+import {adminReferralLink,adminReferrals,updateReferralSettings} from './admin-referrals';
 import {adminRevenue,adminOverview,adminMembers,adminPosts,adminPayments,adminWithdrawals} from './admin-console';
 @Injectable()
 export class PlatformAdminGuard implements CanActivate{
@@ -56,6 +57,9 @@ export class PlatformAdminController{
  @Get('overview') @Permit(['overview','view']) overview(){return adminOverview(this.service.db);}
  @Get('revenue') @Permit(['revenue','view']) revenue(@Query() query:any,@Req() req:any){return adminRevenue(this.service.db,req.admin,query);}
  @Get('members') @Permit(['members','view']) members(@Query() query:any){return adminMembers(this.service.db,query);}
+ @Get('referrals') @Permit(['referrals','view']) referrals(@Query() query:any){return adminReferrals(this.service.db,query);}
+ @Put('referrals/settings') @Permit(['referrals','update']) referralSettings(@Body() body:any,@Req() req:any){return updateReferralSettings(this.service.db,req.admin,body);}
+ @Post('members/:id/referral') @Permit(['referrals','create']) referralLink(@Param('id') id:string){return adminReferralLink(this.service.db,id);}
  @Get('posts') @Permit(['content','view']) posts(@Query() query:any){return adminPosts(this.service.db,query);}
  @Get('payments') @Permit(['revenue','view']) payments(@Query() query:any,@Req() req:any){return adminPayments(this.service.db,req.admin,query);}
  @Get('withdrawals') @Permit(['revenue','view']) withdrawals(@Query() query:any,@Req() req:any){return adminWithdrawals(this.service.db,req.admin,query);}

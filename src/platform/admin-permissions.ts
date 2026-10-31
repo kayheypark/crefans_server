@@ -7,6 +7,7 @@ export const ADMIN_MENUS={
  advertising:['view','create','update','delete'],
  members:['view','update'],
  invites:['view','create','update','delete'],
+ referrals:['view','create','update'],
  content:['view','create','update'],
  revenue:['view','create'],
  beans:['view','create','update'],

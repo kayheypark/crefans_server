@@ -1854,3 +1854,12 @@ model ReferralSignup {
  @@index([reward_status,grant_due_at])
  @@map("referral_signups")
 }
+
+/// 운영 콘솔에서 바꾸는 서비스 설정(키-값). 2026-11-01: referral.enabled(친구 초대 보상 스위치).
+model PlatformSetting {
+ key String @id @db.VarChar(64)
+ value Json
+ updated_by String? @db.VarChar(191)
+ updated_at DateTime @updatedAt
+ @@map("platform_settings")
+}

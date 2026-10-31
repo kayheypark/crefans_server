@@ -11,7 +11,9 @@ import {enqueueOperation} from './operations-events';
 // - the reward is 100 withdrawable promotional beans (earned-promotion lot, provenance = referral_signups row).
 // - a refund inside the hold cancels the qualification; a later refund claws the reward back (paid-out beans become a bean receivable).
 export const REFERRAL_REWARD_BEANS=100;
-export const referralEnabled=(config:{get:(key:string)=>any})=>config.get('REFERRAL_ENABLED')==='true';
+// The switch lives in platform_settings and is changed from the operator console (2026-11-01); missing means off.
+export const REFERRAL_SETTING='referral.enabled';
+export const referralOn=async(db:any)=>(await db.platformSetting.findUnique({where:{key:REFERRAL_SETTING}}))?.value===true;
 
 export async function ensureReferral(db:any,member:string){return db.referral.upsert({where:{member_id:member},create:{member_id:member},update:{}});}
 /** A usable code: the row exists and its owner is an active member. */
@@ -42,8 +44,8 @@ const kstMonthStart=(now:Date)=>{const k=new Date(now.getTime()+9*3600000);retur
  * Called inside the payment success transaction. Only live payments count: test-key payments must never mint withdrawable beans.
  * The first live payment qualifies the invitee; the reward is credited after the refund window (user decision 2026-11-01).
  */
-export async function qualifyReferralReward(tx:any,config:{get:(key:string)=>any},payer:string,source:'checkout'|'bean_charge',sourceId:string,live:boolean,now=new Date()){
- if(!referralEnabled(config)||!live)return null;
+export async function qualifyReferralReward(tx:any,payer:string,source:'checkout'|'bean_charge',sourceId:string,live:boolean,now=new Date()){
+ if(!live||!await referralOn(tx))return null;
  const rows:any[]=await tx.$queryRaw`SELECT id FROM referral_signups WHERE member_id=${payer} FOR UPDATE`;if(!rows.length)return null;
  const signup=await tx.referralSignup.findUniqueOrThrow({where:{id:rows[0].id}});if(signup.reward_status!=='pending')return null;
  return tx.referralSignup.update({where:{id:signup.id},data:{reward_status:'qualified',reward_source:source,reward_source_id:sourceId,grant_due_at:new Date(now.getTime()+REFERRAL_HOLD_DAYS*86400000)}});
@@ -54,7 +56,7 @@ async function sourceStillPaid(tx:any,signup:any){
 }
 /** Worker tick: credits rewards whose refund window has passed. A refunded source goes back to pending; over the monthly cap is recorded as capped. */
 export async function grantDueReferralRewards(db:any,config:{get:(key:string)=>any},now=new Date()){
- if(!referralEnabled(config)||config.get('BEAN_LEDGER_ENABLED')!=='true')return 0;
+ if(config.get('BEAN_LEDGER_ENABLED')!=='true'||!await referralOn(db))return 0;
  const due=await db.referralSignup.findMany({where:{reward_status:'qualified',grant_due_at:{lte:now}},orderBy:{grant_due_at:'asc'},take:50,select:{id:true}});let count=0;
  for(const {id} of due)await db.$transaction(async(tx:any)=>{
   await tx.$queryRaw`SELECT id FROM referral_signups WHERE id=${id} FOR UPDATE`;const signup=await tx.referralSignup.findUniqueOrThrow({where:{id}});if(signup.reward_status!=='qualified')return;
@@ -110,4 +112,4 @@ export async function requireBeanPayoutMember(db:any,member:string){
  if(await db.referralSignup.findFirst({where:{referrer_id:member,reward_status:{in:['granted','clawed_back']}},select:{id:true}}))return;
  reject(403,'CREATOR_REQUIRED','크리에이터 또는 친구 초대 보상을 받은 회원만 이용할 수 있습니다.');
 }
-export async function myReferral(db:any,config:{get:(key:string)=>any},member:string){if(!referralEnabled(config))reject(404,'REFERRAL_DISABLED','친구 초대 기능을 준비 중입니다.');return referralSummary(db,member);}
+export async function myReferral(db:any,member:string){if(!await referralOn(db))reject(404,'REFERRAL_DISABLED','친구 초대 기능을 준비 중입니다.');return referralSummary(db,member);}

@@ -137,7 +137,7 @@ export class PlatformFinanceService {
    const fees=Math.floor(o.amount*bps/10000);await tx.revenueEntry.create({data:{creator_id:p.creator_id,order_id:o.id,title:(o.snapshot as any).name,gross:o.amount,fees,net:o.amount-fees,available_at:new Date(now.getTime()+hold*86400000)}});
    await tx.memberNotification.create({data:{member_id:o.member_id,actor_id:p.creator_id,type:'subscription',text:o.subscription_id?'멤버십 갱신이 완료되었습니다.':'멤버십 가입이 완료되었습니다.',path:'/subscriptions'}});
    await enqueueOperation(tx,o.subscription_id?'subscription.renewed':'subscription.started',{memberId:o.member_id,creatorId:p.creator_id,subscriptionId:sub.id,orderId:o.id,planId:p.id},`subscription.paid:${o.id}`);
-   await qualifyReferralReward(tx,this.config,o.member_id,'checkout',o.id,(o.snapshot as any).paymentEnvironment==='live');
+   await qualifyReferralReward(tx,o.member_id,'checkout',o.id,(o.snapshot as any).paymentEnvironment==='live');
   });
  }
  async cancelSubscription(member:string,creator:string){

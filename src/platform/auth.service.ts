@@ -13,7 +13,7 @@ import {LocalMemberService} from '../auth/local/local-member.service';
 import {MemberMailService} from '../auth/local/member-mail.service';
 import {assertNewPassword,digest,hashPassword,normalizeEmail} from '../auth/local/credentials';
 import {reject,text} from './http';
-import {assertReferralCode,linkReferralSignup,referralCodeInput,referralEnabled} from './referrals';
+import {assertReferralCode,linkReferralSignup,referralCodeInput,referralOn} from './referrals';
 // Sign-in accepts any value a past contract could have stored (reset allowed up to 256 characters).
 const signInPassword=(value:unknown)=>{if(typeof value!=='string'||!value||value.length>256)reject(400,'INVALID_INPUT','입력값을 확인해주세요.');return value as string;};
 @Injectable()
@@ -21,8 +21,8 @@ export class PlatformAuthService {
  constructor(private db:PrismaService,private local:LocalMemberService,private mail:MemberMailService,private config:ConfigService,private legal:LegalDocumentsService=new LegalDocumentsService()){}
  private email(value:unknown){const email=normalizeEmail(text(value,191));if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))reject(400,'INVALID_EMAIL','이메일을 확인해주세요.');return email;}
  private codeHash(email:string,code:string){return createHmac('sha256',this.config.get('LOCAL_AUTH_SECRET')).update(`${email}:${code}`).digest('hex');}
- // A valid referral link admits a visitor without an operator invite while REFERRAL_ENABLED (user decision 2026-11-01).
- private async assertInvitedOrReferred(email:string,referralCode:unknown){if(referralEnabled(this.config)&&referralCodeInput(referralCode)!==undefined){await assertReferralCode(this.db,referralCode);return true;}await signupPolicy(this.config).assertInvited(email,this.db);return false;}
+ // A valid referral link admits a visitor without an operator invite while the console switch is on (user decision 2026-11-01).
+ private async assertInvitedOrReferred(email:string,referralCode:unknown){if(referralCodeInput(referralCode)!==undefined&&await referralOn(this.db)){await assertReferralCode(this.db,referralCode);return true;}await signupPolicy(this.config).assertInvited(email,this.db);return false;}
  async requestCode(raw:string,referralCode?:unknown){
    // The invitation check answers first so non-invited visitors see the beta notice; invited emails still wait for published terms.
    const email=this.email(raw);await this.assertInvitedOrReferred(email,referralCode);this.legal.requirePublished();await this.local.limit(`signup-email:${email}`,10,3600);
