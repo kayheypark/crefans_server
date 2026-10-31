@@ -1,4 +1,4 @@
-import {Body,Controller,Delete,Get,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
+import {Body,Controller,Delete,Get,Header,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
 import {EmailChangeService} from './email-change.service';
 import {PlatformService} from './service';
 import {updateProfilePhotos} from './profile-photos';
