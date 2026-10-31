@@ -45,6 +45,7 @@
 | 프론트 FAQ·서비스 안내·결제 화면·이벤트 (`support.ts` 9·14행, `ServiceGuidePage.tsx` 10행, `CheckoutPage.tsx` 15행은 테스트 결제일 때만 표시되므로 유지, `events.ts` 135행) | 테스트 결제만, 실제 청구·송금 없음 | 위 약관 문구와 같은 내용으로 교체 |
 | 가이드 11개 문서 (`crefans_guide`: start/about·preview, resources/service-introduction, creators/payouts·payout-setup·income-scenarios·memberships, fans/membership·payment-methods·beans, help/policies·troubleshooting) | 베타 실제 청구·송금 없음 | 위와 같은 내용으로 교체, 가이드 검사기 잠금 갱신 |
 | 계약서 별지 B (`docs/contracts/...txt`) | 실제 청구와 은행 송금은 하지 않는다 | 2026-10-31 사용자 결정으로 별지 B 삭제(오픈 서비스 전용 계약서, 계약서 README v2.25). 본문의 남은 베타 표현은 별도 결정 |
+| 약관 신설 조항(콩 조항 다음)·개인정보 처리방침 (`legal-documents.ts`) | 없음 | 2026-11-01 결정(친구 초대): 회원은 초대 링크를 공유할 수 있다. 초대받은 회원의 첫 실결제가 7일(환불 기간) 동안 환불되지 않으면 직접 초대한 회원에게만 출금 가능한 프로모션콩 100개를 지급한다(추천인의 추천인에게는 지급 없음, 추천인당 월 10건). 지급 후 결제가 환불·취소되면 보상을 회수하고 이미 출금한 몫은 이후 콩 출금에서 정산한다. 출금 조건은 후원콩과 같다(최소 1,000콩, 수수료 20%, 본인 명의 계좌). 부정 가입·자기 초대·다중 계정은 지급 제외·회수. 처리방침: 초대 관계(추천인·초대받은 회원 식별자, 가입·자격·지급 상태)를 보상 지급·회수 목적으로 탈퇴 후 거래기록 보존 기간 동안 보관, 추천인에게는 건수·보상 합계만 표시. 시행: 실결제 개정본과 함께, `REFERRAL_ENABLED`는 시행일에 켬 |
 
 ## 5. 남은 결정·위험
 
