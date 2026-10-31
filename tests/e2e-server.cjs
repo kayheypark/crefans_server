@@ -53,6 +53,31 @@ async function main(){releaseDatabase=await require('./e2e-db-lock.cjs').lockE2E
  if(req.params.action==='marketing-link'){const marketing=app.get(require('../dist/src/platform/marketing.service').MarketingService);return res.json({path:'/api/v1/marketing/unsubscribe?token='+marketing.token(f.ids[1])});}
  if(req.params.action==='dispose'){await dispose(f);return res.json({ok:true});}
  if(req.params.action==='payment-mode'){assert.ok(['declined','lost-response','normal'].includes(req.body.mode));paymentModes.set(f.orderId,req.body.mode);return res.json({ok:true});}
+ // QA cohort (2026-10-31): C0/C2/C10 creators with level 1-3 plans, public/L1/L2/L3/exact-L2 posts each with one image,
+ // 12 subscribers bought through the real order/payment path (test provider stand-in), N0 without subscription.
+ if(req.params.action==='cohort'){const fsp=require('node:fs/promises'),pathm=require('node:path'),hash=await hashPassword(f.password),ids={},png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==','base64');
+  for(const role of['C0','C2','C10','S01','S02','S03','S04','S05','S06','S07','S08','S09','S10','S11','S12','N0']){const id=randomUUID(),email='e2e-'+id+'@example.invalid';f.ids.push(id);f.users.push({id,email,role});ids[role]=id;await db.member.create({data:{id,email,password_hash:hash,name:'QA '+role,nickname:'QA '+role+' 긴 닉네임 검수용 합성 계정',preferred_username:'qa-'+role.toLowerCase()+'-'+id.slice(0,8),email_verified:true,status:'CONFIRMED'}});}
+  const creators={};
+  for(const c of['C0','C2','C10']){await db.creator.create({data:{user_id:ids[c],display_name:'QA '+c+' 크리에이터 아주 긴 활동명',handle:'qa-'+c.toLowerCase()+'-'+ids[c].slice(0,8),is_active:true}});const plans={};
+   for(const lv of[1,2,3])plans[lv]=(await db.membershipItem.create({data:{creator_id:ids[c],name:`QA ${c} 레벨${lv} 멤버십`,price:5000*lv,benefits:'["QA 혜택"]',billing_unit:'MONTH',level:lv}})).id;
+   const posts={};
+   for(const [k,data]of[['public',{is_membership:false}],['L1',{is_membership:true,membership_level:1}],['L2',{is_membership:true,membership_level:2}],['L3',{is_membership:true,membership_level:3}],['exactL2',{is_membership:true,membership_level:2,access_plan_id:plans[2]}]]){
+    const p=await db.posting.create({data:{user_sub:ids[c],title:`QA ${c} ${k}`,content:`QA-BODY ${c} ${k} ${f.id}`,status:'PUBLISHED',is_public:true,allow_comments:true,allow_tips:true,published_at:new Date(),...data}});
+    const mid=randomUUID();await fsp.mkdir(process.env.MEDIA_ROOT,{recursive:true});await fsp.writeFile(pathm.join(process.env.MEDIA_ROOT,mid),png);
+    await db.media.create({data:{id:mid,user_sub:ids[c],type:'IMAGE',original_name:'qa.png',file_name:mid,file_size:png.length,mime_type:'image/png',original_url:`/api/v1/media/${mid}/file`,s3_upload_key:'local/'+mid,processing_status:'COMPLETED'}});
+    await db.postingMedia.create({data:{posting_id:p.id,media_id:mid,sort_order:0}});posts[k]={id:p.id,media:mid,body:p.content};}
+   creators[c]={id:ids[c],plans,posts};}
+  const orders={};
+  for(const [s,c,lv]of[['S01','C2',1],['S02','C2',2],['S03','C10',1],['S04','C10',1],['S05','C10',1],['S06','C10',1],['S07','C10',2],['S08','C10',2],['S09','C10',2],['S10','C10',2],['S11','C10',3],['S12','C10',3]]){
+   const r=await finance.startRegistration(ids[s],{});await finance.addMethod(ids[s],{...r,authKey:'e2e-auth'});const o=await finance.createOrder(ids[s],{planId:creators[c].plans[lv],requestId:randomUUID(),creatorProvision:'2026-10-30.1'});await finance.pay(ids[s],o.id);orders[s]={id:o.id,creator:c,level:lv,amount:o.amount};}
+  return res.json({ids,creators,orders,password:f.password,users:f.users.filter(u=>ids[u.role]===u.id)});}
+ if(req.params.action==='cohort-expire'){assert.ok(f.ids.includes(req.body.memberId));await db.subscription.updateMany({where:{subscriber_id:req.body.memberId},data:{ended_at:new Date(Date.now()-60000),auto_renew:false}});return res.json({ok:true});}
+ // QA journey (2026-10-31): optional activity category for the creator start screen (fixture-scoped name, removed again by
+ // category-remove) and a stand-in bean charge for one cohort member so the tip screen can complete. No provider is called.
+ if(req.params.action==='category'){const name='QA 분야 '+f.id.slice(0,8);const c=await db.creatorCategory.upsert({where:{name},update:{is_active:true,is_deleted:false},create:{name,is_active:true,sort_order:999}});f.qaCategory=c.id;return res.json({name});}
+ if(req.params.action==='category-remove'){if(f.qaCategory){await db.creator.updateMany({where:{category_id:f.qaCategory},data:{category_id:null}});await db.creatorCategory.delete({where:{id:f.qaCategory}}).catch(()=>{});f.qaCategory=null;}return res.json({ok:true});}
+ if(req.params.action==='qa-policy'){const p=await db.financialPolicy.findUnique({where:{id:'platform'}});return res.json({platformFeeBps:p?.platform_fee_bps??null,settlementHoldDays:p?.settlement_hold_days??null,version:p?.version??null});}
+ if(req.params.action==='qa-beans'){assert.ok(f.ids.includes(req.body.memberId));const beans=app.get(require('../dist/src/platform/beans.service').BeansService);const o=await beans.createCharge(req.body.memberId,{quantity:req.body.quantity||100,requestId:randomUUID()});await beans.confirm(req.body.memberId,o.id,{orderId:o.id,amount:o.amount,paymentKey:'e2e-bean-'+o.id});return res.json({chargeId:o.id,amount:o.amount});}
  if(req.params.action==='attach-media'){const m=await db.media.findFirstOrThrow({where:{id:req.body.mediaId,user_sub:f.creator}});await db.postingMedia.create({data:{posting_id:f.postId,media_id:m.id,sort_order:0}});return res.json({ok:true});}
  if(req.params.action==='signup-mode'){assert.ok(['pass','email-only'].includes(req.body.mode));process.env.SIGNUP_IDENTITY_MODE=req.body.mode;process.env.SIGNUP_EMAIL_ALLOWLIST=req.body.inviteOnly?f.signupEmail:'';return res.json({ok:true});}
  if(req.params.action==='mail'){const email=req.body.email||f.signupEmail;assert.ok([f.signupEmail,...f.users.map(u=>u.email)].includes(email));return res.json({code:messages.get(email)});}
