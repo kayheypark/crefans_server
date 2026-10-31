@@ -21,6 +21,7 @@
 | POST | `/api/v1/admin/beans/receivables/:id/settle` | `src/platform/beans.controller.ts::settle` |
 | GET | `/api/v1/admin/beans/wallets/:id` | `src/platform/beans.controller.ts::wallet` |
 | POST | `/api/v1/admin/beans/withdrawals/:id/approve` | `src/platform/beans.controller.ts::approve` |
+| POST | `/api/v1/admin/beans/withdrawals/:id/manual-result` | `src/platform/beans.controller.ts::manualResult` |
 | POST | `/api/v1/admin/beans/withdrawals/:id/reject` | `src/platform/beans.controller.ts::reject` |
 | POST | `/api/v1/admin/categories` | `src/platform/admin.controller.ts::category` |
 | POST | `/api/v1/admin/client-errors` | `src/platform/admin.controller.ts::clientError` |
@@ -70,7 +71,10 @@
 | POST | `/api/v1/admin/reports/:id/resolve` | `src/platform/admin.controller.ts::resolve` |
 | GET | `/api/v1/admin/revenue` | `src/platform/admin.controller.ts::revenue` |
 | POST | `/api/v1/admin/revenue/:id/receipt` | `src/platform/admin.controller.ts::receipt` |
+| GET | `/api/v1/admin/settlement-accounts` | `src/platform/admin.controller.ts::settlementAccounts` |
+| POST | `/api/v1/admin/settlement-accounts/:id/verify` | `src/platform/admin.controller.ts::verifyAccount` |
 | GET | `/api/v1/admin/withdrawals` | `src/platform/admin.controller.ts::withdrawals` |
+| POST | `/api/v1/admin/withdrawals/:id/manual-result` | `src/platform/admin.controller.ts::manualResult` |
 | POST | `/api/v1/auth/forgot-password` | `src/platform/auth.controller.ts::forgot` |
 | POST | `/api/v1/auth/identity` | `src/platform/auth.controller.ts::identity` |
 | POST | `/api/v1/auth/login` | `src/platform/auth.controller.ts::login` |

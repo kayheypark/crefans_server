@@ -1,4 +1,5 @@
 import {BeansService} from './beans.service';
+import {PlatformFinanceService} from './finance.service';
 import {MarketingService} from './marketing.service';
 import {confirmSettlementReceipt} from './settlement-receipts';
 import {LocalMemberService} from '../auth/local/local-member.service';
@@ -37,12 +38,12 @@ export class PlatformAdminGuard implements CanActivate{
 }
 @Controller('admin') @UseGuards(PlatformAdminGuard)
 export class PlatformAdminController{
- constructor(private service:PlatformService,private limiter:LocalMemberService,private marketing:MarketingService,private beans:BeansService){}
+ constructor(private service:PlatformService,private limiter:LocalMemberService,private marketing:MarketingService,private beans:BeansService,private finance:PlatformFinanceService){}
  @Post('marketing/campaigns') @Permit('super') campaign(@Body() body:any,@Req() req:any){return this.marketing.queue(req.admin,body);}
  @Post('client-errors') @Permit('self') clientError(@Body() body:any){return reportClientError(this.service.db,this.limiter,body,'console');}
  @Get('logs') @Permit(['logs','view']) logs(@Query() query:any,@Req() req:any){return adminLogs(this.service.db,req.admin,query);}
  @Get('logs/:id') @Permit(['logs','view']) logDetail(@Param('id') id:string,@Req() req:any){return adminLogDetail(this.service.db,req.admin,id);}
- @Get('me') @Permit('self') me(@Req() req:any){return{id:req.admin.id,name:req.admin.name,role:req.admin.role,mustChangePassword:req.admin.must_change_password,totp:{enabled:!!req.admin.totp_enabled_at,graceUntil:req.admin.totp_enabled_at?null:req.admin.totp_grace_until,recoveryCodesLeft:Array.isArray(req.admin.totp_recovery)?req.admin.totp_recovery.length:0},permissions:effectivePermissions(req.admin),beanSupport:this.beans.available()};}
+ @Get('me') @Permit('self') me(@Req() req:any){return{id:req.admin.id,name:req.admin.name,role:req.admin.role,mustChangePassword:req.admin.must_change_password,totp:{enabled:!!req.admin.totp_enabled_at,graceUntil:req.admin.totp_enabled_at?null:req.admin.totp_grace_until,recoveryCodesLeft:Array.isArray(req.admin.totp_recovery)?req.admin.totp_recovery.length:0},permissions:effectivePermissions(req.admin),beanSupport:this.beans.available(),...this.service.paymentSwitches()};}
  @Get('me/profile') @Permit('self') profile(@Req() req:any){return myProfile(this.service.db,req.admin);}
  @Put('me/profile') @Permit('self') saveProfile(@Body() body:any,@Req() req:any){if(req.admin.must_change_password)reject(403,'PASSWORD_CHANGE_REQUIRED','임시 비밀번호를 먼저 변경해주세요.');return updateMyProfile(this.service.db,req.admin,body);}
  @Post('me/password') @Permit('self') async password(@Body() body:any,@Req() req:any){await this.limiter.limit('admin-password:'+req.admin.id,5,600);return changeMyPassword(this.service.db,req.admin,body,req.cookies?.[ADMIN_ACCESS_COOKIE]?digest(req.cookies[ADMIN_ACCESS_COOKIE]):undefined);}
@@ -58,6 +59,10 @@ export class PlatformAdminController{
  @Get('posts') @Permit(['content','view']) posts(@Query() query:any){return adminPosts(this.service.db,query);}
  @Get('payments') @Permit(['revenue','view']) payments(@Query() query:any,@Req() req:any){return adminPayments(this.service.db,req.admin,query);}
  @Get('withdrawals') @Permit(['revenue','view']) withdrawals(@Query() query:any,@Req() req:any){return adminWithdrawals(this.service.db,req.admin,query);}
+ // Manual payout mode: the operator records a bank transfer made outside the app, and confirms settlement accounts by hand.
+ @Post('withdrawals/:id/manual-result') @Permit(['revenue','create']) manualResult(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.manualResult(req.admin,id,body);}
+ @Get('settlement-accounts') @Permit(['revenue','view']) async settlementAccounts(){const rows=await this.service.db.settlementAccount.findMany({where:{verified:false,account_encrypted:{not:null}},orderBy:{created_at:'asc'},take:100,select:{id:true,creator_id:true,bank:true,holder_alias:true,last_four:true,version:true,created_at:true}});return rows.map((r:any)=>({id:r.id,creatorId:r.creator_id,bank:r.bank,holder:r.holder_alias,lastFour:r.last_four,version:r.version,createdAt:r.created_at}));}
+ @Post('settlement-accounts/:id/verify') @Permit(['revenue','create']) verifyAccount(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.manualVerifyAccount(req.admin,id,body);}
  @Post('revenue/:id/receipt') @Permit(['revenue','create']) receipt(@Param('id') id:string,@Body() body:any,@Req() req:any){return confirmSettlementReceipt(this.service.db,req.admin,id,body);}
  @Get('financial-policy') @Permit(['settings','view']) async financialPolicy(){return policyView(await this.service.db.financialPolicy.findUnique({where:{id:'platform'}}));}
  @Put('financial-policy') @Permit(['settings','update']) setFinancialPolicy(@Body() body:any,@Req() req:any){return updateFinancialPolicy(this.service.db,req.admin,body);}

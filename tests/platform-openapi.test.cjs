@@ -37,10 +37,10 @@ before(async()=>{
 });
 after(async()=>{await app?.close();});
 const request=(path,cookie)=>fetch(base+path,{headers:cookie?{cookie}:{},redirect:'manual'});
-test('OpenAPI 3 validates, has all 166 runtime operations and no legacy controllers',async()=>{
+test('OpenAPI 3 validates, has all 171 runtime operations and no legacy controllers',async()=>{
  await Parser.validate(structuredClone(document));
  const operations=Object.entries(document.paths).flatMap(([path,item])=>Object.keys(item).filter(method=>['get','post','put','patch','delete','head','options'].includes(method)).map(method=>method+' '+path));
- assert.equal(operations.length,166);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());
+ assert.equal(operations.length,171);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 171: +4 manual payout routes, +1 GET categories (2026-10-31)
  assert.ok(operations.every(key=>key.includes(' /api/v1/')));assert.equal(document.info.version,'v1');
  assert.equal(document.components.securitySchemes.memberSession.name,'access_token');
  assert.equal(document.paths['/api/v1/admin/me'].get.security[0].adminSession.length,0);assert.equal(document.paths['/api/v1/admin/me'].get.security[0].memberSession,undefined,'console uses the operator session only');assert.equal(document.components.securitySchemes.adminSession.name,'admin_access_token');
@@ -118,7 +118,7 @@ test('media is documented as binary, JSON APIs have common envelope, key materia
 test('three valid documents isolate business APIs, retain required shared calls and cover all operations',async()=>{
  const operations=doc=>Object.entries(doc.paths).flatMap(([path,item])=>Object.keys(item).map(method=>method+' '+path));
  const user=operations(documents.user),studio=operations(documents.studio),console=operations(documents.console);
- assert.equal(user.length,72);assert.equal(studio.length,45);assert.equal(console.length,68);
+ assert.equal(user.length,72);assert.equal(studio.length,45);assert.equal(console.length,73);
  assert.deepEqual([...new Set([...user,...studio,...console])].sort(),operations(document).sort());
  const auth=['post /api/v1/auth/login','post /api/v1/auth/logout','post /api/v1/auth/refresh'];
  assert.deepEqual(user.filter(key=>console.includes(key)).sort(),auth);

@@ -180,6 +180,10 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /admin/documents | 공지·FAQ 등록·수정. 코드 관리 법률문서 변경 거부 |
 | POST | /admin/marketing/campaigns | 활성 SUPER_ADMIN; campaignId/subject/body/memberIds(최대100), 현재 증빙 동의자만 중복 없는 광고 대기열 등록. 법률문서 발행·서명키 필요 |
 | POST | /admin/revenue/:id/receipt | 매출·정산 생성 권한; reference/reason/amount/receivedAt, 실제 결제의 PG 입금 대사·감사 기록. 테스트 결제/중복 정정 거부 |
+| POST | /admin/withdrawals/:id/manual-result | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 출금 검사(수요일·잔액·확인 계좌)로 처리 중 전환 후, 운영자가 직접 이체한 결과(paid: 참조번호·이체 시각, rejected: 사유)를 한 번만 기록. 감사 `withdrawal.manual_result`. 은행 API 호출 없음 |
+| GET | /admin/settlement-accounts | 매출·정산 조회 권한. 수동 지급 모드에서 예금주 확인 대기 계좌(은행·예금주 표시명·끝 4자리, 최대 100건). 전체 계좌번호는 반환하지 않음 |
+| POST | /admin/settlement-accounts/:id/verify | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 통장 사본 등으로 예금주 확인 후 expectedVersion·확인 내용으로 기록, 이미 확인·버전 불일치는 409. 감사 `account.manual_verified` |
+| POST | /admin/beans/withdrawals/:id/manual-result | 콩 변경 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
 | GET | /admin/financial-policy | 운영 설정 조회 권한; 현재 DB 수수료율/정산 보류·version 조회 |
 | PUT | /admin/financial-policy | 운영 설정 수정 권한; expectedVersion/platformFeeBps/settlementHoldDays/reason와 confirmation='정책 변경'(정확히 일치, 아니면 400 CONFIRMATION_REQUIRED), 충돌409·감사 기록 원자 반영 |
 | GET | /admin/financial-policy/history | 운영 설정 조회 권한; 최근 정책 변경100건 |
@@ -238,6 +242,8 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 - 베타 갱신은 첫 실패 후24시간 간격3회 추가다. 분실/정지 카드는 교체 전 중단하고 기결제 기간 종료 후 접근을 차단한다. 테스트 snapshot을 운영 키로 재청구할 수 없다. 실결제로 전환하려면 테스트 구독을 정리하고 새 계약·결제 동의를 받아야 한다.
 - 수수료·보류일은 기존 DB version 정책을 유지한다. 선택값은2000bps/7일이며 배포 때 `GET /admin/financial-policy`의 현재 version을 받아 `PUT`에 expectedVersion/2000/7/reason을 보내 적용·이력을 확인한다. 이번 작업은 운영 DB 값을 변경하지 않았다. 기존 결제 snapshot은 보존한다.
 - 최소 출금100,000원(2026-10-27 사용자 결정으로 10,000원에서 상향, 콩 출금 최소 1,000콩=총액100,000원과 동일). 보류기간이 끝났어도 `receipt_confirmed_at/received_amount/receipt_reference`가 없는 수익은 출금 가능액에서 제외한다. 대사는 수동 PG·은행 기록 확인 API이며 실제 은행 조회를 했다는 보장이 아니다. 신규 지급은 수요일(KST), 이미 처리 중인 송금의 결과 확인은 다른 요일에도 가능하다. 베타는 모두 실송금 금지. 공휴일·신청마감은 실결제 전 별도 확정한다.
+- 2026-10-31(계약서 7⑥): `GET /studio/finance`의 `settlements[].holdReasons`는 대기 사유를 `period`(보류기간 중)·`receipt`(PG 입금 대사 미기록 또는 입금액 부족)로 구분한다. 판정은 `settlementPending`과 같은 규칙이며, 스튜디오 정산 내역은 건별 '대기 사유'로 표시한다.
+- 2026-10-31 실결제·수동 지급 스위치: `LIVE_PAYMENTS_ENABLED`면 베타에서도 토스 운영 키만 허용(아니면 테스트 키만), `MANUAL_PAYOUTS_ENABLED`면 계좌 확인·이체를 운영자가 콘솔에서 기록(은행 API 없음). `/admin/me`에 `livePayments`·`manualPayouts`, `/admin/withdrawals?status=open`은 접수·처리 중만. 절차·문구 개정안은 `docs/live-payment-launch-20261031.md`.
 - 설정의 광고 동의 활성화에는 최신 marketingVersion이 필요하다. 회원가입·설정·메일 수신거부가 MemberConsent 이력과 AccountPreference 동의 ID를 같은 트랜잭션에 보존한다. 기존 true값만 있고 증빙 ID가 없으면 광고 대상에서 제외한다. 큐 등록/발송 직전 현재 동의·계정 활성·이메일 인증을 다시 확인하고 수신거부와 회원 잠금으로 직렬화한다.
 - 광고 메일은 `(광고)` 제목, 발신자/연락처, 로그인 없는 수신거부 링크를 사용한다. 처리결과와2년 동의 확인은 비광고 안내다. 기한이 지난 확인 안내가 미접수이면 광고를 보류한다. SMTP 결과 불명 또는15분 이상 중단된 발송은 uncertain으로 남기고 자동 재전송하지 않는다. worker 오류 보고로 운영 확인한다. `MARKETING_MAIL_ENABLED=false` 기본이며 실제 발송은 미실행이다. List-Unsubscribe 헤더는 준비했지만 운영 DKIM 및 수신처의 one-click 인식은 검증하지 않았다.
 - 추가 migration2개는 `20261025100000_beta_policy`, `20261025110000_marketing_delivery_claim`이다. 격리 테스트 DB만 적용했으며 운영과 개발 DB에는 적용하지 않았다. API/worker 배포 전에 두 migration과 DB 정책·환경값을 함께 확인한다.
@@ -440,7 +446,7 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 | PUT | /admin/advertising/products/:id | advertising.update. 동일 필드와 expectedVersion 필수, 충돌409·없는/삭제상품404 |
 | DELETE | /admin/advertising/products/:id | advertising.delete. expectedVersion 확인, deleted_at 및 숨김/판매중지, 반복 삭제 멱등. 물리 삭제 없음 |
 | GET | /admin/invites | invites.view. page/status(active·used·revoked)/search(이메일·메모), 20개 페이지. 초대별 개별 조건(terms)·가입 회원 ID |
-| POST | /admin/invites | invites.create. email/memo와 개별 조건(platformFeeBps·settlementHoldDays·beanWithdrawalFeeBps·minimumWithdrawalKrw, null=기본값). 조건이 있으면 settings.update와 confirmation '정책 변경' 필요. 가입 회원 이메일·중복 409, 취소된 이메일은 같은 행 복구 |
+| POST | /admin/invites | invites.create. email/memo와 개별 조건(platformFeeBps·settlementHoldDays·beanWithdrawalFeeBps·minimumWithdrawalKrw, null=기본값). 조건이 있으면 settings.update와 confirmation '정책 변경' 필요. 가입 회원 이메일·중복 409, 취소된 이메일은 같은 행 복구. 탈퇴(본인·콘솔 삭제)한 회원의 이메일은 다시 초대 가능(2026-10-31): 사용 완료 초대를 새 초대로 재발급(`admin.signup_invite_reissued`)하고, 30일 파기 전이면 탈퇴 회원의 이메일·본인확인 중복값만 즉시 해제(`member.email_released`) |
 | PUT | /admin/invites/:id | invites.update. memo·개별 조건과 expectedVersion. 조건 변경 시 settings.update·확인 문구. 가입 완료·취소 초대 409 |
 | DELETE | /admin/invites/:id | invites.delete. expectedVersion 확인 후 revoked_at 기록(이 이메일은 다시 가입 코드 불가). 가입 완료 초대는 409 |
 | POST | /admin/posts/:id/moderation | content.update. hidden(true/false)·reason 필수. 숨긴 게시물은 작성자 외 피드·프로필·상세·댓글·반응·미디어·게시물 후원에서 제외, 스튜디오에는 hiddenByOperator 표시. moderation_actions에 기록. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
@@ -455,3 +461,4 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 | PUT | /admin/members/:id/terms | members.update + settings.update, confirmation '정책 변경', expectedVersion, reason(필수). 이후 신규 구독 결제·출금 신청부터 적용, 기존 결제·진행 중 정기결제 조건 유지. 저장마다 creator_financial_term_changes 이력 1행 |
 
 AdProduct 응답: id/name/description/terms/placement/amount/durationDays/visible/onSale/sortOrder/version/deletedAt/createdAt/updatedAt. placement는 featured_creator, amount는 VAT 포함 원 단위 정수100~10,000,000, durationDays는1~365 정수, sortOrder는-100,000~100,000 정수. 문자열 제한은 name100/description3000/terms5000자. 가격·기간은 관리자 입력이며 실제 운영 시드 없음. 변경 감사와 상품 쓰기는 같은 트랜잭션이고 행 잠금+version으로 동시 수정 충돌을 거절한다. PG 구매/노출 적용 정책 선택 대기.
+

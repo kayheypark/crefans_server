@@ -342,3 +342,17 @@ test('a membership receivable does not stop bean payouts; a bean receivable does
  await assert.rejects(beans.review(creator,{quantity:1000,accountId:account.id}),code('RECEIVABLE_OPEN'));
  await db.creatorReceivable.deleteMany({where:{id:{in:[membership.id,bean.id]}}});
 });
+test('manual payout mode: a Wednesday claim parks the payout without a bank call; the operator transfer is recorded once',async()=>{
+ // 2026-10-31 user decision: beta pays creators by operator bank transfer recorded in the console (MANUAL_PAYOUTS_ENABLED).
+ const {BankProvider}=require('../dist/src/platform/bank-provider');const manualConfig=new ConfigService({BEAN_LEDGER_ENABLED:'true',BEAN_LIVE_PAYMENTS_APPROVED:'true',BETA_MODE:'true',MANUAL_PAYOUTS_ENABLED:'true'});
+ const manual=new BeansService(service,finance,provider,new BankProvider(manualConfig,db),manualConfig);
+ const o=await charge(1000);await receipt(o);await beans.tip(fan,creator,{quantity:1000,requestId:randomUUID()});const p=await payout(1000);const before=transfers;
+ await assert.rejects(new BeansService(service,finance,provider,bank,new ConfigService({BEAN_LEDGER_ENABLED:'true',BETA_MODE:'true'})).manualResult(admin,p.id,{result:'paid',reference:'X'},new Date(WED)),code('MANUAL_PAYOUTS_DISABLED'));
+ await assert.rejects(manual.manualResult({...admin,role:'ADMIN',permissions:{beans:{view:true}}},p.id,{result:'paid',reference:'X'},new Date(WED)),code('ADMIN_PERMISSION_REQUIRED'));
+ await assert.rejects(manual.manualResult(admin,p.id,{result:'paid'},new Date(WED)),code('INVALID_MANUAL_RESULT'),'a paid record needs the transfer reference');
+ await assert.rejects(manual.manualResult(admin,p.id,{result:'paid',reference:'BANK-1',transferredAt:THU},new Date(WED)),code('INVALID_MANUAL_RESULT'),'no future transfer time');
+ await manual.manualResult(admin,p.id,{result:'paid',reference:'BANK-REF-1',transferredAt:WED},new Date(WED));
+ assert.equal(transfers,before,'no bank adapter call in manual mode');const row=await db.beanPayout.findUniqueOrThrow({where:{id:p.id}});assert.equal(row.status,'paid');assert.match(row.note,/수동 이체 완료 · BANK-REF-1/);
+ assert.equal(await db.beanMovement.count({where:{request_key:`payout-result:${p.id}`}}),1,'ledger result applied once');
+ await assert.rejects(manual.manualResult(admin,p.id,{result:'paid',reference:'BANK-REF-1'},new Date(WED)),code('PAYOUT_NOT_PROCESSING'),'a recorded payout cannot be recorded again');
+ assert.equal(await db.platformAuditLog.count({where:{entity_id:p.id,action:'bean.payout_manual_result'}}),1);});

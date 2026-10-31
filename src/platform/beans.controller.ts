@@ -38,6 +38,7 @@ export class BeansAdminController {
  @Get('receivables') @Permit(['beans','view']) receivables(@Req() r:any){return this.beans.receivables(r.admin);}
  @Post('receivables/:id/settle') @Permit(['beans','update']) settle(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.settleReceivable(r.admin,id,b);}
  @Post('withdrawals/:id/approve') @Permit(['beans','update']) async approve(@Req() r:any,@Param('id') id:string){await this.beans.payout(id,r.admin);return{message:'은행 지급 상태를 확인했습니다.'};}
+ @Post('withdrawals/:id/manual-result') @Permit(['beans','update']) manualResult(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.manualResult(r.admin,id,b);}
  @Post('withdrawals/:id/reject') @Permit(['beans','update']) reject(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.rejectPayout(r.admin,id,b);}
 }
 

@@ -67,7 +67,9 @@ test('a refund after payout becomes a receivable with a notice and settles itsel
  await db.withdrawalRequest.create({data:{creator_id:id,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:8000,status:'paid'}});
  await finance.completeRefund(order,'provider');await finance.completeRefund(order,'provider');
  const r=await db.creatorReceivable.findMany({where:{creator_id:id,kind:'membership'}});assert.deepEqual(r.map(x=>[x.amount,x.status]),[[8000,'open']],'one receivable for the paid-out income');
- assert.ok(await db.memberNotification.findFirst({where:{member_id:id,type:'settlement',text:{contains:'8,000원'}}}));
+ const notice=await db.memberNotification.findFirst({where:{member_id:id,type:'settlement',text:{contains:'8,000원'}}});assert.ok(notice);
+ // Creator agreement 9③: the notice names the original transaction and how to object.
+ assert.match(notice.text,/원거래: \d{4}-\d{2}-\d{2} 미수금 검증 결제/);assert.match(notice.text,/이의가 있으면 고객센터/);
  assert.deepEqual((await finance.finance(id)).receivables.map(x=>x.amount),[8000]);
  await finance.settleReceivables();assert.equal((await db.creatorReceivable.findUniqueOrThrow({where:{id:r[0].id}})).status,'open','still owed');
  const next=await db.checkoutOrder.create({data:{member_id:ids.fan,membership_id:plan.id,snapshot:{name:'미수금 검증'},amount:12000,status:'paid',idempotency_key:randomUUID(),expires_at:new Date(),paid_at:new Date(Date.now()-15*86400000)}});

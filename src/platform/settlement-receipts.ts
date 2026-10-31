@@ -2,7 +2,9 @@ import {can} from './admin-permissions';
 import {appendAudit,contentDigest} from './audit';
 import {reject,text} from './http';
 
-export const settlementPending=(entry:any,now=new Date())=>entry.available_at>now||!entry.receipt_confirmed_at||entry.received_amount<Math.max(0,entry.net);
+// Why an entry is not withdrawable yet (creator agreement 7⑥): the hold period, the PG deposit reconciliation, or both.
+export const settlementHoldReasons=(entry:any,now=new Date()):Array<'period'|'receipt'>=>[...(entry.available_at>now?['period' as const]:[]),...(!entry.receipt_confirmed_at||entry.received_amount<Math.max(0,entry.net)?['receipt' as const]:[])];
+export const settlementPending=(entry:any,now=new Date())=>settlementHoldReasons(entry,now).length>0;
 // Confirmation is a manual PG/bank reconciliation record, never a claim of a bank API response.
 export async function confirmSettlementReceipt(db:any,admin:any,id:string,input:any){
  if(!can(admin,'revenue','create'))reject(403,'ADMIN_PERMISSION_REQUIRED','입금 대사를 기록할 권한이 없습니다.');

@@ -1,6 +1,6 @@
 import {postSupporterCount} from './post-supporters';
 import {recordMarketingChoice} from './marketing.service';
-import {isBeta} from './beta-policy';
+import {isBeta,livePayments,manualPayouts} from './beta-policy';
 import {LegalDocumentsService} from './legal-documents';
 import {ConfigService} from '@nestjs/config';
 import {signupPolicy} from './signup-policy';
@@ -19,6 +19,7 @@ const notificationLabels:Record<string,string>={subscription:'멤버십',comment
 export class PlatformService {
  constructor(public db:PrismaService,private legal:LegalDocumentsService=new LegalDocumentsService(),private config:ConfigService=new ConfigService()){}
  beta(){return isBeta(this.config);}
+ paymentSwitches(){return{livePayments:livePayments(this.config),manualPayouts:manualPayouts(this.config)};}
  async creator(id:string){const c=await this.db.creator.findFirst({where:{OR:[{user_id:id},{id},{handle:id}]}});if(!c)reject(404,'CREATOR_NOT_FOUND','크리에이터를 찾을 수 없습니다.');return c;}
  async requireCreator(id:string){const c=await this.db.creator.findUnique({where:{user_id:id}});if(!c)reject(403,'CREATOR_REQUIRED','크리에이터 등록이 필요합니다.');return c;}
  async member(id:string){const m=await this.db.member.findUnique({where:{id}});if(!m?.enabled)reject(404,'MEMBER_NOT_FOUND','사용자를 찾을 수 없습니다.');return m;}

@@ -1,7 +1,7 @@
 import {purgeWithdrawnMembers} from './member-purge';
 import {BeansService} from './beans.service';
 import {MarketingService} from './marketing.service';
-import {isBeta,isPayoutDay} from './beta-policy';
+import {isBeta,isPayoutDay,manualPayouts} from './beta-policy';
 import {pruneAuditLogs} from './audit-retention';
 import {randomUUID} from 'node:crypto';
 import {requestContext} from './request-context';
@@ -47,7 +47,7 @@ export class PlatformJobsService {
   await run('bean-expiry',async()=>this.beans?.expireLots(now));
   await run('receivables',async()=>this.finance.settleReceivables());
   await run('beans-reconciliation',async()=>this.beans?.tick(async(job,error)=>{failures[job]=(failures[job]||0)+1;await this.operations?.error('worker.error',error,{job});}));
-  if(this.config.get('BANK_PAYOUTS_ENABLED')==='true'&&!isBeta(this.config)){const payouts=await this.db.withdrawalRequest.findMany({where:{status:{in:isPayoutDay(now)?['requested','processing']:['processing']}},select:{id:true},orderBy:{updated_at:'asc'},take:20});for(const p of payouts)await run('payout',async()=>{try{await this.finance.payout(p.id,now);return 1;}finally{await this.db.withdrawalRequest.updateMany({where:{id:p.id,status:{in:['requested','processing']}},data:{updated_at:now}});}});}
+  if((this.config.get('BANK_PAYOUTS_ENABLED')==='true'&&!isBeta(this.config))||manualPayouts(this.config)){const payouts=await this.db.withdrawalRequest.findMany({where:{status:{in:isPayoutDay(now)?['requested','processing']:['processing']}},select:{id:true},orderBy:{updated_at:'asc'},take:20});for(const p of payouts)await run('payout',async()=>{try{await this.finance.payout(p.id,now);return 1;}finally{await this.db.withdrawalRequest.updateMany({where:{id:p.id,status:{in:['requested','processing']}},data:{updated_at:now}});}});}
   const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',hour:'2-digit',hourCycle:'h23'}).format(now));
   if(hour>=19)await run('media-cleanup',()=>this.cleanup(now));
   const expired=await this.db.subscription.updateMany({where:{auto_renew:false,status:'CANCELLED',ended_at:{lte:now}},data:{status:'EXPIRED'}});if(expired.count)activity['subscription-expired']=expired.count;
