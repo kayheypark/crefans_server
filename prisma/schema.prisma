@@ -1824,3 +1824,30 @@ model MemberNotice {
  @@index([completed_at,retry_at])
  @@map("member_notices")
 }
+
+/// 레퍼럴(친구 초대). 회원당 1행이며 id 가 초대 링크의 코드다(2026-11-01).
+model Referral {
+ id String @id @default(uuid())
+ member_id String @unique @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@map("referrals")
+}
+/// 레퍼럴로 가입한 회원과 보상 상태. 보상은 직접 초대한 회원(referrer_id)에게만, 초대받은 회원의 첫 유료 결제 1회에 지급.
+model ReferralSignup {
+ id String @id @default(uuid())
+ referral_id String
+ referrer_id String @db.VarChar(191)
+ member_id String @unique @db.VarChar(191)
+ /// pending → granted → clawed_back
+ reward_status String @default("pending") @db.VarChar(20)
+ reward_quantity Int @default(0)
+ reward_source String? @db.VarChar(20)
+ reward_source_id String? @db.VarChar(191)
+ rewarded_at DateTime?
+ clawed_back_at DateTime?
+ created_at DateTime @default(now())
+ @@index([referral_id])
+ @@index([referrer_id,created_at])
+ @@index([reward_source,reward_source_id])
+ @@map("referral_signups")
+}

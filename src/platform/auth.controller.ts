@@ -7,7 +7,7 @@ import {setAuthCookies,clearAuthCookies} from '../auth/utils/cookie.util';
 @Controller('auth')
 export class PlatformAuthController {
  constructor(private auth:PlatformAuthService,private local:LocalMemberService,private config:ConfigService){}
- @Post('signup/email/request') request(@Body() body:any){return this.auth.requestCode(body.email);}
+ @Post('signup/email/request') request(@Body() body:any){return this.auth.requestCode(body.email,body.referralCode);}
  @Post('signup/email/verify') verify(@Body() body:any){return this.auth.verifyCode(body);}
  @Post('identity') identity(){return this.auth.identity();}
  @Post('signup') signup(@Body() body:any){return this.auth.signup(body);}

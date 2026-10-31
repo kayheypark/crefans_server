@@ -13,6 +13,7 @@ import {LocalMemberService} from '../auth/local/local-member.service';
 import {MemberMailService} from '../auth/local/member-mail.service';
 import {assertNewPassword,digest,hashPassword,normalizeEmail} from '../auth/local/credentials';
 import {reject,text} from './http';
+import {assertReferralCode,linkReferralSignup,referralCodeInput,referralEnabled} from './referrals';
 // Sign-in accepts any value a past contract could have stored (reset allowed up to 256 characters).
 const signInPassword=(value:unknown)=>{if(typeof value!=='string'||!value||value.length>256)reject(400,'INVALID_INPUT','입력값을 확인해주세요.');return value as string;};
 @Injectable()
@@ -20,9 +21,11 @@ export class PlatformAuthService {
  constructor(private db:PrismaService,private local:LocalMemberService,private mail:MemberMailService,private config:ConfigService,private legal:LegalDocumentsService=new LegalDocumentsService()){}
  private email(value:unknown){const email=normalizeEmail(text(value,191));if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))reject(400,'INVALID_EMAIL','이메일을 확인해주세요.');return email;}
  private codeHash(email:string,code:string){return createHmac('sha256',this.config.get('LOCAL_AUTH_SECRET')).update(`${email}:${code}`).digest('hex');}
- async requestCode(raw:string){
+ // A valid referral link admits a visitor without an operator invite while REFERRAL_ENABLED (user decision 2026-11-01).
+ private async assertInvitedOrReferred(email:string,referralCode:unknown){if(referralEnabled(this.config)&&referralCodeInput(referralCode)!==undefined){await assertReferralCode(this.db,referralCode);return true;}await signupPolicy(this.config).assertInvited(email,this.db);return false;}
+ async requestCode(raw:string,referralCode?:unknown){
    // The invitation check answers first so non-invited visitors see the beta notice; invited emails still wait for published terms.
-   const email=this.email(raw);await signupPolicy(this.config).assertInvited(email,this.db);this.legal.requirePublished();await this.local.limit(`signup-email:${email}`,10,3600);
+   const email=this.email(raw);await this.assertInvitedOrReferred(email,referralCode);this.legal.requirePublished();await this.local.limit(`signup-email:${email}`,10,3600);
    if(await this.db.member.findUnique({where:{email}}))reject(409,'EMAIL_IN_USE','이미 가입한 이메일입니다.');
    const code=String(randomInt(0,1000000)).padStart(6,'0'),now=new Date();
    await this.db.$transaction(async tx=>{
@@ -44,7 +47,7 @@ export class PlatformAuthService {
  async identity(){reject(503,'PASS_NOT_CONFIGURED','PASS 본인인증 공급자 설정이 필요합니다.');}
  async signup(input:any){const email=this.email(input.email),nickname=text(input.nickname,40);
    if(input.terms!==true||input.privacy!==true)reject(400,'INVALID_INPUT','비밀번호와 필수 동의를 확인해주세요.');const password=assertNewPassword(input.password);
-   const policy=signupPolicy(this.config);await policy.assertInvited(email,this.db);
+   const policy=signupPolicy(this.config),referred=await this.assertInvitedOrReferred(email,input.referralCode);
    if(!policy.identityRequired&&input.ageAcknowledged!==true)reject(400,'AGE_ACKNOWLEDGEMENT_REQUIRED','만 19세 이상 가입 조건을 확인해주세요.');
    const password_hash=await hashPassword(password);
    await this.db.$transaction(async tx=>{
@@ -60,7 +63,8 @@ export class PlatformAuthService {
      }
      const consents=this.legal.consents(input);const member=await tx.member.create({data:{id:randomUUID(),email,password_hash,name:verifiedName,nickname,preferred_username:randomBytes(7).toString('hex'),email_verified:true,status:'CONFIRMED',identity_hash}});
      // A console invite revoked after the check above must not still let this email in.
-     if(!await consumeInvite(tx,email,member.id)&&policy.inviteOnly&&!policy.listed(email))reject(403,'SIGNUP_INVITE_REQUIRED',INVITE_REQUIRED_MESSAGE);
+     if(!await consumeInvite(tx,email,member.id)&&policy.inviteOnly&&!policy.listed(email)&&!referred)reject(403,'SIGNUP_INVITE_REQUIRED',INVITE_REQUIRED_MESSAGE);
+     if(referred&&!await linkReferralSignup(tx,input.referralCode,member.id))reject(400,'INVALID_REFERRAL','초대 링크를 확인해주세요.');
      if(this.config.get('BEAN_LEDGER_ENABLED')==='true')await ensureBeanWallet(tx,member.id);
      await tx.accountPreference.create({data:{member_id:member.id,marketing_alert:false}});
      await tx.memberConsent.createMany({data:consents.filter(c=>c.kind!=='marketing').map(c=>({...c,member_id:member.id}))});if(input.marketing===true)await recordMarketingChoice(tx,member.id,true,'signup',this.legal.signup().documents.marketing);await tx.signupChallenge.delete({where:{email}});await enqueueOperation(tx,'member.signup',{memberId:member.id},`member.signup:${member.id}`);
