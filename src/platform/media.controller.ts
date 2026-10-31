@@ -14,6 +14,7 @@ import {PlatformService} from './service';
 import {PlatformAuthGuard,PlatformOptionalAuthGuard,PlatformMediaEdgeGuard} from './platform-auth.guard';
 import {reject} from './http';
 import {PlatformMediaStorage,managedMediaKey} from './media-storage';
+import {profilePhotoInUse} from './profile-photos';
 @Controller('media')
 export class PlatformMediaController {
  private readonly logger=new Logger(PlatformMediaController.name);
@@ -50,7 +51,7 @@ export class PlatformMediaController {
    const restricted=links.filter(link=>link.posting.is_membership||link.posting.is_sensitive||!link.posting.is_public||link.posting.hidden_at);
    if(!allowed){for(const link of restricted){if(!await this.service.access(link.posting,req.user?.sub))reject(403,'MEDIA_ACCESS_DENIED','파일 이용 권한이 없습니다.');}for(const link of links){if(await this.service.access(link.posting,req.user?.sub)){allowed=true;break;}}}
    // Membership versions preserve image references; only images used by publicly active plans are public.
-   if(!allowed&&m.type==='IMAGE'){allowed=!!await this.service.db.membershipItem.findFirst({where:{creator_id:m.user_sub,image:m.original_url,is_active:true,is_deleted:false}});}
+   if(!allowed&&m.type==='IMAGE'){allowed=!!await this.service.db.membershipItem.findFirst({where:{creator_id:m.user_sub,image:m.original_url,is_active:true,is_deleted:false}})||await profilePhotoInUse(this.service.db,m);}
    if(!allowed)reject(403,'MEDIA_ACCESS_DENIED','파일 이용 권한이 없습니다.');
    for(const link of restricted){if(!await this.service.consumeContent(link.posting,req.user?.sub))reject(403,'MEDIA_ACCESS_DENIED','파일 이용 권한이 없습니다.');}
    return m;

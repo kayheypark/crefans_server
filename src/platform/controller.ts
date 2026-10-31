@@ -1,6 +1,7 @@
 import {Body,Controller,Delete,Get,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
 import {EmailChangeService} from './email-change.service';
 import {PlatformService} from './service';
+import {updateProfilePhotos} from './profile-photos';
 import {PlatformAuthGuard,PlatformOptionalAuthGuard} from './platform-auth.guard';
 @Controller()
 export class PlatformController {
@@ -30,6 +31,7 @@ export class PlatformController {
  @Post('reports') @UseGuards(PlatformAuthGuard) report(@Body() b:any,@Req() r:any){return this.service.report(r.user.sub,b.id,b.kind==='POSTING'||b.kind==='COMMENT'?b.kind:'USER',b.reason??'OTHER');}
  @Put('notifications/read') @UseGuards(PlatformAuthGuard) async read(@Body('ids') ids:string[],@Req() r:any){await this.service.db.memberNotification.updateMany({where:{member_id:r.user.sub,id:{in:Array.isArray(ids)?ids.slice(0,100):[]}},data:{read_at:new Date()}});return{message:'읽음 처리했습니다.'};}
  @Put('me/profile') @UseGuards(PlatformAuthGuard) profile(@Body() b:any,@Req() r:any){return this.service.profile(r.user.sub,b);}
+ @Put('me/profile/photos') @UseGuards(PlatformAuthGuard) profilePhotos(@Body() b:any,@Req() r:any){return updateProfilePhotos(this.service.db,r.user.sub,b);}
  @Post('me/email/request') @UseGuards(PlatformAuthGuard) emailRequest(@Body() b:any,@Req() r:any){return this.emailChange.request(r.user.sub,b?.email,b?.currentPassword);}
  @Post('me/email/confirm') @UseGuards(PlatformAuthGuard) emailConfirm(@Body() b:any,@Req() r:any){return this.emailChange.confirm(r.user.sub,b.email,b.code);}
  @Put('me/settings') @UseGuards(PlatformAuthGuard) settings(@Body() b:any,@Req() r:any){return this.service.settings(r.user.sub,b);}
