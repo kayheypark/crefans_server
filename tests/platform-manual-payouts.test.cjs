@@ -57,6 +57,12 @@ test('membership withdrawal: claimed on Wednesday with the usual checks, then th
  assert.equal(await db.platformAuditLog.count({where:{entity_id:w.id,action:'withdrawal.manual_result'}}),1);
  assert.equal((await finance.finance(creator)).summary.paid,100000);});
 
+test('a request made on the payout Wednesday itself waits for the next week (Tuesday 23:59 KST cutoff)',async()=>{
+ const w=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:10000,status:'requested',created_at:WED}});
+ await assert.rejects(finance.manualResult(admins[0],w.id,{result:'paid',reference:'BANK-CUT',transferredAt:WED.toISOString()},WED),code('PAYOUT_SCHEDULED'));
+ assert.equal((await db.withdrawalRequest.findUniqueOrThrow({where:{id:w.id}})).status,'requested');
+ await db.withdrawalRequest.delete({where:{id:w.id}});});
+
 test('a processing withdrawal can be rejected with a reason, which returns the amount to the available balance',async()=>{
  const w=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:10000,status:'processing'}});
  const before=(await finance.finance(creator)).summary.available;
