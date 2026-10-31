@@ -5,7 +5,7 @@ import {reject} from './http';
 import {hasActiveInvite} from './signup-invites';
 
 // Shown when a non-invited email asks for a signup code during the beta.
-export const INVITE_REQUIRED_MESSAGE='베타기간(~26년 11월)에는 사전 협의된 유저만 가입할 수 있습니다. 빠른 시일 내에 그랜드 오픈을 준비하겠습니다.';
+export const INVITE_REQUIRED_MESSAGE='현재 기간(~26년 11월)에는 사전 협의된 유저만 가입할 수 있습니다. 빠른 시일 내에 그랜드 오픈을 준비하겠습니다.';
 
 // Only an explicit server setting can defer identity verification. It never grants adult access.
 // Invited emails come from SIGNUP_EMAIL_ALLOWLIST or an active console invite (signup_invites); either one passes.

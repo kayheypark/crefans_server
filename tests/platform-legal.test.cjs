@@ -19,7 +19,7 @@ test('an open item still blocks signup while the documents stay readable, includ
  // No console invite exists for the stranger, so only the env allowlist can admit it.
  const auth=new PlatformAuthService({signupInvite:{findFirst:async()=>null}}, {},{sendCode(){throw Error('must not send');}}, new ConfigService({BETA_MODE:'true',SIGNUP_EMAIL_ALLOWLIST:'synthetic@example.invalid'}),legal);
  await assert.rejects(auth.requestCode('synthetic@example.invalid'),error('POLICY_NOT_PUBLISHED'));
- await assert.rejects(auth.requestCode('stranger@example.invalid'),e=>e.getResponse().code==='SIGNUP_INVITE_REQUIRED'&&e.getResponse().message==='베타기간(~26년 11월)에는 사전 협의된 유저만 가입할 수 있습니다. 빠른 시일 내에 그랜드 오픈을 준비하겠습니다.');
+ await assert.rejects(auth.requestCode('stranger@example.invalid'),e=>e.getResponse().code==='SIGNUP_INVITE_REQUIRED'&&e.getResponse().message==='현재 기간(~26년 11월)에는 사전 협의된 유저만 가입할 수 있습니다. 빠른 시일 내에 그랜드 오픈을 준비하겠습니다.');
  assert.ok(legal.catalog().documents.privacy.sections.some(s=>s.body.includes('좋아하는일해야지')));
 });
 test('public documents ignore database legal rows, while database notices still work',async()=>{
