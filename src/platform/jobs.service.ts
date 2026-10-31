@@ -17,6 +17,7 @@ import {PlatformOperationsService} from './operations.service';
 import {enqueueOperation} from './operations-events';
 import {dateOnly} from './http';
 import {PlatformMediaStorage,managedMediaKey} from './media-storage';
+import {grantDueReferralRewards} from './referrals';
 // Card cancellations and chargebacks are normally raised within months; older orders need manual review.
 const PAID_RECHECK_DAYS=120;
 @Injectable()
@@ -34,6 +35,7 @@ export class PlatformJobsService {
   await run('audit-retention',()=>pruneAuditLogs(this.db,now));
   await run('sessions',async()=>{const sessions=await this.db.memberSession.deleteMany({where:{expires_at:{lt:now}}}),adminSessions=await this.db.adminSession.deleteMany({where:{expires_at:{lt:now}}}),buckets=await this.db.authRateBucket.deleteMany({where:{expires_at:{lt:now}}});return sessions.count+adminSessions.count+buckets.count;});
   await run('member-purge',()=>purgeWithdrawnMembers(this.db,now));
+  await run('referral-rewards',()=>grantDueReferralRewards(this.db,this.config,now));
   await run('billing-registration-and-revocation',()=>this.finance.retryBilling());
   const renewals=await this.db.subscription.findMany({where:{auto_renew:true,status:'ONGOING',next_billing_date:{lte:now}},select:{id:true},orderBy:{updated_at:'asc'},take:50});for(const s of renewals)await run('renewal',async()=>{try{return await this.finance.renew(s.id);}finally{await this.db.subscription.update({where:{id:s.id},data:{updated_at:now}});}});
   const uncertain=await this.db.checkoutOrder.findMany({where:{status:'processing'},select:{id:true},orderBy:{updated_at:'asc'},take:50});for(const o of uncertain)await run('payment-reconciliation',async()=>{try{await this.finance.reconcile(o.id);return 1;}finally{await this.db.checkoutOrder.update({where:{id:o.id},data:{updated_at:now}});}});

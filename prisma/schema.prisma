@@ -1838,16 +1838,19 @@ model ReferralSignup {
  referral_id String
  referrer_id String @db.VarChar(191)
  member_id String @unique @db.VarChar(191)
- /// pending → granted → clawed_back
+ /// pending → qualified(첫 실결제, 7일 보류) → granted → clawed_back. 월 상한 초과 시 capped
  reward_status String @default("pending") @db.VarChar(20)
  reward_quantity Int @default(0)
  reward_source String? @db.VarChar(20)
  reward_source_id String? @db.VarChar(191)
  rewarded_at DateTime?
+ /// 첫 실결제 후 보상 확정 예정 시각(환불 기간 7일). qualified 상태에서만 값이 있다.
+ grant_due_at DateTime?
  clawed_back_at DateTime?
  created_at DateTime @default(now())
  @@index([referral_id])
  @@index([referrer_id,created_at])
  @@index([reward_source,reward_source_id])
+ @@index([reward_status,grant_due_at])
  @@map("referral_signups")
 }

@@ -6,9 +6,10 @@ import {enqueueOperation} from './operations-events';
 
 // Referral rewards (user decisions 2026-11-01, docs/referral-design-20261101.md):
 // - every member has one referral row; its id is the invite code joined to members.id.
-// - only the member who invited directly is rewarded, once, on the invitee's first live payment.
+// - only the member who invited directly is rewarded, once: the invitee's first live payment qualifies, and the reward is
+//   credited by the worker 7 days later if that payment is still unrefunded; at most 10 rewards per referrer per KST month.
 // - the reward is 100 withdrawable promotional beans (earned-promotion lot, provenance = referral_signups row).
-// - refunding that payment claws the reward back; beans already paid out become a bean receivable.
+// - a refund inside the hold cancels the qualification; a later refund claws the reward back (paid-out beans become a bean receivable).
 export const REFERRAL_REWARD_BEANS=100;
 export const referralEnabled=(config:{get:(key:string)=>any})=>config.get('REFERRAL_ENABLED')==='true';
 
@@ -34,22 +35,42 @@ async function lockWallets(tx:any,member:string){
  const wallet=await ensureBeanWallet(tx,member);await tx.$queryRaw`SELECT id FROM bean_wallets WHERE id=${wallet.id} FOR UPDATE`;
 }
 
+export const REFERRAL_HOLD_DAYS=7,REFERRAL_MONTHLY_CAP=10;
+const kstMonthStart=(now:Date)=>{const k=new Date(now.getTime()+9*3600000);return new Date(Date.UTC(k.getUTCFullYear(),k.getUTCMonth(),1)-9*3600000);};
+
 /**
  * Called inside the payment success transaction. Only live payments count: test-key payments must never mint withdrawable beans.
- * Idempotent per invitee: the first successful payment wins, later payments are ignored.
+ * The first live payment qualifies the invitee; the reward is credited after the refund window (user decision 2026-11-01).
  */
-export async function grantReferralReward(tx:any,config:{get:(key:string)=>any},payer:string,source:'checkout'|'bean_charge',sourceId:string,live:boolean){
- if(!referralEnabled(config)||!live||config.get('BEAN_LEDGER_ENABLED')!=='true')return null;
+export async function qualifyReferralReward(tx:any,config:{get:(key:string)=>any},payer:string,source:'checkout'|'bean_charge',sourceId:string,live:boolean,now=new Date()){
+ if(!referralEnabled(config)||!live)return null;
  const rows:any[]=await tx.$queryRaw`SELECT id FROM referral_signups WHERE member_id=${payer} FOR UPDATE`;if(!rows.length)return null;
  const signup=await tx.referralSignup.findUniqueOrThrow({where:{id:rows[0].id}});if(signup.reward_status!=='pending')return null;
- const referrer=await tx.member.findFirst({where:{id:signup.referrer_id,enabled:true},select:{id:true}});if(!referrer)return null;
- await lockWallets(tx,signup.referrer_id);const q=REFERRAL_REWARD_BEANS;
- await move(tx,`referral-reward:${signup.id}`,'referral.reward','친구 초대 첫 결제 보상',signup.id,[{member:'company',bucket:'stock',delta:-q},{member:signup.referrer_id,bucket:'earned-promotion',delta:q}]);
- await tx.beanLot.create({data:{member_id:signup.referrer_id,bucket:'earned-promotion',grant_id:signup.id,available:q,release_at:new Date()}});
- const granted=await tx.referralSignup.update({where:{id:signup.id},data:{reward_status:'granted',reward_quantity:q,reward_source:source,reward_source_id:sourceId,rewarded_at:new Date()}});
- await tx.memberNotification.create({data:{member_id:signup.referrer_id,type:'settlement',text:`초대한 친구가 첫 결제를 해 출금 가능한 프로모션콩 ${q}개를 받았어요.`,path:'/beans'}});
- await enqueueOperation(tx,'referral.rewarded',{memberId:signup.referrer_id,targetId:signup.id},`referral.rewarded:${signup.id}`,{amount:q});
- return granted;
+ return tx.referralSignup.update({where:{id:signup.id},data:{reward_status:'qualified',reward_source:source,reward_source_id:sourceId,grant_due_at:new Date(now.getTime()+REFERRAL_HOLD_DAYS*86400000)}});
+}
+async function sourceStillPaid(tx:any,signup:any){
+ if(signup.reward_source==='checkout'){const o=await tx.checkoutOrder.findUnique({where:{id:signup.reward_source_id}});return o?.status==='paid';}
+ const c=await tx.beanCharge.findUnique({where:{id:signup.reward_source_id}});return c?.status==='paid'&&c.refunded_quantity===0;
+}
+/** Worker tick: credits rewards whose refund window has passed. A refunded source goes back to pending; over the monthly cap is recorded as capped. */
+export async function grantDueReferralRewards(db:any,config:{get:(key:string)=>any},now=new Date()){
+ if(!referralEnabled(config)||config.get('BEAN_LEDGER_ENABLED')!=='true')return 0;
+ const due=await db.referralSignup.findMany({where:{reward_status:'qualified',grant_due_at:{lte:now}},orderBy:{grant_due_at:'asc'},take:50,select:{id:true}});let count=0;
+ for(const {id} of due)await db.$transaction(async(tx:any)=>{
+  await tx.$queryRaw`SELECT id FROM referral_signups WHERE id=${id} FOR UPDATE`;const signup=await tx.referralSignup.findUniqueOrThrow({where:{id}});if(signup.reward_status!=='qualified')return;
+  if(!await sourceStillPaid(tx,signup)){await tx.referralSignup.update({where:{id},data:{reward_status:'pending',reward_source:null,reward_source_id:null,grant_due_at:null}});return;}
+  if(!await tx.member.findFirst({where:{id:signup.referrer_id,enabled:true},select:{id:true}}))return;
+  await lockWallets(tx,signup.referrer_id);
+  await tx.$queryRaw`SELECT id FROM referral_signups WHERE referrer_id=${signup.referrer_id} FOR UPDATE`;
+  if(await tx.referralSignup.count({where:{referrer_id:signup.referrer_id,reward_status:{in:['granted','clawed_back']},rewarded_at:{gte:kstMonthStart(now)}}})>=REFERRAL_MONTHLY_CAP){await tx.referralSignup.update({where:{id},data:{reward_status:'capped'}});return;}
+  const q=REFERRAL_REWARD_BEANS;
+  await move(tx,`referral-reward:${id}`,'referral.reward','친구 초대 첫 결제 보상',id,[{member:'company',bucket:'stock',delta:-q},{member:signup.referrer_id,bucket:'earned-promotion',delta:q}]);
+  await tx.beanLot.create({data:{member_id:signup.referrer_id,bucket:'earned-promotion',grant_id:id,available:q,release_at:now}});
+  await tx.referralSignup.update({where:{id},data:{reward_status:'granted',reward_quantity:q,rewarded_at:now}});
+  await tx.memberNotification.create({data:{member_id:signup.referrer_id,type:'settlement',text:`초대한 친구의 첫 결제가 확정되어 출금 가능한 프로모션콩 ${q}개를 받았어요.`,path:'/beans'}});
+  await enqueueOperation(tx,'referral.rewarded',{memberId:signup.referrer_id,targetId:id},`referral.rewarded:${id}`,{amount:q});count++;
+ },{isolationLevel:'ReadCommitted',timeout:20000});
+ return count;
 }
 
 /**
@@ -57,6 +78,8 @@ export async function grantReferralReward(tx:any,config:{get:(key:string)=>any},
  * beans already reserved or paid out are frozen in place and recorded as an open bean receivable that blocks later bean payouts.
  */
 export async function clawBackReferralReward(tx:any,source:'checkout'|'bean_charge',sourceId:string){
+ // Refunded inside the hold: nothing was credited, so the invitee's next live payment may qualify instead.
+ await tx.referralSignup.updateMany({where:{reward_source:source,reward_source_id:sourceId,reward_status:'qualified'},data:{reward_status:'pending',reward_source:null,reward_source_id:null,grant_due_at:null}});
  const signup=await tx.referralSignup.findFirst({where:{reward_source:source,reward_source_id:sourceId,reward_status:'granted'}});if(!signup)return null;
  await lockWallets(tx,signup.referrer_id);
  const lot=await tx.beanLot.findFirst({where:{member_id:signup.referrer_id,bucket:'earned-promotion',grant_id:signup.id}});
@@ -74,7 +97,7 @@ export async function clawBackReferralReward(tx:any,source:'checkout'|'bean_char
 export async function referralSummary(db:any,member:string){
  const referral=await ensureReferral(db,member);
  const [invited,rewarded,rows]=await Promise.all([db.referralSignup.count({where:{referrer_id:member}}),db.referralSignup.count({where:{referrer_id:member,reward_status:'granted'}}),db.referralSignup.aggregate({where:{referrer_id:member,reward_status:'granted'},_sum:{reward_quantity:true}})]);
- return{code:referral.id,invited,rewarded,rewardBeans:rows._sum.reward_quantity||0,rewardPerInvite:REFERRAL_REWARD_BEANS};
+ return{code:referral.id,invited,rewarded,rewardBeans:rows._sum.reward_quantity||0,rewardPerInvite:REFERRAL_REWARD_BEANS,holdDays:REFERRAL_HOLD_DAYS,monthlyCap:REFERRAL_MONTHLY_CAP,qualified:await db.referralSignup.count({where:{referrer_id:member,reward_status:'qualified'}})};
 }
 export function referralCodeInput(value:unknown){if(value===undefined||value===null||value==='')return undefined;return text(value,36);}
 export const assertReferralCode=async(db:any,code:unknown)=>{if(!await findReferral(db,code))reject(400,'INVALID_REFERRAL','초대 링크를 확인해주세요.');};
