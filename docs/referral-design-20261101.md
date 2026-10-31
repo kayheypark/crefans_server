@@ -1,6 +1,6 @@
 # 레퍼럴(친구 초대) 보상 설계 — 2026-11-01
 
-상태: 설계·구현 중. 기능 스위치 `REFERRAL_ENABLED`(기본 off)로 배포하며 켜는 시점은 사업자 결정.
+상태: 구현 완료, 스위치 꺼짐. 스위치는 운영 콘솔 '레퍼럴 관리'에서 켜고 끈다(`platform_settings` referral.enabled, 기본 꺼짐, 감사 기록). 켜는 시점은 약관·처리방침 개정본 시행일(사업자 결정).
 
 ## 사용자 결정(2026-10-31~11-01, 클릭형 질문 답변)
 
@@ -47,3 +47,10 @@
 | 업계 사례 | 모인(익월 지급, 5만원 초과 22%), 스픽(30일 검토 후 지급, 환불 시 미지급), 토스플레이스(종료 후 1~2주) | 업계는 즉시 지급보다 환불 기간 보류 후 확정이 일반적 | 재확인 결과 '환불 기간(7일) 뒤 지급'으로 변경 |
 
 출처: casenote.kr 법령 조문(방문판매법 제2조, 소득세법 제84·164조, 전자금융거래법 제2·19·28조, 개인정보 보호법 제17조), fsc.go.kr/no010101/82531·83004, korea.kr 공정위 보도(테무), shinkim.com 뉴스레터 2613·사례 400, themoin.com/blog/?p=6668, intercom.help/speakFAQ/ko/articles/7949095, tossplace.com/story/48797. law.go.kr 원문·공정위 유권해석·국세청 질의회신 원문은 미확인.
+
+## 운영 콘솔(2026-11-01 사용자 요청)
+
+- 레퍼럴 관리 메뉴: 스위치(확인 창), 상태별 집계·목록(`GET admin/referrals`, `PUT admin/referrals/settings`). 권한 메뉴 `referrals`(조회·링크 생성·스위치).
+- 회원·크리에이터 목록: 회원 구분 필터(`type=fan|creator`), 구분 없이 모든 회원에 '레퍼럴 링크 생성'(`POST admin/members/:id/referral`, 회원당 1개).
+- 환경변수 `REFERRAL_ENABLED`는 더 이상 쓰지 않는다(마이그레이션 `20261101150000_platform_settings`).
+- 검증: 서버 `tests/platform-referrals.test.cjs` 9건(스위치 무시 시 7건 실패 대조), 콘솔 e2e `e2e/referrals.spec.ts` 3건(API 대역).
