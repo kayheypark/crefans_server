@@ -37,10 +37,10 @@ before(async()=>{
 });
 after(async()=>{await app?.close();});
 const request=(path,cookie)=>fetch(base+path,{headers:cookie?{cookie}:{},redirect:'manual'});
-test('OpenAPI 3 validates, has all 176 runtime operations and no legacy controllers',async()=>{
+test('OpenAPI 3 validates, has all 183 runtime operations and no legacy controllers',async()=>{
  await Parser.validate(structuredClone(document));
  const operations=Object.entries(document.paths).flatMap(([path,item])=>Object.keys(item).filter(method=>['get','post','put','patch','delete','head','options'].includes(method)).map(method=>method+' '+path));
- assert.equal(operations.length,176);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 171: +4 manual payout routes, +1 GET categories (2026-10-31)
+ assert.equal(operations.length,185);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 171: +4 manual payout routes, +1 GET categories (2026-10-31), +1 PUT me/profile/photos, +1 GET me/referral, +3 admin referrals, +1 GET media/:id/status (2026-11-01)
  assert.ok(operations.every(key=>key.includes(' /api/v1/')));assert.equal(document.info.version,'v1');
  assert.equal(document.components.securitySchemes.memberSession.name,'access_token');
  assert.equal(document.paths['/api/v1/admin/me'].get.security[0].adminSession.length,0);assert.equal(document.paths['/api/v1/admin/me'].get.security[0].memberSession,undefined,'console uses the operator session only');assert.equal(document.components.securitySchemes.adminSession.name,'admin_access_token');
@@ -109,6 +109,7 @@ test('media is documented as binary, JSON APIs have common envelope, key materia
  for(const [path,methods]of Object.entries(document.paths))for(const [method,op]of Object.entries(methods)){
   const success=op.responses[path==='/api/v1/beans/webhook'?'200':method==='post'?'201':'200'];if(!success)continue;
   if(path.endsWith('/file')||path.endsWith('/origin-file')){assert.equal(success.content['application/octet-stream'].schema.format,'binary');assert.ok(op.responses['206']);}
+  else if(['/api/v1/categories/{id}/icon/{version}','/api/v1/admin/categories/{id}/icon/{version}'].includes(path))assert.equal(success.content['image/webp'].schema.format,'binary');
   else if(path==='/api/v1/marketing/unsubscribe'&&method==='get')assert.equal(success.content['text/html'].schema.type,'string');
   else assert.deepEqual(success.content['application/json'].schema.required,['success','data','errorMessage','errorCode']);
  }
@@ -118,12 +119,12 @@ test('media is documented as binary, JSON APIs have common envelope, key materia
 test('three valid documents isolate business APIs, retain required shared calls and cover all operations',async()=>{
  const operations=doc=>Object.entries(doc.paths).flatMap(([path,item])=>Object.keys(item).map(method=>method+' '+path));
  const user=operations(documents.user),studio=operations(documents.studio),console=operations(documents.console);
- assert.equal(user.length,74);assert.equal(studio.length,45);assert.equal(console.length,76);
+ assert.equal(user.length,78);assert.equal(studio.length,46);assert.equal(console.length,81);
  assert.deepEqual([...new Set([...user,...studio,...console])].sort(),operations(document).sort());
  const auth=['post /api/v1/auth/login','post /api/v1/auth/logout','post /api/v1/auth/refresh'];
  assert.deepEqual(user.filter(key=>console.includes(key)).sort(),auth);
  assert.deepEqual(studio.filter(key=>console.includes(key)).sort(),auth);
- assert.deepEqual(user.filter(key=>studio.includes(key)).sort(),[...auth,'get /api/v1/session','get /api/v1/bootstrap','get /api/v1/common','post /api/v1/identity/start','post /api/v1/identity/status','post /api/v1/media','get /api/v1/media/{id}/file','get /api/v1/media/{id}/origin-file','post /api/v1/members/{id}/messages','put /api/v1/members/{id}/messages/read','put /api/v1/members/{id}/block','post /api/v1/reports','post /api/v1/telemetry/browser-errors'].sort());
+ assert.deepEqual(user.filter(key=>studio.includes(key)).sort(),[...auth,'get /api/v1/session','get /api/v1/bootstrap','get /api/v1/common','post /api/v1/identity/start','post /api/v1/identity/status','post /api/v1/media','get /api/v1/media/{id}/file','get /api/v1/media/{id}/origin-file','get /api/v1/media/{id}/status','post /api/v1/members/{id}/messages','put /api/v1/members/{id}/messages/read','put /api/v1/members/{id}/block','post /api/v1/reports','post /api/v1/telemetry/browser-errors'].sort());
  assert.ok(user.every(key=>!key.includes('/api/v1/admin/')&&!key.includes('/api/v1/studio/')));
  assert.ok(studio.every(key=>!key.includes('/api/v1/admin/')));
  for(const path of Object.keys(document.paths).filter(path=>path.startsWith('/api/v1/studio/')))assert.ok(documents.studio.paths[path],path);
