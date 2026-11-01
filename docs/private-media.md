@@ -85,3 +85,5 @@ AWS 원본 → CloudFront 전송은 $0/GB. Lambda@Edge는 100만 호출당 $0.60
 확인일2026-11-01 공식 근거: [FFmpeg drawtext](https://ffmpeg.org/ffmpeg-filters.html#drawtext)의 textfile·expansion=none을 사용하고 사용자 문자열을 필터 문법에 삽입하지 않는다. [Sharp composite](https://sharp.pixelplumbing.com/api-composite/)에 따라 방향 정규화 뒤 작은 SVG 스트립을 합성한다. [OWASP 파일 업로드 지침](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)의 형식·크기·소유권 검사 및 비공개 저장 원칙을 유지한다. 이 근거는 워터마크의 제거 불가능성이나 저작권 보호를 보장하지 않는다.
 
 검증: `tests/platform-watermark.test.cjs`는 격리 MySQL·실제 이미지 처리·S3 대역으로 신규/기존/비크리에이터·소유권·재시도·중복·정리 보호를 검사한다. `tests/platform-watermark-render.integration.cjs`는 배포 Linux 이미지의 실제 FFmpeg·Sharp로 가로/세로 MP4/WebM·오디오·회전·고해상도 사진을 검사한다. 운영 반영 및 실행 결과는 PROGRESS와 해당 릴리스 증거에 별도로 기록한다.
+
+운영 반영·최초 실패/보완·실행 명령·해시·경계는 [2026-11-01 워터마크 검증 증거](./watermark-20261101.json)를 참고한다.

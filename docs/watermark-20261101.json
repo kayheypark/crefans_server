@@ -1,0 +1,375 @@
+{
+  "release": "watermark-20261101",
+  "recordedAt": "2026-11-01T14:32:05.166994+00:00",
+  "scope": {
+    "eligible": "new uploads by active creators after deployment, only when attached to a post",
+    "excluded": [
+      "pre-deployment uploads, including when old posts are edited",
+      "avatars",
+      "covers",
+      "membership images"
+    ],
+    "text": "https://crefans.com/{upload-time handle}",
+    "imageMaxSide": 2560,
+    "videoMaxSide": 1280,
+    "originals": "not overwritten; existing orphan retention applies"
+  },
+  "repositories": {
+    "server": {
+      "path": "/Users/ethan/repository/crefans_server",
+      "head": "ead628810c671e578ab82e5f27de732bcc814d48",
+      "dirty": false
+    },
+    "front": {
+      "path": "/Users/ethan/repository/crefans_front",
+      "head": "4360c2e56abcd0887c0bb99ff474f7ebbd107ef3",
+      "dirty": false
+    }
+  },
+  "environment": {
+    "local": "macOS-15.2-arm64-arm-64bit-Mach-O",
+    "node": "v22.7.0",
+    "conversion": "production linux/amd64 image, FFmpeg + DejaVu Sans + Sharp, --network none, --memory 384m --memory-swap 384m, full PlatformModule preloaded",
+    "database": "local loopback 3307 isolated dev/e2e MySQL; storage stand-ins in local tests"
+  },
+  "checks": [
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "result": "nest build",
+      "logSha256": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2",
+      "logFinishedAt": "2026-11-01T14:25:26.429252+00:00"
+    },
+    {
+      "command": "CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-watermark.test.cjs tests/platform-media-storage.test.cjs tests/platform-video-transcode.test.cjs tests/platform-media-edge.test.cjs tests/platform-profile-photos.test.cjs tests/platform-jobs.test.cjs tests/platform-operations.test.cjs",
+      "exitCode": 0,
+      "result": "# pass 48",
+      "logSha256": "f7121a1984f868429337d8f58cd22ecbdd83e3035723d2a3827a48110111ccb4",
+      "logFinishedAt": "2026-11-01T14:28:03.274289+00:00"
+    },
+    {
+      "command": "npm run check (layers, tsc, node tests)",
+      "exitCode": 0,
+      "result": "# pass 489",
+      "logSha256": "b5c5a5c9d9d48dad6aa6d27d7cbb8d329185f51530e9258ab5e0fc4cee08386b",
+      "logFinishedAt": "2026-11-01T14:28:14.390429+00:00"
+    },
+    {
+      "command": "docker run production image, node -r ./dist/src/platform/module.js --test tests/platform-watermark-render.integration.cjs",
+      "exitCode": 0,
+      "result": "# pass 4",
+      "logSha256": "7e6b7cf31f80b14e87b77638fe75e1e421d6e0c5f45a46060e51250b03924a92",
+      "logFinishedAt": "2026-11-01T14:27:12.943661+00:00"
+    },
+    {
+      "command": "npx playwright test --config .local/watermark-deploy-20261101/ui.config.ts",
+      "exitCode": 0,
+      "result": "2 passed",
+      "logSha256": "62ae08fa61486f6d0ee7f400a181aedad937a1438a4772d00392af3655928d61",
+      "logFinishedAt": "2026-11-01T14:31:10.591709+00:00"
+    }
+  ],
+  "firstFailure": {
+    "result": "40MP full-size conversion test SIGKILL under 384MB; three other cases passed",
+    "logSha256": "34fb8168dbe37782844aad2d144782da3ac51148de861f5d90ab0660002d2f88",
+    "fix": "preserve raw file; derivative long edge max2560 and single libvips pipeline/thread, no image cache; rerun passed"
+  },
+  "negativeCases": [
+    "invalid/injected handles and filter paths rejected",
+    "pre-release and noncreator uploads bypass conversion",
+    "foreign media refused",
+    "pending media returns404",
+    "private completed media returns403 to anonymous user",
+    "failed renderer retries then fails without publishing",
+    "concurrent claim skips duplicate work"
+  ],
+  "deployment": {
+    "startedAt": "2026-11-01T14:29:01.269708+00:00",
+    "finishedAt": "2026-11-01T14:29:18.703753+00:00",
+    "exitCode": 0,
+    "command": "ssh verified private host: sudo bash watermark-20261101/deploy.sh",
+    "scope": "API/worker/frontend; new-only creator post watermark, additive queue migration; admin/db/proxy preserved"
+  },
+  "images": {
+    "server": {
+      "sourceManifestSha256": "527c944c95c6e438edfb8386f3532b003ca7bc614d48de86b538236378df7a42",
+      "tag": "crefans-api:watermark-20261101",
+      "imageId": "sha256:1ba76192f14fbcae2a1c87ffa719ed330f7a49bdc8a2adeb58c86b2638d6afc9",
+      "runtimeImage": "sha256:1ba76192f14fbcae2a1c87ffa719ed330f7a49bdc8a2adeb58c86b2638d6afc9",
+      "architecture": "amd64",
+      "sourceFiles": 244,
+      "rootFsLayers": [
+        "sha256:9b35de7893378218e365c34c2c735fb0032a859112fb7345ca8ea73f9aa1db70",
+        "sha256:73455f008d2c29b7bd012ed6034808c2eb31011ad5585202f9162c661bcfee9f",
+        "sha256:304cbc337ac002298f36802ea165638e0751e9d71f3065025df466bfac483932",
+        "sha256:0d441fd7f082d3ceb0aa923bbaf1c53fa09b6c5b3e4eeeb60a0980faa13b1a1a",
+        "sha256:a6a14a60a059ce70d9917ac911eb5ee06263ece91632613de6e562cfec9027d1",
+        "sha256:d0b58001ecabb0214bf4bb08a4ae11b502e5393216089bdc2446f92dc419d447",
+        "sha256:688b81013efb8ebc4dabcdae2d9a981f93befdb7af0992f15f7439f84ade28d1",
+        "sha256:8ff075a0ac0841cdab6ce71af0cbd8ef8e72f25495871d3794dcdf7b26b277ea",
+        "sha256:10ccaecc2f6203ae687d1a692911f63014b1a090fe6f0caa38cd9973a9b11c98",
+        "sha256:ce6622616e99ac2fee07121638b780a293607b1ebedfbb3a2e67406c4776835e",
+        "sha256:657fbeba37655db01fea51be7e3ed47570602107f7ee050d471fe87ee34f0d83",
+        "sha256:d60d9f3bf7b6fd5893a0d5077c97453125ba99850c5a439963a242c649435062",
+        "sha256:de1280ef9f8e6f102592a96677576d373b441d78b18688d55c3ff5d21a97fbb4",
+        "sha256:af67bc85adbbaad0704b147bc705336d3140904e5475949926332a948c73a715",
+        "sha256:353cc613a52408b353a049a40f59a6d550d3b10fc4a790d5af25b127e3cf269c"
+      ]
+    },
+    "front": {
+      "sourceManifestSha256": "ad588033492d18a577a728595c91f9cc0dffd7b661a022904024a84112db2d9c",
+      "tag": "crefans-front:watermark-20261101",
+      "imageId": "sha256:3c9139bd07c8ffe599734999a9b3310b236b817de92a415e2d3263d2d7f994c8",
+      "runtimeImage": "sha256:3c9139bd07c8ffe599734999a9b3310b236b817de92a415e2d3263d2d7f994c8",
+      "architecture": "amd64",
+      "sourceFiles": 721,
+      "rootFsLayers": [
+        "sha256:9b35de7893378218e365c34c2c735fb0032a859112fb7345ca8ea73f9aa1db70",
+        "sha256:73455f008d2c29b7bd012ed6034808c2eb31011ad5585202f9162c661bcfee9f",
+        "sha256:304cbc337ac002298f36802ea165638e0751e9d71f3065025df466bfac483932",
+        "sha256:0d441fd7f082d3ceb0aa923bbaf1c53fa09b6c5b3e4eeeb60a0980faa13b1a1a",
+        "sha256:a6a14a60a059ce70d9917ac911eb5ee06263ece91632613de6e562cfec9027d1",
+        "sha256:d0b58001ecabb0214bf4bb08a4ae11b502e5393216089bdc2446f92dc419d447",
+        "sha256:4f3a3284deb055ce646193bff3d08f3387274c96e7263db7d62122cb6cb1c7a5",
+        "sha256:5012b192ba8b646fd9c90aeaf59a0955439f4ffbadbbb3392e25d8af3d4511c2",
+        "sha256:8afd0c28332e7e33c281a904b57897be8b410c047e3b94be85d7526c1d3ecde3",
+        "sha256:b83bec546fe2e63fbd8fd1932c1f4bac3b7a747c177ea67417df8f3d32b780b9"
+      ]
+    }
+  },
+  "productionCanary": {
+    "startedAt": "2026-11-01T14:29:49.058Z",
+    "kind": "live worker/private S3 synthetic canary; no account or public post created",
+    "completed": [
+      {
+        "type": "IMAGE",
+        "bytes": 6696,
+        "status": "COMPLETED",
+        "anonymousStatus": 403
+      },
+      {
+        "type": "VIDEO",
+        "bytes": 4720,
+        "status": "COMPLETED",
+        "anonymousStatus": 403
+      }
+    ],
+    "cleanup": true,
+    "finishedAt": "2026-11-01T14:30:00.734Z"
+  },
+  "queueAfterCanary": {
+    "remainingJobs": 0,
+    "failed": 0
+  },
+  "runtime": {
+    "crefans-beta-frontend-1": {
+      "id": "117803ddd5fed0785fafcf64e695b67e3df9402425f1a2ede334d4d7713b491f",
+      "image": "sha256:e6c7ea054fa976d880ea251a9a8bbc3efbd8079cb4c8cdff3dcaa40e1a7032f3",
+      "tag": "crefans-front:watermark-20261101",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-api-1": {
+      "id": "7bb9ff729847461aea0439a69ebf0780913765ff556a7fc5e6a138456300c308",
+      "image": "sha256:3fa6149c465728e22eaac380ed6c941f761db248d934ff258c1d5db00f233049",
+      "tag": "crefans-api:watermark-20261101",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-worker-1": {
+      "id": "5c6ea0ab10206be47ed87fb7547c79ca5bf1d0f209b179bafbf05b0f9fd10800",
+      "image": "sha256:3fa6149c465728e22eaac380ed6c941f761db248d934ff258c1d5db00f233049",
+      "tag": "crefans-api:watermark-20261101",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-admin-1": {
+      "id": "ed59dc3e82c269b5422f04cd4d8c3208f3f618c8074876d5558df1161a07bed1",
+      "image": "sha256:a2cd46f7e40423675d563faef8083fd75b23764539778f99d783875b54fcf04c",
+      "tag": "crefans-admin:full-sync-20261101",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-database-1": {
+      "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+      "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b",
+      "tag": "mysql:8.0",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-proxy-1": {
+      "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+      "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f",
+      "tag": "caddy:2-alpine",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    }
+  },
+  "sourceDelta": {
+    "changes": {
+      "server": [
+        {
+          "file": "infra/platform/Dockerfile",
+          "before": "e4bfe7585c58d27d1520ba4d69c208508bfb1a4385fb7b6eca1d9d6235b3b10c",
+          "after": "387de6623a7c7bec5de68d6fb2f1d4e46adee5ac017d91f35b210b12d2a443b0",
+          "repoSha256": "387de6623a7c7bec5de68d6fb2f1d4e46adee5ac017d91f35b210b12d2a443b0",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "prisma/schema.prisma",
+          "before": "6902a8e9af974b6461cd805b955566a31da89a9ef6f006ebb73e64427adfa666",
+          "after": "7f53aaa50dbf0e34db8cefa3fecbfdf4a6d74f64983995ee91537a083f5e1ff0",
+          "repoSha256": "7f53aaa50dbf0e34db8cefa3fecbfdf4a6d74f64983995ee91537a083f5e1ff0",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "src/platform/jobs.service.ts",
+          "before": "34b403577c3670e1483b674e9ede6e38aef1e86cadb23b468cb1d5cdb1b55f2f",
+          "after": "ce258b46faa2c30ff9147082a74b74b6e3d1b6739fd86640bc7a4ca7a15cd3f2",
+          "repoSha256": "ce258b46faa2c30ff9147082a74b74b6e3d1b6739fd86640bc7a4ca7a15cd3f2",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "src/platform/media-storage.ts",
+          "before": "eeb242e738bbaec0f7800b64f1eda7a63f6144efcdb7c8c46346e255157b94a2",
+          "after": "2b86d2790ba0d128592d28684e9e1069b068b4651b64602175fdc77f08c82a38",
+          "repoSha256": "2b86d2790ba0d128592d28684e9e1069b068b4651b64602175fdc77f08c82a38",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "src/platform/media.controller.ts",
+          "before": "6e9bd803b70e6b24bd0f91b229c5272730f0d214a1620e65256027b36a098241",
+          "after": "22c6926b1de0b685b42ac8994b4b68898a4a607707cf69093eeba3f473803090",
+          "repoSha256": "22c6926b1de0b685b42ac8994b4b68898a4a607707cf69093eeba3f473803090",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "src/platform/operations.service.ts",
+          "before": "894521c0b08165db642850e3500e5a8b4f1a282b8ef1a90645e327dacd76626f",
+          "after": "f29611faa95e582c1df0bf87804e976ed3c97af635c9f18db9eab2da1c77ecc0",
+          "repoSha256": "f29611faa95e582c1df0bf87804e976ed3c97af635c9f18db9eab2da1c77ecc0",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "src/platform/studio.service.ts",
+          "before": "12eb440509c8b3d3744b0206ed998150cd2b413d9be73771e23243f7ca8b6b2b",
+          "after": "c905cc500c25e1603f7e69f855ac513e7e38da7b1b59b3003b239e1efcba78f0",
+          "repoSha256": "c905cc500c25e1603f7e69f855ac513e7e38da7b1b59b3003b239e1efcba78f0",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "src/platform/worker.ts",
+          "before": "f4cf5930b2ad86ecfcd09874435252a94e1c0a1d8137879d9fecc5a2468962be",
+          "after": "b1df3870f82c077f3d4a417a613f0f22bd1fac5c39411c60bcb9689a489eb494",
+          "repoSha256": "b1df3870f82c077f3d4a417a613f0f22bd1fac5c39411c60bcb9689a489eb494",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "prisma/migrations/20261101150000_media_watermark/migration.sql",
+          "before": null,
+          "after": "d35db7c463e962eb8fe6697643288f56e616e4df3acffef9bcd3fe58604c719a",
+          "repoSha256": "d35db7c463e962eb8fe6697643288f56e616e4df3acffef9bcd3fe58604c719a",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "src/platform/media-watermark-render.ts",
+          "before": null,
+          "after": "50af806c8b461dac0393df0091dcd20f676eaf6ee26a23d971fd7768b0cbc599",
+          "repoSha256": "50af806c8b461dac0393df0091dcd20f676eaf6ee26a23d971fd7768b0cbc599",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "src/platform/media-watermark.ts",
+          "before": null,
+          "after": "fb2b39d260b7b4e661766b254a917cafb839bae14a59a9976817f26fb3ca187f",
+          "repoSha256": "fb2b39d260b7b4e661766b254a917cafb839bae14a59a9976817f26fb3ca187f",
+          "source": "scoped-diff"
+        }
+      ],
+      "front": [
+        {
+          "file": "components/crefans/studio/ManagementPages.tsx",
+          "before": "70c7a961da16317a5f001ae3e4780ac494b8e4b73e5c82e0aac5c3492d6c2ac0",
+          "after": "d7425768416288d72421760b4ad6a6b85581f2d68161a7eacfaa236af2da10b0",
+          "repoSha256": "d7425768416288d72421760b4ad6a6b85581f2d68161a7eacfaa236af2da10b0",
+          "source": "scoped-diff"
+        },
+        {
+          "file": "components/ui/MediaUpload.tsx",
+          "before": "daf193346f0ca16f3d9dc174fdccadf23f77b23aadf351a32433e2261db013ae",
+          "after": "339da81ac549d75958b3bd57f88beae9b6d6ecbb9e1b38f43d2f0c0b59362076",
+          "repoSha256": "339da81ac549d75958b3bd57f88beae9b6d6ecbb9e1b38f43d2f0c0b59362076",
+          "source": "scoped-diff"
+        }
+      ]
+    }
+  },
+  "evidenceFiles": {
+    ".local/watermark-deploy-20261101/canary-results/image.webp": "c8fcd39deb3c7be6eb0446e9154fd4787856b43fb924a7344fcfc73c28381bed",
+    ".local/watermark-deploy-20261101/canary-results/result.json": "ded54bb05767e24984567786c4fe84656de42dee9ca4b44a1bb9aed3ca13bc27",
+    ".local/watermark-deploy-20261101/canary-results/video-frame.png": "ca979897136cbe97d9bd3ec0e9b9fd6060ceb2150b70f02442bbe6f1ada23fab",
+    ".local/watermark-deploy-20261101/canary-results/video.mp4": "5668ed3d6167826b4094198c0a5553ec90d3db071118a78765d2b008d0905a88",
+    ".local/watermark-deploy-20261101/ui-results/.last-run.json": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903",
+    ".local/watermark-deploy-20261101/ui-results/ui-배포된-공용-게시물-작성-화면-워터마크-안내-mobile/watermark-guidance.png": "f490eda8628c5fc282be33f91143c7016cd10e5878abbe2f8c6d1730f91d4896",
+    ".local/watermark-deploy-20261101/ui-results/ui-배포된-공용-게시물-작성-화면-워터마크-안내-desktop/watermark-guidance.png": "1c445a4dc0e6dac6a7db090b20547c12a74e022c8ef5e6e7e9981251468fc5cf"
+  },
+  "limits": [
+    "No physical iPhone upload-to-post journey in this run",
+    "Production canary used synthetic private media/job records, not account signup or public posting",
+    "1-second synthetic videos; no long-duration/full-load soak test",
+    "UI browser checks used deployed shared preview editor; service model upload/ownership tested against isolated DB",
+    "No conversion/backfill of existing media; no claim that watermark cannot be removed"
+  ],
+  "retention_local": {
+    "removed": [
+      {
+        "tag": "crefans-front:ad-minimal-20261101",
+        "usedIdFallback": false
+      },
+      {
+        "tag": "crefans-api:save-fix-20261101",
+        "usedIdFallback": false
+      }
+    ],
+    "kept": [
+      "crefans-front:watermark-20261101",
+      "crefans-front:beans-empty-20261101",
+      "crefans-front:ad-tabs-20261101",
+      "crefans-api:watermark-20261101",
+      "crefans-api:full-sync-20261101",
+      "crefans-api:video-harden-20261101",
+      "crefans-admin:full-sync-20261101",
+      "crefans-admin:ad-form-20261101",
+      "crefans-admin:totp-native-20261101"
+    ]
+  },
+  "retention_remote": {
+    "removed": [
+      {
+        "tag": "crefans-front:ad-minimal-20261101",
+        "usedIdFallback": false
+      },
+      {
+        "tag": "crefans-api:save-fix-20261101",
+        "usedIdFallback": false
+      }
+    ],
+    "kept": [
+      "crefans-front:watermark-20261101",
+      "crefans-front:beans-empty-20261101",
+      "crefans-front:ad-tabs-20261101",
+      "crefans-api:watermark-20261101",
+      "crefans-api:full-sync-20261101",
+      "crefans-api:video-harden-20261101",
+      "crefans-admin:full-sync-20261101",
+      "crefans-admin:ad-form-20261101",
+      "crefans-admin:totp-native-20261101"
+    ]
+  }
+}

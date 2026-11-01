@@ -1,10 +1,12 @@
 # PROGRESS: crefans_server
 
-## 2026-11-01 신규 크리에이터 게시물 워터마크 (구현·검증 중)
-- 범위: 사용자 선택에 따라 배포 후 새 업로드의 게시물 사진·영상만. 기존 미디어·프로필·배경·멤버십 이미지는 제외. 업로드 시점 핸들로 오른쪽 아래 https://crefans.com/{handle} 합성.
-- 원본 보존 + 새 Media UUID 파생 파일, DB 작업 큐·소유권·중복 방지·3회 재시도·비공개 완료 처리·고아 정리 보호·실패 감시. 추가 migration 20261101150000_media_watermark.
-- 검증 계획/근거: docs/private-media.md 마지막 절. 신규 테스트 및 기존 미디어 회귀 실행 기록은 `.local/watermark-*.log`, 배포 사본은 front `.local/watermark-deploy-20261101/`.
-- 브랜치: origin/prod → feat/creator-media-watermark → dev 검증 → prod 승격 예정. 운영 배포는 아직 미완료.
+## 2026-11-01 신규 크리에이터 게시물 워터마크 — 운영 배포 완료
+- 확정 범위: 배포 후 활성 크리에이터가 새로 업로드한 게시물 사진·영상만 오른쪽 아래 https://crefans.com/{업로드 시점 핸들} 합성. 기존 미디어·프로필·배경·멤버십 이미지는 제외하며 소급 작업 없음.
+- 원본 보존 + 새 Media UUID 파생 파일, DB 작업 큐·소유권·중복 방지·3회 재시도·완료 전 비공개·고아 정리 보호·실패 감시. 사진은 긴 변 최대2560px, 영상은 최대1280px. 40MP 원본 크기 변환이 384MB 제한에서 SIGKILL된 최초 실패를 보존하고, 파생 사진 크기 제한·단일 파이프라인으로 보완 후 재검증.
+- 검증: 서버 build·dev 미디어/권한/정리/운영 회귀48건, 프론트 check489건, 실제 배포 Linux 이미지 FFmpeg/Sharp4건(모듈 로드·384MB·네트워크 차단), 배포된 공용 작성 화면 PC/모바일2건 통과. 원본 불변·기존 파일 재저장 제외·인젝션 거부·비공개·재시도 실패·중복 차단 대조 포함.
+- 운영 `watermark-20261101`, 2026-11-01 23:29 KST: live baseline full-sync(API/worker)·beans-empty(front)에 이번 변경만 합성. DB 백업 후 migration 20261101150000_media_watermark 하나 적용. API/worker/front만 교체, admin/DB/proxy 유지. 실제 운영 워커+S3의 비공개 합성 사진·영상2건 완료·무인증403, 시험 객체/행 삭제 후 작업0·실패0 확인. 현재+직전2 이미지·롤백 보존, 집 SSH 규칙 유지.
+- 브랜치: origin/prod → feat/creator-media-watermark → dev 통합 검사 → prod 승격·push 완료. 코드 기준 server ead6288, front4360c2e. [검증 증거](docs/watermark-20261101.json), 상세 계약은 docs/private-media.md.
+- 경계: 실기기 iPhone 업로드→게시 전 과정과 장시간 영상/동시 부하는 미실시. 운영 시험은 계정·공개 글을 만들지 않은 비공개 미디어 큐 시험이며, 실사용자 E2E 전체 통과로 확대하지 않는다.
 
 
 ## 2026-11-01 저녁 /pilot-work 결정 동기화 (커밋 완료·배포 대기)
