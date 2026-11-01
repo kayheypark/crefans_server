@@ -1801,3 +1801,7 @@
 ## 2026-11-02 지갑 메뉴 명칭 문서 동기화
 - 최신 origin/prod에서 feat/wallet-navigation-labels 분기. 프론트 요청의 친구 초대 이벤트/충전 내역/콩 내역/후원 내역 명칭과 순서를 docs/current-contracts.md에 생성 반영. API/DB/금융 로직·관리자 용어 변경 없음.
 - 프론트 npm run docs:contracts 생성 및 문서 계약 검사로 검증. 상세 증거는 프론트 `.local/wallet-navigation-labels-20261102/`. backend 빌드·실금융 검증은 문서만 변경되어 미실행. AGENTS 불변 규약 유지. 운영 미배포; 통합 시 프론트 화면 카탈로그 변경과 함께 반영해야 함.
+
+## 2026-11-02 지갑 화면 명칭 계약 운영 소스 반영
+- 사용자 확정 사항 배포 지시로 feat/wallet-navigation-labels 22ffc56→dev7f961b7 통합→prod1f1a82f 승격 후 원격 dev/prod 동기화. docs/current-contracts.md의 화면명·순서와 작업 로그만 변경; 서버 런타임/API/worker/DB 배포·마이그레이션 없음.
+- 프론트 지갑 메뉴·새로고침 아이콘은 wallet-release-20261102로 04:42 KST 배포. 문서 계약75개 검사 통과, 운영6서비스 정상 및 서버·worker·DB ID 유지. 증거 ../crefans_front/.local/wallet-release-20261102/verification.json, deployment-git.json, runtime-after.json. 금융 동작 검증으로 확대하지 않음.
