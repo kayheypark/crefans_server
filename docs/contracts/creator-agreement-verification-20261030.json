@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-30T23:38:35.295692+09:00",
+  "repo": "/Users/ethan/repository/crefans_server",
+  "head": "2bc698d07b52c1504b5006de0394dc4825e01d39",
+  "workingTree": "pre-existing modifications preserved; draft and research added, no commit",
+  "checks": {
+    "articles": 13,
+    "annexes": 2,
+    "signature": true,
+    "policyValues": "20%, 7days, KRW100000, 1000beans, Wednesday"
+  },
+  "files": {
+    "docs/contracts/crefans-creator-agreement-draft-20261030.txt": "7af9e14b7bf78f21cf54e8b2aec39713c63be97827f991a79a90221ccde8a76e",
+    "docs/contracts/creator-agreement-research-20261030.txt": "855c2168a69964f2b2a387ab62386688bdf8fd56d5309fa171ebcb2fede5a196"
+  },
+  "notVerified": [
+    "full official model attachment",
+    "lawyer review",
+    "real provider contract",
+    "runtime implementation of recommended clauses"
+  ],
+  "deployment": false
+}

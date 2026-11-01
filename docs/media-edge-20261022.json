@@ -1,0 +1,1207 @@
+{
+  "checkedAt": "2026-10-22T07:52:18.183841+00:00",
+  "result": "passed-with-stated-scope",
+  "repositories": {
+    "server": {
+      "root": "/Users/ethan/repository/crefans_server",
+      "branch": "feat/operations-security",
+      "head": "c100a3af5a5508adb0e6ba521d2e5238fb5f1ff1",
+      "dirty": true,
+      "preservedExistingDirtyWork": true,
+      "statusSha256": "2a14bcce7d0585296f3de98f44a0453335cbba9c96c8f1b2cea62d668742a9cd"
+    },
+    "front": {
+      "root": "/Users/ethan/repository/crefans_front",
+      "branch": "feat/operations-security",
+      "head": "dc3d663e63c7b22bb57dc8c198af2ab6d963488a",
+      "dirty": true,
+      "preservedExistingDirtyWork": true,
+      "statusSha256": "e453e97bc1c8851d2f4db770e81c61bb227111154c5be8a2850af099cc7f5093"
+    }
+  },
+  "requirements": [
+    "URL alone never authorizes protected media",
+    "Each GET HEAD Range including CDN cache hits checks current session, exact plan/minimum rank, paid period and refund state",
+    "Media bytes served by private S3 and CloudFront, not application streaming",
+    "Authorization errors fail closed, original protected API remains rollback path",
+    "Deploy after preflight and verify public beta, browser login/refresh/logout and cleanup"
+  ],
+  "sources": {
+    "src/platform/media-edge-handler.ts": "0419837cf1d7ecfda67ab542ff3ccbfee9411f6c87e00cf718805ec93327f035",
+    "src/platform/media-edge-protocol.ts": "e86ae42a430e372788255a5ada7b12036d6bebb1578a42be8494c722df17ecef",
+    "src/platform/media.controller.ts": "6e6fc2f8ff5ac4c27306e711da349ff6bf8161fda47e04ff962013e2eb410356",
+    "src/platform/platform-auth.guard.ts": "c472cc4d981cc0351111ac7d68161d464619d1cb48493c26c958bc2451945a9b",
+    "src/platform/security.service.ts": "01ce7b56af876e3250e6181f573222683addf0c2930769fdf4e49411069fa3ef",
+    "src/platform/media-storage.ts": "eeb242e738bbaec0f7800b64f1eda7a63f6144efcdb7c8c46346e255157b94a2",
+    "src/platform/module.ts": "8794ea4e5205e5808f8b561c4eaa5e684640dc0abae54d592867eb0e6ca30fd4",
+    "tests/platform-media-edge.test.cjs": "edb15b920dc5ba42ca1c5d769b15415f9b76bcf047ea0eab7d2f61b30cabedbe",
+    "tests/platform-media-storage.test.cjs": "52bafa85f105c4afae5bd23f172758c7ebb8cedce4a067524ebdb988e4e75e85",
+    "tests/platform-security.test.cjs": "b06177678611653206f39d026691518b8c8b1319a04ab9263d4316bfe2173d9f",
+    "tests/platform-media-cloud.integration.test.cjs": "3115c7dd4b86344e274813e3f6300f482bf72a1c73ad3ca2d937fb4355003ae6",
+    "infra/platform/provision-media-edge.py": "5f3a5eb3c21ab3008fab2be2f5199502e898477b2ab1f20fa02ea0ea56912d42",
+    "infra/platform/provision-media.py": "a2d314085894c9f3274fdc6fa66fbe2f8848ec5e68434036d019c8ba3a1cc904",
+    "infra/platform/Caddyfile": "57f0392113a69c06b1db7c05f16988c3de82667a8f37d08748bfb44fefad423d",
+    "infra/platform/compose.yml": "56d9e3344285055c016fccdb4c76b69ccf45d38f80f41a000ded9633a5fec13b",
+    "infra/platform/runtime.env.example": "1c0c6916c471f2d40fcc1ca88ab0ffe193854e3b0daf06ccbdefcc7db9c901a9"
+  },
+  "localExecution": {
+    "unit-final": {
+      "command": [
+        "node",
+        "--test",
+        "tests/platform-media-edge.test.cjs",
+        "tests/platform-media-storage.test.cjs",
+        "tests/platform-security.test.cjs"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:34:17.301582+00:00",
+      "finishedAt": "2026-10-22T07:34:17.711886+00:00",
+      "exitCode": 0,
+      "logSha256": "b516809cdfe17c09070515cb54286f969c76650833b287eff0e8a06be46b6232"
+    },
+    "edge-final": {
+      "command": [
+        "node",
+        "--test",
+        "tests/platform-media-edge.test.cjs",
+        "tests/platform-media-storage.test.cjs"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:36:34.429060+00:00",
+      "finishedAt": "2026-10-22T07:36:34.786259+00:00",
+      "exitCode": 0,
+      "logSha256": "11569b9bc7281c5a572c7fb2030cc73ab837d41a030b6e628cee92ad4b3d55a3"
+    },
+    "domain": {
+      "command": [
+        "npm",
+        "run",
+        "test:platform:domain"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:26:06.126703+00:00",
+      "finishedAt": "2026-10-22T07:26:09.228397+00:00",
+      "exitCode": 0,
+      "logSha256": "8806007ab8e08a5c3a735655e23b8c504dc183057ed0fae9c07de1f081379ead"
+    },
+    "live-local": {
+      "command": [
+        "env",
+        "CREFANS_S3_E2E=true",
+        "CREFANS_S3_BROWSER=true",
+        "CREFANS_S3_E2E_STATE=.local/aws-beta/media-release/resources.json",
+        "CREFANS_S3_E2E_ARTIFACTS=.local/aws-beta/media-edge",
+        "node",
+        "--test",
+        "tests/platform-media-cloud.integration.test.cjs"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:24:17.556935+00:00",
+      "finishedAt": "2026-10-22T07:24:39.576818+00:00",
+      "exitCode": 0,
+      "logSha256": "411d9a6ff2c33547daa040178fb0496348f61eab1cece0c303832be550471fb5"
+    },
+    "operations": {
+      "command": [
+        "env",
+        "CREFANS_E2E=true",
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "tests/platform-operations-http.test.cjs",
+        "tests/platform-log-config.test.cjs"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:29:26.227527+00:00",
+      "finishedAt": "2026-10-22T07:29:27.457026+00:00",
+      "exitCode": 0,
+      "logSha256": "026446739b85be5405b557cd65344125a4cf7e90d5ec3b2327152539aac0e1f8"
+    },
+    "caddy-config": {
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "-e",
+        "APP_DOMAIN=localhost",
+        "-e",
+        "MEDIA_AUTH_ORIGIN=media-auth.localhost",
+        "-v",
+        "/Users/ethan/repository/crefans_server/infra/platform/Caddyfile:/etc/caddy/Caddyfile:ro",
+        "caddy:2-alpine",
+        "caddy",
+        "validate",
+        "--config",
+        "/etc/caddy/Caddyfile",
+        "--adapter",
+        "caddyfile"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:25:36.013925+00:00",
+      "finishedAt": "2026-10-22T07:25:36.413663+00:00",
+      "exitCode": 0,
+      "logSha256": "9789f69cf3126af45a8b0bf6110be49ba8db16bd0b0a58eafd63b30428014f54"
+    },
+    "final-build": {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:36:10.446548+00:00",
+      "finishedAt": "2026-10-22T07:36:14.716022+00:00",
+      "exitCode": 0,
+      "logSha256": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2"
+    },
+    "api-final-image": {
+      "command": [
+        "docker",
+        "build",
+        "--platform",
+        "linux/amd64",
+        "--build-arg",
+        "APP_RELEASE=media-edge-final-20261022",
+        "-f",
+        "infra/platform/Dockerfile",
+        "-t",
+        "crefans-api:media-edge-final-20261022",
+        "."
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:37:13.859770+00:00",
+      "finishedAt": "2026-10-22T07:38:30.435038+00:00",
+      "exitCode": 0,
+      "logSha256": "e7f4138606b7ab7447a900f46a996b295cf92e04c720b01a7e592b7ea1a85525"
+    },
+    "bundle-final": {
+      "command": [
+        "python3",
+        ".local/aws-beta/media-edge/bundle-final.py"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:41:45.923446+00:00",
+      "finishedAt": "2026-10-22T07:41:55.772894+00:00",
+      "exitCode": 0,
+      "logSha256": "0de102fd147945f0e7f48453404d1c7d7144f279198400ffa03f1e18b4b7d2b9"
+    },
+    "origin-deployment": {
+      "command": [
+        "python3",
+        ".local/aws-beta/media-edge/run-release.py"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:29:09.195121+00:00",
+      "finishedAt": "2026-10-22T07:30:05.659946+00:00",
+      "exitCode": 0,
+      "logSha256": "4695e827fff3410c8e7cf5aacf626973b53709a98773336ca1d5f835226cc7f8"
+    },
+    "final-release": {
+      "command": [
+        "python3",
+        ".local/aws-beta/media-edge/run-final-release.py"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:42:35.711672+00:00",
+      "finishedAt": "2026-10-22T07:43:23.374712+00:00",
+      "exitCode": 0,
+      "logSha256": "4695e827fff3410c8e7cf5aacf626973b53709a98773336ca1d5f835226cc7f8"
+    },
+    "preflight-final": {
+      "command": [
+        "python3",
+        ".local/aws-beta/media-edge/remote-probe.py",
+        "preflight-final",
+        "https://d2ljg3181zuyc4.cloudfront.net"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:47:01.919395+00:00",
+      "finishedAt": "2026-10-22T07:47:15.475193+00:00",
+      "exitCode": 0,
+      "logSha256": "d1f70b452feb994a4a866ed13dec1c9b37dac73e9c66e672d595905966a9ea62"
+    },
+    "browser-preflight-final": {
+      "command": [
+        "node",
+        ".local/aws-beta/media-edge/browser-test.cjs",
+        "https://d2ljg3181zuyc4.cloudfront.net",
+        "browser-preflight-final"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:39:02.684875+00:00",
+      "finishedAt": "2026-10-22T07:39:15.887737+00:00",
+      "exitCode": 0,
+      "logSha256": "49c9044f5e57ada0af8e83c25c108460699f3f13d961c283b7f41708788d9873"
+    },
+    "outage-begin": {
+      "command": [
+        ".local/aws-beta/media-release/venv/bin/python",
+        ".local/aws-beta/media-edge/outage-test.py",
+        "begin"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:42:01.618654+00:00",
+      "finishedAt": "2026-10-22T07:42:08.543003+00:00",
+      "exitCode": 0,
+      "logSha256": "6f4209bfef42b40845423e3eb0696476879878b4e3d78942e4bc6fd7317e791d"
+    },
+    "outage-check": {
+      "command": [
+        ".local/aws-beta/media-release/venv/bin/python",
+        ".local/aws-beta/media-edge/outage-test.py",
+        "check"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:44:49.525274+00:00",
+      "finishedAt": "2026-10-22T07:44:53.000961+00:00",
+      "exitCode": 0,
+      "logSha256": "f56800a93d7804cb97130b54786b0660631d7d810a86df285eee99835c860324"
+    },
+    "outage-restored": {
+      "command": [
+        ".local/aws-beta/media-release/venv/bin/python",
+        ".local/aws-beta/media-edge/outage-test.py",
+        "restored"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:46:11.538772+00:00",
+      "finishedAt": "2026-10-22T07:46:13.236895+00:00",
+      "exitCode": 0,
+      "logSha256": "5a1a0f28f876917075de294641ca073860d14e40df5f18cec49ac7d2adcbcb31"
+    },
+    "cutover": {
+      "command": [
+        ".local/aws-beta/media-release/venv/bin/python",
+        "infra/platform/provision-media-edge.py",
+        "--resources",
+        ".local/aws-beta/media-release/resources.json",
+        "--state",
+        ".local/aws-beta/media-edge/state.json",
+        "--secret-file",
+        ".local/aws-beta/media-edge/secret",
+        "--apply",
+        "--phase",
+        "cutover"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:47:39.296615+00:00",
+      "finishedAt": "2026-10-22T07:47:41.478426+00:00",
+      "exitCode": 0,
+      "logSha256": "43c716ac8631b689b23e553825893c4ef4799f1763ec10378d4e3848187e3a49"
+    },
+    "production": {
+      "command": [
+        "python3",
+        ".local/aws-beta/media-edge/remote-probe.py",
+        "production",
+        "https://beta.crefans.com"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:48:11.460951+00:00",
+      "finishedAt": "2026-10-22T07:48:24.571236+00:00",
+      "exitCode": 0,
+      "logSha256": "4b3a024333f4baaa8d7a8f8d985c9759295c8215611fcae059d52ce9a56995cf"
+    },
+    "browser-production-final": {
+      "command": [
+        "node",
+        ".local/aws-beta/media-edge/browser-test.cjs",
+        "https://beta.crefans.com",
+        "browser-production-final"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:49:13.816371+00:00",
+      "finishedAt": "2026-10-22T07:49:30.128107+00:00",
+      "exitCode": 0,
+      "logSha256": "51506105f6b152faf5796bda1eabef28a65cff620eecc8bd874a43813e71c076"
+    },
+    "browser-cleanup-final": {
+      "command": [
+        "python3",
+        ".local/aws-beta/media-edge/cleanup-browser.py"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:50:30.945955+00:00",
+      "finishedAt": "2026-10-22T07:50:35.143275+00:00",
+      "exitCode": 0,
+      "logSha256": "64abdc24bdcafc004656d5720aa10d9364156df9afa2f5811968ea48b1781c12"
+    },
+    "final-live-verified": {
+      "command": [
+        ".local/aws-beta/media-release/venv/bin/python",
+        ".local/aws-beta/media-edge/verify-final.py"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_server",
+      "startedAt": "2026-10-22T07:51:20.162299+00:00",
+      "finishedAt": "2026-10-22T07:51:26.895766+00:00",
+      "exitCode": 0,
+      "logSha256": "8f91de370fc9c77cdf228281dbc398ddc325e1f582c913ae006b8918714b5e85"
+    }
+  },
+  "deployment": {
+    "cutoverAt": "2026-10-22T07:47:41.429443+00:00",
+    "release": "media-edge-final-20261022",
+    "apiWorkerOnlyFinalUpdate": true,
+    "frontendUnchanged": "membership-level-20261022",
+    "databaseSchemaUnchanged": true,
+    "initialBackup": "/opt/crefans-backup-media-edge-20261022",
+    "finalBackup": "/opt/crefans-backup-media-edge-final-20261022",
+    "imageProof": {
+      "checkedAt": "2026-10-22T07:41:45.948518+00:00",
+      "images": [
+        {
+          "tag": "crefans-api:media-edge-final-20261022",
+          "id": "sha256:1b9084c4bc313398ec3c4bc528d4a0ac9e1fd6d3ad19d7abda22ba92e54d6869",
+          "architecture": "amd64",
+          "sourceHashes": {
+            "src/main.ts": "913b91505be811f7158c379c89cc46efb181201086b0620228973636181486ec",
+            "src/app.service.ts": "1c5f4f6906cac27d31d72b1d44ce256f373257962d17ac216b383f45fef13f9a",
+            "src/app.module.ts": "54e666c96993a9f558528cfeab434ff1774e4a8c4af0f6625e46684076b0d9e6",
+            "src/app.controller.ts": "86e9adee40ba9b91137aab21f4cf6561a2a5db19b01d90631a15d1df5a03a5d7",
+            "src/token/token.module.ts": "3d72893bf85b74946af014b2dbbe2720fa040dc868dd7f087379048588f58b6b",
+            "src/token/token.service.ts": "5020358594d372a66ccd1145a7d91a8d99347266fc4eed4d909c9b7b921c0205",
+            "src/board/board.controller.ts": "3823f797d31c978266a22475275c81be613a1f881d2d26c08b18ed593228995a",
+            "src/board/board-category.controller.ts": "1fa896a2e910d4b68cb401360aa1f36f720b31f972b5a9fcb927d3b93a6e727c",
+            "src/board/admin-board-category.controller.ts": "9d918c61da5272b61e0b551e14d7ab7740789674d790d4c0c3e91da362828591",
+            "src/board/board.module.ts": "e9823efa2030fa1439ab63bdce0c69a54312d72310a8da08ca232d0824fdfaa4",
+            "src/board/admin-board.service.ts": "76816393a20ef17620747b6dc7cf27570f23d56f8c63732198c513dfe1462c66",
+            "src/board/admin-board.controller.ts": "d0a6b8b8a99595091716b2302782b30a14adda4c9f471d52dcf43c8c45924bda",
+            "src/board/board.service.ts": "6568b4fad9d12dd0874548f65bbbe7e16db8537149c53448cf97b6584717de17",
+            "src/board/board-category.service.ts": "bc812ef442c47c369e7a0d0ae5e44cdb3a9668f62516b6a0cbe66cdf43f90355",
+            "src/config/aws.config.ts": "e93451c63807b9e2315303c948714588c10d0d59fb43aff6818c28d57890ce63",
+            "src/config/database.config.ts": "e0b36970177f6c3e11a2e093cd7cc07c3b3fc2bcd40678df05b5ac5603d3b241",
+            "src/config/app.config.ts": "26f2cb7f8d629c136e3c8d9de37cfa37d1634e24711b0b5bffd692399b5b64b3",
+            "src/auth/auth.controller.ts": "94325cf509cbc7d54839993a9d2aa3c5ae78e10c79ce536d133d964f3fd4d1a9",
+            "src/auth/cognito.service.ts": "1ed56803fbf56506ad5fddc79dc38d745c133a40202a401c311af04d79431589",
+            "src/auth/auth.service.ts": "3af291f52ecadbcadc8daf09af7e10924a3d018d95cd54eaee4d6204206b597e",
+            "src/auth/aws-cognito.service.ts": "38d1d96decaabed7f40fee43b04a6488481cb39eaf5f44e1d017de2135634c46",
+            "src/auth/auth.module.ts": "96d4172a939ace0db407ae34a6227e91445d46db5231f2a07590c77104f1f2b1",
+            "src/comment/comment.service.ts": "05bb04cd95edfdb0ccc425ea8d095b4d3dc1fe9af84a9a9268ef23b611cf41bf",
+            "src/comment/comment.controller.ts": "bc58bec3a851adb6421184e3cbcb40fa1534c4e78cc43bff9e8d7dc59610231a",
+            "src/comment/comment-like.service.ts": "9fc1eac837d7f9ecd1dfcbb541b20915d6a14c2a14ffa0a1cd3e311ebbf47c3a",
+            "src/comment/comment-like.controller.ts": "0ee4114056b24bfee3cfbb290583ac7721870c2da52e96f4f9b26678fe52efb4",
+            "src/comment/comment.module.ts": "821684070d8a488c45a48138ee9daa4e95ed4ee508f47dcea8f526a70993b938",
+            "src/payment/payment.module.ts": "1c11ff02553566229551038921ad72d564e232ae5224673983f88e2feea99f2b",
+            "src/payment/payment.service.ts": "10e1e55f230c2cd4ef31b28c4765029c6a021febd9d72b1eee9fc029323687e8",
+            "src/payment/payment.controller.ts": "8ccf4927759e33ce2815e0962a454fc0ab9943654a5ee17a6654df25c6962253",
+            "src/payment/tosspayments.service.ts": "a43176b342198a2329037b5db24533031151efa6fba935f0b55081466328fa83",
+            "src/follow/follow.service.ts": "8694e1fa787b3bb56c509781ffc404c67db7858a160da5b297f7cc7b8c834ba8",
+            "src/follow/follow.controller.ts": "a9e3fac482e7925979f2b6d82316dc8dcfd12b153bd299a274504b094c339b0e",
+            "src/follow/follow.module.ts": "9e87c744063d25406f95489a898ec2596857823da96baa32ff1a390e54381c66",
+            "src/platform/identity-provider.ts": "fb350cc75566c4199abf1598a14b615bac7f495e950121516ea7e0ac909ffb0d",
+            "src/platform/finance.controller.ts": "45ed102b5dd17fdff49be87ec6b370cea01fe9c475995f2a1e0f4dcdf782aeaa",
+            "src/platform/auth.controller.ts": "894748867a454698f3359388074ebc044ee5b47324839cb1c1691c9eeb3bff1f",
+            "src/platform/middleware.ts": "c85f434cbc23fae90611210e31874eca05fb8214b83c14f151c2464093c77556",
+            "src/platform/studio.controller.ts": "03373f54a2ff4a8f7705ef451ce401d530578774aae3f055d0f551ad1ed9c85e",
+            "src/platform/bank-provider.ts": "2973b468a2b2e82cdc67398530fa200781d812455c6157fd580965c7b6742ba7",
+            "src/platform/payment-provider.ts": "8b157e7edb2b7db0bc735b3d0fb9a7de3aefed8fdb74de3577cea7cd7e6b0c24",
+            "src/platform/media.controller.ts": "6e6fc2f8ff5ac4c27306e711da349ff6bf8161fda47e04ff962013e2eb410356",
+            "src/platform/email-change.service.ts": "a277646aaa7bb311803be4bd580c5750bed45d8ae30445e4a088cb899582933c",
+            "src/platform/admin-logs.ts": "6696603b3c003f24e31d475256bd64623c317b5892ef0b5881b5733612db50e0",
+            "src/platform/admin-dashboard.ts": "cc74f9be672b91feda85742a045227ea754204e9d87a32ca780c02997b0222ca",
+            "src/platform/billing-failures.ts": "904a353da61a38c5a7e06627a390f55ee792c3aec3fd3665f337d666301c9872",
+            "src/platform/billing-notices.service.ts": "057c5f0a9f968963406c4b0205bad73014d30d04e1a7e757f637207f2a9ca949",
+            "src/platform/main.ts": "0bc08c54f924e11d6f3504cf1757d3c24b8d0ee43fc78c8ff97526bb75f1e7a7",
+            "src/platform/auth.service.ts": "fdb11ec42f86ee6acff13e77fcdc5be480aa27c1e2c9202e65796a577a0edfc3",
+            "src/platform/module.ts": "8794ea4e5205e5808f8b561c4eaa5e684640dc0abae54d592867eb0e6ca30fd4",
+            "src/platform/audit-retention.ts": "487d5d5f655208a810d43a7807da934430b516be7418419107894d4073b77618",
+            "src/platform/studio.service.ts": "787a3aa857584e83d4a748c6fcec4a3f4947f08649dd17494576eb3f29917ef0",
+            "src/platform/http.ts": "fa6719725948b8119c078cea4dd2a2264e77ba0d773a37cf5bef4d7988434f09",
+            "src/platform/finance.service.ts": "e30888d386f7ebcb658c4a5104b47accb92d1255a485e3697ca5f7e84e04689d",
+            "src/platform/admin.controller.ts": "0c901c12e0cd3bb0f4b8280a31e95800831cfb6493f1b6a662360fc01555b94b",
+            "src/platform/billing-card.ts": "0578f2ca288c165ab6c669d8e33e2f7be69fe3f6bc7a243929a2be1f8b5823cd",
+            "src/platform/admin-console.ts": "1d5fc97114bdf48e65d3e39e3de91cf41fb817df10e0b54526044494b13a92a0",
+            "src/platform/jobs.service.ts": "9a4e9b3ce17731f9719abca878fbba026963a9a44f27554ea5d21c7439a59177",
+            "src/platform/financial-policy.ts": "39f77f75fdd00e0c85462c1ed5b34e9b9fb76f5a785fd4ea5619edd63eead2b0",
+            "src/platform/media-storage.ts": "eeb242e738bbaec0f7800b64f1eda7a63f6144efcdb7c8c46346e255157b94a2",
+            "src/platform/media-edge-handler.ts": "0419837cf1d7ecfda67ab542ff3ccbfee9411f6c87e00cf718805ec93327f035",
+            "src/platform/security.service.ts": "01ce7b56af876e3250e6181f573222683addf0c2930769fdf4e49411069fa3ef",
+            "src/platform/request-context.ts": "6918d05ad00b22891a504aeba2938df10e13ad4c33133e8916720a2e904f8cd1",
+            "src/platform/client-errors.ts": "21e152e7315fd2c5eeec74e7b70cdc3e42b1ea7083e22a04f2b02d7f6215a97c",
+            "src/platform/operations.service.ts": "7d2442071ea4466dcb8ee17bee40c5bb2fdd5d4122a64f77d6004891c486d514",
+            "src/platform/telemetry.controller.ts": "940e2e43998e7cb020461b6d1e971a228375a6c4cbada80bf7929e4de6493a4c",
+            "src/platform/audit.ts": "152ac60ca0dcd8755668b2e69d611b8f95b3c9472e35ba1870e15f8c7b245706",
+            "src/platform/controller.ts": "9a83e5360a125d1ce7b0f28b53f0efd4a8a311f37563985747971174b2c96ee4",
+            "src/platform/operations-events.ts": "fd9f0a020e0aa2f2fe0de7f20f1b9bc76c32f9a406e8e58f215926525a53d9e1",
+            "src/platform/service.ts": "cf1f25e42f8acd2c49aba7f54250d03eec91445ff663709e655c292b807a7520",
+            "src/platform/media-edge-protocol.ts": "e86ae42a430e372788255a5ada7b12036d6bebb1578a42be8494c722df17ecef",
+            "src/platform/identity.controller.ts": "75c26a2fc5fdf824d29ebe46d5b334c531ab4584790023dc0ccbf76642011330",
+            "src/platform/worker.ts": "dbccbeebd3eca3c9736ba4f2dc11eed87d378288d558657da38ab528c3f4c62b",
+            "src/platform/platform-auth.guard.ts": "c472cc4d981cc0351111ac7d68161d464619d1cb48493c26c958bc2451945a9b",
+            "src/prisma/prisma.service.ts": "34731afef83f55ad8bdf484fa7dcb0054179ee9be3494cf2a45e5ff98c2dc937",
+            "src/prisma/prisma.module.ts": "02b450aceff810c4e49bf6d038ca599d2044bf608d757e17d0394e620abdfa1a",
+            "src/admin/admin.controller.ts": "8f36e2f0bedfffeeb8f1eb9b73950a67bd04462a678a01b0061a4cd55dd38b3e",
+            "src/admin/admin-auth.controller.ts": "cd9041c1e1d1b52a7222ecad64b261b718a97a32221ba7e12e8b11c7a2a1e6c2",
+            "src/admin/admin.module.ts": "fbed03a84289330265132eb48e6d1e17c528e66156abcea87946985185994466",
+            "src/admin/admin.service.ts": "d062d6e0de36d3c4785f98173dbbea18dce53996aeca499174bd56abeee14c6c",
+            "src/user/user.module.ts": "d458148402b41f763e8c84ef8f676c19d877469a4f5653380af990f0f228929c",
+            "src/user/user.controller.ts": "215fd0919f0c984d041754dc0cc15c54bab120741e0225887612e45a50ea51a1",
+            "src/user/user.service.ts": "f0e10d8fef277dd9c7d587d05d8286f7cf3006c38c15f02fee182732ed99e86d",
+            "src/explore/explore.service.ts": "a23862363ca8cd98e1248ca3ad8a70aa1b2191791b20c46644d1c50d5e7d7157",
+            "src/explore/explore.controller.ts": "55687de3d3e3322ec6c740fad43e27118095cf89aa8042c5899619cc9dd8f71a",
+            "src/explore/explore.module.ts": "19406ccb0b37f8aed1c15c29af4a72dbf09df4c0459c236a12e79eab74d7a088",
+            "src/subscription/subscription.controller.ts": "9a4731df902def9fcb7116d5f2c7e4b1427930f6a86f716e4a5d9cd721d12466",
+            "src/subscription/subscription.service.ts": "14ad15a616edde3393b44935d045e714e14d9dd23a90e1ee79ee66e33275bab4",
+            "src/subscription/subscription.module.ts": "0a0d705c92d13b4c00030f482adaa25340eed2db947fa2f66d9a02e0407488a9",
+            "src/feed/feed.controller.ts": "5d66c438d0c65620ef5e4db6ec783abf9d1678ea4cd641a56f173681a9f8fe18",
+            "src/feed/feed.module.ts": "888f1ad82c1b10211f6af48591a5fab871e16188a4a95d5ce6da1d7b12069083",
+            "src/feed/feed.service.ts": "36826b1828a23fdbf719b7d1e8f17289f575a3f376cbfb6731704ac944f49d37",
+            "src/wallet/wallet.service.ts": "359397ec4de375e9c679e148bc2f3da5d9f73e61c8fe83b95758994a1549a8a2",
+            "src/wallet/wallet.module.ts": "53cdb857bec7fac16bed8294d0ed9268daeb764ce5137fcfa4d4848a11f6c1bc",
+            "src/wallet/wallet.controller.ts": "9431eef11810dd5275eb3cf64386dc05a0993edb022f1bd2be499ba15d68820b",
+            "src/posting/posting.module.ts": "588f6f3f11196e3bc5e7a20da2ea5f4cd122030d013e42fac2c4b33ed812d25f",
+            "src/posting/posting.service.ts": "528a98dc1c7dad50602d94ec595607b477cb18e7e839d3ac0950377f6e24c222",
+            "src/posting/posting-like.service.ts": "4432b75cb07659a461d66f27ad94fc917776af7ae3d73f7d270aaa9828554696",
+            "src/posting/posting-like.controller.ts": "18bc8fcab75958ce5aaaaedd1368961d960763431d1e12e2d111ede63d874d21",
+            "src/posting/posting.controller.ts": "fe493a2203aa43938a801e6b7ad31f715149c9bbdbc94c5a02d221b8df7d0407",
+            "src/membership/membership.module.ts": "63c9938b80df52d6127f2e07214894eebe07a6c4cbdfc624ee4276a11ebb49ca",
+            "src/membership/membership.service.ts": "5708a96eaad6c50b1303681416980fe894fa4994911d8a8e77df27349311518a",
+            "src/membership/membership.controller.ts": "1a4810c41b206ad9edbb561a2e8cd04a5f4fddbaeaebcc275f58700e5bd9f1f7",
+            "src/media/media.controller.ts": "46cd810db3e17e0d0708f65578c254951ef409195d1dc0416f3ff88473a321a6",
+            "src/media/s3.service.ts": "a9b8ab0098820800d9c0e42ac7cacb2671b6a4c9835586197b9bb498091c9a9b",
+            "src/media/media.module.ts": "2619478fdb8191e64276e5c4897e367421ae4548426b99740d28068f17eb0005",
+            "src/media/image-processing.service.ts": "c449c6c03031f04eb04f78f660657232dd495ba999563b39f54c51db67e53b4e",
+            "src/media/media.service.ts": "434f29f371baee1a4f13e1a262debd000ed12053702746bbfb7a89ba41b85364",
+            "src/media/dto/media.dto.ts": "fbc4400ce861627b6ce96d5491e783cddf0ed54069c9800c45f0623a8ff9d1e1",
+            "src/membership/dto/update-membership.dto.ts": "4fae485f9db534625e2f2c2015ba5e7c0296852f619ef2bc8de265d8f98a0d7e",
+            "src/membership/dto/create-membership.dto.ts": "9de5b32dea14c90ead549a78ef1a8ab4fa0529ea13c4a333192cb145b498d571",
+            "src/posting/dto/posting.dto.ts": "59310289db4a147a6380c357fedb54d0e8c72ba3cb33be074efbccc9d7e1a576",
+            "src/wallet/dto/wallet.dto.ts": "fedd56b8815d140ff8c7dca897dff0db3ecae95704fcc7270c042e82365ccab9",
+            "src/common/dto/api-response.dto.ts": "39c9d1443f60aac56664faaa1e0167d1bec4b017689b9cb0045f29427da2cc85",
+            "src/common/filters/global-exception.filter.ts": "80c5bad3e2c472d7aa2dc33c03d886938bca57fa631c1e36b7e4dc138b4235cf",
+            "src/common/interceptors/logging.interceptor.ts": "55df63f79cef315b4ba0218188be837524abe62a7c44e58816f3bcab86522417",
+            "src/common/logger/logger.service.ts": "4155870e832842d0a4dc66e6836955bcdbdf6bfda9a5acae52d49eaa424b3819",
+            "src/common/logger/logger.module.ts": "0349de13cdcd1cc9fdfa325f16a48b04bbb470a578915eb9804f29ad35a22f5d",
+            "src/common/decorators/current-user.decorator.ts": "5d88ad427300ff3fbfe68f62d965283b3e32cc18b144bcc4c95fb2875cbb3bd1",
+            "src/common/utils/user-transformation.util.ts": "665cd505e4329d7e352366cbb31859016c781858223925e575c3e91e19d8949a",
+            "src/common/utils/pagination.util.ts": "0c4de0cfd9fd09bbfceb1fef37afbb5b168c893d20ed809b40bd723e728a8889",
+            "src/common/utils/media-stream.util.ts": "315ee32f0105474578187a1d2e15dae348470888924ee9f22efbb633f5b777f6",
+            "src/common/services/membership-access.service.ts": "ca3e7b979f3edfa9b7fa5bc7f528258850666d5789edb08570222dfd6d10f010",
+            "src/common/guards/creator.guard.ts": "79b8e6460e0f68e2b5ca0040c8016f13b70969f572e6b60a6d02c3b4680dd9f8",
+            "src/common/guards/auth.guard.ts": "8a09b9ad3a4dcd40c4cf7ee1805359d3283078594a9975229c5ad9deb8be5dd6",
+            "src/common/guards/optional-auth.guard.ts": "8b81b6ba742b203f5d0b3329212ada7df87f5bb218a5552549f0bcf5b1e9030b",
+            "src/subscription/dto/subscription.dto.ts": "ee46c58d24a61eaa4ed91172e7e0c5b2b3a8366f0a01fdbcf42648c94340194c",
+            "src/explore/dto/explore.dto.ts": "3c6710300d26890dedea25f8ee97a480b633db99b30739516e06abfd2309e954",
+            "src/user/dto/creator-application.dto.ts": "3d514a54f95d03728d9e461fabf1cc219d7aad0d18f745ee01d032fa8805b2b2",
+            "src/user/dto/user.dto.ts": "2545394ee2d63878a94f6e1c03069bf0693b097969f9287750c2079d324101f2",
+            "src/admin/guards/admin-auth.guard.ts": "a276099589f0ebc79a99f0d45a26bd58846d8e979fb2c22c5b2fb8bf66af4412",
+            "src/payment/dto/payment.dto.ts": "0194f6f006faa73e638cc2a82cf609d204ea56f9ff3b90b248db26479d4c101b",
+            "src/comment/dto/comment.dto.ts": "7d6825443e6beb7b651dcca785311e2fda36283ee8f72a49eef25341c13114de",
+            "src/comment/dto/comment-like.dto.ts": "abf9622ece6e1a22fb3ca26cc3d23c473875ee7d1a892194e97f2cfda859940f",
+            "src/auth/dto/auth.dto.ts": "52073261277a9ef8708ae4f158703ca0876ccd33d06cad64f6fe6a1b2bb434d4",
+            "src/auth/filters/cognito-exception.filter.ts": "e7dd4949f1f78d48b3b9df73481fd1e47a8f1c10f4a2d0361c406cf28c19e795",
+            "src/auth/utils/cookie.util.ts": "9362343d6cd1b5bee3f8e5f15cf8b3a08a4a59a56984a2eccb80b924ebe9b181",
+            "src/auth/exceptions/cognito.exception.ts": "80f0016b9f950159836eb04072bae642c9ad028f6e897c3faf6a8e845950a59e",
+            "src/auth/local/import-members.ts": "8dcd900c11c3b5dfa9a6f9dfaba4a18aa8dbbe8e719d97222c66c00d9d8f9176",
+            "src/auth/local/member-mail.service.ts": "1cba7af6db9af0d9eeb7600e70b3e74ffc75378f988ef61cebe936792ee402de",
+            "src/auth/local/local-member.module.ts": "66fd4695d04bdc411a27fab03886c74a85d7ed485cb64e0aeb6c201163fc84e6",
+            "src/auth/local/credentials.ts": "943df7663dc1cc9eb32cd7e79e41ced12782087ebf9419fcc12e6101ef8aaf62",
+            "src/auth/local/local-member.service.ts": "2825b84fc03d363dd2dfd29f5d46cfd87501b7532949bfd390fc9d11a6186a40",
+            "src/auth/local/mail/templates.ts": "9ce46de7f77b8188295791afc2023b997d738fdc10096de0f18d7d9ab117b91c",
+            "src/auth/local/mail/logo.ts": "cf9a5d0f2f326d14bcc7155e4fe047ac35d56113f5c60913e6ace091e1330393",
+            "src/board/dto/board-category.dto.ts": "561a96f8cfc762f609255b4e53fcf62aa2795d43c74e5df56d33de851e1d0aee",
+            "src/board/dto/board.dto.ts": "284b0c8c587184c18265011a2c2bbbaec2a7b6d80ba4027b413602bbc84d7a93",
+            "scripts/platform-audit-export.cjs": "d17a00b8a7739f359c62bc4ea3815c51c033894d4246842e5c562b920e4523da",
+            "scripts/platform-external-monitor.cjs": "99c264f05a5b60ed587de0145f8c4cff3954349a3836ebcfdea40df56e1bc81f",
+            "scripts/platform-admin.cjs": "8943111716aa01f34e74f883049400b31816425f6917778287b8505f0cf977d4",
+            "scripts/migrate-members.ts": "46a0fc15c43283aff37ee682295ef1dd550aeb49ffc4f433099f9fb51e22ba90",
+            "scripts/export-cognito-members.ts": "0922fb554b78c4dce3ee11baf525af02dbbbdc66be26572ab2863212e6caf5c6",
+            "scripts/audit-members.ts": "66f1b4e407b056fbb47b907221528fe32776a34bd0431710c4f4f94a8724671c",
+            "scripts/platform-audit.cjs": "ab1f9fdae88dbfa416d0a6054e23b1fa5c453e24d3a80668006c6b6f167dfde3",
+            "scripts/platform-dev.cjs": "9dcb30b19dab45ba0f442b0cd390cf3c2a460c0b135695f19915660668930d10",
+            "scripts/platform-audit-security-test.cjs": "a7f15d10ff046798a7aa5ff783f1ac781b280983544cfab1d5c361799d25e8eb",
+            "scripts/platform-billing-test.cjs": "fb5392dfa69a69b2422ce29c1c745beeaf9d1471b0a3589865813681fafd4aa6",
+            "scripts/platform-operations-test.cjs": "d71e603f704270bd4605f868d41b075cca73fa44f2b0a294d304ba982ba0bc7d",
+            "prisma/schema.prisma": "302ea383ea17cfe0cfdc5f9a34447c7d607bf5b9bc05a98a49904faf71db42a9",
+            "prisma/seed.ts": "f692e313fe7c655b82746f52778ebc005c8c7d13421c5c0e7042b45a6ce89baa",
+            "prisma/migrations/20261021160000_platform_security_ip/migration.sql": "1dfd3a3c4b1fc8147ea840c23772fef342810e6f683c65b66da21d663c4670e6",
+            "prisma/migrations/20261007000000_platform_v1/migration.sql": "4076884920bbaa5c0bab99d08a9fa4db1e39f48779f66d84dfa7b9ddb238ba01",
+            "prisma/migrations/20261007050000_platform_age_gate/migration.sql": "1445731150a5fa2045bbaa7c3bfeb83a8f4dad46d6159396d1261708269d24dc",
+            "prisma/migrations/20261021070000_unused_content_refund/migration.sql": "5d1e2290f77bcc448a8eccd4e2270600f339f38422fd7b4a56714d666887ad98",
+            "prisma/migrations/20261007010000_platform_hardening/migration.sql": "14b6ef2d8e6eb443a6afc08b7d6a0e4e0c5c58a5946680848f905fe4129abdcc",
+            "prisma/migrations/0_init/migration.sql": "3833bea35684a61c3d59c5f04b590d6f34ca459b9220fd0425cb0a0356904219",
+            "prisma/migrations/20261007040000_platform_audit/migration.sql": "f46af57baf903d9c9164518917a08e9bd799666f51f1cc7ff7316c5619b6f82b",
+            "prisma/migrations/20261022020000_audit_logs/migration.sql": "c3312aca7d23bfd77a2c71c497dc1e26a2b2570d575f5e6cf1fc446f91e06eef",
+            "prisma/migrations/20261021161000_operational_events/migration.sql": "0ce6cf718f5ee4497dc90300d3c97e61a070e379cf58eb3b3df6b34bc9aa8701",
+            "prisma/migrations/20261007060000_billing_registration/migration.sql": "8565a40c6393a36834870fd41f362d699ebd507346a7f87fad53eb4d9f419ef2",
+            "prisma/migrations/20260910000000_local_members/migration.sql": "3076434a542b6badcf5549fd713cf7a3a9ffcbc7dd5606d92d617873d3ee471a",
+            "prisma/migrations/20261022030000_billing_recovery/migration.sql": "67e4f2729a36db3717d8ecc234c6a5dd2c3936b76e27a1cc43c2c0e4b6e66b47",
+            "prisma/migrations/20261007030000_platform_completion/migration.sql": "2b7f8288195ee6b81160d9047bac6435abc87019eda946953106694cc14ac6f4",
+            "prisma/migrations/20261021080000_db_financial_policy/migration.sql": "80ba545b2b74906641d70418e33119d00ae3d80116ff68865b8c6d90580d7c95",
+            "prisma/migrations/20261007020000_platform_jobs/migration.sql": "e0b23da51ac54a4143af2496c6d6da39912efb3f37a2c26345f341475e0a6008",
+            "prisma/migrations/20261008000000_payment_lifecycle/migration.sql": "360fe0032ff09a9e7c48e0da34cd893b72d6fda87a26ccf58e4ad74b015357cc",
+            "package.json": "a7bb62dec024726727034ac6aec860fedd281cb96cec86ea6c3421e53c01a93f",
+            "package-lock.json": "358500095728b395a3c73293295ed80f74400be934842d2affda15291a9844fc",
+            "tsconfig.json": "eb51473ff1a63eed2f1c8777ce0d01f9fb05d413a4f76ed673af9f26d4bc40d4",
+            "nest-cli.json": "2850f78cb47701adddfea972ebeebc37c6634bfb7325f461b80d0e263d809c04"
+          }
+        }
+      ]
+    },
+    "steps": [
+      {
+        "step": "prepare",
+        "startedAt": "2026-10-22T07:42:35.730000+00:00",
+        "finishedAt": "2026-10-22T07:42:37.034363+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "upload",
+        "startedAt": "2026-10-22T07:42:37.034854+00:00",
+        "finishedAt": "2026-10-22T07:43:01.730009+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "load",
+        "startedAt": "2026-10-22T07:43:01.730680+00:00",
+        "finishedAt": "2026-10-22T07:43:17.572640+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "deploy",
+        "startedAt": "2026-10-22T07:43:17.573712+00:00",
+        "finishedAt": "2026-10-22T07:43:23.360328+00:00",
+        "exitCode": 0
+      }
+    ],
+    "remoteStagingRemoved": true
+  },
+  "preflight": {
+    "checkedAt": "2026-10-22T07:47:03.913Z",
+    "scope": "production HTTPS and real S3; temporary synthetic owner/subscriber/nonmember; no signup/PASS/provider payment test",
+    "checks": [
+      {
+        "type": "image/png",
+        "upload": 201,
+        "ownerGet": 200,
+        "subscriberGet": 200,
+        "range": 206,
+        "head": 200,
+        "noRedirect": true,
+        "anonymousAllMethodsDenied": true,
+        "nonmemberAllMethodsDenied": true,
+        "cdnDenied": true,
+        "rawS3Denied": true,
+        "bytesVerified": true
+      },
+      {
+        "type": "video/mp4",
+        "upload": 201,
+        "ownerGet": 200,
+        "subscriberGet": 200,
+        "range": 206,
+        "head": 200,
+        "noRedirect": true,
+        "anonymousAllMethodsDenied": true,
+        "nonmemberAllMethodsDenied": true,
+        "cdnDenied": true,
+        "rawS3Denied": true,
+        "bytesVerified": true
+      }
+    ],
+    "higherDifferentProductAllowedForTier": true,
+    "levelMatrix": [
+      {
+        "minimum": 1,
+        "purchasedRank": 1,
+        "allowed": true
+      },
+      {
+        "minimum": 1,
+        "purchasedRank": 2,
+        "allowed": true
+      },
+      {
+        "minimum": 1,
+        "purchasedRank": 3,
+        "allowed": true
+      },
+      {
+        "minimum": 2,
+        "purchasedRank": 1,
+        "allowed": false
+      },
+      {
+        "minimum": 2,
+        "purchasedRank": 2,
+        "allowed": true
+      },
+      {
+        "minimum": 2,
+        "purchasedRank": 3,
+        "allowed": true
+      },
+      {
+        "minimum": 3,
+        "purchasedRank": 1,
+        "allowed": false
+      },
+      {
+        "minimum": 3,
+        "purchasedRank": 2,
+        "allowed": false
+      },
+      {
+        "minimum": 3,
+        "purchasedRank": 3,
+        "allowed": true
+      }
+    ],
+    "studioContract": {
+      "minimumLevel": 3,
+      "membershipRankExposed": true,
+      "rankEditPreservesPurchasedSnapshot": true,
+      "tierCancelledAllowed": true,
+      "tierExpiryDenied": true
+    },
+    "cache": {
+      "responses": [
+        "Hit from cloudfront",
+        "Hit from cloudfront",
+        "Hit from cloudfront"
+      ],
+      "warmHit": true
+    },
+    "retry": {
+      "authorized206": true,
+      "nonmemberDenied": true,
+      "unexpectedQueryDenied": true
+    },
+    "refund": {
+      "usageRecordedBeforeDelivery": true,
+      "pendingRefundDeniedOnWarmCache": true
+    },
+    "concurrent": {
+      "requests": 22,
+      "allSucceeded": true,
+      "p50Ms": 935,
+      "p95Ms": 1116,
+      "maxMs": 1134,
+      "scope": "22 concurrent media Range requests against one subscription; not a long-duration or distributed load test"
+    },
+    "delivery": {
+      "authorizationRequests": 154,
+      "apiFileStreams": 0,
+      "clientIps": [
+        "15.164.140.26"
+      ]
+    },
+    "lifecycle": {
+      "differentPlanDenied": true,
+      "cancellationReservationAllowed": true,
+      "expiryDenied": true,
+      "revokedSessionDenied": true
+    },
+    "passed": true,
+    "origin": "https://d2ljg3181zuyc4.cloudfront.net",
+    "cleanup": {
+      "remainingProbeMembers": 0,
+      "remainingProbeMedia": 0
+    }
+  },
+  "preflightBrowsers": {
+    "at": "2026-10-22T07:39:02.860Z",
+    "origin": "https://d2ljg3181zuyc4.cloudfront.net",
+    "scope": "Live CloudFront and production API with synthetic accounts, Chromium/WebKit engines; not a physical iPhone test",
+    "engines": [
+      {
+        "engine": "chromium",
+        "viewport": "desktop",
+        "decoded": true,
+        "playedAndSeeked": true,
+        "range206": true,
+        "copiedUrlsDeniedInOtherSessions": true,
+        "pageErrors": []
+      },
+      {
+        "engine": "chromium",
+        "viewport": "mobile",
+        "decoded": true,
+        "playedAndSeeked": true,
+        "range206": true,
+        "copiedUrlsDeniedInOtherSessions": true,
+        "pageErrors": []
+      },
+      {
+        "engine": "webkit",
+        "viewport": "desktop",
+        "decoded": true,
+        "playedAndSeeked": true,
+        "range206": true,
+        "copiedUrlsDeniedInOtherSessions": true,
+        "pageErrors": []
+      },
+      {
+        "engine": "webkit",
+        "viewport": "mobile",
+        "decoded": true,
+        "playedAndSeeked": true,
+        "range206": true,
+        "copiedUrlsDeniedInOtherSessions": true,
+        "pageErrors": []
+      }
+    ],
+    "passed": true
+  },
+  "actualNetworkOutage": {
+    "at": 1792655091.543156,
+    "warmFileDeniedOnActualNetworkFailure": true,
+    "httpStatus": 503,
+    "bodyIsErrorNotMedia": true,
+    "cacheHeader": "LambdaGeneratedResponse from cloudfront",
+    "betaCutoverNotYetPerformed": true,
+    "restoredAuthorizedRange206": true
+  },
+  "production": {
+    "checkedAt": "2026-10-22T07:48:13.848Z",
+    "scope": "production HTTPS and real S3; temporary synthetic owner/subscriber/nonmember; no signup/PASS/provider payment test",
+    "checks": [
+      {
+        "type": "image/png",
+        "upload": 201,
+        "ownerGet": 200,
+        "subscriberGet": 200,
+        "range": 206,
+        "head": 200,
+        "noRedirect": true,
+        "anonymousAllMethodsDenied": true,
+        "nonmemberAllMethodsDenied": true,
+        "cdnDenied": true,
+        "rawS3Denied": true,
+        "bytesVerified": true
+      },
+      {
+        "type": "video/mp4",
+        "upload": 201,
+        "ownerGet": 200,
+        "subscriberGet": 200,
+        "range": 206,
+        "head": 200,
+        "noRedirect": true,
+        "anonymousAllMethodsDenied": true,
+        "nonmemberAllMethodsDenied": true,
+        "cdnDenied": true,
+        "rawS3Denied": true,
+        "bytesVerified": true
+      }
+    ],
+    "higherDifferentProductAllowedForTier": true,
+    "levelMatrix": [
+      {
+        "minimum": 1,
+        "purchasedRank": 1,
+        "allowed": true
+      },
+      {
+        "minimum": 1,
+        "purchasedRank": 2,
+        "allowed": true
+      },
+      {
+        "minimum": 1,
+        "purchasedRank": 3,
+        "allowed": true
+      },
+      {
+        "minimum": 2,
+        "purchasedRank": 1,
+        "allowed": false
+      },
+      {
+        "minimum": 2,
+        "purchasedRank": 2,
+        "allowed": true
+      },
+      {
+        "minimum": 2,
+        "purchasedRank": 3,
+        "allowed": true
+      },
+      {
+        "minimum": 3,
+        "purchasedRank": 1,
+        "allowed": false
+      },
+      {
+        "minimum": 3,
+        "purchasedRank": 2,
+        "allowed": false
+      },
+      {
+        "minimum": 3,
+        "purchasedRank": 3,
+        "allowed": true
+      }
+    ],
+    "studioContract": {
+      "minimumLevel": 3,
+      "membershipRankExposed": true,
+      "rankEditPreservesPurchasedSnapshot": true,
+      "tierCancelledAllowed": true,
+      "tierExpiryDenied": true
+    },
+    "cache": {
+      "responses": [
+        "Hit from cloudfront",
+        "Hit from cloudfront",
+        "Hit from cloudfront"
+      ],
+      "warmHit": true
+    },
+    "retry": {
+      "authorized206": true,
+      "nonmemberDenied": true,
+      "unexpectedQueryDenied": true
+    },
+    "refund": {
+      "usageRecordedBeforeDelivery": true,
+      "pendingRefundDeniedOnWarmCache": true
+    },
+    "concurrent": {
+      "requests": 22,
+      "allSucceeded": true,
+      "p50Ms": 351,
+      "p95Ms": 619,
+      "maxMs": 684,
+      "scope": "22 concurrent media Range requests against one subscription; not a long-duration or distributed load test"
+    },
+    "delivery": {
+      "authorizationRequests": 154,
+      "apiFileStreams": 0,
+      "clientIps": [
+        "15.164.140.26"
+      ]
+    },
+    "lifecycle": {
+      "differentPlanDenied": true,
+      "cancellationReservationAllowed": true,
+      "expiryDenied": true,
+      "revokedSessionDenied": true
+    },
+    "passed": true,
+    "origin": "https://beta.crefans.com",
+    "cleanup": {
+      "remainingProbeMembers": 0,
+      "remainingProbeMedia": 0
+    }
+  },
+  "productionBrowsers": {
+    "at": "2026-10-22T07:49:14.003Z",
+    "origin": "https://beta.crefans.com",
+    "scope": "Live CloudFront and production API with synthetic accounts, Chromium/WebKit engines; not a physical iPhone test",
+    "engines": [
+      {
+        "engine": "chromium",
+        "viewport": "desktop",
+        "decoded": true,
+        "playedAndSeeked": true,
+        "range206": true,
+        "copiedUrlsDeniedInOtherSessions": true,
+        "pageErrors": []
+      },
+      {
+        "engine": "chromium",
+        "viewport": "mobile",
+        "decoded": true,
+        "playedAndSeeked": true,
+        "range206": true,
+        "copiedUrlsDeniedInOtherSessions": true,
+        "pageErrors": []
+      },
+      {
+        "engine": "webkit",
+        "viewport": "desktop",
+        "decoded": true,
+        "playedAndSeeked": true,
+        "range206": true,
+        "copiedUrlsDeniedInOtherSessions": true,
+        "pageErrors": []
+      },
+      {
+        "engine": "webkit",
+        "viewport": "mobile",
+        "decoded": true,
+        "playedAndSeeked": true,
+        "range206": true,
+        "copiedUrlsDeniedInOtherSessions": true,
+        "pageErrors": []
+      }
+    ],
+    "realLogin": [
+      {
+        "engine": "chromium",
+        "formLogin201": true,
+        "secureHostOnlyCookies": true,
+        "refresh201": true,
+        "media206": true,
+        "logoutDeniesMedia": true
+      },
+      {
+        "engine": "webkit",
+        "formLogin201": true,
+        "secureHostOnlyCookies": true,
+        "refresh201": true,
+        "media206": true,
+        "logoutDeniesMedia": true
+      }
+    ],
+    "logoutRevokesWarmMedia": true,
+    "passed": true
+  },
+  "cleanup": {
+    "remainingMembers": 0,
+    "remainingMedia": 0
+  },
+  "finalState": {
+    "at": "2026-10-22T07:51:20.294268+00:00",
+    "aws": {
+      "distributionStatus": "Deployed",
+      "dnsAliasVerified": true,
+      "mediaPath": "/api/v1/media/*/file",
+      "appCacheDisabled": true,
+      "privateS3PublicBlock": {
+        "BlockPublicAcls": true,
+        "IgnorePublicAcls": true,
+        "BlockPublicPolicy": true,
+        "RestrictPublicBuckets": true
+      },
+      "oacScopedToDistribution": true,
+      "publishedCodeHashMatched": true,
+      "mediaVersion": "arn:aws:lambda:us-east-1:849615239502:function:crefans-beta-session-edge-media:2",
+      "originVersion": "arn:aws:lambda:us-east-1:849615239502:function:crefans-beta-session-edge-origin:2",
+      "plan": {
+        "planFamily": "CloudFront",
+        "planTier": "FREE",
+        "status": "ACTIVE"
+      }
+    },
+    "public": [
+      {
+        "path": "/api/v1/health",
+        "status": 200,
+        "viaCloudFront": true
+      },
+      {
+        "path": "/service/feed",
+        "status": 200,
+        "viaCloudFront": true
+      },
+      {
+        "path": "/service/login",
+        "status": 200,
+        "viaCloudFront": true
+      },
+      {
+        "path": "/preview/landing",
+        "status": 200,
+        "viaCloudFront": true
+      }
+    ],
+    "adminLoginStatus": 200,
+    "runtime": {
+      "at": "2026-10-22T07:51:26.326Z",
+      "since": "2026-10-22T07:47:41.429Z",
+      "release": "media-edge-final-20261022",
+      "storage": "s3",
+      "workerLastCompletedAt": "2026-10-22T07:51:22.280Z",
+      "workerFailures": {},
+      "http5xxAfterCutover": 0,
+      "errorKinds": [],
+      "counts": {
+        "members": 1,
+        "creators": 0,
+        "media": 0,
+        "testMembers": 0
+      }
+    },
+    "containers": [
+      {
+        "name": "/crefans-beta-api-1",
+        "running": true,
+        "oomKilled": false,
+        "restarts": 0,
+        "image": "sha256:1b9084c4bc313398ec3c4bc528d4a0ac9e1fd6d3ad19d7abda22ba92e54d6869"
+      },
+      {
+        "name": "/crefans-beta-worker-1",
+        "running": true,
+        "oomKilled": false,
+        "restarts": 0,
+        "image": "sha256:1b9084c4bc313398ec3c4bc528d4a0ac9e1fd6d3ad19d7abda22ba92e54d6869"
+      },
+      {
+        "name": "/crefans-beta-frontend-1",
+        "running": true,
+        "oomKilled": false,
+        "restarts": 0,
+        "image": "sha256:fd2b33573f6b255861a8da0ae53a88e69a08d0580f0856db7ef7962a5b98923e"
+      },
+      {
+        "name": "/crefans-beta-admin-1",
+        "running": true,
+        "oomKilled": false,
+        "restarts": 0,
+        "image": "sha256:9902c76ebc556ebab5b9023737c10fc9e207ec88e2a15a4bca7f84a7338bfb90"
+      },
+      {
+        "name": "/crefans-beta-proxy-1",
+        "running": true,
+        "oomKilled": false,
+        "restarts": 0,
+        "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f"
+      },
+      {
+        "name": "/crefans-beta-database-1",
+        "running": true,
+        "oomKilled": false,
+        "restarts": 0,
+        "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b"
+      }
+    ],
+    "passed": true
+  },
+  "testSummary": {
+    "lastDirectUnitRun": {
+      "observedAt": "2026-10-22T07:49:14.961867+00:00",
+      "command": [
+        "node",
+        "--test",
+        "tests/platform-media-edge.test.cjs",
+        "tests/platform-media-storage.test.cjs",
+        "tests/platform-security.test.cjs"
+      ],
+      "execution": "direct exec tool; 2026-10-22T07:47 UTC",
+      "exitCode": 0,
+      "passed": 37,
+      "skipped": 1,
+      "skipReason": "optional real MySQL security opt-in, unchanged from prior run",
+      "scope": "unit and loopback HTTP/security tests; not full production validation"
+    },
+    "domainPassed": 95,
+    "realS3IsolatedMysqlAndBrowserPassed": 10,
+    "operationsHttpAndLogConfigPassed": 2,
+    "browserEngines": [
+      "chromium",
+      "webkit"
+    ],
+    "viewports": [
+      "1280x900",
+      "390x844"
+    ],
+    "browserIsNotPhysicalIphone": true
+  },
+  "testHarnessHashes": {
+    "cdn-smoke.cjs": "e3cd78dce0f1eb590a1e01faaac65651f27eba28aa089f0d92c1fb70a1028509",
+    "browser-test.cjs": "9659839e99df8f383804e476bb0fe193e6112b04e8d2f2eebfd7ed574ffa90bb",
+    "browser-fixture.cjs": "8a40b165cbe325f5eccb57dea21e6840583fadb9f69cadaa14633f612362aa09",
+    "outage-test.py": "23633d3369c088e922d061e48e8cf569b0f04344b211251ce7056ddd42acc1fe",
+    "remote-probe.py": "262452e744a9de3d7a905f0d4fe0310042dfe7d222c960f19138f98b5af8fcea",
+    "verify-final.py": "cad949bdbe3d815da07df7ffe3957ca65a154e4cc01877da908600ae7e557631",
+    "verify-live.cjs": "0cbc677583f9577ca76af3d638e49d451effeb92492138488f2bc3e671e2f1f8",
+    "cleanup-browser.py": "99fd4c091ad75b5d1e32d6d4fb87a8da2195ad99ba6254e3afb7abe15f35d210"
+  },
+  "screenshots": {
+    "crefans_front/docs/audit/media-edge-desktop.png": "241f47e1ea3f4379966cf33af66261ccb5a1a35b0c7af1277ae93f9985b0ea62",
+    "crefans_front/docs/audit/media-edge-mobile.png": "860360bad96d12e80047260a1839dc49ecfba4871d6ddc6b52c5b44dba534389"
+  },
+  "manualReview": {
+    "browserScreenshots": "Desktop Chromium and mobile WebKit media renders observed; no layout edits in this task",
+    "routing": "Managed caching disabled for app/API; only exact media behavior uses OAC and live viewer authorization",
+    "sourceImage": "180 source file SHA-256 matches final amd64 API image; published numbered Lambda code hash checked",
+    "docs": "Current implementation, API routes, infrastructure and rollback reviewed; previous research and deployments retained as history"
+  },
+  "failedAttemptsAndCorrections": [
+    {
+      "area": "first local security loopback test",
+      "cause": "sandbox EPERM binding loopback",
+      "correction": "reran with network permission and passed"
+    },
+    {
+      "area": "first browser preflight",
+      "cause": "waited for decoded frame before starting preload=metadata video",
+      "correction": "WebKit diagnosis confirmed normal playback; wait metadata, play, then decode and seek"
+    },
+    {
+      "area": "second preflight test",
+      "cause": "play called before metadata ready",
+      "correction": "wait readyState>=1 then play; four engine/viewport runs passed"
+    },
+    {
+      "area": "first production login test",
+      "cause": "test assumed automatic URL navigation after login; existing UI does not navigate",
+      "correction": "verified successful login response and private-page access, Secure HttpOnly host-only cookies, refresh, logout in both engines"
+    },
+    {
+      "area": "first browser fixture cleanup",
+      "cause": "Node script in /tmp did not resolve app node_modules",
+      "correction": "set NODE_PATH for scoped cleanup script; all temporary members/media removed"
+    },
+    {
+      "area": "first final health verification",
+      "cause": "ran before cleanup completed; worker failure map is an object not integer",
+      "correction": "waited for cleanup, checked empty failure map, final verification passed"
+    }
+  ],
+  "limitations": [
+    "No physical iPhone Safari, long-duration multi-user load, host failover or backup restore test",
+    "22 concurrent Range requests are against one paid synthetic subscription, not 22 distinct active users",
+    "No actual PASS enrollment, PG payment/refund, bank transfer or new email delivery test in this task",
+    "Already authorized in-flight responses, saved bytes/screen recordings, or stolen/shared session cookies cannot be revoked by URL authorization",
+    "Authorization API/DB remains required even when CDN has a warm file; failure deliberately denies access",
+    "CloudFront Free remains ACTIVE; Lambda@Edge and S3 usage and EC2/DB remain separately billed; no measured monthly saving claim",
+    "Synthetic fixture audit history retained for traceability; no customer data deleted",
+    "No Git commit/push or branch integration in this task; preexisting dirty tree preserved"
+  ],
+  "outageFunctionCleanup": {
+    "at": "2026-10-22T07:52:19.249146+00:00",
+    "latestRestoredToHealthyPublishedCode": true,
+    "activeVersionsUnchanged": true
+  },
+  "documentationVerification": {
+    "snapshot": {
+      "command": [
+        "npm",
+        "run",
+        "docs:record"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_front",
+      "startedAt": "2026-10-22T07:52:31.613424+00:00",
+      "finishedAt": "2026-10-22T07:52:32.562916+00:00",
+      "exitCode": 0,
+      "logSha256": "b6721109d77b0e74cb0773016a725e323b5e9a1ca01c4463333c1f81b2bba1b2"
+    },
+    "contracts": {
+      "command": [
+        "npm",
+        "run",
+        "check:docs"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_front",
+      "startedAt": "2026-10-22T07:52:43.341505+00:00",
+      "finishedAt": "2026-10-22T07:52:43.823537+00:00",
+      "exitCode": 0,
+      "logSha256": "518b2962772470cde8c4dc2ae55877fb2167209100a39c73350a4d5e90ad2449"
+    },
+    "negativeControls": {
+      "command": [
+        "npm",
+        "run",
+        "test:docs"
+      ],
+      "cwd": "/Users/ethan/repository/crefans_front",
+      "startedAt": "2026-10-22T07:52:43.852538+00:00",
+      "finishedAt": "2026-10-22T07:52:44.228440+00:00",
+      "exitCode": 0,
+      "logSha256": "61c8c3c4d5c5c0f1af1b85c42a59015ae5a8454c65d33a8cd12d4e0f1b4751f4"
+    },
+    "summary": {
+      "documents": 58,
+      "routes": 98,
+      "screens": 41,
+      "negativeControlsPassed": 5,
+      "scope": "contract/reference and stale snapshot detection, not product proof"
+    }
+  }
+}

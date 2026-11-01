@@ -1,3 +1,4 @@
+import { CognitoService } from "../../auth/cognito.service";
 import {
   Injectable,
   CanActivate,
@@ -16,6 +17,7 @@ export class OptionalAuthGuard implements CanActivate {
 
   constructor(
     private configService: ConfigService,
+    private identity: CognitoService,
     private logger: LoggerService
   ) {
     this.cognitoClient = new CognitoIdentityProviderClient({
@@ -90,6 +92,12 @@ export class OptionalAuthGuard implements CanActivate {
   }
 
   private async validateToken(accessToken: string) {
+    if (this.identity.local.enabled) {
+      const info = await this.identity.getUserInfo(accessToken);
+      const member = await this.identity.local.byIdentity(info.attributes.sub);
+      return { sub: info.attributes.sub, userSub: info.attributes.sub, email: info.attributes.email,
+        name: info.attributes.name, username: member.cognito_username || member.id, accessToken };
+    }
     const command = new GetUserCommand({
       AccessToken: accessToken,
     });

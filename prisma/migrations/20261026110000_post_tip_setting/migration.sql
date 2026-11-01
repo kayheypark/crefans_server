@@ -1,0 +1,1 @@
+ALTER TABLE `postings` ADD COLUMN `allow_tips` BOOLEAN NOT NULL DEFAULT true;

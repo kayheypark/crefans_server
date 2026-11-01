@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { S3Service } from './s3.service';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { ConfigService } from '@nestjs/config';
-import * as sharp from 'sharp';
+const sharp:typeof import('sharp').default = require('sharp');
 
 @Injectable()
 export class ImageProcessingService {

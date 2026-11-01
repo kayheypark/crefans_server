@@ -461,7 +461,9 @@ export class AdminService {
         // Remove AttributesToGet to get all attributes
       });
 
-      const response = await cognitoClient.send(command);
+      const response = this.cognitoService.local.enabled
+        ? await this.cognitoService.local.listUsers(validatedLimit, paginationToken)
+        : await cognitoClient.send(command);
 
       const users = response.Users?.map(user => {
         const userAttributes = user.Attributes || user.UserAttributes;
@@ -544,7 +546,9 @@ export class AdminService {
         Limit: 10,
       });
 
-      const emailResults = await cognitoClient.send(emailSearchCommand);
+      const emailResults = this.cognitoService.local.enabled
+        ? await this.cognitoService.local.listUsers(10, undefined, query)
+        : await cognitoClient.send(emailSearchCommand);
 
       // 닉네임으로 검색
       const nicknameSearchCommand = new ListUsersCommand({
@@ -553,7 +557,9 @@ export class AdminService {
         Limit: 10,
       });
 
-      const nicknameResults = await cognitoClient.send(nicknameSearchCommand);
+      const nicknameResults = this.cognitoService.local.enabled
+        ? { Users: [] }
+        : await cognitoClient.send(nicknameSearchCommand);
 
       // 결과 합치기 및 중복 제거
       const allUsers = [...(emailResults.Users || []), ...(nicknameResults.Users || [])];

@@ -14,6 +14,8 @@ model UserProfile {
   user_id    String   @id
   /// 소개글
   bio        String?  @db.Text
+  /// 프로필 배경 사진(media original_url). 크리에이터는 creators.cover 와 같은 값
+  cover      String?  @db.Text
   /// 생성 일시
   created_at DateTime @default(now())
   /// 수정 일시
@@ -185,6 +187,17 @@ model Creator {
   updated_at  DateTime         @updatedAt
   /// 카테고리 ID (선택사항)
   category_id String?
+  display_name String?
+  handle String? @unique
+  bio String? @db.Text
+  about String? @db.Text
+  links Json?
+  avatar String? @db.Text
+  cover String? @db.Text
+  comments_enabled Boolean @default(true)
+  promoted Boolean @default(false)
+  /// Administrator-issued creator badge; independent of identity verification.
+  is_verified Boolean @default(false)
   category    CreatorCategory? @relation(fields: [category_id], references: [id])
 
   @@index([category_id])
@@ -242,6 +255,8 @@ model MembershipItem {
   is_active      Boolean        @default(true)
   /// 삭제 여부
   is_deleted     Boolean        @default(false)
+  image String? @db.Text
+  version Int @default(1)
   subscriptions  Subscription[]
 
   @@index([creator_id])
@@ -264,6 +279,8 @@ model Subscription {
   status                SubscriptionStatus   @default(ONGOING)
   /// 구독 금액
   amount                Decimal              @db.Decimal(18, 4)
+  plan_snapshot Json?
+  billing_method_id String?
   /// 자동 갱신 여부 (유저가 구독 취소시 자동 갱신여부가 false로 업데이트됨)
   auto_renew            Boolean              @default(true)
   /// 생성 일시
@@ -404,6 +421,13 @@ model Posting {
   /// 수정 일시
   updated_at                DateTime       @updatedAt
   /// 개별 구매 허용 여부
+  /// 운영자 숨김(약관 8조). null이면 정상. 작성자 본인 외에는 목록·상세·미디어에서 제외
+  hidden_at                 DateTime?
+  hidden_reason             String?        @db.VarChar(500)
+  hidden_by                 String?        @db.VarChar(191)
+  /// 베타 사후 검수: 운영자가 확인한 시각. 작성자가 수정하면 다시 null(미검수)
+  reviewed_at               DateTime?
+  reviewed_by               String?        @db.VarChar(191)
   allow_individual_purchase Boolean        @default(false)
   /// 개별 구매 가격 (원)
   individual_purchase_price Decimal?       @db.Decimal(10, 0)
@@ -414,12 +438,16 @@ model Posting {
   /// 크리에이터 ID (Cognito의 userSub)
   user_sub                  String
   /// 댓글 허용 여부
+  allow_tips                Boolean        @default(true)
   allow_comments            Boolean        @default(true)
+  access_plan_id String?
+  scheduled_at DateTime?
   comments                  Comment[]
   likes                     PostingLike[]
   medias                    PostingMedia[]
   views                     PostingView[]
 
+  @@index([status, is_deleted, reviewed_at, created_at], map: "postings_review_queue_idx")
   @@map("postings")
 }
 
@@ -475,6 +503,10 @@ model Comment {
   created_at     DateTime      @default(now())
   /// 수정 일시
   updated_at     DateTime      @updatedAt
+  hidden Boolean @default(false)
+  mentions Json?
+  /// Set when the author edits the body; shown as "수정됨".
+  edited_at DateTime?
   likes          CommentLike[]
   parent         Comment?      @relation("CommentToComment", fields: [parent_id], references: [id])
   children       Comment[]     @relation("CommentToComment")
@@ -639,8 +671,39 @@ model Admin {
   updated_at DateTime  @updatedAt
   /// 생성한 사용자 ID (상위 관리자)
   created_by String?
+  /// 메뉴별 권한 {menu:{view,create,update,delete}}. null이면 기존 역할 기본값
+  permissions Json?
+  /// 임시 비밀번호로 생성·초기화되어 첫 로그인 시 변경 필요
+  must_change_password Boolean @default(false)
+  /// 운영자 전용 비밀번호(scrypt). 팬·크리에이터 회원 계정과 분리
+  password_hash String? @db.VarChar(255)
+  /// 운영자 연락처
+  phone String @default("") @db.VarChar(32)
+  /// 2차 인증(TOTP, 2026-10-30): 암호화한 비밀값, 등록 대기 비밀값, 등록 시각, 마지막 사용 시간창, 복구코드 해시, 미등록 유예 종료
+  totp_secret_encrypted String? @db.Text
+  totp_pending_encrypted String? @db.Text
+  totp_enabled_at DateTime?
+  totp_last_step Int?
+  totp_recovery Json?
+  totp_grace_until DateTime?
+  sessions AdminSession[]
 
   @@map("admins")
+}
+
+/// 운영 콘솔 로그인 세션. 회원 세션(member_sessions)과 분리
+model AdminSession {
+  id           String   @id @default(uuid())
+  admin_id     String
+  access_hash  String   @unique @db.Char(64)
+  refresh_hash String   @unique @db.Char(64)
+  access_until DateTime
+  expires_at   DateTime
+  created_at   DateTime @default(now())
+  admin        Admin    @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+  @@index([admin_id])
+  @@index([expires_at])
+  @@map("admin_sessions")
 }
 
 /// 사용자 신고
@@ -948,6 +1011,7 @@ enum ReportReason {
   INAPPROPRIATE
   COPYRIGHT
   FRAUD
+  PRIVACY
   OTHER
 
   @@map("report_reasons")
@@ -992,3 +1056,810 @@ enum PaymentStatus {
   @@map("payment_statuses")
 }
 //
+/// Identity key is the original Cognito sub; existing business tables are untouched.
+model Member {
+  id                 String   @id @db.VarChar(191)
+  email              String   @unique @db.VarChar(191)
+  cognito_username   String?  @unique @db.VarChar(191)
+  password_hash      String?  @db.VarChar(255)
+  name               String   @db.VarChar(255)
+  nickname           String   @db.VarChar(191)
+  preferred_username String   @unique @db.VarChar(191)
+  phone_number       String   @default("") @db.VarChar(64)
+  picture            String?  @db.Text
+  email_verified     Boolean  @default(false)
+  enabled            Boolean  @default(true)
+  status             String   @default("UNCONFIRMED") @db.VarChar(32)
+  migrated_at        DateTime?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  identity_hash String? @unique @db.Char(64)
+  // Operator suspension (terms §8). suspended_until null with suspended_at set means indefinite.
+  suspended_at       DateTime?
+  suspended_until    DateTime?
+  suspension_reason  String?  @db.VarChar(500)
+  // Withdrawal (decision 2026-10-29): personal data is purged 30 days after withdrawn_at; purged_at marks completion.
+  withdrawn_at       DateTime?
+  purged_at          DateTime?
+  sessions           MemberSession[]
+  challenges         MemberChallenge[]
+  @@index([nickname])
+  @@index([withdrawn_at, purged_at])
+  @@map("members")
+}
+
+model MemberSession {
+  id           String   @id @default(uuid())
+  member_id    String   @db.VarChar(191)
+  access_hash  String   @unique @db.Char(64)
+  refresh_hash String   @unique @db.Char(64)
+  access_until DateTime
+  expires_at   DateTime
+  created_at   DateTime @default(now())
+  member       Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@index([member_id])
+  @@index([expires_at])
+  @@map("member_sessions")
+}
+
+model MemberChallenge {
+  member_id  String @db.VarChar(191)
+  purpose    String @db.VarChar(24)
+  digest     String @db.Char(64)
+  attempts   Int @default(0)
+  expires_at DateTime
+  sent_at    DateTime @default(now())
+  target_email String? @db.VarChar(191)
+  member     Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@id([member_id, purpose])
+  @@index([expires_at])
+  @@map("member_challenges")
+}
+
+/// Shared across processes; keys are hashes, not emails or IP addresses.
+model AuthRateBucket {
+  id         String @id @db.Char(64)
+  count      Int @default(1)
+  expires_at DateTime
+  @@index([expires_at])
+  @@map("auth_rate_buckets")
+}
+
+
+model AccountPreference {
+  marketing_consent_id String? @db.VarChar(191)
+  member_id String @id @db.VarChar(191)
+  content_alert Boolean @default(true)
+  message_alert Boolean @default(true)
+  marketing_alert Boolean @default(false)
+  show_activity Boolean @default(true)
+  allow_search Boolean @default(true)
+  show_followers Boolean @default(true)
+  show_following Boolean @default(true)
+  updated_at DateTime @updatedAt
+  @@map("account_preferences")
+}
+model SavedPost {
+  member_id String @db.VarChar(191)
+  posting_id String
+  created_at DateTime @default(now())
+  @@id([member_id, posting_id])
+  @@map("saved_posts")
+}
+model MemberBlock {
+  member_id String @db.VarChar(191)
+  target_id String @db.VarChar(191)
+  created_at DateTime @default(now())
+  @@id([member_id, target_id])
+  @@map("member_blocks")
+}
+model DirectMessage {
+  id String @id @default(uuid())
+  sender_id String @db.VarChar(191)
+  recipient_id String @db.VarChar(191)
+  body String @db.Text
+  read_at DateTime?
+  created_at DateTime @default(now())
+  @@index([recipient_id, created_at])
+  @@index([sender_id, recipient_id, created_at])
+  @@map("direct_messages")
+}
+model MemberNotification {
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  actor_id String? @db.VarChar(191)
+  type String
+  text String
+  path String
+  read_at DateTime?
+  created_at DateTime @default(now())
+  @@index([member_id, created_at])
+  @@map("member_notifications")
+}
+model SupportTicket {
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  category String
+  title String
+  message String @db.Text
+  reply String? @db.Text
+  status String @default("pending")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([member_id, created_at])
+  @@map("support_tickets")
+}
+model ServiceDocument {
+  id String @id @default(uuid())
+  kind String
+  title String
+  category String @default("")
+  content Json
+  pinned Boolean @default(false)
+  published Boolean @default(false)
+  updated_at DateTime @updatedAt
+  @@index([kind, published])
+  @@map("service_documents")
+}
+model SignupChallenge {
+  email String @id @db.VarChar(191)
+  code_hash String @db.Char(64)
+  attempts Int @default(0)
+  sent_at DateTime
+  expires_at DateTime
+  proof_hash String? @db.Char(64)
+  verified_at DateTime?
+  @@map("signup_challenges")
+}
+model IdentityProof {
+ adult_verified Boolean @default(false)
+ verified_name String? @db.VarChar(80)
+  id String @id @default(uuid())
+  token_hash String @unique @db.Char(64)
+  provider_reference String @unique
+  member_id String? @db.VarChar(191)
+  attempt_id String @unique
+  purpose String @default("signup")
+  identity_hash String @db.Char(64)
+  expires_at DateTime
+  consumed_at DateTime?
+  @@map("identity_proofs")
+}
+model MembershipVersion {
+  id String @id @default(uuid())
+  membership_id String
+  version Int
+  snapshot Json
+  created_at DateTime @default(now())
+  @@unique([membership_id, version])
+  @@map("membership_versions")
+}
+model BillingMethod {
+  unavailable_at DateTime?
+  unavailable_reason String? @db.VarChar(80)
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  billing_key_encrypted String @db.Text
+  customer_key String? @db.VarChar(36)
+  masked_number String? @db.VarChar(24)
+  revoked_at DateTime?
+  revoke_retry_at DateTime?
+  revoke_attempts Int @default(0)
+  label String
+  last_four String @db.Char(4)
+  is_default Boolean @default(false)
+  deleted_at DateTime?
+  created_at DateTime @default(now())
+  @@index([member_id])
+  @@map("billing_methods")
+}
+model BillingNotice {
+  id String @id @default(uuid())
+  dedupe_key String @unique @db.VarChar(191)
+  member_id String @db.VarChar(191)
+  subscription_id String @db.VarChar(191)
+  order_id String? @db.VarChar(191)
+  kind String @db.VarChar(40)
+  action_required Boolean @default(false)
+  attempts Int @default(0)
+  retry_at DateTime @default(now())
+  locked_until DateTime?
+  completed_at DateTime?
+  outcome String? @db.VarChar(40)
+  created_at DateTime @default(now())
+  @@index([completed_at, retry_at])
+  @@map("billing_notices")
+}
+model CheckoutOrder {
+  usage_tracking_started_at DateTime?
+  content_accessed_at DateTime?
+  locked_until DateTime?
+  processing_started_at DateTime?
+  paid_at DateTime?
+  period_end DateTime?
+  attempts Int @default(0)
+  retry_at DateTime?
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  membership_id String
+  snapshot Json
+  amount Int
+  status String @default("pending")
+  payment_key String? @unique
+  subscription_id String?
+  billing_method_id String?
+  period_start DateTime?
+  idempotency_key String @unique
+  failure_code String?
+  expires_at DateTime
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([member_id, created_at])
+  @@map("checkout_orders")
+}
+model RevenueEntry {
+  receipt_confirmed_at DateTime?
+  receipt_reference String? @db.VarChar(191)
+  received_amount Int?
+  id String @id @default(uuid())
+  creator_id String @db.VarChar(191)
+  order_id String @unique
+  title String
+  gross Int
+  reversals Int @default(0)
+  fees Int
+  net Int
+  available_at DateTime
+  created_at DateTime @default(now())
+  @@index([creator_id, available_at])
+  @@map("revenue_entries")
+}
+model SettlementAccount {
+  id String @id @default(uuid())
+  creator_id String @db.VarChar(191)
+  bank String
+  holder_alias String
+  last_four String @db.Char(4)
+  account_encrypted String? @db.Text
+  verified Boolean @default(false)
+  version Int @default(1)
+  is_default Boolean @default(false)
+  created_at DateTime @default(now())
+  @@index([creator_id])
+  @@map("settlement_accounts")
+}
+model WithdrawalCredential {
+  creator_id String @id @db.VarChar(191)
+  pin_hash String
+  updated_at DateTime @updatedAt
+  @@map("withdrawal_credentials")
+}
+model WithdrawalAuthorization {
+  id String @id @default(uuid())
+  creator_id String @db.VarChar(191)
+  account_id String
+  account_version Int
+  amount Int
+  expires_at DateTime
+  consumed_at DateTime?
+  @@map("withdrawal_authorizations")
+}
+model WithdrawalRequest {
+  id String @id @default(uuid())
+  creator_id String @db.VarChar(191)
+  request_key String @unique
+  account_id String
+  account_label String
+  amount Int
+  status String @default("requested")
+  note String @default("")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([creator_id, status])
+  @@map("withdrawal_requests")
+}
+
+model IdentityAttempt {
+ id String @id @default(uuid())
+ state_hash String @unique @db.Char(64)
+ proof_encrypted String? @db.Text
+ member_id String? @db.VarChar(191)
+ purpose String
+ provider_reference String? @unique
+ status String @default("pending")
+ expires_at DateTime
+ created_at DateTime @default(now())
+ @@map("identity_attempts")
+}
+model PlatformJob {
+ id String @id
+ locked_until DateTime
+ completed_at DateTime?
+ note String?
+ @@map("platform_jobs")
+}
+
+model MemberConsent {
+ document_snapshot Json?
+ id String @id @default(uuid())
+ member_id String
+ kind String @db.VarChar(40)
+ document_id String?
+ accepted_at DateTime @default(now())
+ @@index([member_id])
+ @@map("member_consents")
+}
+
+model FollowEvent {
+ id String @id @default(uuid())
+ follower_id String
+ following_id String
+ enabled Boolean
+ created_at DateTime @default(now())
+ @@index([following_id,created_at])
+ @@index([follower_id,following_id])
+ @@map("follow_events")
+}
+
+model BillingCustomer {
+ member_id String @id @db.VarChar(191)
+ customer_key String @unique @default(uuid()) @db.VarChar(36)
+ created_at DateTime @default(now())
+ @@map("billing_customers")
+}
+model BillingRegistration {
+ id String @id @default(uuid())
+ member_id String @db.VarChar(191)
+ customer_key String @db.VarChar(36)
+ state_hash String @db.Char(64)
+ return_path String @db.VarChar(250)
+ status String @default("pending") @db.VarChar(24)
+ auth_key_encrypted String? @db.Text
+ billing_method_id String? @db.VarChar(191)
+ locked_until DateTime?
+ expires_at DateTime
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([member_id])
+ @@map("billing_registrations")
+}
+
+model FinancialPolicy {
+  id String @id @default("platform") @db.VarChar(32)
+  version Int @default(0)
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  updated_at DateTime @updatedAt
+  @@map("financial_policies")
+}
+model FinancialPolicyChange {
+  id String @id @default(uuid())
+  version Int @unique
+  platform_fee_bps Int
+  settlement_hold_days Int
+  changed_by String? @db.VarChar(191)
+  reason String @db.VarChar(500)
+  created_at DateTime @default(now())
+  @@map("financial_policy_changes")
+}
+
+model PlatformSecurityIp {
+ ip String @id @db.VarChar(45)
+ blocked_until DateTime?
+ window_start DateTime
+ count Int @default(0)
+ detected_at DateTime?
+ @@map("platform_security_ips")
+}
+
+model PlatformOperationalEvent {
+ id String @id @default(uuid()) @db.VarChar(36)
+ type String @db.VarChar(64)
+ data Json
+ ip String? @db.VarChar(45)
+ peer_ip String? @db.VarChar(45)
+ request_id String? @db.VarChar(36)
+ dedupe_key String? @unique @db.VarChar(191)
+ created_at DateTime @default(now())
+ available_at DateTime @default(now())
+ attempts Int @default(0)
+ locked_until DateTime?
+ delivered_at DateTime?
+ last_error_code String? @db.VarChar(64)
+ @@index([delivered_at,available_at,locked_until],map:"platform_operations_dispatch_idx")
+ @@index([created_at])
+ @@map("platform_operational_events")
+}
+
+// Application-append-only audit trail, independent from Telegram delivery/cleanup.
+model PlatformAuditLog {
+ id String @id @default(uuid()) @db.VarChar(36)
+ category String @db.VarChar(24)
+ action String @db.VarChar(96)
+ level String @db.VarChar(8)
+ actor_id String? @db.VarChar(191)
+ actor_role String? @db.VarChar(32)
+ ip String? @db.VarChar(45)
+ peer_ip String? @db.VarChar(45)
+ request_id String? @db.VarChar(36)
+ job_id String? @db.VarChar(64)
+ entity_id String? @db.VarChar(191)
+ source_id String? @unique @db.VarChar(191)
+ release String @db.VarChar(96)
+ environment String @db.VarChar(32)
+ status_code Int?
+ duration_ms Int?
+ metadata Json
+ occurred_at DateTime @default(now()) @db.DateTime(3)
+ @@index([occurred_at, id])
+ @@index([category, occurred_at])
+ @@index([request_id, occurred_at])
+ @@index([actor_id, occurred_at])
+ @@index([entity_id, occurred_at])
+ @@index([ip, occurred_at])
+ @@index([job_id, occurred_at])
+ @@map("platform_audit_logs")
+}
+
+model MarketingDelivery {
+ id String @id @default(uuid())
+ member_id String @db.VarChar(191)
+ kind String @db.VarChar(40)
+ dedupe_key String @unique @db.VarChar(191)
+ consent_id String? @db.VarChar(191)
+ subject String @db.VarChar(200)
+ body String @db.Text
+ status String @default("queued") @db.VarChar(30)
+ created_at DateTime @default(now())
+ started_at DateTime?
+ completed_at DateTime?
+ @@index([status, created_at])
+ @@index([member_id, kind, completed_at])
+ @@map("marketing_deliveries")
+}
+
+// New platform bean ledger. Legacy Wallet/Transfer remain isolated.
+model BeanWallet {
+ accounts BeanAccount[]
+ id String @id
+ owner_key String @unique(map:"owner_key") @db.VarChar(191)
+ status String @default("active") @db.VarChar(20)
+ created_at DateTime @default(now())
+ @@map("bean_wallets")
+}
+model BeanAccount {
+ wallet BeanWallet @relation(fields:[wallet_id],references:[id],onUpdate:NoAction,map:"bean_accounts_ibfk_1")
+ entries BeanEntry[]
+ id String @id
+ wallet_id String
+ bucket String @db.VarChar(40)
+ balance BigInt @default(0)
+ version Int @default(0)
+ @@unique([wallet_id,bucket])
+ @@map("bean_accounts")
+}
+model BeanMovement {
+ entries BeanEntry[]
+ id String @id
+ request_key String @unique(map:"request_key") @db.VarChar(191)
+ fingerprint String @db.Char(64)
+ kind String @db.VarChar(40)
+ reason String @db.VarChar(500)
+ actor_id String @db.VarChar(191)
+ reference_id String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@index([kind,created_at])
+ @@map("bean_movements")
+}
+model BeanEntry {
+ movement BeanMovement @relation(fields:[movement_id],references:[id],onUpdate:NoAction,map:"bean_entries_ibfk_1")
+ account BeanAccount @relation(fields:[account_id],references:[id],onUpdate:NoAction,map:"bean_entries_ibfk_2")
+ id String @id
+ movement_id String
+ account_id String
+ delta BigInt
+ balance_after BigInt
+ created_at DateTime @default(now())
+ @@unique([movement_id,account_id])
+ @@index([account_id,created_at])
+ @@map("bean_entries")
+}
+
+model BeanCharge {
+ id String @id @default(uuid())
+ member_id String
+ request_key String @unique
+ quantity Int
+ amount Int
+ environment String @db.VarChar(10)
+ status String @default("pending") @db.VarChar(30)
+ payment_key String? @unique
+ locked_until DateTime?
+ expires_at DateTime
+ paid_at DateTime?
+ receipt_confirmed_at DateTime?
+ receipt_reference String?
+ received_amount Int?
+ failure_code String?
+ refunded_quantity Int @default(0)
+ refunded_amount Int @default(0)
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([member_id,created_at])
+ @@index([status,updated_at])
+ @@map("bean_charges")
+}
+model BeanLot {
+ id String @id @default(uuid())
+ member_id String
+ bucket String @db.VarChar(40)
+ charge_id String?
+ grant_id String?
+ available Int
+ reserved Int @default(0)
+ release_at DateTime
+ frozen Boolean @default(false)
+ expires_at DateTime?
+ expiry_noticed_at DateTime?
+ created_at DateTime @default(now())
+ @@index([member_id,bucket,created_at])
+ @@index([expires_at])
+ @@index([charge_id])
+ @@map("bean_lots")
+}
+model BeanTip {
+ id String @id @default(uuid())
+ request_key String @unique
+ sender_id String
+ creator_id String
+ post_id String?
+ post_title_snapshot String? @db.Text
+ quantity Int
+ paid_quantity Int
+ promotion_quantity Int
+ message String @db.VarChar(500)
+ created_at DateTime @default(now())
+ @@index([sender_id,created_at])
+ @@index([creator_id,created_at])
+ @@index([post_id,sender_id])
+ @@map("bean_tips")
+}
+model BeanTipAllocation {
+ id String @id @default(uuid())
+ tip_id String
+ source_lot_id String
+ target_lot_id String @unique
+ quantity Int
+ @@index([tip_id])
+ @@map("bean_tip_allocations")
+}
+model BeanPromotion {
+ id String @id @default(uuid())
+ request_key String @unique
+ member_id String
+ quantity Int
+ reason String @db.VarChar(500)
+ actor_id String
+ created_at DateTime @default(now())
+ @@index([member_id,created_at])
+ @@map("bean_promotions")
+}
+model BeanPayout {
+ id String @id @default(uuid())
+ request_key String @unique
+ creator_id String
+ account_id String
+ account_version Int
+ account_label String
+ quantity Int
+ gross Int
+ fee Int
+ net Int
+ fee_bps Int
+ environment String @db.VarChar(10)
+ status String @default("requested") @db.VarChar(30)
+ note String @default("") @db.VarChar(500)
+ approved_by String?
+ locked_until DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([creator_id,created_at])
+ @@index([status,updated_at])
+ @@map("bean_payouts")
+}
+model BeanPayoutAllocation {
+ id String @id @default(uuid())
+ payout_id String
+ lot_id String
+ quantity Int
+ @@unique([payout_id,lot_id])
+ @@map("bean_payout_allocations")
+}
+model BeanWithdrawalAuthorization {
+ id String @id @default(uuid())
+ creator_id String
+ account_id String
+ account_version Int
+ quantity Int
+ expires_at DateTime
+ consumed_at DateTime?
+ @@index([creator_id,expires_at])
+ @@map("bean_withdrawal_authorizations")
+}
+
+// Advertising products are archived, never physically deleted. Paid order snapshots are immutable.
+model AdProduct {
+  id String @id @default(uuid())
+  name String @db.VarChar(100)
+  description String @db.Text
+  terms String @db.Text
+  placement String @default("featured_creator") @db.VarChar(40)
+  amount Int
+  duration_days Int
+  visible Boolean @default(false)
+  on_sale Boolean @default(false)
+  sort_order Int @default(0)
+  version Int @default(1)
+  deleted_at DateTime?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([deleted_at, visible, sort_order])
+  @@map("ad_products")
+}
+
+// Admin-managed beta invitations. Terms set here move to creator_financial_terms when the email signs up.
+model SignupInvite {
+  id String @id @default(uuid())
+  email String @unique @db.VarChar(191)
+  memo String @default("") @db.VarChar(100)
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  bean_withdrawal_fee_bps Int?
+  minimum_withdrawal_krw Int?
+  member_id String? @db.VarChar(191)
+  used_at DateTime?
+  revoked_at DateTime?
+  version Int @default(1)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@index([revoked_at, created_at])
+  @@map("signup_invites")
+}
+// Per-creator overrides. A null column follows the platform default at the time of each payment or withdrawal.
+model CreatorFinancialTerms {
+  member_id String @id @db.VarChar(191)
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  bean_withdrawal_fee_bps Int?
+  minimum_withdrawal_krw Int?
+  version Int @default(1)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  @@map("creator_financial_terms")
+}
+// Append-only history of creator_financial_terms. source: admin(console change), invite(copied at signup), backfill(set before history existed).
+model CreatorFinancialTermChange {
+  id String @id @default(uuid())
+  member_id String @db.VarChar(191)
+  version Int
+  platform_fee_bps Int?
+  settlement_hold_days Int?
+  bean_withdrawal_fee_bps Int?
+  minimum_withdrawal_krw Int?
+  source String @db.VarChar(20)
+  changed_by String? @db.VarChar(191)
+  reason String @default("") @db.VarChar(500)
+  created_at DateTime @default(now())
+  @@unique([member_id, version])
+  @@map("creator_financial_term_changes")
+}
+
+// Append-only record of operator moderation (post hide/unhide, member suspend/unsuspend) for appeals.
+model ModerationAction {
+  id String @id @default(uuid())
+  target_type String @db.VarChar(20)
+  target_id String @db.VarChar(191)
+  action String @db.VarChar(30)
+  reason String @db.VarChar(500)
+  public_reason String? @db.VarChar(500)
+  until DateTime?
+  admin_id String @db.VarChar(191)
+  created_at DateTime @default(now())
+  @@index([target_type, target_id, created_at])
+  @@map("moderation_actions")
+}
+
+/// Member refund of unused purchased beans (2026-10-30): full within 7 days of payment, 10% deducted after (waived when the company is at fault).
+model BeanRefund {
+ id String @id @default(uuid())
+ request_key String @unique
+ charge_id String
+ member_id String
+ lot_id String
+ quantity Int
+ gross Int
+ deduction Int
+ amount Int
+ waived Boolean @default(false)
+ actor_id String
+ status String @default("processing") @db.VarChar(20)
+ failure_code String?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([charge_id])
+ @@index([status,updated_at])
+ @@map("bean_refunds")
+}
+/// Money a creator owes back after a refund or chargeback of income that was already paid out (D4).
+model CreatorReceivable {
+ id String @id @default(uuid())
+ creator_id String
+ kind String @db.VarChar(20)
+ source_id String
+ amount Int
+ status String @default("open") @db.VarChar(20)
+ note String @default("") @db.VarChar(500)
+ settled_by String?
+ settled_at DateTime?
+ created_at DateTime @default(now())
+ @@unique([kind,source_id,creator_id])
+ @@index([creator_id,status])
+ @@map("creator_receivables")
+}
+/// Mail outbox for member notices that are not billing notices (operator actions, bean expiry).
+model MemberNotice {
+ id String @id @default(uuid())
+ dedupe_key String @unique @db.VarChar(191)
+ member_id String @db.VarChar(191)
+ kind String @db.VarChar(40)
+ rows Json
+ path String @db.VarChar(191)
+ note String @db.Text
+ attempts Int @default(0)
+ retry_at DateTime @default(now())
+ locked_until DateTime?
+ completed_at DateTime?
+ outcome String? @db.VarChar(40)
+ created_at DateTime @default(now())
+ @@index([completed_at,retry_at])
+ @@map("member_notices")
+}
+
+/// 레퍼럴(친구 초대). 회원당 1행이며 id 가 초대 링크의 코드다(2026-11-01).
+model Referral {
+ id String @id @default(uuid())
+ member_id String @unique @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@map("referrals")
+}
+/// 레퍼럴로 가입한 회원과 보상 상태. 보상은 직접 초대한 회원(referrer_id)에게만, 초대받은 회원의 첫 유료 결제 1회에 지급.
+model ReferralSignup {
+ id String @id @default(uuid())
+ referral_id String
+ referrer_id String @db.VarChar(191)
+ member_id String @unique @db.VarChar(191)
+ /// pending → qualified(첫 실결제, 7일 보류) → granted → clawed_back. 월 상한 초과 시 capped
+ reward_status String @default("pending") @db.VarChar(20)
+ reward_quantity Int @default(0)
+ reward_source String? @db.VarChar(20)
+ reward_source_id String? @db.VarChar(191)
+ rewarded_at DateTime?
+ /// 첫 실결제 후 보상 확정 예정 시각(환불 기간 7일). qualified 상태에서만 값이 있다.
+ grant_due_at DateTime?
+ clawed_back_at DateTime?
+ created_at DateTime @default(now())
+ @@index([referral_id])
+ @@index([referrer_id,created_at])
+ @@index([reward_source,reward_source_id])
+ @@index([reward_status,grant_due_at])
+ @@map("referral_signups")
+}
+
+/// 운영 콘솔에서 바꾸는 서비스 설정(키-값). 2026-11-01: referral.enabled(친구 초대 보상 스위치).
+model PlatformSetting {
+ key String @id @db.VarChar(64)
+ value Json
+ updated_by String? @db.VarChar(191)
+ updated_at DateTime @updatedAt
+ @@map("platform_settings")
+}

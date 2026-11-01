@@ -9,3 +9,21 @@ dist
 lambda/dist/
 lambda/node_modules/
 lambda/*.zip
+# Single-instance runtime secrets and member export PII
+infra/single-instance/.env
+infra/single-instance/.env.runtime
+member-export*.json
+
+# Isolated platform development runtime
+.local/
+
+infra/platform/runtime.env
+infra/platform/.env
+
+# Local generated files
+*.tsbuildinfo
+
+# Generated local previews and QA artifacts (retained on disk)
+/.next-*/
+/output/
+/tmp/

@@ -1,0 +1,125 @@
+{
+  "recordedAt": "2026-10-23T13:43:30.622887+00:00",
+  "scope": "Split Swagger into user+creator studio and management console; documentation/access only",
+  "repository": {
+    "name": "crefans_server",
+    "head": "c100a3af5a5508adb0e6ba521d2e5238fb5f1ff1",
+    "branch": "feat/operations-security",
+    "dirtyPaths": 112,
+    "sourceSha256": {
+      "src/platform/openapi.ts": "07a27ab5f42b138bb77b8e0b2a63ae2049e94a761b5605c4965a036021a30fd7",
+      "src/platform/openapi-contract.ts": "e2cc8c9d5975dbfff07178c46ca2744c1073b4573e24dec09169ebd9bd2ad9ec",
+      "src/platform/main.ts": "df9930915987aa0348d492fdbb6df8b3f60f5ff3f9000d53987694d9db4afdda",
+      "tests/platform-openapi.test.cjs": "1e5edffdccd57ffb0c67a8a38a32a53fe0134f83a3e8871e89ef5c849f7dabab",
+      "package.json": "e77c6594e4b045146f7c6aae6885ba71e4fffa010fb9811db7ff2f124c9e8bb5",
+      "package-lock.json": "8ce1e65281a4136187fe642a0ded9073e6a10b356e680f89b6af082dbd666216"
+    }
+  },
+  "checks": [
+    {
+      "command": "npm run test:openapi",
+      "environment": "macOS / Node v22.7.0; no env files, auth/DB boundary stubs, no provider calls",
+      "finishedAt": "2026-10-23T13:37:24.248820+00:00",
+      "exitCode": 0,
+      "result": "11/11 passed; two OpenAPI documents valid, user76/console25/union98/overlap3, isolated models and auth schemes, missing/stale contract negative controls, no auth401/member+inactive-admin403/admin200, HTML/JSON/YAML/assets guards, encoded paths/HEAD/expired access/refresh-only rejection, backend failure closed, root redirect and legacy combined exports404",
+      "outputSha256": "6180e487e8ca701100c867454cb3b39ef25a68d18be5287ea4aae62d700aad79"
+    },
+    {
+      "command": "docker build --platform linux/amd64 -f infra/platform/Dockerfile --build-arg APP_RELEASE=swagger-split-20261023 -t crefans-api:swagger-split-20261023 .",
+      "finishedAt": "2026-10-23T13:39:29.456650+00:00",
+      "exitCode": 0,
+      "outputSha256": "58cb7cf33abe070c8e6fbd05147b783d0cb0fb3d6dfbc7389725aad019354201"
+    },
+    {
+      "command": "docker run --rm --platform linux/amd64 --network none -v image-smoke.cjs:/tmp/image-smoke.cjs:ro crefans-api:swagger-split-20261023 node /tmp/image-smoke.cjs",
+      "finishedAt": "2026-10-23T13:39:38.547003+00:00",
+      "exitCode": 0,
+      "result": {
+        "operations": 98,
+        "user": 76,
+        "console": 25,
+        "overlap": 3,
+        "node": "v22.23.4",
+        "architecture": "x64",
+        "release": "swagger-split-20261023"
+      },
+      "outputSha256": "5973806518091e5a7ca83b6b54ddc213784958104909e08802d3519b96ccaa11"
+    },
+    {
+      "command": "production source comparison over SSH",
+      "exitCode": 0,
+      "result": {
+        "changedProductionSourceFiles": [
+          "src/platform/openapi.ts"
+        ],
+        "comparedFiles": 181,
+        "prismaAndPackagesUnchanged": true
+      }
+    },
+    {
+      "command": "production deployment with rollback trap, container/HTTP checks",
+      "exitCode": 0,
+      "result": "All6 running. API/worker image matches and restarts0. Health200 on beta/origin; both docs HTML/JSON/YAML/assets anonymous401 on admin/beta domains. DB/frontend/admin/proxy IDs preserved.",
+      "outputSha256": "0c322228ac6057c1900ab2615c8baf8d5e28b569a4752fbc50ee1b36d68f08f0"
+    },
+    {
+      "kind": "manual production browser",
+      "checkedAt": "2026-10-23T13:43:30.622887+00:00",
+      "result": "Authenticated old entry redirects to user document. User title + studio filter/11 studio operations rendered. Top console link opens second page. Console shows auth/operations-log/admin groups and25 operation buttons. No warning/error console logs in either tab. No API request executed through Swagger.",
+      "screenshots": [
+        {
+          "file": "/Users/ethan/repository/crefans_server/.local/swagger-split-20261023/user-production.png",
+          "sha256": "dad6c94a33b843999e2f39432b4e343542d048264196caf90602ce9ae28de6db"
+        },
+        {
+          "file": "/Users/ethan/repository/crefans_server/.local/swagger-split-20261023/console-production.png",
+          "sha256": "3c50c33036a97d1c7e86542a7a19d6a6e986d3794a1d042bfc9925bc723e5703"
+        }
+      ]
+    }
+  ],
+  "deployment": {
+    "urls": [
+      "https://admin.crefans.com/api/v1/admin/docs/user",
+      "https://admin.crefans.com/api/v1/admin/docs/console"
+    ],
+    "release": "swagger-split-20261023",
+    "image": "sha256:fcfc968241aa75ac5b523e92a36a2430000b463008fb0ebd488016532453115a",
+    "steps": [
+      {
+        "step": "prepare",
+        "startedAt": "2026-10-23T13:40:01.661482+00:00",
+        "finishedAt": "2026-10-23T13:40:02.774425+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "upload",
+        "startedAt": "2026-10-23T13:40:02.775096+00:00",
+        "finishedAt": "2026-10-23T13:40:07.702441+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "load",
+        "startedAt": "2026-10-23T13:40:07.703035+00:00",
+        "finishedAt": "2026-10-23T13:40:24.316630+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "deploy",
+        "startedAt": "2026-10-23T13:40:24.317519+00:00",
+        "finishedAt": "2026-10-23T13:40:31.021050+00:00",
+        "exitCode": 0
+      }
+    ],
+    "rollbackBackup": "/opt/crefans-backup-swagger-split-20261023",
+    "databaseMigrations": false,
+    "temporaryManagementAccessRemoved": true,
+    "previousManagementRulePreserved": true
+  },
+  "limitations": [
+    "This does not test real PG/PASS/bank flows or broader business scenarios.",
+    "Member/inactive-admin and authenticated JSON/YAML tests use local boundary stubs; production UI uses real existing administrator session.",
+    "Existing dependency findings remain outside this change; see initial Swagger release evidence."
+  ],
+  "previousEvidence": "swagger-20261023.json"
+}

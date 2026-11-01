@@ -1,3 +1,4 @@
+import { LocalMemberService } from "./auth/local/local-member.service";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
@@ -11,6 +12,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const logger = app.get(LoggerService);
+
+  const localMembers = app.get(LocalMemberService);
+  if (localMembers.enabled) app.use(async (req, res, next) => {
+    if (!/^\/(auth|admin\/auth)(\/|$)/.test(req.path)) return next();
+    try { await localMembers.limit(`ip:${req.socket.remoteAddress}`, 120, 60); next(); }
+    catch { res.status(429).json({ message: "잠시 후 다시 시도해주세요." }); }
+  });
 
   // CORS 설정 - credentials: true를 사용할 때는 동적 origin 설정 필요
   const corsConfig = configService.get("app.cors");
@@ -51,7 +59,7 @@ async function bootstrap() {
   );
 
   const port = configService.get("app.port");
-  await app.listen(port);
+  await app.listen(port, process.env.HOST || "0.0.0.0");
 
   logger.log(`Application is running on port ${port}`, {
     service: "Bootstrap",

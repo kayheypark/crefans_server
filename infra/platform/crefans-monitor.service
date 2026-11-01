@@ -1,0 +1,16 @@
+[Unit]
+Description=Crefans external availability monitor
+After=network-online.target
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+StateDirectory=crefans-monitor
+EnvironmentFile=/etc/crefans-monitor.env
+ExecStart=/usr/bin/flock -n /var/lib/crefans-monitor/monitor.lock /usr/bin/node /opt/crefans-monitor/platform-external-monitor.cjs
+TimeoutStartSec=180
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+UMask=0077
