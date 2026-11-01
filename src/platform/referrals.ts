@@ -101,6 +101,30 @@ export async function referralSummary(db:any,member:string){
  const [invited,rewarded,rows]=await Promise.all([db.referralSignup.count({where:{referrer_id:member}}),db.referralSignup.count({where:{referrer_id:member,reward_status:'granted'}}),db.referralSignup.aggregate({where:{referrer_id:member,reward_status:'granted'},_sum:{reward_quantity:true}})]);
  return{code:referral.id,invited,rewarded,rewardBeans:rows._sum.reward_quantity||0,rewardPerInvite:REFERRAL_REWARD_BEANS,holdDays:REFERRAL_HOLD_DAYS,monthlyCap:REFERRAL_MONTHLY_CAP,qualified:await db.referralSignup.count({where:{referrer_id:member,reward_status:'qualified'}})};
 }
+/** Invitee names are masked: first three characters, then ten stars (user decision 2026-11-01). */
+export const maskReferralName=(name:string)=>Array.from(name.trim()).slice(0,3).join('')+'*'.repeat(10);
+const historyStatus:Record<string,string>={pending:'joined',qualified:'waiting',granted:'rewarded',clawed_back:'clawed',capped:'capped'};
+const historyFilter:Record<string,string[]>={joined:['pending'],waiting:['qualified'],rewarded:['granted']};
+/**
+ * The member's own invite history (user decision 2026-11-01): masked invitee name, status and dates only.
+ * No email, member id or payment detail of the invitee is returned.
+ */
+export async function referralHistory(db:any,member:string,status?:string,pageText?:string){
+ if(!await referralOn(db))reject(404,'REFERRAL_DISABLED','친구 초대 기능을 준비 중입니다.');
+ if(status&&!historyFilter[status])reject(400,'INVALID_REFERRAL_STATUS','조회할 상태를 확인해주세요.');
+ const page=Math.max(1,Math.min(1000,Number.parseInt(pageText||'1',10)||1)),take=20;
+ const where={referrer_id:member,...(status?{reward_status:{in:historyFilter[status]}}:{})};
+ const [rows,total,counts,beans]=await Promise.all([
+  db.referralSignup.findMany({where,orderBy:[{created_at:'desc'},{id:'asc'}],skip:(page-1)*take,take}),
+  db.referralSignup.count({where}),
+  db.referralSignup.groupBy({by:['reward_status'],where:{referrer_id:member},_count:{_all:true}}),
+  db.referralSignup.aggregate({where:{referrer_id:member,reward_status:'granted'},_sum:{reward_quantity:true}})]);
+ const people=await db.member.findMany({where:{id:{in:rows.map((r:any)=>r.member_id)}},select:{id:true,nickname:true}});
+ const count=(...keys:string[])=>counts.filter((c:any)=>keys.includes(c.reward_status)).reduce((n:number,c:any)=>n+c._count._all,0);
+ return{summary:{invited:count('pending','qualified','granted','clawed_back','capped'),waiting:count('qualified'),rewardBeans:beans._sum.reward_quantity||0},
+  items:rows.map((r:any)=>{const m=people.find((p:any)=>p.id===r.member_id);return{id:r.id,name:m?.nickname?maskReferralName(m.nickname):'탈퇴한 회원',status:historyStatus[r.reward_status]||'joined',joinedAt:r.created_at.toISOString(),dueAt:r.reward_status==='qualified'&&r.grant_due_at?r.grant_due_at.toISOString():null,rewardedAt:r.rewarded_at?.toISOString()||null,rewardBeans:r.reward_status==='granted'?r.reward_quantity:0};}),
+  total,page,pageSize:take};
+}
 export function referralCodeInput(value:unknown){if(value===undefined||value===null||value==='')return undefined;return text(value,36);}
 export const assertReferralCode=async(db:any,code:unknown)=>{if(!await findReferral(db,code))reject(400,'INVALID_REFERRAL','초대 링크를 확인해주세요.');};
 /**

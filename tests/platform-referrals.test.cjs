@@ -101,3 +101,24 @@ test('console: switch, list, member type filter and a link for any member',async
   assert.equal((await adminMembers(db,{type:'fan',search:third})).items.length,1);await assert.rejects(adminMembers(db,{type:'admin'}),code('INVALID_QUERY'));
  }finally{await db.creator.deleteMany({where:{user_id:busy}});}
 });
+
+test('my invite history: masked names (first 3 + 10 stars), status filters, own rows only, no email or ids of invitees',async()=>{
+ const owner=randomUUID(),other=randomUUID(),people=[['카이팍크리에이터','pending'],['minjun','qualified'],['jo','granted']].map(([nickname,status])=>({id:randomUUID(),nickname,status}));
+ const all=[owner,other,...people.map(p=>p.id)];
+ try{
+  for(const id of all){const p=people.find(x=>x.id===id);await db.member.create({data:{id,email:id+'@history.invalid',name:'History fixture',nickname:p?.nickname||'History owner',preferred_username:id,email_verified:true}});}
+  const ref=await referrals.ensureReferral(db,owner),otherRef=await referrals.ensureReferral(db,other);
+  for(const [i,p] of people.entries())await db.referralSignup.create({data:{referral_id:ref.id,referrer_id:owner,member_id:p.id,reward_status:p.status,created_at:new Date(Date.now()-i*60000),...(p.status==='qualified'?{grant_due_at:new Date(Date.now()+86400000)}:{}),...(p.status==='granted'?{reward_quantity:100,rewarded_at:new Date()}:{})}});
+  const outsider=randomUUID();all.push(outsider);await db.member.create({data:{id:outsider,email:outsider+'@history.invalid',name:'x',nickname:'outsider',preferred_username:outsider,email_verified:true}});
+  await db.referralSignup.create({data:{referral_id:otherRef.id,referrer_id:other,member_id:outsider}});
+  const h=await referrals.referralHistory(db,owner);
+  assert.deepEqual(h.items.map(i=>i.name),['카이팍**********','min**********','jo**********']);
+  assert.deepEqual(h.items.map(i=>i.status),['joined','waiting','rewarded']);assert.deepEqual(h.summary,{invited:3,waiting:1,rewardBeans:100});
+  assert.ok(h.items[1].dueAt&&!h.items[0].dueAt);assert.equal(h.items[2].rewardBeans,100);
+  const text=JSON.stringify(h);for(const p of people){assert.ok(!text.includes(p.id),'invitee id hidden');assert.ok(!text.includes('@history.invalid'),'email hidden');}
+  assert.ok(!text.includes('outsider'),'other referrers are isolated');
+  assert.deepEqual((await referrals.referralHistory(db,owner,'waiting')).items.map(i=>i.name),['min**********']);
+  await assert.rejects(referrals.referralHistory(db,owner,'everything'),code('INVALID_REFERRAL_STATUS'));
+  await setSwitch(false);try{await assert.rejects(referrals.referralHistory(db,owner),code('REFERRAL_DISABLED'));}finally{await setSwitch(true);}
+ }finally{await db.referralSignup.deleteMany({where:{OR:[{member_id:{in:all}},{referrer_id:{in:all}}]}});await db.referral.deleteMany({where:{member_id:{in:all}}});await db.member.deleteMany({where:{id:{in:all}}});}
+});

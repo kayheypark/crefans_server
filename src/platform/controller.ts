@@ -2,7 +2,7 @@ import {Body,Controller,Delete,Get,Header,Param,Post,Put,Query,Req,UseGuards} fr
 import {EmailChangeService} from './email-change.service';
 import {PlatformService} from './service';
 import {updateProfilePhotos} from './profile-photos';
-import {myReferral} from './referrals';
+import {myReferral,referralHistory} from './referrals';
 import {PlatformAuthGuard,PlatformOptionalAuthGuard} from './platform-auth.guard';
 @Controller()
 export class PlatformController {
@@ -33,6 +33,7 @@ export class PlatformController {
  @Put('notifications/read') @UseGuards(PlatformAuthGuard) async read(@Body('ids') ids:string[],@Req() r:any){await this.service.db.memberNotification.updateMany({where:{member_id:r.user.sub,id:{in:Array.isArray(ids)?ids.slice(0,100):[]}},data:{read_at:new Date()}});return{message:'읽음 처리했습니다.'};}
  @Put('me/profile') @UseGuards(PlatformAuthGuard) profile(@Body() b:any,@Req() r:any){return this.service.profile(r.user.sub,b);}
  @Get('me/referral') @Header('Cache-Control','private, no-store') @UseGuards(PlatformAuthGuard) referral(@Req() r:any){return myReferral(this.service.db,r.user.sub);}
+ @Get('me/referral/history') @Header('Cache-Control','private, no-store') @UseGuards(PlatformAuthGuard) referralHistoryList(@Req() r:any,@Query('status') status?:string,@Query('page') page?:string){return referralHistory(this.service.db,r.user.sub,status,page);}
  @Put('me/profile/photos') @UseGuards(PlatformAuthGuard) profilePhotos(@Body() b:any,@Req() r:any){return updateProfilePhotos(this.service.db,r.user.sub,b);}
  @Post('me/email/request') @UseGuards(PlatformAuthGuard) emailRequest(@Body() b:any,@Req() r:any){return this.emailChange.request(r.user.sub,b?.email,b?.currentPassword);}
  @Post('me/email/confirm') @UseGuards(PlatformAuthGuard) emailConfirm(@Body() b:any,@Req() r:any){return this.emailChange.confirm(r.user.sub,b.email,b.code);}
