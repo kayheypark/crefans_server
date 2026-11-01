@@ -1775,3 +1775,12 @@
 - 남은 일: 운영 배포(마이그레이션 2개), 약관·처리방침 본문 반영(개정본), 세무사 확인(소득 구분), 선불전자지급수단 해당성 자문 여부, 1인 상한 외 부정 가입 탐지(동일 기기·결제수단) 미구현.
 - 2026-11-01 레퍼럴 스위치를 콘솔 설정으로 이전(8e27809, 2f1edd6): platform_settings referral.enabled(기본 꺼짐, 감사), GET admin/referrals·PUT admin/referrals/settings·POST admin/members/:id/referral, admin/members?type=fan|creator, 권한 메뉴 referrals. 환경변수 REFERRAL_ENABLED 미사용. 테스트 9건(스위치 무시 시 7건 실패), 회귀 121건.
 - 2026-11-01 운영 배포 `referral-20261101`(API·worker·front·admin). 기준 API profile-photo·front nobeta·admin handle-sync. 1차 시도는 배포 스크립트 내 파이썬 문법 오류(빈 for)로 자동 롤백(이전 이미지 복구, 마이그레이션 3개는 추가 테이블만이라 유지), 수정·내장 파이썬 블록 컴파일 검사 후 2차 성공. DB 백업 후 마이그레이션 referrals·referral_hold·platform_settings, platform_settings 0행(스위치 꺼짐) 확인. 운영: /me/referral·/admin/referrals 비로그인 401, /service/beans/withdraw·/console/referrals 200, 목업 초대 카드·출금 화면 확인, 이미지 보존 정리. 미확인: 운영자 로그인 상태 콘솔 레퍼럴 화면, 실제 보상 계정 출금. 증거 crefans_front/.local/referral-deploy-20261101/.
+
+## 2026-11-01 prod 기준 작업·dev 통합·prod 승격 전환
+- 사용자 명시 요청에 따라 새 작업 기준을 dev에서 prod로 변경. docs/branch-workflow.md와 AGENTS.md 동기화. 기존 변경은 먼저 보존 커밋, backup/branch-workflow-20261101 태그·로컬 패치 저장 후 prod에서 feat/prod-dev-workflow를 생성하여 기존 개발 이력을 병합.
+- 관리자 콘솔은 origin/main을 보존 기준으로 prod/dev 초기 생성. 생성 캐시/개인 QA 파일은 삭제 없이 Git 제외. 이번 작업은 Git 통합이며 운영 배포 아님. 다음: 통합 검사 후 dev→prod 및 원격 동기화.
+
+### 통합 검증 및 승격 절차
+- 기존 이력 병합에 충돌 없음. 관리자 타입검사+11단위 통과, 서버 Nest 빌드 통과. 프론트 기존488검사 중 빈 출금의 최근50건 표시를 기대하던1건은 최신 빈 상태 요구사항에 맞춰 수정 후 재검사. 제품 코드 변경 없이 테스트 기대값 정정. 문서 계약의 이벤트 slug 4개를 현재 카탈로그와 동기화, Git 제외 QA 출력 README는 문서 인벤토리에서 제거(파일 보존).
+- 과거 별도 프론트 signup-success 모달은 최신 SignupCompletePage로 대체됨, video-first-frame은 현행 MediaVideo에 반영되어 개선 유지. 이 과거 브랜치/작업트리는 삭제·역병합하지 않고 보존.
+- 이번 검증은 Git 이력·소스 보존/타입·단위·빌드·문서 검사 범위. 전체 E2E/실결제/운영 재배포는 수행하지 않음. dev에 통합 후 동일 트리를 prod에 일반 병합하고 원격 push, dev를 prod로 fast-forward 동기화한다. 최종 SHA/원격 일치/clean 증거는 `.local/branch-workflow-20261101/after.json`에 기록한다.

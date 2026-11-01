@@ -2,7 +2,7 @@
 
 - 공통 조사 규약: 애매한 요구사항·구현·검증이나 결정이 필요한 부분은 공식 공급사 문서·현행 법령·OWASP를 웹검색하여 업계 기준을 면밀히 조사한다. 출처·확인일·적용 판단과 미결정 사업 정책을 기록한다. 역할별 출시 검수 기준은 프론트 `docs/release-test-scenarios.md`이며, 공급자 대역 통과를 실제 PG/PASS/은행·운영 검증으로 간주하지 않는다.
 
-- 크레팬스(팬·크리에이터 멤버십 플랫폼) 백엔드. NestJS + Prisma + MySQL. AWS Cognito 제거·자체 회원 인증·단일 원서버(docker compose, host Postfix SMTP) 배포를 준비 중. `dev`는 승인된 개발 기준, `prod`는 기존 운영 기준이다. 새 작업은 `dev`에서 `feat/<작업명>` 브랜치로 진행한다.
+- 크레팬스(팬·크리에이터 멤버십 플랫폼) 백엔드. NestJS + Prisma + MySQL. AWS Cognito 제거·자체 회원 인증·단일 원서버(docker compose, host Postfix SMTP) 배포를 준비 중. 
 - 작업 전에 `PROGRESS.md`를 먼저 읽고, 작업 후 갱신한다. 신규 서비스 기준은 `docs/platform-api.md`, `docs/platform-implementation.md`, `infra/platform/`이다. `docs/local-member-migration.md`와 `infra/single-instance/`는 구형 인증 전환 참고 자료다. `docs/prd.md`·`docs/deployment-setup.md`의 Cognito 전제 내용은 구식.
 - 운영 DB에 `migrate dev`/`db push`/`seed`를 실행하지 않는다. 비밀번호·인증 코드·AWS 키를 로그에 남기지 않는다.
 - 활동 분야 정렬·아이콘은 `categories.service.ts`와 `category-catalog.ts`를 사용한다. 기존 sort_order/icon 컬럼·권한·Origin·감사 이력을 유지하고, 업로드는 제한된 이미지 재인코딩 후 저장한다. 공개 분야 아이콘 경로를 유료 미디어 공개 경로로 재사용하지 않는다.
@@ -57,3 +57,9 @@
 - 콩 충전 대사는 미승인 pending·결제키 미저장 주문의 PG EXPIRED/ABORTED(approvedAt=null)만 주문번호·금액·KRW 검증 후 재고 예약을 종료할 수 있다. 저장된 결제키 불일치나 승인 결과 불일치를 무시하지 않고, 대사에서 새 결제 승인을 요청하지 않는다.
 
 - 콩 후원은 server `docs/platform-implementation.md`의 콩 확장 설계를 따른다. 구형 Wallet/Transfer와 신규 Bean 원장을 자동 혼합하지 않고, 충전·후원·출금은 중복 집계하지 않는다. 공유 지갑/후원/출금과 독립 콘솔은 연결되어 있다. 기능/live 판매 기본 off 및 실공급자 미확인 경계·배포 상태는 PROGRESS.md에서 확인한다.
+
+## 브랜치 규칙
+
+- 새 작업은 최신 `origin/prod`에서 `feat/<작업명>` 생성 → `dev` 통합·검증 → `prod` 승격한다. `dev`에서 새 작업을 분기하지 않는다.
+- dev/prod 직접 기능 개발·prod 직행·force push 금지. 기본 PR, 사용자 직접 통합 요청은 같은 순서의 로컬 merge와 일반 push 허용.
+- 실행 방법·증거 기준은 `docs/branch-workflow.md`. prod 반영과 운영 배포는 별개다.

@@ -244,10 +244,10 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/studio/security` | 출금 PIN 설정 |
 | `/preview/studio/settings` | 크리에이터 설정 |
 | `/preview/events` | 이벤트 안내 |
-| `/preview/events/beta-feedback` | 네이버페이 1만원 상품권 이벤트 |
-| `/preview/events/beta-creator-advertising` | 주목할 크리에이터 광고상품 30일 이벤트 |
-| `/preview/events/beta-promotion-beans` | 프로모션 100콩 이벤트 |
-| `/preview/events/beta-founding-badge` | 원년멤버 한정판 뱃지 이벤트 |
+| `/preview/events/feedback` | 네이버페이 1만원 상품권 이벤트 |
+| `/preview/events/creator-advertising` | 주목할 크리에이터 광고상품 30일 이벤트 |
+| `/preview/events/promotion-beans` | 프로모션 100콩 이벤트 |
+| `/preview/events/founding-badge` | 원년멤버 한정판 뱃지 이벤트 |
 | `/preview/guide/fan` | 팬 이용안내 |
 | `/preview/guide/creator` | 크리에이터 이용안내 |
 | `/preview/reset-password` | 비밀번호 재설정 |
