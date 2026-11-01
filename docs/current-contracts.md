@@ -199,10 +199,10 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | 경로 | 메뉴명 |
 | --- | --- |
 | `/preview/beans` | 지갑 |
-| `/preview/beans/charges` | 충전 주문 |
-| `/preview/beans/history` | 콩 이동 내역 |
-| `/preview/beans/referral` | 친구 초대 |
-| `/preview/beans/tips` | 보낸 후원 |
+| `/preview/beans/referral` | 친구 초대 이벤트 |
+| `/preview/beans/charges` | 충전 내역 |
+| `/preview/beans/history` | 콩 내역 |
+| `/preview/beans/tips` | 후원 내역 |
 | `/preview/beans/charge` | 콩 충전 |
 | `/preview/beans/success` | 콩 충전 완료 |
 | `/preview/landing` | 랜딩페이지 |
