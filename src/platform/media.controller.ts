@@ -14,6 +14,7 @@ import {PlatformService} from './service';
 import {PlatformAuthGuard,PlatformOptionalAuthGuard,PlatformMediaEdgeGuard} from './platform-auth.guard';
 import {reject} from './http';
 import {PlatformMediaStorage,managedMediaKey} from './media-storage';
+import {QUICKTIME_MIME,sourcePath} from './video-transcode';
 import {profilePhotoInUse} from './profile-photos';
 @Controller('media')
 export class PlatformMediaController {
@@ -22,10 +23,12 @@ export class PlatformMediaController {
  @Post() @UseGuards(PlatformAuthGuard) @UseInterceptors(FileInterceptor('file',{storage:diskStorage({destination:(_req,_file,done)=>{const directory=join(resolve(process.env.MEDIA_ROOT||'.local/media'),'.uploads');mkdirSync(directory,{recursive:true});done(null,directory);},filename:(_req,_file,done)=>done(null,randomUUID())}),limits:{fileSize:300*1024*1024}}))
  async upload(@UploadedFile() file:any,@Req() req:any){
    if(!file)reject(400,'INVALID_MEDIA','파일을 선택해주세요.');
-   const root=resolve(this.config.get('MEDIA_ROOT')||'.local/media'),id=randomUUID(),destination=join(root,id);let saved=false,tracked=false;
+   const root=resolve(this.config.get('MEDIA_ROOT')||'.local/media'),id=randomUUID(),destination=join(root,id);let saved=false,tracked=false,source='';
    try{
-    if(!['image/jpeg','image/png','image/webp','video/mp4','video/webm'].includes(file.mimetype))reject(400,'INVALID_MEDIA','JPG·PNG·WebP·MP4·WebM 파일만 지원합니다.');
-    const type:'IMAGE'|'VIDEO'=file.mimetype.startsWith('image/')?'IMAGE':'VIDEO';let mime=file.mimetype,size=file.size;
+    // iPhone videos come as QuickTime (.mov); they are converted to MP4 by the worker (video-transcode.ts, 2026-11-01).
+    const quicktime=file.mimetype===QUICKTIME_MIME||(file.mimetype==='application/octet-stream'&&/\.mov$/i.test(file.originalname||''));
+    if(!quicktime&&!['image/jpeg','image/png','image/webp','video/mp4','video/webm'].includes(file.mimetype))reject(400,'INVALID_MEDIA','JPG·PNG·WebP 이미지 또는 MP4·WebM·MOV 동영상만 지원합니다.');
+    const type:'IMAGE'|'VIDEO'=file.mimetype.startsWith('image/')?'IMAGE':'VIDEO';let mime=quicktime?QUICKTIME_MIME:file.mimetype,size=file.size;
     await mkdir(root,{recursive:true});
     if(type==='IMAGE'){
      if(file.size>5*1024*1024)reject(400,'FILE_TOO_LARGE','이미지는 5MB 이하입니다.');
@@ -33,17 +36,19 @@ export class PlatformMediaController {
      size=bytes.length;await writeFile(destination,bytes,{mode:0o600});
     }else{
      const handle=await open(file.path,'r'),buffer=Buffer.alloc(12);try{await handle.read(buffer,0,12,0);}finally{await handle.close();}
-     const mp4=buffer.subarray(4,8).toString()==='ftyp',webm=buffer.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3]));if(mime==='video/mp4'?!mp4:!webm)reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');await rename(file.path,destination);
+     const atom=buffer.subarray(4,8).toString('latin1'),mp4=atom==='ftyp',webm=buffer.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3])),mov=['ftyp','moov','mdat','wide','free','skip','pnot'].includes(atom);
+     if(quicktime?!mov:mime==='video/mp4'?!mp4:!webm)reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');if(quicktime)source=sourcePath(root,id);await rename(file.path,source||destination);
     }
     const remote=this.storage.enabled;
-    const row=await this.service.db.media.create({data:{id,user_sub:req.user.sub,type,original_name:file.originalname.slice(0,200),file_name:id,file_size:size,mime_type:mime,original_url:`/api/v1/media/${id}/file`,s3_upload_key:remote?`platform/${id}`:`local/${id}`,processing_status:remote?'UPLOADING':'COMPLETED',processed_at:remote?null:new Date()}});tracked=true;
+    const row=await this.service.db.media.create({data:{id,user_sub:req.user.sub,type,original_name:file.originalname.slice(0,200),file_name:id,file_size:size,mime_type:mime,original_url:`/api/v1/media/${id}/file`,s3_upload_key:remote?`platform/${id}`:`local/${id}`,processing_status:quicktime?'PROCESSING':remote?'UPLOADING':'COMPLETED',processed_at:remote||quicktime?null:new Date()}});tracked=true;
+    if(quicktime)return{id:row.id,type:'video',url:row.original_url,processing:true};
     if(remote){await this.storage.put(id,destination,mime,size);await this.service.db.media.update({where:{id},data:{processing_status:'COMPLETED',processed_at:new Date()}});}saved=true;
     return{id:row.id,type:type==='IMAGE'?'image':'video',url:row.original_url};
    }catch(error){
     // Retain a failed row for orphan cleanup if the upload or DB completion was interrupted.
     if(tracked&&!saved&&this.storage.enabled){try{await this.service.db.media.update({where:{id},data:{processing_status:'FAILED',is_deleted:true,deleted_at:new Date()}});await this.storage.remove(`platform/${id}`);}catch{this.logger.error('Failed media upload requires orphan cleanup');}}
     throw error;
-   }finally{for(const path of[file.path,...(!saved||this.storage.enabled?[destination]:[])]){try{await unlink(path);}catch(e:any){if(e.code!=='ENOENT')throw e;}}}
+   }finally{for(const path of[file.path,...(!saved||this.storage.enabled?[destination]:[]),...(source&&!tracked?[source]:[])]){try{await unlink(path);}catch(e:any){if(e.code!=='ENOENT')throw e;}}}
  }
  private async authorize(id:string,req:any){const m=await this.service.db.media.findUnique({where:{id},include:{postings:{include:{posting:true}}}});if(!m||m.is_deleted||m.processing_status!=='COMPLETED')reject(404,'MEDIA_NOT_FOUND','파일을 찾을 수 없습니다.');let allowed=req.user?.sub===m.user_sub;
    const links=m.postings.filter(link=>!link.is_deleted&&!link.posting.is_deleted);
