@@ -31,8 +31,14 @@
   log_append request_id {http.response.header.X-Request-ID}
 }
 
-# Service hosts (2026-10-29, KG이니시스 심사): root/www and review hosts serve the same service and API as the app domain, direct to this origin.
-{$APP_DOMAIN}, {$MEDIA_AUTH_ORIGIN:media-auth.localhost}, crefans.com, www.crefans.com, www-stage.crefans.com, www-dev.crefans.com, www-local.crefans.com {
+# www.crefans.com moves permanently to the root domain so search engines index one host (2026-11-01 SEO decision).
+www.crefans.com {
+  import safe_access
+  redir https://crefans.com{uri} 301
+}
+
+# Service hosts (2026-10-29, KG이니시스 심사): root and review hosts serve the same service and API as the app domain, direct to this origin.
+{$APP_DOMAIN}, {$MEDIA_AUTH_ORIGIN:media-auth.localhost}, crefans.com, www-stage.crefans.com, www-dev.crefans.com, www-local.crefans.com {
   import safe_access
   encode zstd gzip
   redir / /service/feed 302
