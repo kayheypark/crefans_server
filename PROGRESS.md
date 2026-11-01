@@ -1,5 +1,13 @@
 # PROGRESS: crefans_server
 
+## 2026-11-01 아이폰 .mov 업로드 서버 변환 — mov-transcode-20261101 운영 배포(API·워커·프론트)
+
+- 사용자 제보: 아이폰에서 동영상 선택 시 "JPG·PNG·WebP·MP4·WebM 파일만 지원" 오류(아이폰은 QuickTime .mov, 주로 HEVC). 사용자 결정: 서버에서 MP4로 변환.
+- 서버 c7aee2e: 업로드가 video/quicktime(또는 .mov octet-stream, QuickTime 아톰 검사)을 받아 원본을 `MEDIA_ROOT/<id>.source`에 두고 PROCESSING. 워커 별도 루프(15초)가 한 번에 하나씩 ffmpeg로 H.264/AAC MP4(긴 변 1280, 메타데이터 제거, faststart, nice·1스레드) 변환 후 S3 `platform/<id>` 저장, COMPLETED. 실패는 FAILED, 원본은 끝나면 삭제. 게시물 저장은 변환 중 영상 허용, 게시물에는 COMPLETED만 표시. API 이미지에 ffmpeg 설치.
+- 프론트 938a813: accept에 video/quicktime·.mov, 타일 "동영상 변환 중"/"변환 실패", 팬 미리보기에서 제외.
+- 검증: 서버 tests/platform-video-transcode.test.cjs 3건(대조 2종 실패), 기존 media·studio·jobs 회귀 통과, Docker와 운영 워커 컨테이너에서 HEVC .mov → H.264 720p 실제 변환·위치 태그 제거 확인. 프론트 npm test 442.
+- 미확인: 실제 아이폰 업로드부터 게시·재생까지(사용자 실기기 시험 필요), 긴 4K 영상의 변환 시간과 서버 부하(2코어). 증거 `.local/mov-transcode-deploy-20261101/`.
+
 ## 2026-10-31 /pilot-work: 소개서·가이드 동기화 결정 반영 (운영 배포 guide-sync-20261031 + 가이드 guide-sync-20261031, 커밋 완료·푸시 안 함)
 - 근거: night-work `crefans_front/.local/night-work/2026-10-30-2213.md`. 사용자 결정(클릭): 약관 개정 바로 공지·30일 뒤 시행, 세금은 가이드에 개정 예정 주석, 비구독 전용 게시물 후원 막기, 신고자 결과 앱 알림, 앱 FAQ·안내 보강, 가이드 원본 해시+숫자 대조, 명칭 '오픈베타(가입은 초대 이메일)', 약관에서 '17개' 삭제, 이벤트 일정 미정 유지(유효기간 문장만), 콘솔 공지로 게시까지, 배포+커밋.
 - 서버: `legal-documents.ts` 2026-11-30 시행 개정판(약관 1·2·6·8·9조 수정, 11조 콩 신설, 운영정책 신고 절) — `catalog(now)`가 KST 시행일 전에는 `upcoming`으로, 당일부터 terms·policy로 자동 교체. 처리방침은 그대로. `/common` legal에 `terms-next`·`policy-next`. `beans.tip` 볼 수 없는 게시물 403 POST_ACCESS_REQUIRED. 신고 처리 시 신고자 앱 알림(type moderation, 내부 메모 미포함). 공지 원문 `infra/platform/notices/terms-20261130.json`(배포 스크립트가 검증 후 id 고정 upsert, 덮어쓰지 않음).
