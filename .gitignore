@@ -19,3 +19,11 @@ member-export*.json
 
 infra/platform/runtime.env
 infra/platform/.env
+
+# Local generated files
+*.tsbuildinfo
+
+# Generated local previews and QA artifacts (retained on disk)
+/.next-*/
+/output/
+/tmp/

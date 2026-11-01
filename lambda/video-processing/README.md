@@ -1,5 +1,7 @@
 # 🎬 Video Processing Lambda Function
 
+> 문서 상태 (2026-10-08): 기존 AWS Lambda 실행 경로의 참고 자료다. 신규 플랫폼 런타임은 이 Lambda를 등록하지 않는다. 신규 worker와 동시에 정기결제를 실행하지 않는다. 현재 배포 기준은 [플랫폼 배포](../../infra/platform/README.md), 외부 계약은 [공급자 경계](../../docs/provider-contracts.md)다. 실 AWS 배포/호출 검증은 별도다.
+
 S3에 업로드된 동영상 파일을 자동으로 감지하여 AWS MediaConvert로 다중 해상도 변환 처리를 수행하는 Lambda 함수입니다.
 
 ## 📋 기능

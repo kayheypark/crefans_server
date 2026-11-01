@@ -1,13 +1,14 @@
-import { Injectable, BadRequestException, UnauthorizedException, HttpException, OnModuleInit } from "@nestjs/common";
+import { Injectable, BadRequestException, ForbiddenException, UnauthorizedException, HttpException, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Member } from "@prisma/client";
 import { randomUUID, randomBytes, randomInt, createHmac } from "crypto";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../../prisma/prisma.service";
 import { MemberMailService } from "./member-mail.service";
-import { digest, normalizeEmail, hashPassword, verifyPassword } from "./credentials";
+import { digest, normalizeEmail, hashPassword, matchesPassword, assertNewPassword } from "./credentials";
 import { SignUpDto } from "../dto/auth.dto";
 import { CognitoException } from "../exceptions/cognito.exception";
+import { suspension, suspendedMessage } from "../../platform/suspension";
 
 @Injectable()
 export class LocalMemberService implements OnModuleInit {
@@ -86,9 +87,12 @@ export class LocalMemberService implements OnModuleInit {
       } });
     }
     const current = await this.byIdentity(member.id);
-    if (!current?.enabled || !await verifyPassword(password, current.password_hash)) throw new UnauthorizedException("이메일 또는 비밀번호를 확인해주세요.");
+    if (!current?.enabled || !await matchesPassword(password, current.password_hash)) throw new UnauthorizedException("이메일 또는 비밀번호를 확인해주세요.");
     if (!current.email_verified) throw new CognitoException("이메일 인증이 필요합니다.", "UserNotConfirmedException");
-    return this.createSession(current);
+    // Shown only after the password matched, so it does not reveal which emails are restricted.
+    const restricted = suspension(current);
+    if (restricted) throw new ForbiddenException({ code: "ACCOUNT_SUSPENDED", message: suspendedMessage(restricted) });
+    return this.createSession(current, current.password_hash);
   }
   private tokens() {
     return { accessToken: `la.${randomBytes(32).toString("base64url")}`, refreshToken: `lr.${randomBytes(32).toString("base64url")}` };
@@ -99,18 +103,26 @@ export class LocalMemberService implements OnModuleInit {
       "cognito:username": member.cognito_username || member.id, token_use: "id",
     }, { secret: this.secret, algorithm: "HS256", issuer: "crefans-local", audience: "crefans-web", expiresIn: "1h" });
   }
-  private async createSession(member: Member) {
+  private async createSession(member: Member, verifiedHash: string) {
     const tokens = this.tokens();
-    await this.prisma.memberSession.create({ data: {
-      member_id: member.id, access_hash: digest(tokens.accessToken), refresh_hash: digest(tokens.refreshToken),
-      access_until: new Date(Date.now() + 3600000), expires_at: new Date(Date.now() + 30 * 86400000),
-    } });
+    // Password changes and resets update the member row and revoke sessions in one transaction.
+    // Locking the same row here means a sign-in verified against the old password either commits
+    // first (and is revoked by that change) or sees the new hash and is refused.
+    await this.prisma.$transaction(async tx => {
+      const rows: any[] = await tx.$queryRaw`SELECT password_hash, enabled, email FROM members WHERE id=${member.id} FOR UPDATE`;
+      if (!rows[0]?.enabled || rows[0].password_hash !== verifiedHash || rows[0].email !== member.email)
+        throw new UnauthorizedException("이메일 또는 비밀번호를 확인해주세요.");
+      await tx.memberSession.create({ data: {
+        member_id: member.id, access_hash: digest(tokens.accessToken), refresh_hash: digest(tokens.refreshToken),
+        access_until: new Date(Date.now() + 3600000), expires_at: new Date(Date.now() + 30 * 86400000),
+      } });
+    });
     return { ...tokens, idToken: this.idToken(member), message: "로그인이 완료되었습니다." };
   }
   async validateToken(token: string) {
     if (!/^la\.[A-Za-z0-9_-]{43}$/.test(token || "")) throw new UnauthorizedException();
     const session = await this.prisma.memberSession.findUnique({ where: { access_hash: digest(token) }, include: { member: true } });
-    if (!session || session.access_until <= new Date() || session.expires_at <= new Date() || !session.member.enabled || !session.member.email_verified)
+    if (!session || session.access_until <= new Date() || session.expires_at <= new Date() || !session.member.enabled || !session.member.email_verified || suspension(session.member))
       throw new UnauthorizedException();
     return { sub: session.member.id, userSub: session.member.id, email: session.member.email,
       name: session.member.name, username: session.member.cognito_username || session.member.id, accessToken: token };
@@ -124,7 +136,7 @@ export class LocalMemberService implements OnModuleInit {
   async refreshToken(token: string) {
     if (!/^lr\.[A-Za-z0-9_-]{43}$/.test(token || "")) throw new UnauthorizedException();
     const session = await this.prisma.memberSession.findUnique({ where: { refresh_hash: digest(token) }, include: { member: true } });
-    if (!session || session.expires_at <= new Date() || !session.member.enabled || !session.member.email_verified) throw new UnauthorizedException();
+    if (!session || session.expires_at <= new Date() || !session.member.enabled || !session.member.email_verified || suspension(session.member)) throw new UnauthorizedException();
     const tokens = this.tokens();
     const updated = await this.prisma.memberSession.updateMany({ where: { id: session.id, refresh_hash: digest(token), expires_at: { gt: new Date() } }, data: {
       access_hash: digest(tokens.accessToken), refresh_hash: digest(tokens.refreshToken), access_until: new Date(Date.now() + 3600000),
@@ -182,11 +194,16 @@ export class LocalMemberService implements OnModuleInit {
   }
   private async issueCode(member: Member, purpose: "verify" | "reset") {
     // Resend cooldown: one code per member/purpose every 3 minutes (product decision 2026-09-13); the code itself stays valid 10 minutes.
-    await this.limit(`mail:${member.id}:${purpose}`, 1, 180);
     const code = String(randomInt(0, 1000000)).padStart(6, "0");
     const data = { digest: this.codeDigest(member.id, purpose, code), attempts: 0, expires_at: new Date(Date.now() + 600000), sent_at: new Date() };
-    await this.prisma.memberChallenge.upsert({ where: { member_id_purpose: { member_id: member.id, purpose } },
-      create: { member_id: member.id, purpose, ...data }, update: data });
+    await this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM members WHERE id=${member.id} FOR UPDATE`;
+      const prior = await tx.memberChallenge.findUnique({ where: { member_id_purpose: { member_id: member.id, purpose } } });
+      if (prior && Date.now() - prior.sent_at.getTime() < 180000)
+        throw new HttpException("3분 후 인증 코드를 다시 요청해주세요.", 429);
+      await tx.memberChallenge.upsert({ where: { member_id_purpose: { member_id: member.id, purpose } },
+        create: { member_id: member.id, purpose, ...data }, update: data });
+    });
     try { await this.mail.sendCode(member.email, code, purpose); }
     catch { throw new HttpException("이메일 발송에 실패했습니다. 잠시 후 인증 코드를 다시 요청해주세요.", 503); }
   }
@@ -225,7 +242,7 @@ export class LocalMemberService implements OnModuleInit {
     await this.limit(`reset-confirm:${normalizeEmail(email)}`, 5);
     const member = await this.byEmail(email);
     if (!member?.enabled || !member.password_hash) throw new BadRequestException("재설정 요청을 확인해주세요.");
-    await this.consumeCode(member, "reset", code, await hashPassword(password));
+    await this.consumeCode(member, "reset", code, await hashPassword(assertNewPassword(password)));
     return { message: "비밀번호가 변경되었습니다. 다시 로그인해주세요." };
   }
 }

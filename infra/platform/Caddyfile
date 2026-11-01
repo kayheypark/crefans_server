@@ -1,15 +1,156 @@
-{$APP_DOMAIN} {
+{
+  log default {
+    output stdout
+    format filter {
+      wrap json
+      fields {
+        request>uri delete
+        request>headers delete
+        request>tls delete
+        resp_headers delete
+      }
+    }
+  }
+}
+
+# Request paths, query strings and all headers may contain tokens or private IDs.
+# API route templates are recorded by the application under X-Request-ID.
+(safe_access) {
+  log {
+    output stdout
+    format filter {
+      wrap json
+      fields {
+        request>uri delete
+        request>headers delete
+        request>tls delete
+        resp_headers delete
+      }
+    }
+  }
+  log_append request_id {http.response.header.X-Request-ID}
+}
+
+# www.crefans.com moves permanently to the root domain so search engines index one host (2026-11-01 SEO decision).
+www.crefans.com {
+  import safe_access
+  redir https://crefans.com{uri} 301
+}
+
+# Service hosts (2026-10-29, KG이니시스 심사): root and review hosts serve the same service and API as the app domain, direct to this origin.
+{$APP_DOMAIN}, {$MEDIA_AUTH_ORIGIN:media-auth.localhost}, crefans.com, www-stage.crefans.com, www-dev.crefans.com, www-local.crefans.com {
+  import safe_access
   encode zstd gzip
+  redir / /service/feed 302
+  @privateFiles path /.env /.env.* /.git /.git/* /runtime.env /compose.yml /compose.beta.yml /bootstrap-ubuntu.sh
+  handle @privateFiles {
+    respond 404
+  }
+  # CloudFront uses the origin hostname; keep the public host for this mock-only origin check.
+  @previewLogin path /api/preview/v1/login
+  handle @previewLogin {
+    reverse_proxy frontend:3010 {
+      header_up Host {$APP_DOMAIN}
+    }
+  }
   @platform path /api/v1/*
   handle @platform {
-    reverse_proxy api:3001
+    reverse_proxy api:3001 {
+      header_up X-Crefans-Client-IP {remote_host}
+      header_up -CF-Connecting-IP
+    }
   }
   handle {
     reverse_proxy frontend:3010
   }
+  # Only the service itself may frame its pages (design catalog previews). No script policy yet:
+  # the payment SDK and media need a tested CSP before script-src is enforced.
   header {
     X-Content-Type-Options nosniff
     Referrer-Policy strict-origin-when-cross-origin
+    Strict-Transport-Security "max-age=31536000"
+    X-Frame-Options SAMEORIGIN
+    Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
+    -Server
+  }
+}
+
+# Independent operator app. Only the established platform API receives auth cookies.
+{$ADMIN_DOMAIN:admin.crefans.com} {
+  import safe_access
+  encode zstd gzip
+  redir / /console 302
+  @privateFiles path /.env /.env.* /.git /.git/* /runtime.env /compose.yml /compose.beta.yml /compose.admin.yml
+  handle @privateFiles {
+    respond 404
+  }
+  # Operators sign in through /api/v1/admin/auth/*; member auth routes are not served on this host.
+  @adminApi path /api/v1/admin /api/v1/admin/*
+  handle @adminApi {
+    reverse_proxy api:3001 {
+      header_up X-Crefans-Client-IP {remote_host}
+      header_up -CF-Connecting-IP
+    }
+  }
+  @otherApi path /api/*
+  handle @otherApi {
+    respond 404
+  }
+  handle {
+    reverse_proxy admin:3002
+  }
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    X-Robots-Tag "noindex, nofollow, noarchive"
+    Referrer-Policy same-origin
+    Strict-Transport-Security "max-age=31536000"
+    Content-Security-Policy "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    -Server
+  }
+}
+
+# Public product guide: static Starlight build (crefans_guide) in the proxy data volume, no app or API access.
+{$GUIDE_DOMAIN:guide.crefans.com} {
+  import safe_access
+  encode zstd gzip
+  root * /data/sites/guide
+  @hashedAssets path /_astro/*
+  header @hashedAssets Cache-Control "public, max-age=31536000, immutable"
+  file_server
+  handle_errors 404 {
+    rewrite * /404.html
+    file_server
+  }
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy strict-origin-when-cross-origin
+    Strict-Transport-Security "max-age=31536000"
+    Content-Security-Policy "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    -Server
+  }
+}
+
+# Public QR business card, isolated from service APIs and member sessions.
+{$BUSINESS_DOMAIN:business.crefans.com} {
+  import safe_access
+  encode zstd gzip
+  redir / /card?who=khpark 302
+  @card path /card /_next/static/* /brand/business-cards/*
+  handle @card {
+    reverse_proxy frontend:3010
+  }
+  handle {
+    respond 404
+  }
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    X-Robots-Tag "noindex, nofollow, noarchive"
+    Referrer-Policy no-referrer
+    Strict-Transport-Security "max-age=31536000"
+    Content-Security-Policy "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
     -Server
   }
 }

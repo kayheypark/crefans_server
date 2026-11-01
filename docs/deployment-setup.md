@@ -1,5 +1,7 @@
 # Deployment & Setup Guide
 
+> 문서 상태 (2026-10-08): 구형 앱/이전 설계·조사 기록이며 신규 `/api/v1`의 구현·운영 완료를 설명하지 않는다. 본문의 Cognito·비버전 API·S3/Lambda·가격·정책·완료율은 당시 범위다. 현재 계약은 [플랫폼 API](./platform-api.md), 구조/남은 작업은 [구현 추적](./platform-implementation.md), 실행은 [현재 안내](./README.md)를 우선한다. 과거 명령을 신규 배포에 그대로 실행하지 않는다.
+
 이 문서는 crefans_server의 배포 및 설정 방법을 설명합니다.
 
 ## 시스템 요구사항

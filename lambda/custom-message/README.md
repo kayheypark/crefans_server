@@ -1,5 +1,7 @@
 # AWS Cognito Lambda CustomMessage Trigger
 
+> 문서 상태 (2026-10-08): 기존 AWS Lambda 실행 경로의 참고 자료다. 신규 플랫폼 런타임은 이 Lambda를 등록하지 않는다. 신규 worker와 동시에 정기결제를 실행하지 않는다. 현재 배포 기준은 [플랫폼 배포](../../infra/platform/README.md), 외부 계약은 [공급자 경계](../../docs/provider-contracts.md)다. 실 AWS 배포/호출 검증은 별도다.
+
 이메일 인증 시 커스텀 링크(`https://www.crefans.com/email-verification?email=&code=`)를 포함한 이메일을 전송하는 Lambda 함수입니다.
 
 ## 🏗️ 프로젝트 구조
