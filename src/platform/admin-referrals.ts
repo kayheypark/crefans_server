@@ -4,7 +4,7 @@ import {appendAudit,auditChange} from './audit';
 import {ensureReferral,REFERRAL_SETTING,referralOn} from './referrals';
 
 // Console referral management (user request 2026-11-01): the on/off switch, the referral list and a link for any member.
-const statuses=['pending','qualified','granted','clawed_back','capped'];
+const statuses=['pending','qualified','granted','clawed_back','capped','forfeited'];
 const serviceOrigin=()=>process.env.MARKETING_PUBLIC_ORIGIN||'https://crefans.com';
 export async function adminReferrals(db:any,query:any){
  const {page,size,skip}=adminPage(query),status=query.status===undefined||query.status===''?undefined:text(query.status,20);if(status&&!statuses.includes(status))reject(400,'INVALID_QUERY','조회 조건을 확인해주세요.');

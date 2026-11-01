@@ -78,6 +78,7 @@ test('a disabled referrer forfeits a due reward so the queue keeps moving',async
   await buy(beans,friend);await db.member.update({where:{id:owner},data:{enabled:false}});
   await grantDue();const s=await signupOf(friend);assert.equal(s.reward_status,'forfeited');assert.equal((await rewardLot(owner,s.id)).length,0);
   assert.equal((await referrals.referralHistory(db,owner)).items[0].status,'forfeited');
+  const forfeited=await require('../dist/src/platform/admin-referrals').adminReferrals(db,{status:'forfeited',pageSize:'100'});assert.ok(forfeited.items.some(i=>i.id===s.id));assert.ok(forfeited.summary.forfeited.count>=1);
  }finally{await db.member.update({where:{id:owner},data:{enabled:true}});await db.referralSignup.deleteMany({where:{OR:[{member_id:friend},{referrer_id:owner}]}});await db.referral.deleteMany({where:{member_id:{in:[owner,friend]}}});}
 });
 
