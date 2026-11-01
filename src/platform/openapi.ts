@@ -45,12 +45,13 @@ export function buildPlatformOpenApi(app:INestApplication):OpenAPIObject{
   if(path==='/api/v1/auth/identity')delete op.responses[success];
   if(path==='/api/v1/admin/auth/login'||path==='/api/v1/admin/auth/refresh')op.responses[success]['headers']={'Set-Cookie':{schema:str(),description:'HttpOnly·SameSite=Strict admin_access_token(1시간)·admin_refresh_token(7일) 쿠키, 콘솔 도메인 전용. 운영에서는 Secure.'}};
   if(path==='/api/v1/auth/login'||path==='/api/v1/auth/refresh')op.responses[success]['headers']={'Set-Cookie':{schema:str(),description:'HttpOnly access_token 및 refresh_token 쿠키. 운영에서는 Secure.'}};
-  if(path==='/api/v1/media')op.responses['413']={description:'파일 용량 제한 초과',content:{'application/json':{schema:ref('Error')}}};
+  if(path==='/api/v1/media'||path==='/api/v1/admin/categories/{id}/icon')op.responses['413']={description:'파일 용량 제한 초과',content:{'application/json':{schema:ref('Error')}}};
   if(['/api/v1/media/{id}/file','/api/v1/media/{id}/origin-file'].includes(path)){
    op.parameters.push({name:'Range',in:'header',schema:{type:'string',example:'bytes=0-1023'},description:'단일 바이트 범위. HEAD도 지원.'});
    for(const status of ['200','206'])op.responses[status]={description:status==='200'?'전체 파일. HEAD는 본문 없음.':'부분 파일',headers:{'Accept-Ranges':{schema:str()},'Content-Length':{schema:{type:'integer'}},'Content-Range':{schema:str()}},content:{'application/octet-stream':{schema:{type:'string',format:'binary'}}}};
    op.responses['416']={description:'지원하지 않는 범위. 스트리밍 경로에서는 Content-Range와 빈 본문을 반환할 수 있습니다.'};
   }
+  if(['/api/v1/categories/{id}/icon/{version}','/api/v1/admin/categories/{id}/icon/{version}'].includes(path))op.responses['200']={description:'공개 분야 아이콘',content:{'image/webp':{schema:{type:'string',format:'binary'}}}};
   if(edge)for(const name of ['purpose','ip','at','id','method'])op.parameters.push({name:'x-crefans-edge-'+name,in:'header',required:true,schema:str()});
  }
  for(const key of Object.keys(endpoints))if(!seen.has(key))throw new Error('OpenAPI contract without controller: '+key);

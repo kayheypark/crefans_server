@@ -1,3 +1,5 @@
+import {CategoriesService} from './categories.service';
+import {Res} from '@nestjs/common';
 import {Body,Controller,Delete,Get,Header,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
 import {EmailChangeService} from './email-change.service';
 import {PlatformService} from './service';
@@ -6,7 +8,8 @@ import {myReferral,referralHistory} from './referrals';
 import {PlatformAuthGuard,PlatformOptionalAuthGuard} from './platform-auth.guard';
 @Controller()
 export class PlatformController {
- constructor(private service:PlatformService,private emailChange:EmailChangeService){}
+ constructor(private service:PlatformService,private emailChange:EmailChangeService,private categories:CategoriesService){}
+ @Get('categories/:id/icon/:version') categoryIcon(@Param('id') id:string,@Param('version') version:string,@Res() res:any){return this.categories.image(id,version,res);}
  @Get('health') async health(){await this.service.db.$queryRaw`SELECT 1`;return{status:'ready',version:'v1'};}
  @Get('session') @UseGuards(PlatformAuthGuard) session(){return{active:true};}
  @Get('bootstrap') @UseGuards(PlatformOptionalAuthGuard) bootstrap(@Req() r:any,@Query('collection') collection:string){return this.service.bootstrap(r.user?.sub,collection);}
@@ -31,6 +34,7 @@ export class PlatformController {
  @Put('members/:id/messages/read') @UseGuards(PlatformAuthGuard) readMessages(@Param('id') id:string,@Body('ids') ids:unknown,@Req() r:any){return this.service.readMessages(r.user.sub,id,ids);}
  @Post('reports') @UseGuards(PlatformAuthGuard) report(@Body() b:any,@Req() r:any){return this.service.report(r.user.sub,b.id,b.kind==='POSTING'||b.kind==='COMMENT'?b.kind:'USER',b.reason??'OTHER');}
  @Put('notifications/read') @UseGuards(PlatformAuthGuard) async read(@Body('ids') ids:string[],@Req() r:any){await this.service.db.memberNotification.updateMany({where:{member_id:r.user.sub,id:{in:Array.isArray(ids)?ids.slice(0,100):[]}},data:{read_at:new Date()}});return{message:'읽음 처리했습니다.'};}
+ @Get('me/handle-availability') @Header('Cache-Control','private, no-store') @UseGuards(PlatformAuthGuard) handleAvailability(@Query('handle') handle:string,@Req() r:any){return this.service.handleAvailability(r.user.sub,handle);}
  @Put('me/profile') @UseGuards(PlatformAuthGuard) profile(@Body() b:any,@Req() r:any){return this.service.profile(r.user.sub,b);}
  @Get('me/referral') @Header('Cache-Control','private, no-store') @UseGuards(PlatformAuthGuard) referral(@Req() r:any){return myReferral(this.service.db,r.user.sub);}
  @Get('me/referral/history') @Header('Cache-Control','private, no-store') @UseGuards(PlatformAuthGuard) referralHistoryList(@Req() r:any,@Query('status') status?:string,@Query('page') page?:string){return referralHistory(this.service.db,r.user.sub,status,page);}

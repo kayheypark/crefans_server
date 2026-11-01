@@ -1,3 +1,6 @@
+import {CategoriesService} from './categories.service';
+import {Res,UploadedFile,UseInterceptors} from '@nestjs/common';
+import {FileInterceptor} from '@nestjs/platform-express';
 import {BeansService} from './beans.service';
 import {PlatformFinanceService} from './finance.service';
 import {MarketingService} from './marketing.service';
@@ -39,7 +42,7 @@ export class PlatformAdminGuard implements CanActivate{
 }
 @Controller('admin') @UseGuards(PlatformAdminGuard)
 export class PlatformAdminController{
- constructor(private service:PlatformService,private limiter:LocalMemberService,private marketing:MarketingService,private beans:BeansService,private finance:PlatformFinanceService){}
+ constructor(private service:PlatformService,private limiter:LocalMemberService,private marketing:MarketingService,private beans:BeansService,private finance:PlatformFinanceService,private categoryManager:CategoriesService){}
  @Post('marketing/campaigns') @Permit('super') campaign(@Body() body:any,@Req() req:any){return this.marketing.queue(req.admin,body);}
  @Post('client-errors') @Permit('self') clientError(@Body() body:any){return reportClientError(this.service.db,this.limiter,body,'console');}
  @Get('logs') @Permit(['logs','view']) logs(@Query() query:any,@Req() req:any){return adminLogs(this.service.db,req.admin,query);}
@@ -82,7 +85,34 @@ export class PlatformAdminController{
 await tx.memberNotification.create({data:{member_id:report.reporter_id,type:'moderation',text:body.status==='RESOLVED'?'신고하신 내용을 검토하고 조치했습니다.':'신고하신 내용을 검토했으며 운영정책 위반을 확인하지 못했습니다.',path:'/notifications'}});await enqueueOperation(tx,'admin.report_resolved',{memberId:req.admin.user_sub,targetId:id,status:body.status,previousStatus:'PENDING'});});return{message:'신고를 처리했습니다.'};}
  @Get('documents') @Permit(['support','view']) documents(){return this.service.db.serviceDocument.findMany({where:{kind:{in:['faq','notice']}},orderBy:{updated_at:'desc'},take:100});}
  @Post('documents') @Permit(['support','view']) async document(@Body() body:any,@Req() req:any){requirePermission(req.admin,'support',body?.id?'update':'create');if(!['faq','notice'].includes(body.kind)||typeof body.published!=='boolean'||!body.content||JSON.stringify(body.content).length>100000)reject(400,'INVALID_DOCUMENT','문서 내용을 확인해주세요.');const data={kind:body.kind,title:text(body.title,200),content:body.content,published:body.published,pinned:body.pinned===true,category:text(body.category||'',50,false)};const d=await this.service.db.$transaction(async tx=>{const before=body.id?await tx.serviceDocument.findUnique({where:{id:body.id}}):null;if(before&&!['faq','notice'].includes(before.kind))reject(400,'CODE_MANAGED_DOCUMENT','약관과 개인정보처리방침은 코드 배포로만 변경합니다.');const saved=body.id?await tx.serviceDocument.update({where:{id:body.id},data}):await tx.serviceDocument.create({data});await enqueueOperation(tx,'admin.document_saved',{memberId:req.admin.user_sub,targetId:saved.id,status:saved.published?'published':'draft'},undefined,auditChange(before?{...before,titleHash:contentDigest(before.title),contentHash:contentDigest(before.content)}:null,{...data,titleHash:contentDigest(data.title),contentHash:contentDigest(data.content)}));return saved;});return{id:d.id,message:'문서를 저장했습니다.'};}
- @Post('categories') @Permit(['content','view']) async category(@Body() body:any,@Req() req:any){requirePermission(req.admin,'content',body?.active===undefined?'create':'update');const name=text(body.name,40);await this.service.db.$transaction(async tx=>{const before=await tx.creatorCategory.findUnique({where:{name}});const saved=await tx.creatorCategory.upsert({where:{name},create:{name},update:{is_active:body.active!==false}});await appendAudit(tx,{category:'admin',action:'admin.category_saved',entityId:String(saved.id),data:auditChange(before,{is_active:saved.is_active})});});return{message:'분야를 저장했습니다.'};}
+ @Get('categories') @Permit(['content','view']) categories(){return this.categoryManager.list();}
+ @Put('categories/order') @Permit(['content','update']) categoryOrder(@Body() body:any){return this.categoryManager.reorder(body);}
+ @Put('categories/:id') @Permit(['content','update']) updateCategory(@Param('id') id:string,@Body() body:any){return this.categoryManager.update(id,body);}
+ @Get('categories/:id/icon/:version') @Permit(['content','view']) categoryImage(@Param('id') id:string,@Param('version') version:string,@Res() res:any){return this.categoryManager.image(id,version,res);}
+ @Post('categories/:id/icon') @Permit(['content','update']) @UseInterceptors(FileInterceptor('file',{limits:{fileSize:2*1024*1024,files:1,fields:0}}))
+ async categoryIcon(@Param('id') id:string,@UploadedFile() file:any,@Req() req:any){await this.limiter.limit('category-icon:'+req.admin.id,30,600);return this.categoryManager.upload(id,file);}
+ @Delete('categories/:id/icon') @Permit(['content','update']) resetCategoryIcon(@Param('id') id:string){return this.categoryManager.resetIcon(id);}
+ @Post('categories') @Permit(['content','view']) async category(@Body() body:any,@Req() req:any){
+  const creating=body?.active===undefined;
+  requirePermission(req.admin,'content',creating?'create':'update');
+  const name=text(body?.name,40);
+  if(!creating&&typeof body.active!=='boolean')reject(400,'INVALID_INPUT','활성 상태는 true 또는 false여야 합니다.');
+  try{await this.service.db.$transaction(async tx=>{
+   // Serialize status changes; creation uses the unique name constraint, never an upsert.
+   if(!creating)await tx.$queryRaw`SELECT id FROM creator_categories WHERE name=${name} FOR UPDATE`;
+   const before=await tx.creatorCategory.findUnique({where:{name}});
+   if(creating&&before)reject(409,'CATEGORY_EXISTS','이미 등록된 분야 이름입니다. 다른 이름을 입력해주세요.');
+   if(!creating&&(!before||before.is_deleted))reject(404,'CATEGORY_NOT_FOUND','활동 분야를 찾을 수 없습니다.');
+   if(!creating&&before.is_active===body.active)return;
+   const last=creating?await tx.creatorCategory.aggregate({_max:{sort_order:true}}):null;
+   const saved=creating?await tx.creatorCategory.create({data:{name,sort_order:(last?._max.sort_order??-1)+1}}):await tx.creatorCategory.update({where:{id:before.id},data:{is_active:body.active}});
+   await appendAudit(tx,{category:'admin',action:'admin.category_saved',entityId:saved.id,data:auditChange(before?{is_active:before.is_active}:null,{is_active:saved.is_active})});
+  });}catch(error){
+   if((error as {code?:string})?.code==='P2002')reject(409,'CATEGORY_EXISTS','이미 등록된 분야 이름입니다. 다른 이름을 입력해주세요.');
+   throw error;
+  }
+  return{message:creating?'활동 분야를 추가했습니다.':'분야 상태를 저장했습니다.'};
+ }
  @Put('creators/:id/verification') @Permit(['members','update']) async verification(@Param('id') id:string,@Body('isVerified') isVerified:boolean,@Req() req:any){
   if(typeof isVerified!=='boolean')reject(400,'INVALID_INPUT','인증 여부를 확인해주세요.');
   await this.service.db.$transaction(async tx=>{
