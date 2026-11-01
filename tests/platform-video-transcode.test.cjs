@@ -12,6 +12,8 @@ async function upload(bytes,mimetype='video/quicktime',originalname='IMG_0001.MO
  const file=path.join(root,'.upload-'+randomUUID());fs.writeFileSync(file,bytes);
  return controller([]).upload({path:file,mimetype,originalname,size:bytes.length},{user:{sub:member}});
 }
+// No ffprobe on developer machines: the probe is replaced; limit tests set their own answers.
+const probeAnswer={seconds:12,side:1920};video.videoTools.probe=async()=>{if(probeAnswer.fail)throw new Error('probe failed');return probeAnswer;};
 before(async()=>{await db.$connect();});
 after(async()=>{await db.media.deleteMany({where:{user_sub:member}});await db.$disconnect();fs.rmSync(root,{recursive:true,force:true});});
 
@@ -43,7 +45,7 @@ test('the worker converts one waiting video to MP4, stores it under the media ke
 test('a failed conversion is marked FAILED and the original is removed; a claimed row is not converted twice',async()=>{
  await db.media.updateMany({where:{user_sub:member},data:{processing_status:'COMPLETED'}});
  const {id}=await upload(movHeader);
- await assert.rejects(video.transcodeNextVideo(db,{enabled:true,put:async()=>{}},root,async()=>{throw new Error('decode failed');}),/decode failed/);
+ await assert.rejects(video.transcodeNextVideo(db,{enabled:true,put:async()=>{}},root,async()=>{throw new video.TranscodeInputError('decode failed');}),/decode failed/);
  assert.equal((await db.media.findUniqueOrThrow({where:{id}})).processing_status,'FAILED');assert.equal(fs.existsSync(video.sourcePath(root,id)),false);
  const second=await upload(movHeader);await db.media.update({where:{id:second.id},data:{processed_at:new Date()}});
  assert.equal(await video.transcodeNextVideo(db,{enabled:true,put:async()=>{}},root,async()=>{throw new Error('must not run');}),0,'a fresh claim belongs to another worker');
@@ -74,4 +76,30 @@ test('a converting iPhone video can be saved, scheduled and published; the post 
   const failed=await upload(movHeader);await db.media.update({where:{id:failed.id},data:{processing_status:'FAILED'}});
   await assert.rejects(studio.saveContent(member,{...base,id:draft.id,status:'published',scheduledAt:null,media:[{id:failed.id,type:'video',url:failed.url}]}),error=>error.getResponse?.().code==='INVALID_MEDIA');
  }finally{await db.postingMedia.deleteMany({where:{posting:{user_sub:member}}}).catch(()=>{});await db.posting.deleteMany({where:{user_sub:member}});await db.creator.deleteMany({where:{user_id:member}});await db.member.deleteMany({where:{id:member}});}
+});
+
+test('upload refuses QuickTime longer than 10 minutes, larger than 4K, or unreadable; nothing is stored',async()=>{
+ try{
+  Object.assign(probeAnswer,{seconds:601,side:1920});await assert.rejects(upload(movHeader),error=>error.getResponse?.().code==='VIDEO_TOO_LONG');
+  Object.assign(probeAnswer,{seconds:30,side:4097});await assert.rejects(upload(movHeader),error=>error.getResponse?.().code==='VIDEO_TOO_LARGE');
+  Object.assign(probeAnswer,{fail:true});await assert.rejects(upload(movHeader),error=>error.getResponse?.().code==='INVALID_VIDEO');
+  assert.equal(fs.readdirSync(root).filter(f=>f.endsWith('.source')&&!fs.existsSync(path.join(root,f))).length,0);
+ }finally{Object.assign(probeAnswer,{seconds:12,side:3840,fail:false});}
+ assert.equal((await upload(movHeader)).processing,true,'4K and 12 seconds are accepted');
+});
+
+test('storage trouble keeps the original and retries; the third failure gives up; ffmpeg input is locked down',async()=>{
+ await db.media.updateMany({where:{user_sub:member},data:{processing_status:'COMPLETED'}});
+ const {id}=await upload(movHeader),fake=async args=>fs.writeFileSync(args[args.length-1],'x'),broken={enabled:true,put:async()=>{throw new Error('S3 503');}};
+ let clock=Date.now();
+ for(let attempt=1;attempt<=3;attempt++){
+  await assert.rejects(video.transcodeNextVideo(db,broken,root,fake,new Date(clock)),/S3 503/);
+  const row=await db.media.findUniqueOrThrow({where:{id}});assert.equal(row.processing_job_id,`transcode-attempt:${attempt}`);
+  if(attempt<3){assert.equal(row.processing_status,'PROCESSING');assert.ok(fs.existsSync(video.sourcePath(root,id)),'original kept for retry');
+   assert.equal(await video.transcodeNextVideo(db,broken,root,fake,new Date(clock+60000)),0,'not retried before two minutes');clock+=3*60000;}
+  else{assert.equal(row.processing_status,'FAILED');assert.equal(fs.existsSync(video.sourcePath(root,id)),false);}
+ }
+ const args=video.transcodeArgs('in','out');
+ assert.ok(args.indexOf('-f')<args.indexOf('-i')&&args[args.indexOf('-f')+1]==='mov'&&args.includes('-protocol_whitelist'));
+ assert.match(args[args.indexOf('-vf')+1],/trunc\(min\(1280,iw\)\/2\)\*2/);
 });

@@ -76,17 +76,17 @@ test('client reports are bounded, untrusted, rate-limited and scrubbed server-si
  await assert.rejects(scoped(()=>reportClientError(db,{limit:async()=>{throw Error('rate limited');}},{errorType:'Error',frames:[]},'service')),/rate limited/);
 });
 test('API watchdog detects missing/stale worker but never alerts for fresh heartbeat',async()=>{
- const none={count:async()=>0};let heartbeat=null;const events=[];const ops=new PlatformOperationsService({platformJob:{findUnique:async()=>heartbeat},checkoutOrder:none,beanCharge:none,marketingDelivery:none,platformAuditLog:none,platformOperationalEvent:none},new ConfigService({}));ops.record=async(...args)=>events.push(args);
+ const none={count:async()=>0};let heartbeat=null;const events=[];const ops=new PlatformOperationsService({platformJob:{findUnique:async()=>heartbeat},checkoutOrder:none,beanCharge:none,marketingDelivery:none,platformAuditLog:none,platformOperationalEvent:none,media:none},new ConfigService({}));ops.record=async(...args)=>events.push(args);
  const now=new Date();await ops.checkWorkerHealth(now);heartbeat={completed_at:new Date(+now-300001)};await ops.checkWorkerHealth(now);heartbeat={completed_at:now};await ops.checkWorkerHealth(now);assert.equal(events.length,2);assert.equal(events[0][0],'worker.stale');assert.equal(events[0][2],events[1][2]);
 });
 
 test('API watchdog reports each stalled queue once an hour and stays quiet when queues are empty',async()=>{
- const now=new Date('2026-10-29T03:10:00Z'),counts={processing:0,refunding:0,beans:0,uncertain:0,lagging:0,backlog:0},events=[];
- const db={platformJob:{findUnique:async()=>({completed_at:now})},checkoutOrder:{count:async q=>q.where.status==='processing'?counts.processing:counts.refunding},beanCharge:{count:async()=>counts.beans},marketingDelivery:{count:async()=>counts.uncertain},platformAuditLog:{count:async()=>counts.lagging},platformOperationalEvent:{count:async()=>counts.backlog}};
+ const now=new Date('2026-10-29T03:10:00Z'),counts={processing:0,refunding:0,beans:0,uncertain:0,lagging:0,backlog:0,stuck:0,failed:0},events=[];
+ const db={platformJob:{findUnique:async()=>({completed_at:now})},checkoutOrder:{count:async q=>q.where.status==='processing'?counts.processing:counts.refunding},beanCharge:{count:async()=>counts.beans},marketingDelivery:{count:async()=>counts.uncertain},platformAuditLog:{count:async()=>counts.lagging},platformOperationalEvent:{count:async()=>counts.backlog},media:{count:async q=>q.where.processing_status==='PROCESSING'?counts.stuck:counts.failed}};
  const ops=new PlatformOperationsService(db,new ConfigService({TELEGRAM_OPERATIONS_BOT_TOKEN:'configured'}));ops.record=async(...args)=>events.push(args);
  await ops.checkWorkerHealth(now);assert.equal(events.length,0);
- Object.assign(counts,{processing:2,refunding:1,beans:1,uncertain:3,lagging:5,backlog:4});await ops.checkWorkerHealth(now);
- assert.deepEqual(events.map(e=>e[0]),['payment.stuck','refund.stuck','beans.charge_stuck','marketing.uncertain','audit.retention_lagging','alerts.backlog']);
+ Object.assign(counts,{processing:2,refunding:1,beans:1,uncertain:3,lagging:5,backlog:4,stuck:1,failed:2});await ops.checkWorkerHealth(now);
+ assert.deepEqual(events.map(e=>e[0]),['payment.stuck','refund.stuck','beans.charge_stuck','marketing.uncertain','media.transcode_stuck','media.transcode_failed','audit.retention_lagging','alerts.backlog']);
  assert.equal(events[0][1].count,2);assert.equal(events[0][2],'payment.stuck:'+Math.floor(+now/3600000));
 });
 

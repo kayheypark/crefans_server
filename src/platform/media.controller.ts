@@ -14,7 +14,7 @@ import {PlatformService} from './service';
 import {PlatformAuthGuard,PlatformOptionalAuthGuard,PlatformMediaEdgeGuard} from './platform-auth.guard';
 import {reject} from './http';
 import {PlatformMediaStorage,managedMediaKey} from './media-storage';
-import {QUICKTIME_MIME,sourcePath} from './video-transcode';
+import {MAX_VIDEO_SECONDS,MAX_VIDEO_SIDE,QUICKTIME_MIME,sourcePath,videoTools} from './video-transcode';
 import {profilePhotoInUse} from './profile-photos';
 @Controller('media')
 export class PlatformMediaController {
@@ -37,7 +37,14 @@ export class PlatformMediaController {
     }else{
      const handle=await open(file.path,'r'),buffer=Buffer.alloc(12);try{await handle.read(buffer,0,12,0);}finally{await handle.close();}
      const atom=buffer.subarray(4,8).toString('latin1'),mp4=atom==='ftyp',webm=buffer.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3])),mov=['ftyp','moov','mdat','wide','free','skip','pnot'].includes(atom);
-     if(quicktime?!mov:mime==='video/mp4'?!mp4:!webm)reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');if(quicktime)source=sourcePath(root,id);await rename(file.path,source||destination);
+     if(quicktime?!mov:mime==='video/mp4'?!mp4:!webm)reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');if(quicktime){
+      // Too long or larger than 4K is refused before anything is stored (user decision 2026-11-01).
+      let info:{seconds:number;side:number};try{info=await videoTools.probe(file.path);}catch{reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');}
+      if(info.seconds>MAX_VIDEO_SECONDS)reject(400,'VIDEO_TOO_LONG','동영상은 10분 이하만 올릴 수 있어요.');
+      if(info.side>MAX_VIDEO_SIDE)reject(400,'VIDEO_TOO_LARGE','4K보다 큰 동영상은 올릴 수 없어요.');
+      source=sourcePath(root,id);
+     }
+     await rename(file.path,source||destination);
     }
     const remote=this.storage.enabled;
     const row=await this.service.db.media.create({data:{id,user_sub:req.user.sub,type,original_name:file.originalname.slice(0,200),file_name:id,file_size:size,mime_type:mime,original_url:`/api/v1/media/${id}/file`,s3_upload_key:remote?`platform/${id}`:`local/${id}`,processing_status:quicktime?'PROCESSING':remote?'UPLOADING':'COMPLETED',processed_at:remote||quicktime?null:new Date()}});tracked=true;
