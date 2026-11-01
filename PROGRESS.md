@@ -1,5 +1,14 @@
 # PROGRESS: crefans_server
 
+## 2026-11-01 친구 초대 내역(A안)·초대 페이지 로딩 규칙 — 로컬 완료·미배포
+
+- 사용자 결정: 초대 내역 화면은 시안 A(요약 3칸+상태 칩+초대별 행). 가입자 이름은 앞 세 글자+별 10개로 가림.
+- 서버 a7637e8: GET /api/v1/me/referral/history(status=joined|waiting|rewarded, page, 20개). 본인 초대만, 마스킹 닉네임·상태·가입일·확정 예정일·지급일·보상 콩만 반환(이메일·회원 ID·결제 정보 없음), 스위치 꺼지면 404. OpenAPI 계약 포함.
+- 프론트 2cc2e29: ReferralHistoryPage(로딩 규칙: 이전 목록 유지·1초 뒤 스피너·마지막 요청만 반영), 모델 액션, 목업 데이터. 99fc856: 친구 초대 응답 전 undefined.
+- 미커밋(다른 세션 미커밋 코드 위): /beans/referral-history 경로 허용·제목(app/service, app/preview), 두 ServiceRouter 분기, 초대 페이지 "초대 내역 보기" 링크, 초대 페이지 로딩 분기(BeanReferralPage)와 그 테스트, 서버 tests/platform-openapi.test.cjs 개수(185/78/46).
+- 검증: 서버 referrals·openapi 21건(대조: 마스킹 제거 시 실패), 프론트 npm test 450(대조: 마지막 요청 검사 제거 시 실패), 모바일 WebKit 목업 화면. 증거 `.local/referral-history-20261101/`, `.local/ux-spinner-referral-20261101/`.
+- 남은 일: 운영 배포 승인 대기. 처리방침에 "초대한 회원에게 가입자 닉네임 앞 세 글자와 진행 상태를 보여 줌" 고지 필요(현재 처리방침은 집계만 보여 준다고 되어 있을 수 있음, 확인 필요). 운영 레퍼럴 스위치는 꺼져 있어 배포해도 화면은 "이용할 수 없음".
+
 ## 2026-11-01 아이폰 .mov 업로드 서버 변환 — mov-transcode-20261101 운영 배포(API·워커·프론트)
 
 - 사용자 제보: 아이폰에서 동영상 선택 시 "JPG·PNG·WebP·MP4·WebM 파일만 지원" 오류(아이폰은 QuickTime .mov, 주로 HEVC). 사용자 결정: 서버에서 MP4로 변환.
