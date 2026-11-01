@@ -62,7 +62,7 @@ export function buildPlatformOpenApi(app:INestApplication):OpenAPIObject{
 export function splitPlatformOpenApi(document:OpenAPIObject):Record<keyof typeof API_DOCS_PAGES,OpenAPIObject>{
  const sharedAuth=new Set(['/api/v1/auth/login','/api/v1/auth/logout','/api/v1/auth/refresh']);
  // Shared calls used by StudioRouter/useStudioModel and their session, identity and media adapters.
- const studioShared=new Set([...sharedAuth,'/api/v1/session','/api/v1/bootstrap','/api/v1/common','/api/v1/identity/start','/api/v1/identity/status','/api/v1/media','/api/v1/media/{id}/file','/api/v1/media/{id}/origin-file','/api/v1/members/{id}/messages','/api/v1/members/{id}/messages/read','/api/v1/members/{id}/block','/api/v1/reports','/api/v1/telemetry/browser-errors']);
+ const studioShared=new Set([...sharedAuth,'/api/v1/session','/api/v1/bootstrap','/api/v1/common','/api/v1/identity/start','/api/v1/identity/status','/api/v1/media','/api/v1/media/{id}/file','/api/v1/media/{id}/origin-file','/api/v1/media/{id}/status','/api/v1/members/{id}/messages','/api/v1/members/{id}/messages/read','/api/v1/members/{id}/block','/api/v1/reports','/api/v1/telemetry/browser-errors']);
  const labels={user:'유저',studio:'크리에이터 스튜디오',console:'관리자 콘솔'};
  const descriptions={user:'팬 서비스와 공통 인증·결제·미디어·연동 API. 스튜디오 전용 API는 크리에이터 스튜디오 문서에서 확인합니다.',studio:'크리에이터 콘텐츠·멤버십·구독자·통계·수익·정산·출금 API. 화면 초기화·인증·출금 본인확인·미디어·소통·오류 보고의 공통 API도 포함합니다.',console:'운영자 API와 콘솔에서 사용하는 공통 로그인·세션 갱신·로그아웃 API.'};
  const links=(Object.keys(API_DOCS_PAGES) as (keyof typeof API_DOCS_PAGES)[]).map(key=>`[${labels[key]}](${API_DOCS_PAGES[key]})`).join(' | ');
