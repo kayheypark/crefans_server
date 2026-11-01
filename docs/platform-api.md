@@ -87,6 +87,9 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /me/email/confirm | 회원; email/code, 변경 후 세션 철회 |
 | POST | /me/inquiries | 회원; category/title/message |
 | POST | /me/withdraw | 회원; 자동 갱신·처리 중 출금 확인 후 탈퇴/세션 철회. 크리에이터는 추가로(2026-10-30 D8) 판매 중 멤버십 409 MEMBERSHIP_ON_SALE, 결제된 구독 기간 남음 409 PAID_PERIOD_REMAINS, 미정산 미수금 409 RECEIVABLE_OPEN, 남은 멤버십 수익 409 EARNINGS_REMAIN. 탈퇴 30일 후 파기에 메시지(주고받은 양쪽)·문의·본인확인 해시 포함. 콩: 남은 충전콩은 지갑 환불 후(409 BEAN_BALANCE_REMAINS 안내 문구), 후원받은 콩은 출금 후, 프로모션콩은 막지 않고 소멸. 30일 후 파기는 본인확인 해시를 지우고 DM은 상대방 쪽 보존(보낸 사람 "탈퇴한 사용자"), 문의는 파기 3년 후 삭제(2026-10-30 /pilot-work) |
+| PUT | /me/profile/photos | 회원; avatar·cover(POST /media 응답 url, null=삭제, 생략=유지). 본인이 올린 이미지만 사용, 크리에이터면 크리에이터 프로필 사진·배경도 같은 값으로 변경. 사용 중인 사진은 공개 조회 가능 |
+| GET | /me/referral | 회원; 스위치(platform_settings referral.enabled)가 켜졌을 때만, 꺼지면 404 REFERRAL_DISABLED. 초대 코드와 집계(가입·확정 대기·보상 수, 받은 보상 콩)만 반환. 보상은 직접 초대한 회원의 첫 실결제 1회에 후원 전용 프로모션콩 100개(출금 불가, 2026-11-01) |
+| GET | /me/referral/history | 회원; status=joined/waiting/rewarded, page. 본인이 초대한 회원만, 닉네임 앞 세 글자+별 10개로 마스킹, 이메일·회원 ID·결제 정보 없음. 항목 상태 joined/waiting/rewarded/clawed/capped/forfeited(소멸) |
 
 게시물 DTO의 `views`는 기존 `Posting.total_view_count`를 그대로 제공한다(bootstrap·피드·직접 상세 공통).0회와 잠긴 글에도 집계 숫자를 제공하며 본문·미디어 접근 판정은 기존대로다. 신규 v1의 증가 처리는 아직 없고 이번 변경은 조회수 표시 계약만 추가했다. 예전 비버전 PostingService의 조회 증가 API를 호출하거나 DB 값을 보정하지 않는다. 검증: `tests/platform-feed-category.test.cjs`의 실제 격리DB/HTTP 대조, 프론트 `docs/audit/post-views-20261025.json`. 2026-10-25 `post-views-20261025` 운영 반영, 배포 증거는 프론트 `docs/audit/post-views-deployment-20261025.json`. 자동 증가 기능의 미구현 경계는 동일하다.
 
@@ -117,6 +120,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /media/:id/file | owner/게시물 권한/공개 멤버십 이미지에 따른 파일 응답; CDN 캐시 적중도 현재 권한 검사 |
 | GET | /media/:id/edge-authorize | 엣지 HMAC + 현재 세션/콘텐츠 권한; S3 객체 키 또는 legacy API 경로 선택, 파일 바이트 없음 |
 | GET | /media/:id/origin-file | 동일 권한 검사를 적용한 직접 스트리밍; legacy/롤백 경로 |
+| GET | /media/:id/status | 업로더 본인만; 아이폰 QuickTime 변환 상태 processing/completed/failed. 다른 회원에게는 404 MEDIA_NOT_FOUND |
 
 스튜디오 답글(2026-10-28): `community.comments[].replies[]`는 항상 `author`(id/name/image)를 제공하고 `fromCreator`로 본인 작성 여부를 명시한다. 내 답글에는 크리에이터 활동명·프로필 사진이 우선 적용된다. 프론트는 공통 `StudioCommentReply`로 사진·이름·작성자 표시와 본인 수정·삭제를 제공한다. 삭제 전 확인하고 실패하면 초안/기존 본문을 유지한다. 서버는 로그인 사용자·게시물 소유자·답글 작성자·부모 관계·삭제 상태를 검사하며, 소유하지 않은 대상은404로 거절한다. 수정/소프트 삭제/댓글 수 변경과 `creator.reply.created/updated/deleted` 감사 기록은 같은 DB 트랜잭션에서 처리한다. 감사에는 본문을 저장하지 않는다. 권한 근거: [OWASP API1:2023 객체 수준 권한 검사](https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization/), 확인2026-10-28. 검증: `tests/platform-studio-replies.test.cjs`의 격리 로컬DB·실제 회원 세션 HTTP 검사 및 `tests/platform-openapi.test.cjs`. 이 변경은 아직 운영 미배포.
 
@@ -456,6 +460,9 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 | POST | /admin/comments/:id/moderation | content.update. hidden·reason 필수. 숨긴 댓글은 모든 목록에서 제외(숨긴 최상위 댓글의 답글 포함)·게시물 댓글 수 감소, 해제 시 복구. moderation_actions(target_type COMMENT) 기록. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
 | GET | /admin/comments/:id/moderation | content.view. 댓글 조치 이력(최신 100건) |
 | POST | /admin/members/:id/suspension | members.update. suspended·days(7/30/null=무기한)·reason. 제한 시 세션 삭제, 기간 중 로그인 403 ACCOUNT_SUSPENDED(비밀번호 일치 후에만 안내), 토큰 검증·갱신도 거부. 기간 경과 시 자동 해제. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
+| GET | /admin/referrals | referrals.view. 스위치 상태, 상태별 집계, 추천인·초대받은 회원(활동명·이메일)·보상 상태(pending/qualified/granted/clawed_back/capped/forfeited)·수량·확정 예정일 |
+| PUT | /admin/referrals/settings | referrals.update. enabled(boolean) 필수, platform_settings referral.enabled 저장, 감사 기록 admin.referral_settings_updated. 기본 꺼짐 |
+| POST | /admin/members/:id/referral | referrals.create. 팬·크리에이터 구분 없이 회원당 초대 링크 1개(이미 있으면 같은 코드). 스위치가 꺼져 있으면 가입에 쓰이지 않음 |
 | GET | /admin/members/:id/suspension | members.view. 회원 이용 제한 이력 |
 | POST | /admin/members/:id/erase | SUPER_ADMIN 전용 회원 즉시 삭제(2026-10-30). reason(내부, 500자)·confirmEmail(회원 이메일, 대소문자 무시) 필수, 불일치 400 CONFIRMATION_MISMATCH. 탈퇴 전 회원은 회원 탈퇴와 같은 검사(자동 갱신 구독·남은 콩·진행 중 콩 충전·출금·남은 수익·진행 중 출금·판매 중 멤버십·남은 구독 기간·미수금, 409)를 통과해야 함. 통과하면 30일 유예 없이 `purgeMember`로 즉시 파기(이메일·이름·프로필·게시물·본인확인 값·세션, 이메일이 `withdrawn-<id>@deleted.invalid`가 되어 같은 이메일 재초대·재가입 가능). 결제·정산·주문 기록은 회원 번호로 보관, 댓글·메시지는 '탈퇴한 사용자'. 이미 파기됨 409 MEMBER_ALREADY_PURGED. moderation_actions(member.erased)·감사 로그(admin.member_erased, member.purged) 기록, 당사자 알림 없음 |
 | GET | /admin/members/:id/terms | members.view. 회원 개별 수수료·출금 조건(terms, null=기본값)·version·플랫폼 기본값(defaults)·변경 이력(history, 최신 100건) |
