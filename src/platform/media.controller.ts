@@ -61,6 +61,13 @@ export class PlatformMediaController {
    for(const link of restricted){if(!await this.service.consumeContent(link.posting,req.user?.sub))reject(403,'MEDIA_ACCESS_DENIED','파일 이용 권한이 없습니다.');}
    return m;
  }
+ /** The uploader polls this while an iPhone video is being converted (2026-11-01); other members get 404. */
+ @Get(':id/status') @UseGuards(PlatformAuthGuard)
+ async status(@Param('id') id:string,@Req() req:any){
+   const m=await this.service.db.media.findFirst({where:{id,user_sub:req.user.sub,is_deleted:false},select:{processing_status:true}});
+   if(!m)reject(404,'MEDIA_NOT_FOUND','파일을 찾을 수 없습니다.');
+   return{status:m.processing_status==='COMPLETED'?'completed':m.processing_status==='FAILED'?'failed':'processing'};
+ }
  @Get(':id/edge-authorize') @UseGuards(PlatformMediaEdgeGuard,PlatformOptionalAuthGuard)
  async edgeAuthorize(@Param('id') id:string,@Req() req:any){
    const m=await this.authorize(id,req);

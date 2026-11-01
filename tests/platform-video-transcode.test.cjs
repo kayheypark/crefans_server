@@ -50,3 +50,11 @@ test('a failed conversion is marked FAILED and the original is removed; a claime
  assert.equal(await video.transcodeNextVideo(db,{enabled:false,put:async()=>{}},root,async args=>fs.writeFileSync(args[args.length-1],'x'),new Date(Date.now()+26*60000)),1,'a stale claim is retried');
  assert.ok(fs.existsSync(path.join(root,second.id)),'local storage serves the converted file under the media id');
 });
+
+test('only the uploader can poll conversion status: processing, then completed or failed',async()=>{
+ const {id}=await upload(movHeader),c=controller([]);
+ assert.deepEqual(await c.status(id,{user:{sub:member}}),{status:'processing'});
+ await assert.rejects(c.status(id,{user:{sub:randomUUID()}}),error=>error.getResponse?.().code==='MEDIA_NOT_FOUND');
+ await db.media.update({where:{id},data:{processing_status:'COMPLETED'}});assert.deepEqual(await c.status(id,{user:{sub:member}}),{status:'completed'});
+ await db.media.update({where:{id},data:{processing_status:'FAILED'}});assert.deepEqual(await c.status(id,{user:{sub:member}}),{status:'failed'});
+});

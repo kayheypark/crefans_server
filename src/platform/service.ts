@@ -48,7 +48,8 @@ export class PlatformService {
    return true;
   });
  }
- async post(p:any,viewer?:string,expose=true){const allowed=expose?await this.consumeContent(p,viewer):(!p.is_membership&&await this.access(p,viewer)),c=await this.db.creator.findUnique({where:{user_id:p.user_sub}});const media=allowed?p.medias.filter((x:any)=>!x.is_deleted&&!x.media.is_deleted&&x.media.processing_status==='COMPLETED').map((x:any)=>({type:x.media.type==='VIDEO'?'video':'image',url:`/api/v1/media/${x.media.id}/file` })):[];
+ async post(p:any,viewer?:string,expose=true){const allowed=expose?await this.consumeContent(p,viewer):(!p.is_membership&&await this.access(p,viewer)),c=await this.db.creator.findUnique({where:{user_id:p.user_sub}});// A converting iPhone video stays in place as `processing` so viewers see an "optimizing" notice instead of a gap (2026-11-01).
+   const media=allowed?p.medias.filter((x:any)=>!x.is_deleted&&!x.media.is_deleted&&(x.media.processing_status==='COMPLETED'||x.media.type==='VIDEO'&&x.media.processing_status==='PROCESSING')).map((x:any)=>({type:x.media.type==='VIDEO'?'video':'image',url:`/api/v1/media/${x.media.id}/file`,...(x.media.processing_status==='PROCESSING'?{processing:true}:{}) })):[];
    return{id:p.id,creatorId:p.user_sub,title:p.title,body:allowed?p.content:'',image:media.find((x:any)=>x.type==='image')?.url||'',position:'center',media,likes:p.like_count,comments:p.comment_count,views:p.total_view_count,supporterCount:await postSupporterCount(this.db,p.id),tipsEnabled:p.allow_tips!==false,requiredRank:p.is_membership?p.membership_level||1:0,requiredPlanId:p.access_plan_id||undefined,time:p.created_at.toISOString(),commentsEnabled:!!c?.comments_enabled&&p.allow_comments,canAccess:allowed};}
  async bootstrap(viewer?:string,collection?:string){
    const [creators,plans,posts,documents]=await Promise.all([
