@@ -1,0 +1,7 @@
+require('ts-node/register/transpile-only');
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {codeMail,noticeMail,noticeCopy}=require('../src/auth/local/mail/templates');
+for(const purpose of ['verify','reset','email-change'])test('code template '+purpose,()=>{const m=codeMail('012345',purpose);assert.match(m.html,/012345/);assert.match(m.text,/012345/);assert.match(m.html,/cid:crefans-logo@crefans.com/);assert.equal(m.attachments[0].content.subarray(1,4).toString(),'PNG');assert.doesNotMatch(m.subject+m.text+m.html,/\u2014/);assert.doesNotMatch(m.html,/<script|<a /);assert.match(m.text,/10분/);});
+test('invalid codes and unknown purposes rejected',()=>{for(const c of ['12345','1234567','<script>','１２３４５６'])assert.throws(()=>codeMail(c,'verify'));assert.throws(()=>codeMail('123456','unknown'));});
+for(const kind of Object.keys(noticeCopy))test('notice template '+kind,()=>{const m=noticeMail(kind,[['크리에이터','<script>alert(1)</script>\u2014하늘']], 'https://crefans.com/service/me','검증 안내');assert.doesNotMatch(m.subject+m.text+m.html,/\u2014/);assert.doesNotMatch(m.html,/<script>/);assert.match(m.html,/&lt;script&gt;/);assert.match(m.html,/https:\/\/crefans.com/);});
+test('mail action URL rejects untrusted origins and schemes',()=>{for(const u of ['javascript:alert(1)','https://evil.example','https://crefans.com.evil.example','http://crefans.com','https://user:pass@crefans.com','https://crefans.com:444'])assert.throws(()=>noticeMail('payment-completed',[],u,''));});

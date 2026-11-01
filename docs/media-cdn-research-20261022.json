@@ -1,0 +1,147 @@
+{
+  "createdAt": "2026-10-22T07:11:59.789056+00:00",
+  "kind": "official-source-research-and-arithmetic-not-runtime-proof",
+  "request": "Compare CDN delivery cost savings with URL-only non-subscriber denial, preserving live membership and media authorization.",
+  "repositoryState": {
+    "front": {
+      "path": "/Users/ethan/repository/crefans_front",
+      "head": "dc3d663e63c7b22bb57dc8c198af2ab6d963488a",
+      "branch": "feat/operations-security",
+      "dirty": true,
+      "statusSha256": "c05dee0f3b2d42d4a818d78eb180bb4061e6bee28833bd4e51924d468d06fbc5",
+      "statusEntryCount": 77
+    },
+    "server": {
+      "path": "/Users/ethan/repository/crefans_server",
+      "head": "c100a3af5a5508adb0e6ba521d2e5238fb5f1ff1",
+      "branch": "feat/operations-security",
+      "dirty": true,
+      "statusSha256": "a556407a461d55dd36464306ef5df83e69fe46990b61523190f77c18a90d823a",
+      "statusEntryCount": 97
+    }
+  },
+  "sourceFiles": {
+    "src/platform/media.controller.ts": "583b29d219a8f42e9b68c7bf4668866b3f9a56fbc792c1e71c7e7073b4429fe3",
+    "src/platform/media-storage.ts": "3226954f1be1e1f53e14f12c4aa1b0811fe37b286463ef86eb9ab897d856e7fc",
+    "src/platform/service.ts": "cf1f25e42f8acd2c49aba7f54250d03eec91445ff663709e655c292b807a7520",
+    "infra/platform/provision-media.py": "83161d12f9ae3ce611f5f5da4c333578dc8b6cff1536becab769a7fbe8a1cf61",
+    "tests/platform-media-cloud.integration.test.cjs": "6d0da3e9b28ed8121da2ed0b61a8c75a4c615ba971945018b3f82b6493505640",
+    "docs/private-media.md": "0361592173e81036d6129d80e82cc233a4612752da19409553de4726be8a92ad"
+  },
+  "sources": [
+    {
+      "title": "AWS external authorization",
+      "url": "https://aws.amazon.com/blogs/networking-and-content-delivery/external-server-authorization-with-lambdaedge/",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "Viewer request calls authorization before serving cached or S3 bytes; fail-closed chosen for crefans."
+    },
+    {
+      "title": "CloudFront trigger order",
+      "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-cloudfront-trigger-events.html",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "Viewer request runs before cache lookup; origin request does not run on cache hits."
+    },
+    {
+      "title": "CloudFront signed cookies",
+      "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-signed-cookies.html",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "URL-independent time-limited authorization; default validation does not query live subscription DB."
+    },
+    {
+      "title": "Google Cloud signed cookies",
+      "url": "https://docs.cloud.google.com/cdn/docs/using-signed-cookies",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "Cross-provider support; unsigned requests and origin protection require explicit handling."
+    },
+    {
+      "title": "CloudFront OAC",
+      "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "Private origin access scoped to distribution; does not replace viewer authorization."
+    },
+    {
+      "title": "Edge runtime differences",
+      "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/edge-functions-choosing.html",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "Lambda@Edge supports network calls; CloudFront Functions does not."
+    },
+    {
+      "title": "Edge combination restrictions",
+      "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/edge-function-restrictions-all.html",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "Cannot mix Lambda@Edge and CloudFront Functions in viewer events of the same behavior."
+    },
+    {
+      "title": "CloudFront flat pricing",
+      "url": "https://aws.amazon.com/cloudfront/pricing/",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "Free USD0; Pro USD15 per distribution per month."
+    },
+    {
+      "title": "CloudFront plan allowances and restrictions",
+      "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/flat-rate-pricing-plan.html",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "Free 100GB/1M requests; Pro 50TB/10M; Lambda@Edge available all tiers with extra usage charges; sustained excess can affect delivery; custom caching/response policies need higher tiers."
+    },
+    {
+      "title": "CloudFront usage pricing",
+      "url": "https://aws.amazon.com/cloudfront/pricing/pay-as-you-go/",
+      "checkedOn": "2026-10-22",
+      "review": "manual official-page read through web tool",
+      "finding": "AWS origin to CloudFront USD0/GB; Lambda@Edge USD0.60 per million and USD0.00005001 per GB-second."
+    }
+  ],
+  "costExample": {
+    "currency": "USD",
+    "successfulMediaRequests": 1000000,
+    "memoryMB": 128,
+    "authDurationMs": 100,
+    "viewerResponseDurationMs": 1,
+    "invocationsPerMediaRequest": 2,
+    "authCost": "1.225125000000",
+    "viewerResponseCost": "0.60625125000000",
+    "edgeTotal": "1.83137625000000",
+    "proPlusEdge": "16.83137625000000",
+    "excluded": [
+      "EC2/DB",
+      "S3 storage and requests after applicable plan credits",
+      "logs",
+      "small authorization network traffic",
+      "tax"
+    ],
+    "notMeasured": true
+  },
+  "verification": {
+    "method": "Python Decimal assertions of documented price arithmetic; source and current-code manual review",
+    "exitCode": 0,
+    "arithmeticAssertionsPassed": 4
+  },
+  "notPerformed": [
+    "Application or infrastructure code changes",
+    "AWS or production configuration changes",
+    "New architecture prototype, security integration, latency or load tests",
+    "Actual bill or cost savings measurement"
+  ],
+  "currentProductionReference": "docs/membership-level-20261022.json",
+  "currentVsProposed": "S3 API streaming remains current. Lambda@Edge viewer authorization with S3/CloudFront bytes is a proposal requiring implementation and fail-closed cache-hit testing.",
+  "documentationVerification": {
+    "command": "npm run docs:record && npm run check:docs && npm run test:docs",
+    "cwd": "/Users/ethan/repository/crefans_front",
+    "completedAt": "2026-10-22T07:12:38.551470+00:00",
+    "exitCode": 0,
+    "result": "PASS",
+    "documents": 58,
+    "routes": 96,
+    "negativeControlsPassed": 5,
+    "scope": "Document inventory, contracts, links, change detection only; not a runtime security or deployment test."
+  }
+}

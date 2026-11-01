@@ -31,8 +31,8 @@ export default registerAs("app", () => ({
     optionsSuccessStatus: 204,
   },
   cookie: {
-    domain: process.env.NODE_ENV === "prod" ? ".crefans.com" : undefined,
-    secure: process.env.NODE_ENV === "prod",
+    domain: process.env.COOKIE_DOMAIN || undefined,
+    secure: ["prod", "production"].includes(process.env.NODE_ENV),
     sameSite: "lax" as const,
   },
 }));

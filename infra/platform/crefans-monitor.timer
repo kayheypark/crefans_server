@@ -1,0 +1,10 @@
+[Unit]
+Description=Crefans external availability monitor interval
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+Unit=crefans-monitor.service
+
+[Install]
+WantedBy=timers.target

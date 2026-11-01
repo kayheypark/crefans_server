@@ -1,0 +1,322 @@
+{
+  "at": "2026-10-21T17:27:52.516437+00:00",
+  "scope": "Implementation of previously inventoried logging gaps; local verification only",
+  "environment": {
+    "node": "v22.7.0",
+    "os": "macOS-15.2-arm64-arm-64bit-Mach-O",
+    "database": "loopback3307 dev and locked crefans_platform_e2e; no production migration",
+    "providers": "Toss/bank/Telegram doubles, local SMTP protocol sink; no external sends"
+  },
+  "repositories": {
+    "crefans_server": {
+      "head": "c100a3af5a5508adb0e6ba521d2e5238fb5f1ff1",
+      "branch": "feat/operations-security",
+      "dirty": true,
+      "note": "Contains earlier uncommitted work, not all dirty files originated in this task",
+      "files": {
+        "AGENTS.md": "f8dbd384e022c701d2e080deafa351109729e93c6e160000749a0e0cecc44e4f",
+        "PROGRESS.md": "233a54488de6657c94ce95736c1637c3d3e5bf58d053390eac6b5cc8e7e15755",
+        "prisma/schema.prisma": "da5fe27d75561ede54e5c0cece651c755faead09db11ed8492475f10fd445ecb",
+        "prisma/migrations/20261022020000_audit_logs/migration.sql": "c3312aca7d23bfd77a2c71c497dc1e26a2b2570d575f5e6cf1fc446f91e06eef",
+        "src/platform/audit.ts": "152ac60ca0dcd8755668b2e69d611b8f95b3c9472e35ba1870e15f8c7b245706",
+        "src/platform/audit-retention.ts": "487d5d5f655208a810d43a7807da934430b516be7418419107894d4073b77618",
+        "src/platform/admin-logs.ts": "6696603b3c003f24e31d475256bd64623c317b5892ef0b5881b5733612db50e0",
+        "src/platform/admin.controller.ts": "0c901c12e0cd3bb0f4b8280a31e95800831cfb6493f1b6a662360fc01555b94b",
+        "src/platform/operations-events.ts": "fd9f0a020e0aa2f2fe0de7f20f1b9bc76c32f9a406e8e58f215926525a53d9e1",
+        "src/platform/operations.service.ts": "1941c0a7cc66b3d4d964acf12b89555affe9cc80ca05d308d370673151a6b5a7",
+        "src/platform/request-context.ts": "6918d05ad00b22891a504aeba2938df10e13ad4c33133e8916720a2e904f8cd1",
+        "src/platform/security.service.ts": "3c7f8699e30ff1cd96d00cc03101e869ab0beb24ab5596013096f7b0ead26771",
+        "src/platform/platform-auth.guard.ts": "575af782e6ac21888c3b211b644e2f7ca520075e5627e47f1eadc380f52e0d36",
+        "src/platform/http.ts": "fa6719725948b8119c078cea4dd2a2264e77ba0d773a37cf5bef4d7988434f09",
+        "src/platform/main.ts": "0bc08c54f924e11d6f3504cf1757d3c24b8d0ee43fc78c8ff97526bb75f1e7a7",
+        "src/platform/auth.service.ts": "fdb11ec42f86ee6acff13e77fcdc5be480aa27c1e2c9202e65796a577a0edfc3",
+        "src/platform/auth.controller.ts": "894748867a454698f3359388074ebc044ee5b47324839cb1c1691c9eeb3bff1f",
+        "src/platform/payment-provider.ts": "e5b6dfa7a7618b86a49504588e171e81177d541dd384e52a19197536f2fe783b",
+        "src/platform/bank-provider.ts": "2973b468a2b2e82cdc67398530fa200781d812455c6157fd580965c7b6742ba7",
+        "src/platform/finance.service.ts": "c75356fe05a10cb3a430aed65299b5fc4becd11941a745163c136c2a5490413c",
+        "src/platform/financial-policy.ts": "39f77f75fdd00e0c85462c1ed5b34e9b9fb76f5a785fd4ea5619edd63eead2b0",
+        "src/platform/jobs.service.ts": "b8d6ecbffdad68f16c445291b0e9fb8eb9fcb8cadacb47abc977fc0d65f6cd23",
+        "src/platform/service.ts": "d317dea9be0a6ae066d84f8279ef65c8c512d62f05f1d71d679cd5c162cbe9b7",
+        "src/platform/studio.service.ts": "d53aaca5e71b5c8718a3546b4396472724e28336179a51e2ec7b12312b1ca676",
+        "src/platform/client-errors.ts": "21e152e7315fd2c5eeec74e7b70cdc3e42b1ea7083e22a04f2b02d7f6215a97c",
+        "src/platform/telemetry.controller.ts": "940e2e43998e7cb020461b6d1e971a228375a6c4cbada80bf7929e4de6493a4c",
+        "src/platform/module.ts": "c08eba5b3c8f452514fbeb02b935efaa8c8c8949a7940d1a3ed999734d3725f3",
+        "src/auth/local/member-mail.service.ts": "045a5092bf321558448311bc9f14e6dcab735d63429b930ccedd7536f4c82777",
+        "infra/platform/Caddyfile": "96aeeaf5169e599584d49b5c7fefab1276cc6a5f170efd25efb42b9863d0eb6f",
+        "infra/platform/compose.yml": "ba8323e272080d618d958a22d171c0ea77c36368b85910e86fb3134976d05f1d",
+        "infra/platform/runtime.env.example": "bae6cfac5b5801f1b4e3485c33cb15a602f321f3535b3a4b0f5afd477bcfcf07",
+        "infra/platform/compose.cloudwatch.yml": "baeef45d27e312bdee10b233e00f1a72df87cabeb4041197d7ca8f2663e9c29b",
+        "infra/platform/cloudwatch-role-policy.json.example": "c6311088f0edb6f1edd7172b3521249373661d6904b18eedea75a49f109d2ef9",
+        "infra/platform/crefans-monitor.service": "4e524f7312293795d31269a2714149b0c926658ca0081dc8cce4c50c80b08a88",
+        "infra/platform/crefans-monitor.timer": "24e5265e671fb981a45769279e71f7d3bab4a16dc52fc74db2240658752732bc",
+        "infra/platform/external-monitor.env.example": "c89e6bfad3516c799ae14e4a7d8c7cdecc791e7d35dbdf374dca2f91083ca085",
+        "scripts/platform-audit-export.cjs": "d17a00b8a7739f359c62bc4ea3815c51c033894d4246842e5c562b920e4523da",
+        "scripts/platform-external-monitor.cjs": "99c264f05a5b60ed587de0145f8c4cff3954349a3836ebcfdea40df56e1bc81f",
+        "scripts/platform-audit-security-test.cjs": "a7f15d10ff046798a7aa5ff783f1ac781b280983544cfab1d5c361799d25e8eb",
+        "tests/platform-audit.test.cjs": "0c7072bf314318ae8086e089fb6e66cb63d469674d0bc0f2a4ad9e2f67abee3d",
+        "tests/platform-audit-export.test.cjs": "39940a4c5038ae24ec871b22704a22c8537ef3ae947656b8a0dcd7b3fdf6144d",
+        "tests/platform-log-config.test.cjs": "3f51cbb8743cce0b5a93d2e03ea458f2f102039a6e5b7db0613ba934af8e72d1",
+        "tests/platform-external-monitor.test.cjs": "f85eca26eb90799c78d5fe903cee2cbdccebda2ad145bfd26eb32ed3d46badf6",
+        "tests/platform-proxy.py": "0f9b8707a36dc5ccdf33cb2e238768c415f2541660f318a0324e8d02c73c1aab",
+        "tests/platform-security.test.cjs": "1ceaa93bc25d7c05b9fa008712bbb7a44c9a9c739e69cb0a167c22f2a775d778",
+        "tests/platform-operations-http.test.cjs": "9dad998737d75e3d0c150fe8d64448d3d3df6bb38046f94ef233015f68ba75f9",
+        "tests/platform-operations.test.cjs": "1705c685fa2033e90b28762507aaae1a1fe5be1bc50827d0f12a126a2c49c855",
+        "tests/platform-payment-lifecycle.test.cjs": "81047ddebef07cb5c60eba74b4c9e1294f1e73c7398a78a88f51d50cc9790714",
+        "tests/platform-provider-http.test.cjs": "c230721738cef5e5cacf267e61985a814b99ff6ca38d0b602bf70177684dfefb",
+        "tests/admin-console-server.cjs": "1b8b5ec84a0f2af3f2980b586b7e4f5b69bc5259986dcaf568e32362d482d022",
+        "docs/operational-logging.md": "738983b7760df0abc0017d25b6ff77c6a147790471f10fe48cfb3cb08e2e0788",
+        "docs/platform-api.md": "dd35ad315a768d9e46c9aa8021a2d75220b7dd7446f629dd41c13b594dac56e6",
+        "docs/platform-implementation.md": "7d839f713b989ef69115fabb7c86bd3f2f7ad0daf7a0db8ae17e69ebf4dcb628",
+        "docs/provider-contracts.md": "3737344fe2ae55d4246fc1b59e6b65a2d0a614e6ed96811bf0fdc93a6d109a95",
+        "infra/platform/README.md": "79685362243a651fb5b59ec151ee423f3192babc3d40b1fd6b04497864bb00ab",
+        "package.json": "dfb060196a3ed6f93e4b679425862b2a542eac7d1503b6b794c3d6839bd5c436"
+      }
+    },
+    "crefans_admin": {
+      "head": "7928cb6fc70c27bbcb8f5ec4a760023a5ffda01c",
+      "branch": "feat/operator-console",
+      "dirty": true,
+      "note": "Contains earlier uncommitted work, not all dirty files originated in this task",
+      "files": {
+        "AGENTS.md": "608f8dac534ed0d33e872458d56a7f86cb56cc6f3a4aee893a8a34741bf272f1",
+        "PROGRESS.md": "959368ef0328118f713f1fb017ea179208c441caccd175959a7552cb70146a24",
+        "README.md": "76bc36ea42f8bd60e88a2889e0b6daf181364262180456a3f9ac5d60d286830a",
+        "src/components/console/Logs.tsx": "b51251243ad11baf4e3639450c6d5a1466f668e99e7f9e4da42f8c11593c17c6",
+        "src/components/console/Console.tsx": "da1f9a662a518934046cdc5948aa9fe465988268a33881ca2b55ce1375216011",
+        "src/components/console/ConsoleIcon.tsx": "abaf84cbbcac2361a1686a9f23de42931c524e2349833a7b1a032e4a3786da90",
+        "src/lib/console-api.ts": "3867ade606425ac0dbe7c106772b2456c52415f5f530a198903d9329b0f256b6",
+        "src/lib/browser-errors.ts": "a42ff302211cc7d0e28718dd8f77efd286d28bc76c875460bcc329976b2bcd3f",
+        "src/app/console/error.tsx": "21b1b58853cd8bbfe5d2a6b8d2d1f85dac80935708f10c16e6bae836627fed60",
+        "src/app/console/[[...section]]/page.tsx": "a94ccb77c84e820ebbda23069a0f2035066513a7f2ee42b4970af662fa46ab19",
+        "src/app/globals.css": "2b6674c56840ec9e31e4828f99160e3950bc5287758a08b306d4111c13a47da0",
+        "tests/browser-errors.test.cjs": "2249387af1e31b3c1dac29d172f736f6c83ed46345cee9b20c9c8983dfc6426d",
+        "tests/console-api.test.cjs": "7e948dab02e79d967cd9aabd9c549b086d38042b0ec958269864a3f62a95a9a4",
+        "e2e/console.spec.ts": "90222109cb5c6eea755d197b477de4854b1cdaf7c181145a3ef1a56ba1ace318",
+        "docs/screenshots/logs-desktop.png": "5b50b1add9b38499d60e29aa5033f9ea1d1d5cb03e1f735047e490d40025615a",
+        "docs/screenshots/logs-mobile.png": "e5c3bf485508cb7f4c0df1e64f14ebc8d56fee7fe03739eb0f82ed7e2b6c6f70",
+        "docs/screenshots/logs-dark.png": "ce53fcd8395e0484571738ec8d804be6f732d31af385152296d7eac8e45f0fb0"
+      }
+    },
+    "crefans_front": {
+      "head": "dc3d663e63c7b22bb57dc8c198af2ab6d963488a",
+      "branch": "feat/operations-security",
+      "dirty": true,
+      "note": "Contains earlier uncommitted work, not all dirty files originated in this task",
+      "files": {
+        "AGENTS.md": "ae05ba094c4422aec9c7426496c4530cf64bbdfc0f4b5a36d24499ad43db4cfa",
+        "PROGRESS.md": "d693f40fbfe621c6aafb7839858b963ddf08fdf2192966b0a7504f1f62b505d1",
+        "app/service/layout.tsx": "1a8947e65adfbc109d5522daf9deef93760a50b048de0bc49ed77cacfb9840ca",
+        "app/service/error.tsx": "47d8aeafda52d6cac3db1772fa4305b8d35eac21fda9c68fb6e2f04b0d4f3e0e",
+        "components/service/BrowserErrors.tsx": "441cd43641c97272b1c07679f5224b54b104706d348ce0739eb97b16c7aac79b",
+        "features/service/useBrowserErrors.ts": "a2ae28321acafd6cd15fd22b13e2ad897a8289506bdf7c913e245dbefa751cee",
+        "lib/api/browser-errors.ts": "20174786d519cdb0e7e246936ad17e9b892145cb79bb05438e10a7f4bb04e5d7",
+        "lib/api/platform.ts": "a5ddbc96fd1039e54ddbb8ffa81cffc910b338d15b750defebe2ae7b3cdc4b64",
+        "lib/api/platformProxy.ts": "413fec334eaa90c1face6dfe42e92cdc501ba7040bafe4603b7b20e9b4def3eb",
+        "tests/browser-errors.test.cjs": "f9b97201cf308a66044de815db4b69a1bbeabf8f497b36dc3e0281255aeb1096",
+        "tests/platform-client.test.cjs": "707fc0680dc491cab64ff8e01dd260d9dfbe4eaaf0110b2967b058180d1591ab",
+        "docs/service-api-binding.md": "54877958dc29e80369081770b9899510af993283232bd403dfd1adeaa5c12016"
+      }
+    }
+  },
+  "executions": [
+    {
+      "name": "backend",
+      "repository": "/Users/ethan/repository/crefans_server",
+      "command": [
+        "npm",
+        "run",
+        "test:audit"
+      ],
+      "startedAt": "2026-10-21T17:20:53.793793+00:00",
+      "finishedAt": "2026-10-21T17:21:04.488920+00:00",
+      "exitCode": 0,
+      "logSha256": "b780283d9bd98a6fcd1bd124b9f148256cf4c940b9c4561a99b4730c6eb0e2fa",
+      "logBytes": 28540,
+      "result": {
+        "passed": 55,
+        "skipped": 1,
+        "skipCoverage": "real MySQL optional branch subsequently passed in mysql-security"
+      }
+    },
+    {
+      "name": "regression",
+      "repository": "/Users/ethan/repository/crefans_server",
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "tests/platform-auth.test.cjs",
+        "tests/platform-finance.test.cjs",
+        "tests/platform-jobs.test.cjs",
+        "tests/platform-billing.test.cjs",
+        "tests/platform-payment-lifecycle.test.cjs",
+        "tests/platform-payment-http.test.cjs",
+        "tests/platform-provider-lifecycle.test.cjs",
+        "tests/platform-provider-http.test.cjs",
+        "tests/platform-financial-policy.test.cjs",
+        "tests/platform-billing-activity.test.cjs",
+        "tests/platform-admin-console.test.cjs",
+        "tests/platform-mail.integration.test.cjs",
+        "tests/mail-templates.test.cjs"
+      ],
+      "startedAt": "2026-10-21T17:21:49.614322+00:00",
+      "finishedAt": "2026-10-21T17:22:06.392219+00:00",
+      "exitCode": 0,
+      "logSha256": "d9c015ba7e049b392ddcbb873da40bdf0382576529bc59c9f2100820e0f94fea",
+      "logBytes": 86864,
+      "result": {
+        "passed": 137,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "mysql-security",
+      "repository": "/Users/ethan/repository/crefans_server",
+      "command": [
+        "node",
+        "scripts/platform-audit-security-test.cjs"
+      ],
+      "startedAt": "2026-10-21T17:26:03.983282+00:00",
+      "finishedAt": "2026-10-21T17:26:04.947414+00:00",
+      "exitCode": 0,
+      "logSha256": "7c5a4c966d26fc1adaf1eaa4900528cdb22514c9aa2f809dfad1ab9527776f9e",
+      "logBytes": 4779,
+      "result": {
+        "passed": 19,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "frontend",
+      "repository": "/Users/ethan/repository/crefans_front",
+      "command": [
+        "npm",
+        "run",
+        "check"
+      ],
+      "startedAt": "2026-10-21T17:20:53.793793+00:00",
+      "finishedAt": "2026-10-21T17:21:03.689293+00:00",
+      "exitCode": 0,
+      "logSha256": "929b4937bfae186b0f61140cb446733ce1ee6873d266556da55ca9f141f5204b",
+      "logBytes": 64632,
+      "result": {
+        "passed": 276,
+        "skipped": 0,
+        "additional": "layer and TypeScript"
+      }
+    },
+    {
+      "name": "admin",
+      "repository": "/Users/ethan/repository/crefans_admin",
+      "command": [
+        "npm",
+        "run",
+        "check"
+      ],
+      "startedAt": "2026-10-21T17:20:53.793875+00:00",
+      "finishedAt": "2026-10-21T17:20:57.734502+00:00",
+      "exitCode": 0,
+      "logSha256": "a2d1187bca9910eabe17ac38eba1ef3b95f258cd04111f9688458fa28f3c44d4",
+      "logBytes": 1326,
+      "result": {
+        "passed": 5,
+        "additional": "TypeScript"
+      }
+    },
+    {
+      "name": "browser",
+      "repository": "/Users/ethan/repository/crefans_admin",
+      "command": [
+        "npm",
+        "run",
+        "test:e2e"
+      ],
+      "startedAt": "2026-10-21T17:24:43.729161+00:00",
+      "finishedAt": "2026-10-21T17:25:08.608745+00:00",
+      "exitCode": 0,
+      "logSha256": "fbea85d7d85a1e37231eb1eda114806ba5ba914b8269a095d94022132460dfbc",
+      "logBytes": 1573,
+      "result": {
+        "passed": 9,
+        "additional": "real main, isolated MySQL, Chromium"
+      }
+    },
+    {
+      "name": "proxy",
+      "repository": "/Users/ethan/repository/crefans_server",
+      "command": [
+        "python3",
+        "tests/platform-proxy.py"
+      ],
+      "startedAt": "2026-10-21T17:20:53.793810+00:00",
+      "finishedAt": "2026-10-21T17:21:06.326107+00:00",
+      "exitCode": 0,
+      "logSha256": "2e249d254db198bd33f1a9dd34ed47edc816d85ade907cbe307649927f807dd6",
+      "logBytes": 202,
+      "result": {
+        "passed": "trust boundary, real access/runtime normal+502 redaction, response request ID"
+      }
+    }
+  ],
+  "initialFailuresAndRepairs": [
+    "Invalid regex slash in added stack frame allowlist fixed; final Nest build passed",
+    "SMTP test purpose corrected to existing verify contract; no template contract change",
+    "Real MySQL duplicate source_id race fixed with locking winner read; business transaction rollback retained",
+    "Telegram dispatch gate upsert race fixed with insert skipDuplicates before atomic claim",
+    "Response header mocks updated for request ID and covered by new test",
+    "Initial simultaneous browser/server test runs hit E2E database exclusivity guard; rerun serially passed 137",
+    "Attempt to create a new isolated schema was denied by local DB grant; no permissions expanded, verifier switched to existing locked E2E schema and passed19"
+  ],
+  "negativeControls": [
+    "401/403 and MODERATOR log denial",
+    "invalid/date/injection/log filter checks",
+    "business audit failure and rollback",
+    "observational persistence failure does not retry a successful provider charge",
+    "timeout/provider failure outcomes without raw payload",
+    "SMTP accepted/rejected result vs received inbox distinction",
+    "secrets/CRLF/URL/raw stack excluded",
+    "client payload bound/rate limit and browser dedupe max5",
+    "Caddy normal and upstream502 secret query/header/cookie redaction",
+    "export mode0600/checksum/overwrite rejection",
+    "CloudWatch empty destination rejection and logging replacement",
+    "external monitor 3 failures/recovery/wrong channel refusal",
+    "real MySQL concurrent ban/dedupe/release"
+  ],
+  "visualReview": [
+    "crefans_admin/docs/screenshots/logs-desktop.png",
+    "crefans_admin/docs/screenshots/logs-mobile.png",
+    "crefans_admin/docs/screenshots/logs-dark.png"
+  ],
+  "notDone": [
+    "No new production deployment; current deployed image still lacks these log additions",
+    "CloudWatch group/retention/IAM/actual delivery not provisioned or verified",
+    "Independent monitor host/unit/real alerts not activated",
+    "Business/legal retention policy not decided; audit default0 holds pending decision",
+    "No immutable/WORM or cryptographic signature guarantee, database admin still privileged",
+    "Export is a range snapshot tool, not automated off-host backup/restore proof",
+    "No production load, fault recovery, real PG/bank/Workspace SMTP/inbox or OOM-cause drill",
+    "Browser source-map release artifacts/3rd-party errors are not comprehensively collected"
+  ],
+  "research": [
+    {
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html",
+      "checked": "2026-10-22"
+    },
+    {
+      "url": "https://caddyserver.com/docs/caddyfile/directives/log",
+      "checked": "2026-10-22"
+    },
+    {
+      "url": "https://caddyserver.com/docs/caddyfile/directives/log_append",
+      "checked": "2026-10-22"
+    },
+    {
+      "url": "https://docs.docker.com/engine/logging/drivers/awslogs/",
+      "checked": "2026-10-22"
+    },
+    {
+      "url": "https://docs.docker.com/reference/compose-file/merge/",
+      "checked": "2026-10-22"
+    }
+  ]
+}

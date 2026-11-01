@@ -1,0 +1,268 @@
+{
+  "createdAt": "2026-10-31T12:51:35.953344+00:00",
+  "repository": "crefans_server",
+  "head": "ba8df975ca8fc977446d079da7edbe4c3f3b36e8",
+  "branch": "feat/studio-comment-replies",
+  "workingTree": "dirty: existing unrelated work preserved; this task not committed",
+  "sourceSha256": {
+    "src/platform/beans.service.ts": "d1e8164c50f6a1e500bd4c31f09b856255a12ae985f2b1639a1e2da3783d6641",
+    "tests/platform-beans.test.cjs": "52f5fcad059ee0bcd74b5792a9cfff219781871a8a95d8c5855c8bae0807ff03",
+    "tests/platform-payment-lifecycle.test.cjs": "e853b447f662d891898d714f37c8c150ef29d6c31d4075d5aa3b8f14a5514430",
+    "AGENTS.md": "f638974a4ee87a2e3c97d003a92820ad88660bbd5485974f8f42d4ef0d9c7758",
+    "docs/platform-implementation.md": "35f1abae75cb4e32e8356f5475f9a99ad64a757ed398654c538d2099e02170b1"
+  },
+  "acceptanceCriteria": [
+    "PG-confirmed unapproved expired/aborted pending orders end without payment approval or bean credit",
+    "order, amount, KRW, existing payment key and approved-result guards retained",
+    "reservation released exactly once",
+    "three affected operational test orders closed by natural worker and two clean runs",
+    "completion notification delivered; only API/worker recreated"
+  ],
+  "rootCause": "Unapproved expired test checkout orders had null local payment_key; unconditional key comparison rejected valid PG terminal status on every worker retry.",
+  "providerEvidence": {
+    "checkedAt": "2026-10-31T12:41:18.960Z",
+    "method": "read-only authenticated Toss GET payments/orders for three affected orders",
+    "environment": "test",
+    "orders": 3,
+    "status": "EXPIRED",
+    "approvedAt": null,
+    "amountAndOrderAndCurrencyMatch": true,
+    "paymentKeyOnlyMismatch": true,
+    "creditedLots": 0
+  },
+  "research": [
+    {
+      "checkedOn": "2026-10-31",
+      "url": "https://docs.tosspayments.com/reference",
+      "applied": "Payment terminal status, nullable approvedAt and orderId lookup contract"
+    },
+    {
+      "checkedOn": "2026-10-31",
+      "url": "https://docs.tosspayments.com/guides/v2/get-started/payment-flow",
+      "applied": "Original order and amount verification retained"
+    }
+  ],
+  "checks": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "environment": null,
+      "startedAt": "2026-10-31T12:46:28.921409+00:00",
+      "finishedAt": "2026-10-31T12:46:34.031498+00:00",
+      "exitCode": 0
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "tests/platform-beans.test.cjs",
+        "tests/platform-bean-ledger.test.cjs",
+        "tests/platform-provider-lifecycle.test.cjs",
+        "tests/platform-payment-lifecycle.test.cjs",
+        "tests/platform-jobs.test.cjs"
+      ],
+      "environment": {
+        "CREFANS_E2E": "true"
+      },
+      "startedAt": "2026-10-31T12:46:34.031976+00:00",
+      "finishedAt": "2026-10-31T12:46:45.410845+00:00",
+      "exitCode": 0
+    }
+  ],
+  "testResult": {
+    "total": 101,
+    "passed": 101,
+    "failed": 0,
+    "environment": "isolated local MySQL:3307, provider and bank doubles"
+  },
+  "preservedFailures": [
+    "regression-before.log: original code reproduced PAYMENT_MISMATCH; 2 failed, 1 passed",
+    "tests-first-broad.log: new cases reused an inactive fixture member; isolated a fifth member",
+    "tests-first-broad.log: existing payout test compared current creation with fixed past date; fixed synthetic creation date only",
+    "tests-second-broad.log: repeated reconcile of closed no-key order failed; added failed/cancelled no-op guard",
+    "after-first and after-second-wait: correctly failed minimum-two-runs gate before second natural tick; final run passed"
+  ],
+  "builds": [
+    {
+      "label": "server",
+      "tag": "crefans-api:charge-expiry-20261031",
+      "startedAt": "2026-10-31T12:46:30.569434+00:00",
+      "finishedAt": "2026-10-31T12:46:50.446367+00:00",
+      "exitCode": 0,
+      "sourceManifestSha256": "17e4c2317d78b96ea7756700b4408ce71cd6dbce0b5d5b79967a60337ce9c34a"
+    }
+  ],
+  "deployment": {
+    "command": "ssh private verified host: sudo -n bash /home/ubuntu/crefans-charge-expiry-20261031/deploy.sh",
+    "startedAt": "2026-10-31T12:49:09.131717+00:00",
+    "finishedAt": "2026-10-31T12:49:15.237974+00:00",
+    "exitCode": 0,
+    "scope": "API/worker only: reconcile unapproved expired/aborted bean charges; no migration"
+  },
+  "sourceDelta": {
+    "baseline": "handle-check-20261031",
+    "changes": {
+      "server": [
+        {
+          "file": "src/platform/beans.service.ts",
+          "before": "32aed97a1d02af6491346686a70c995b2aeffb1d9c8481b806ad7e7a627acd92",
+          "after": "d1e8164c50f6a1e500bd4c31f09b856255a12ae985f2b1639a1e2da3783d6641",
+          "source": "exact-baseline"
+        }
+      ]
+    }
+  },
+  "sourceFreeze": {
+    "at": "2026-10-31T12:48:42.868183+00:00",
+    "matched": true,
+    "sets": {
+      "server": {
+        "files": 236,
+        "changed": 1
+      }
+    }
+  },
+  "runtime": {
+    "crefans-beta-frontend-1": {
+      "id": "ea96f3db93b41a1e99ac54bd8d0ead5eae55c3e0b2f37ae92d294c83794fb5ec",
+      "image": "sha256:3748cc7e54cbd3613709475f778dea1576fb9d9189b1f558a8095713d789c39a",
+      "tag": "crefans-front:action-dialog-20261031",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-api-1": {
+      "id": "5ac7714329a697f14b12fd05bea1a64aaefea22d3bbc1956a9e8052fb5f2f90d",
+      "image": "sha256:7b74fd7ba23a9cc59e4df1be2db6161ae6330b1ab75d0e43d07e00e92d086bbf",
+      "tag": "crefans-api:charge-expiry-20261031",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-worker-1": {
+      "id": "a459dba07b16dc67aa979831fe3029704c1a1fd89e973c510fbb5273adeaf0e9",
+      "image": "sha256:7b74fd7ba23a9cc59e4df1be2db6161ae6330b1ab75d0e43d07e00e92d086bbf",
+      "tag": "crefans-api:charge-expiry-20261031",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-admin-1": {
+      "id": "4d7c97b12de94d8b64f99b0d9c54d48fecfd4b201406b29af5a2b9bed1b6abf2",
+      "image": "sha256:083ea1dd64fd7e5109e4703cfde09fc1b448bd898884b2bc8a98fffadd273b14",
+      "tag": "crefans-admin:handle-sync-20261031",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-database-1": {
+      "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+      "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b",
+      "tag": "mysql:8.0",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-proxy-1": {
+      "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+      "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f",
+      "tag": "caddy:2-alpine",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    }
+  },
+  "afterCheck": {
+    "startedAt": "2026-10-31T12:50:33.500474+00:00",
+    "finishedAt": "2026-10-31T12:50:34.521483+00:00",
+    "exitCode": 0,
+    "command": "private SSH -> API node read-only Prisma verification after natural worker reconciliation",
+    "sourceSha256": "7c4e0a5adf6169e0ae5829af4bc3a7598496527c635a9a49f1db98ccb9d4a914"
+  },
+  "operationalResult": {
+    "closedOrders": 3,
+    "releasedBeans": 20010,
+    "creditedBeans": 0,
+    "cleanNaturalRuns": 2
+  },
+  "naturalRuns": [
+    {
+      "occurred_at": "2026-10-31T12:49:14.721Z",
+      "level": "info",
+      "metadata": {
+        "activity": {
+          "beans-reconciliation": 3
+        },
+        "failures": {},
+        "processed": 3,
+        "durationMs": 969
+      }
+    },
+    {
+      "occurred_at": "2026-10-31T12:50:14.931Z",
+      "level": "info",
+      "metadata": {
+        "activity": {},
+        "failures": {},
+        "processed": 0,
+        "durationMs": 107
+      }
+    }
+  ],
+  "workerHealth": {
+    "completed_at": "2026-10-31T12:50:14.809Z",
+    "note": "{\"failures\":{}}"
+  },
+  "notification": [
+    {
+      "type": "worker.completed",
+      "created_at": "2026-10-31T12:49:14.734Z",
+      "delivered_at": "2026-10-31T12:49:18.344Z",
+      "attempts": 1,
+      "last_error_code": null
+    }
+  ],
+  "retention": {
+    "local": {
+      "at": "2026-10-31T12:50:10.223585+00:00",
+      "removed": [
+        {
+          "tag": "crefans-api:new-creators-20261031",
+          "usedIdFallback": false
+        }
+      ],
+      "errors": []
+    },
+    "remote": {
+      "at": "2026-10-31T12:50:13.625184+00:00",
+      "removed": [
+        {
+          "tag": "crefans-api:new-creators-20261031",
+          "usedIdFallback": false
+        }
+      ],
+      "errors": []
+    }
+  },
+  "limits": [
+    "Only these three test-key orders were reviewed; not a live card payment/settlement validation",
+    "Telegram delivery timestamp is server-side API success, not recipient-read confirmation",
+    "No manual production financial writes, new approval/refund/payout or migration executed",
+    "UI and other site scenarios were outside this API-only repair"
+  ],
+  "artifacts": {
+    "localIncident": ".local/charge-incident-20261031",
+    "deployment": "crefans_front/.local/charge-expiry-deploy-20261031"
+  },
+  "logsSha256": {
+    "build-verified.log": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2",
+    "tests-verified.log": "3e9acd43e4aa5a1b8aa782b3d7f8ce0911fa6a2de96949b7d2096190b627f429",
+    "regression-before.log": "481245a99f42b399ba36c383576e7562f61bf74e5b1dc1833984b3b811b529f6",
+    "after.json": "76749c1bb05fc07ae7b9ece0b4234894af056c2379ab2a77ae58a39464d31619",
+    "after-run.json": "46b02662739e35d13f572603f62d8e255c08deedb64fbc7d6b787b1a701e84a8"
+  }
+}

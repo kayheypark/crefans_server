@@ -31,11 +31,11 @@ export class AuthService {
       });
 
       // Cognito 회원가입
-      console.info("signUpDto!!!!!!!!!111", signUpDto);
       const cognitoResult = await this.cognitoService.signUp(signUpDto);
 
       // 직접 지갑 생성
-      await this.createWallet(cognitoResult.userSub);
+      // Local accounts get a wallet after confirmation, including SMTP retry recovery.
+      if (!this.cognitoService.local.enabled) await this.createWallet(cognitoResult.userSub);
 
       // 얼리버드인 경우 얼리버드 테이블에 저장
       if (signUpDto.isEarlybird) {
@@ -144,6 +144,10 @@ export class AuthService {
       });
 
       const result = await this.cognitoService.confirmSignUp(confirmSignUpDto);
+      if (this.cognitoService.local.enabled) {
+        const member = await this.cognitoService.local.byEmail(confirmSignUpDto.email);
+        if (member) await this.createWallet(member.id);
+      }
 
       this.logger.logAuthEvent("ConfirmSignUp completed", undefined, {
         email: confirmSignUpDto.email,
@@ -283,6 +287,10 @@ export class AuthService {
         email,
         code,
       });
+      if (this.cognitoService.local.enabled) {
+        const member = await this.cognitoService.local.byEmail(email);
+        if (member) await this.createWallet(member.id);
+      }
 
       this.logger.logAuthEvent(
         "ConfirmEmailVerification completed",

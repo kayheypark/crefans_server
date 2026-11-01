@@ -98,3 +98,11 @@ export class UpdateHandleDto {
   @Matches(/^(?!_+$).*[가-힣a-zA-Z0-9].*$/, { message: '핸들은 언더스코어만으로 구성될 수 없습니다.' })
   preferredUsername: string;
 }
+
+export class ForgotPasswordDto {
+  @IsEmail() @MaxLength(191) email: string;
+}
+export class ResetPasswordDto extends ForgotPasswordDto {
+  @IsString() @Matches(/^\d{6}$/) code: string;
+  @IsString() @MinLength(8) @MaxLength(256) password: string;
+}

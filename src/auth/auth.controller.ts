@@ -1,3 +1,6 @@
+import { LocalMemberService } from "./local/local-member.service";
+import { ForgotPasswordDto, ResetPasswordDto } from "./dto/auth.dto";
+import { NotFoundException } from "@nestjs/common";
 import {
   Controller,
   Post,
@@ -36,8 +39,22 @@ import { ApiResponseDto } from "../common/dto/api-response.dto";
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly local: LocalMemberService,
     private readonly configService: ConfigService
   ) {}
+
+  @Post("forgot-password")
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    if (!this.local.enabled) throw new NotFoundException();
+    const result = await this.local.forgotPassword(dto.email);
+    return ApiResponseDto.success(result.message, {});
+  }
+  @Post("reset-password")
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    if (!this.local.enabled) throw new NotFoundException();
+    const result = await this.local.resetPassword(dto.email, dto.code, dto.password);
+    return ApiResponseDto.success(result.message, {});
+  }
 
   @Post("signup")
   async signUp(

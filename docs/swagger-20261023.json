@@ -1,0 +1,107 @@
+{
+  "recordedAt": "2026-10-23T13:31:15.331207+00:00",
+  "scope": "Current platform /api/v1 Swagger documentation; 98 registered operations, not legacy/Cognito APIs",
+  "repository": {
+    "name": "crefans_server",
+    "head": "c100a3af5a5508adb0e6ba521d2e5238fb5f1ff1",
+    "branch": "feat/operations-security",
+    "dirtyPaths": 111,
+    "sourceSha256": {
+      "src/platform/main.ts": "df9930915987aa0348d492fdbb6df8b3f60f5ff3f9000d53987694d9db4afdda",
+      "src/platform/openapi.ts": "d512691b73ca62a965714cdf9f65abae1eb77ebbcdde96dfd9dfd772a47a1bf8",
+      "src/platform/openapi-contract.ts": "e2cc8c9d5975dbfff07178c46ca2744c1073b4573e24dec09169ebd9bd2ad9ec",
+      "tests/platform-openapi.test.cjs": "ff613b9c70aab6e58714620d92e94e4d1fa32ba8e5a138d44eb5aac34b16970f",
+      "package.json": "e77c6594e4b045146f7c6aae6885ba71e4fffa010fb9811db7ff2f124c9e8bb5",
+      "package-lock.json": "8ce1e65281a4136187fe642a0ded9073e6a10b356e680f89b6af082dbd666216"
+    }
+  },
+  "checks": [
+    {
+      "command": "npm run test:openapi",
+      "environment": "macOS / Node v22.7.0; no environment files loaded; auth and DB boundaries stubbed; no provider calls",
+      "finishedAt": "2026-10-23T13:26:15.021616+00:00",
+      "exitCode": 0,
+      "result": "9/9 tests passed: OpenAPI validation; all 98 operations; named Body/Query contracts; missing/stale negative controls; anonymous/member/inactive-admin denial; admin HTML/JSON/YAML/assets; backend-failure denial; core serializers; common envelope/binary distinction",
+      "outputSha256": "2ff27c79d6e37a1b435c171abdace085e4779c4fcebd0acac92fed6c6ab73746"
+    },
+    {
+      "command": "docker build --platform linux/amd64 -f infra/platform/Dockerfile --build-arg APP_RELEASE=swagger-20261023 -t crefans-api:swagger-20261023 .",
+      "finishedAt": "2026-10-23T13:26:29.190747+00:00",
+      "exitCode": 0,
+      "result": "Production image built. Anonymous Docker registry configuration used after desktop credential helper stalled."
+    },
+    {
+      "command": "docker run --rm --platform linux/amd64 --network none ... buildPlatformOpenApi",
+      "finishedAt": "2026-10-23T13:26:57.329592+00:00",
+      "exitCode": 0,
+      "result": {
+        "operations": 98,
+        "version": "v1",
+        "node": "v22.23.4",
+        "architecture": "x64"
+      }
+    },
+    {
+      "command": "production source/package comparison over SSH",
+      "exitCode": 0,
+      "result": "Only src/platform/main.ts modified, openapi.ts and openapi-contract.ts added. Prisma unchanged; existing package versions unchanged; only Swagger/parser and scoped lodash/YAML overrides added."
+    },
+    {
+      "command": "production deployment with rollback trap and HTTP checks",
+      "exitCode": 0,
+      "result": "Health 200 on beta/origin. Anonymous docs HTML, JSON, YAML and bundle return401 on admin/beta. API/worker image matches with restarts0. Database/frontend/admin/proxy container IDs preserved."
+    },
+    {
+      "kind": "manual production browser",
+      "result": "Existing administrator login succeeded; Swagger UI, filters, billing group, request body and common response examples rendered. No Try it out button. Browser warning/error log empty. Direct navigation to JSON was blocked by browser client; authenticated raw JSON/YAML verified in local HTTP tests, not separately in production browser."
+    }
+  ],
+  "deployment": {
+    "url": "https://admin.crefans.com/api/v1/admin/docs",
+    "release": "swagger-20261023",
+    "image": "sha256:d5059f7acfc4a7994e1842368e33001b02f3c9c5b3333a671a4ef973328c4d90",
+    "steps": [
+      {
+        "step": "prepare",
+        "startedAt": "2026-10-23T13:27:47.382672+00:00",
+        "finishedAt": "2026-10-23T13:27:47.938232+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "upload",
+        "startedAt": "2026-10-23T13:27:47.938814+00:00",
+        "finishedAt": "2026-10-23T13:27:52.286055+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "load",
+        "startedAt": "2026-10-23T13:27:52.286863+00:00",
+        "finishedAt": "2026-10-23T13:28:07.772876+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "deploy",
+        "startedAt": "2026-10-23T13:28:07.773483+00:00",
+        "finishedAt": "2026-10-23T13:28:14.253107+00:00",
+        "exitCode": 0
+      }
+    ],
+    "rollbackBackup": "/opt/crefans-backup-swagger-20261023",
+    "databaseMigrations": false,
+    "temporaryManagementAccessRemoved": true,
+    "previousManagementRulePreserved": true
+  },
+  "limitations": [
+    "No real PG/PASS/bank transaction exercised; this is documentation/access verification.",
+    "Generic JSON response fields remain explicitly flexible; generated SDK compatibility not asserted.",
+    "Existing production dependency audit still reports24 findings (12high,10moderate,2low), including existing Nest core advisories. Swagger-specific lodash/YAML dependencies patched; repository-wide dependency upgrade outside scope.",
+    "No new general-member production account created for denial test; member/disabled-admin matrix uses local boundary stubs."
+  ],
+  "officialReferences": [
+    "https://docs.nestjs.com/openapi/introduction",
+    "https://docs.nestjs.com/openapi/security",
+    "https://swagger.io/docs/open-source-tools/swagger-ui/usage/configuration/",
+    "https://github.com/advisories/GHSA-r5fr-rjxr-66jc",
+    "https://github.com/advisories/GHSA-2883-xcg3-v3hh"
+  ]
+}

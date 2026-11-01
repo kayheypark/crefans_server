@@ -1,0 +1,47 @@
+{
+  "at": "2026-10-26T07:33:30.767784+00:00",
+  "kind": "read-only-code-audit-and-isolated-regression",
+  "test": {
+    "command": "CREFANS_E2E=true node --test tests/platform-beans.test.cjs",
+    "exitCode": 0,
+    "passed": 16,
+    "logSha256": "e3b8901d9090f03ef9a792b95ba56c0e7b127bf4097fbdcb8bcab8926b72872b"
+  },
+  "findings": {
+    "financialPath": "Post and profile tips share paid/promotion lots, studio totals, admin totals and payout eligibility. 20% payout fee. Membership revenue is separate.",
+    "trace": "movement.reference_id -> bean_tips.id -> post_id; payout allocation lot -> target tip allocation -> post_id",
+    "gaps": [
+      "movement.reason is always 크리에이터 일회성 후원",
+      "No post/profile subtype or target post title/link in studio/admin received-tip lists",
+      "No dedicated full paid-post-tip -> payout -> admin subtype test; existing suite tests post identity/disabled/uniqueness and generic money payout paths separately"
+    ]
+  },
+  "productionMutated": false,
+  "repositories": {
+    "server": {
+      "head": "c100a3af5a5508adb0e6ba521d2e5238fb5f1ff1",
+      "dirty": true,
+      "files": {
+        "src/platform/beans.service.ts": "9dac522e3d7d12195a80ce97a34e2502458057c7f16153e10e576039e0ad6028",
+        "src/platform/bean-policy.ts": "1396634572232efcde7307c009bf3ea03cc5353ecc2f851fe34d17812a540510",
+        "src/platform/studio.service.ts": "c95b4bf20be00df35289e8bf79ca890a93a2c5c483d6e303c466e5aff44a9f9d",
+        "prisma/schema.prisma": "dddb7188ce5345aa00847714af9d4da67f1e610647b5dff873cc704363ccadad",
+        "tests/platform-beans.test.cjs": "6be42bfa0035178295e892662dee3f635c3677e3ce73856a05cc49d800ae89d2"
+      }
+    },
+    "front": {
+      "head": "337f1ca4b47d5e36033a2a9df85a0daaaae65355",
+      "dirty": true,
+      "files": {
+        "components/crefans/BeanPages.tsx": "a15a98e6ec8e3a8d83cacfdbd63ae768d20c0770bb49ed791d051419bd8b3408"
+      }
+    },
+    "admin": {
+      "head": "7928cb6fc70c27bbcb8f5ec4a760023a5ffda01c",
+      "dirty": true,
+      "files": {
+        "src/components/console/Beans.tsx": "b92b73d1c1fa4c435c923484b6cd6d8182d38565f1acc0089b67b7a690c0949b"
+      }
+    }
+  }
+}
