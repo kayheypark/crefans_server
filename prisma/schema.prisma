@@ -1863,3 +1863,22 @@ model PlatformSetting {
  updated_at DateTime @updatedAt
  @@map("platform_settings")
 }
+
+// Immutable watermarked derivative; original media remains private/reusable for profile images.
+model MediaWatermarkJob {
+  id String @id @default(uuid())
+  source_id String @unique
+  target_id String @unique
+  creator_id String
+  handle String @db.VarChar(24)
+  version Int @default(1)
+  status String @default("pending") @db.VarChar(16)
+  attempts Int @default(0)
+  next_attempt_at DateTime @default(now())
+  locked_until DateTime?
+  error_code String? @db.VarChar(64)
+  created_at DateTime @default(now())
+  completed_at DateTime?
+  @@index([status, next_attempt_at])
+  @@map("media_watermark_jobs")
+}

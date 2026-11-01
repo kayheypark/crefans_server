@@ -15,6 +15,7 @@ import {PlatformAuthGuard,PlatformOptionalAuthGuard,PlatformMediaEdgeGuard} from
 import {reject} from './http';
 import {PlatformMediaStorage,managedMediaKey} from './media-storage';
 import {MAX_VIDEO_SECONDS,MAX_VIDEO_SIDE,QUICKTIME_MIME,sourcePath,videoTools} from './video-transcode';
+import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 import {profilePhotoInUse} from './profile-photos';
 @Controller('media')
 export class PlatformMediaController {
@@ -47,7 +48,10 @@ export class PlatformMediaController {
      await rename(file.path,source||destination);
     }
     const remote=this.storage.enabled;
-    const row=await this.service.db.media.create({data:{id,user_sub:req.user.sub,type,original_name:file.originalname.slice(0,200),file_name:id,file_size:size,mime_type:mime,original_url:`/api/v1/media/${id}/file`,s3_upload_key:remote?`platform/${id}`:`local/${id}`,processing_status:quicktime?'PROCESSING':remote?'UPLOADING':'COMPLETED',processed_at:remote||quicktime?null:new Date()}});tracked=true;
+    // Eligibility is recorded at upload, not inferred from a later post edit. Profile/plan references remain untouched.
+    const creator=await this.service.db.creator.findUnique({where:{user_id:req.user.sub}});let watermarkMetadata:any=undefined;
+    if(creator?.is_active){const member=await this.service.member(req.user.sub);watermarkText(member.preferred_username);watermarkMetadata={watermarkEligible:WATERMARK_VERSION,watermarkHandle:member.preferred_username};}
+    const row=await this.service.db.media.create({data:{id,user_sub:req.user.sub,type,...(watermarkMetadata?{metadata:watermarkMetadata}:{}),original_name:file.originalname.slice(0,200),file_name:id,file_size:size,mime_type:mime,original_url:`/api/v1/media/${id}/file`,s3_upload_key:remote?`platform/${id}`:`local/${id}`,processing_status:quicktime?'PROCESSING':remote?'UPLOADING':'COMPLETED',processed_at:remote||quicktime?null:new Date()}});tracked=true;
     if(quicktime)return{id:row.id,type:'video',url:row.original_url,processing:true};
     if(remote){await this.storage.put(id,destination,mime,size);await this.service.db.media.update({where:{id},data:{processing_status:'COMPLETED',processed_at:new Date()}});}saved=true;
     return{id:row.id,type:type==='IMAGE'?'image':'video',url:row.original_url};

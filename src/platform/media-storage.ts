@@ -21,11 +21,11 @@ export class PlatformMediaStorage implements OnModuleInit,OnModuleDestroy {
   if(!this.config.get('S3_MEDIA_BUCKET')||!this.config.get('AWS_REGION'))throw new Error('Private media storage configuration is incomplete');
  }
  private s3(){return this.client||(this.client=new S3Client({region:this.config.get<string>('AWS_REGION'),requestChecksumCalculation:'WHEN_REQUIRED'}));}
- async put(id:string,path:string,mime:string,size:number){
+ async put(id:string,path:string,mime:string,size:number,signal?:AbortSignal){
   const key=`platform/${id}`;if(!this.enabled||!managedMediaKey(key))reject(503,'STORAGE_NOT_CONFIGURED','미디어 저장소 설정을 확인해주세요.');
   this.validate();const body=createReadStream(path);
   // Private bucket only; edge authorization precedes shared caching and viewer response is no-store.
-  try{await this.s3().send(new PutObjectCommand({Bucket:this.config.get('S3_MEDIA_BUCKET'),Key:key,Body:body,ContentLength:size,ContentType:mime,ContentDisposition:'inline',CacheControl:'max-age=0, s-maxage=86400',ServerSideEncryption:'AES256'}));}
+  try{await this.s3().send(new PutObjectCommand({Bucket:this.config.get('S3_MEDIA_BUCKET'),Key:key,Body:body,ContentLength:size,ContentType:mime,ContentDisposition:'inline',CacheControl:'max-age=0, s-maxage=86400',ServerSideEncryption:'AES256'}),{abortSignal:signal});}
   catch{reject(503,'STORAGE_UNAVAILABLE','미디어를 저장하지 못했습니다. 다시 시도해주세요.');}
   finally{body.destroy();}
  }

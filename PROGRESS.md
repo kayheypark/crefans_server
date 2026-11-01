@@ -1,5 +1,12 @@
 # PROGRESS: crefans_server
 
+## 2026-11-01 신규 크리에이터 게시물 워터마크 (구현·검증 중)
+- 범위: 사용자 선택에 따라 배포 후 새 업로드의 게시물 사진·영상만. 기존 미디어·프로필·배경·멤버십 이미지는 제외. 업로드 시점 핸들로 오른쪽 아래 https://crefans.com/{handle} 합성.
+- 원본 보존 + 새 Media UUID 파생 파일, DB 작업 큐·소유권·중복 방지·3회 재시도·비공개 완료 처리·고아 정리 보호·실패 감시. 추가 migration 20261101150000_media_watermark.
+- 검증 계획/근거: docs/private-media.md 마지막 절. 신규 테스트 및 기존 미디어 회귀 실행 기록은 `.local/watermark-*.log`, 배포 사본은 front `.local/watermark-deploy-20261101/`.
+- 브랜치: origin/prod → feat/creator-media-watermark → dev 검증 → prod 승격 예정. 운영 배포는 아직 미완료.
+
+
 ## 2026-11-01 저녁 /pilot-work 결정 동기화 (커밋 완료·배포 대기)
 - 결정(클릭 답): 보상 출금 불가·남은 만큼 회수·일부 환불 전체 회수(약관 명시 예정)·비활성 소멸·상한 초과 종결·내역 고지·부정 문구 완화, 원천징수는 회사가 플랫폼 수수료 안에서 부담, 가이드 틀린3+누락5, SEO 새 주소+301·www→apex, 로딩 일괄 정리, 업로드 상한+감시, 재시도+안내, 오프사이트 백업 나중에, 관리자 수수료 그대로.
 - 커밋: 서버 ebb3406(레퍼럴 출금 불가)·46fe73e(관리자 소멸 상태)·b65f083(API 설명 7건·설계 문서)·384f5ea(Caddy www 301), 프론트 d2af2a6(초대 카드·내역)·0c1d481(이벤트 주소 301), 관리자 93f4c28, 가이드 ee0aed7·053ac97. 미커밋 유지: 계약 폴더(docs/contracts 전체가 미추적), 프론트 docs/audit manifest·evidence(다른 세션 변경과 섞임).

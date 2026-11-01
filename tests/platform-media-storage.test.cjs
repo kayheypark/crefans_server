@@ -32,7 +32,7 @@ test('S3 upload streams the normalized file with encryption, immutable object ke
 async function uploadFixture(fail){
  const root=await mkdtemp(join(tmpdir(),'cf-upload-')),file=join(root,'upload'),bytes=await require('sharp')({create:{width:4,height:4,channels:3,background:'#aabbcc'}}).png().toBuffer(),events=[];let row;
  await writeFile(file,bytes);
- const service={db:{media:{create:async({data})=>{row={...data};events.push('row:'+data.processing_status);return row;},update:async({data})=>{events.push('row:'+data.processing_status);Object.assign(row,data);return row;}}}};
+ const service={db:{creator:{findUnique:async()=>null},media:{create:async({data})=>{row={...data};events.push('row:'+data.processing_status);return row;},update:async({data})=>{events.push('row:'+data.processing_status);Object.assign(row,data);return row;}}}};
  const storage={enabled:true,put:async(id,path,mime)=>{events.push('put');assert.equal(mime,'image/webp');assert.ok((await readFile(path)).length);if(fail)throw Error('S3 failure');},remove:async()=>events.push('remove')};
  const controller=new PlatformMediaController(service,config({MEDIA_ROOT:root}),storage);
  try{let result,error;try{result=await controller.upload({path:file,mimetype:'image/png',size:bytes.length,originalname:'test.png'},{user:{sub:'owner'}});}catch(e){error=e;}

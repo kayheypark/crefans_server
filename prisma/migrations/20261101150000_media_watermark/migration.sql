@@ -1,0 +1,4 @@
+CREATE TABLE `media_watermark_jobs` (
+ `id` VARCHAR(191) NOT NULL, `source_id` VARCHAR(191) NOT NULL, `target_id` VARCHAR(191) NOT NULL, `creator_id` VARCHAR(191) NOT NULL, `handle` VARCHAR(24) NOT NULL, `version` INTEGER NOT NULL DEFAULT 1, `status` VARCHAR(16) NOT NULL DEFAULT 'pending', `attempts` INTEGER NOT NULL DEFAULT 0, `next_attempt_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), `locked_until` DATETIME(3) NULL, `error_code` VARCHAR(64) NULL, `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), `completed_at` DATETIME(3) NULL,
+ PRIMARY KEY (`id`), UNIQUE INDEX `media_watermark_jobs_source_id_key` (`source_id`), UNIQUE INDEX `media_watermark_jobs_target_id_key` (`target_id`), INDEX `media_watermark_jobs_status_next_attempt_at_idx` (`status`, `next_attempt_at`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
