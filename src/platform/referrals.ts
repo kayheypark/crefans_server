@@ -3,13 +3,18 @@ import {reject,text} from './http';
 import {ensureBeanWallet,postBeanMovement} from './bean-ledger';
 import {beanPolicy} from './bean-policy';
 import {enqueueOperation} from './operations-events';
+const validUntil=(from:Date)=>{const d=new Date(from);d.setFullYear(d.getFullYear()+beanPolicy.validityYears);return d;};
+const rewardKey=(id:string)=>`referral-reward:${id}`;
 
 // Referral rewards (user decisions 2026-11-01, docs/referral-design-20261101.md):
 // - every member has one referral row; its id is the invite code joined to members.id.
 // - only the member who invited directly is rewarded, once: the invitee's first live payment qualifies, and the reward is
 //   credited by the worker 7 days later if that payment is still unrefunded; at most 10 rewards per referrer per KST month.
-// - the reward is 100 withdrawable promotional beans (earned-promotion lot, provenance = referral_signups row).
-// - a refund inside the hold cancels the qualification; a later refund claws the reward back (paid-out beans become a bean receivable).
+// - the reward is 100 promotional beans for tipping, NOT withdrawable (user decision 2026-11-01 evening; replaces the earlier
+//   withdrawable reward). It is recorded as a bean_promotions row like an operator grant, so tips and payouts treat it the same.
+// - a refund inside the hold cancels the qualification; a later refund (even partial) claws back what is left of the reward;
+//   beans already used for tips are absorbed by the company (no receivable).
+// - a referrer who is disabled when the reward is due forfeits it ('forfeited'); over the monthly cap stays 'capped' for good.
 export const REFERRAL_REWARD_BEANS=100;
 // The switch lives in platform_settings and is changed from the operator console (2026-11-01); missing means off.
 export const REFERRAL_SETTING='referral.enabled';
@@ -61,37 +66,38 @@ export async function grantDueReferralRewards(db:any,config:{get:(key:string)=>a
  for(const {id} of due)await db.$transaction(async(tx:any)=>{
   await tx.$queryRaw`SELECT id FROM referral_signups WHERE id=${id} FOR UPDATE`;const signup=await tx.referralSignup.findUniqueOrThrow({where:{id}});if(signup.reward_status!=='qualified')return;
   if(!await sourceStillPaid(tx,signup)){await tx.referralSignup.update({where:{id},data:{reward_status:'pending',reward_source:null,reward_source_id:null,grant_due_at:null}});return;}
-  if(!await tx.member.findFirst({where:{id:signup.referrer_id,enabled:true},select:{id:true}}))return;
+  // A disabled or withdrawn referrer forfeits the reward, so the row no longer blocks the queue.
+  if(!await tx.member.findFirst({where:{id:signup.referrer_id,enabled:true},select:{id:true}})){await tx.referralSignup.update({where:{id},data:{reward_status:'forfeited'}});return;}
   await lockWallets(tx,signup.referrer_id);
   await tx.$queryRaw`SELECT id FROM referral_signups WHERE referrer_id=${signup.referrer_id} FOR UPDATE`;
   if(await tx.referralSignup.count({where:{referrer_id:signup.referrer_id,reward_status:{in:['granted','clawed_back']},rewarded_at:{gte:kstMonthStart(now)}}})>=REFERRAL_MONTHLY_CAP){await tx.referralSignup.update({where:{id},data:{reward_status:'capped'}});return;}
   const q=REFERRAL_REWARD_BEANS;
-  await move(tx,`referral-reward:${id}`,'referral.reward','친구 초대 첫 결제 보상',id,[{member:'company',bucket:'stock',delta:-q},{member:signup.referrer_id,bucket:'earned-promotion',delta:q}]);
-  await tx.beanLot.create({data:{member_id:signup.referrer_id,bucket:'earned-promotion',grant_id:id,available:q,release_at:now}});
+  const grant=await tx.beanPromotion.create({data:{request_key:rewardKey(id),member_id:signup.referrer_id,quantity:q,reason:'친구 초대 첫 결제 보상',actor_id:'system:referral'}});
+  await move(tx,rewardKey(id),'referral.reward','친구 초대 첫 결제 보상',id,[{member:'company',bucket:'stock',delta:-q},{member:signup.referrer_id,bucket:'promotion',delta:q}]);
+  await tx.beanLot.create({data:{member_id:signup.referrer_id,bucket:'promotion',grant_id:grant.id,available:q,release_at:now,expires_at:validUntil(now)}});
   await tx.referralSignup.update({where:{id},data:{reward_status:'granted',reward_quantity:q,rewarded_at:now}});
-  await tx.memberNotification.create({data:{member_id:signup.referrer_id,type:'settlement',text:`초대한 친구의 첫 결제가 확정되어 출금 가능한 프로모션콩 ${q}개를 받았어요.`,path:'/beans'}});
+  await tx.memberNotification.create({data:{member_id:signup.referrer_id,type:'settlement',text:`초대한 친구의 첫 결제가 확정되어 후원에 쓸 수 있는 프로모션콩 ${q}개를 받았어요.`,path:'/beans'}});
   await enqueueOperation(tx,'referral.rewarded',{memberId:signup.referrer_id,targetId:id},`referral.rewarded:${id}`,{amount:q});count++;
  },{isolationLevel:'ReadCommitted',timeout:20000});
  return count;
 }
 
 /**
- * Called when the rewarding payment is refunded (fully or partly) or disputed. Beans still in the lot go back to stock;
- * beans already reserved or paid out are frozen in place and recorded as an open bean receivable that blocks later bean payouts.
+ * Called when the rewarding payment is refunded (fully or partly) or disputed. Only what is left of the reward goes back
+ * to stock; beans already used for tips stay spent and the company absorbs them (user decision 2026-11-01).
  */
 export async function clawBackReferralReward(tx:any,source:'checkout'|'bean_charge',sourceId:string){
  // Refunded inside the hold: nothing was credited, so the invitee's next live payment may qualify instead.
  await tx.referralSignup.updateMany({where:{reward_source:source,reward_source_id:sourceId,reward_status:'qualified'},data:{reward_status:'pending',reward_source:null,reward_source_id:null,grant_due_at:null}});
  const signup=await tx.referralSignup.findFirst({where:{reward_source:source,reward_source_id:sourceId,reward_status:'granted'}});if(!signup)return null;
  await lockWallets(tx,signup.referrer_id);
- const lot=await tx.beanLot.findFirst({where:{member_id:signup.referrer_id,bucket:'earned-promotion',grant_id:signup.id}});
- const back=lot?.available||0,owed=signup.reward_quantity-back;
- if(back){await move(tx,`referral-clawback:${signup.id}`,'referral.clawback','친구 초대 보상 회수(결제 환불)',signup.id,[{member:signup.referrer_id,bucket:'earned-promotion',delta:-back},{member:'company',bucket:'stock',delta:back}]);}
+ const grant=await tx.beanPromotion.findUnique({where:{request_key:rewardKey(signup.id)}});
+ const lot=grant&&await tx.beanLot.findFirst({where:{member_id:signup.referrer_id,bucket:'promotion',grant_id:grant.id}});
+ const back=lot?.available||0;
+ if(back)await move(tx,`referral-clawback:${signup.id}`,'referral.clawback','친구 초대 보상 회수(결제 환불)',signup.id,[{member:signup.referrer_id,bucket:'promotion',delta:-back},{member:'company',bucket:'stock',delta:back}]);
  if(lot)await tx.beanLot.update({where:{id:lot.id},data:{available:0,frozen:true}});
- if(owed>0){const net=Math.floor(owed*beanPolicy.krwPerBean*(10000-beanPolicy.withdrawalFeeBps)/10000);
-  await tx.creatorReceivable.upsert({where:{kind_source_id_creator_id:{kind:'beans',source_id:`referral:${signup.id}`,creator_id:signup.referrer_id}},create:{creator_id:signup.referrer_id,kind:'beans',source_id:`referral:${signup.id}`,amount:net,note:'친구 초대 보상의 결제가 환불되어 이미 출금된 보상콩을 돌려받아야 합니다.'},update:{}});}
  const updated=await tx.referralSignup.update({where:{id:signup.id},data:{reward_status:'clawed_back',clawed_back_at:new Date()}});
- await enqueueOperation(tx,'referral.clawed_back',{memberId:signup.referrer_id,targetId:signup.id},`referral.clawed_back:${signup.id}`,{amount:signup.reward_quantity});
+ await enqueueOperation(tx,'referral.clawed_back',{memberId:signup.referrer_id,targetId:signup.id},`referral.clawed_back:${signup.id}`,{amount:back});
  return updated;
 }
 
@@ -103,7 +109,7 @@ export async function referralSummary(db:any,member:string){
 }
 /** Invitee names are masked: first three characters, then ten stars (user decision 2026-11-01). */
 export const maskReferralName=(name:string)=>Array.from(name.trim()).slice(0,3).join('')+'*'.repeat(10);
-const historyStatus:Record<string,string>={pending:'joined',qualified:'waiting',granted:'rewarded',clawed_back:'clawed',capped:'capped'};
+const historyStatus:Record<string,string>={pending:'joined',qualified:'waiting',granted:'rewarded',clawed_back:'clawed',capped:'capped',forfeited:'forfeited'};
 const historyFilter:Record<string,string[]>={joined:['pending'],waiting:['qualified'],rewarded:['granted']};
 /**
  * The member's own invite history (user decision 2026-11-01): masked invitee name, status and dates only.
@@ -121,7 +127,7 @@ export async function referralHistory(db:any,member:string,status?:string,pageTe
   db.referralSignup.aggregate({where:{referrer_id:member,reward_status:'granted'},_sum:{reward_quantity:true}})]);
  const people=await db.member.findMany({where:{id:{in:rows.map((r:any)=>r.member_id)}},select:{id:true,nickname:true}});
  const count=(...keys:string[])=>counts.filter((c:any)=>keys.includes(c.reward_status)).reduce((n:number,c:any)=>n+c._count._all,0);
- return{summary:{invited:count('pending','qualified','granted','clawed_back','capped'),waiting:count('qualified'),rewardBeans:beans._sum.reward_quantity||0},
+ return{summary:{invited:count('pending','qualified','granted','clawed_back','capped','forfeited'),waiting:count('qualified'),rewardBeans:beans._sum.reward_quantity||0},
   items:rows.map((r:any)=>{const m=people.find((p:any)=>p.id===r.member_id);return{id:r.id,name:m?.nickname?maskReferralName(m.nickname):'탈퇴한 회원',status:historyStatus[r.reward_status]||'joined',joinedAt:r.created_at.toISOString(),dueAt:r.reward_status==='qualified'&&r.grant_due_at?r.grant_due_at.toISOString():null,rewardedAt:r.rewarded_at?.toISOString()||null,rewardBeans:r.reward_status==='granted'?r.reward_quantity:0};}),
   total,page,pageSize:take};
 }
@@ -132,8 +138,8 @@ export const assertReferralCode=async(db:any,code:unknown)=>{if(!await findRefer
  * set the withdrawal PIN and withdraw beans with the same conditions (user decision 2026-11-01). Membership payouts stay creator-only.
  */
 export async function requireBeanPayoutMember(db:any,member:string){
+ // Referral rewards are no longer withdrawable (2026-11-01), so bean payouts are creator-only again.
  if(await db.creator.findUnique({where:{user_id:member},select:{id:true}}))return;
- if(await db.referralSignup.findFirst({where:{referrer_id:member,reward_status:{in:['granted','clawed_back']}},select:{id:true}}))return;
- reject(403,'CREATOR_REQUIRED','크리에이터 또는 친구 초대 보상을 받은 회원만 이용할 수 있습니다.');
+ reject(403,'CREATOR_REQUIRED','크리에이터만 이용할 수 있습니다.');
 }
 export async function myReferral(db:any,member:string){if(!await referralOn(db))reject(404,'REFERRAL_DISABLED','친구 초대 기능을 준비 중입니다.');return referralSummary(db,member);}

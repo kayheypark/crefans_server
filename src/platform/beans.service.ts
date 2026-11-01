@@ -118,11 +118,7 @@ if(!await this.service.access(post,member,tx))reject(403,'POST_ACCESS_REQUIRED',
   const allocations=await tx.beanTipAllocation.findMany({where:{target_lot_id:{in:promotional.map(l=>l.id)}}});
   const tips=await tx.beanTip.findMany({where:{id:{in:[...new Set(allocations.map(a=>a.tip_id))]}}});
   const sources=await tx.beanLot.findMany({where:{id:{in:allocations.map(a=>a.source_lot_id)},bucket:'promotion'}});
-  const referrals=await tx.referralSignup.findMany({where:{id:{in:[...new Set(promotional.map(l=>l.grant_id))]}}});
   return lots.filter(l=>{
-   // Referral rewards (2026-11-01) are withdrawable by the inviter directly; provenance is the granted referral_signups row.
-   const referral=l.bucket==='earned-promotion'&&!l.charge_id&&referrals.find((r:any)=>r.id===l.grant_id);
-   if(referral)return referral.referrer_id===l.member_id&&referral.reward_status==='granted'&&l.available+l.reserved<=referral.reward_quantity;
    if(l.bucket==='earned-paid')return !l.grant_id&&charges.some(c=>c.id===l.charge_id&&c.received_amount>=Math.floor(c.amount*.8));
    if(l.bucket!=='earned-promotion'||l.charge_id)return false;
    const grant=grants.find(g=>g.id===l.grant_id),a=allocations.find(a=>a.target_lot_id===l.id),tip=tips.find(t=>t.id===a?.tip_id),source=sources.find(s=>s.id===a?.source_lot_id);

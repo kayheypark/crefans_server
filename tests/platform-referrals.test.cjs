@@ -41,32 +41,44 @@ test('a refund inside the 7-day hold cancels the qualification and the next live
  assert.equal(await db.beanLot.count({where:{member_id:referrer,bucket:'earned-promotion'}}),0,'nothing credited');
 });
 
-test('7 days after the first live payment the direct inviter gets 100 withdrawable beans once; the inviter may then use bean payouts',async()=>{
- await assert.rejects(beans.studio(referrer),code('CREATOR_REQUIRED'),'no reward yet');
+const rewardLot=async(member,signupId)=>{const g=await db.beanPromotion.findUnique({where:{request_key:'referral-reward:'+signupId}});return g?db.beanLot.findMany({where:{member_id:member,grant_id:g.id}}):[];};
+test('7 days after the first live payment the direct inviter gets 100 promotional beans for tips, not withdrawable (2026-11-01)',async()=>{
  const first=await buy(beans,invitee);await buy(beans,invitee);
  const q=await signupOf(invitee);assert.deepEqual([q.reward_status,q.reward_source_id],['qualified',first.id]);
  assert.equal(await referrals.grantDueReferralRewards(db,new ConfigService(settings),new Date()),0,'not before the hold ends');
  assert.equal(await grantDue(),1);assert.equal(await grantDue(),0,'once');
  const s=await signupOf(invitee);assert.deepEqual([s.reward_status,s.reward_quantity,s.reward_source,s.reward_source_id],['granted',100,'bean_charge',first.id]);
- const lots=await db.beanLot.findMany({where:{member_id:referrer,grant_id:s.id}});assert.equal(lots.length,1,'once');assert.deepEqual([lots[0].bucket,lots[0].available],['earned-promotion',100]);
- assert.equal((await beans.wallet(referrer)).withdrawableBeans,100,'withdrawable at once');
- assert.equal((await beans.studio(referrer)).availableBeans,100,'bean payout screen opens for a rewarded member');
- await assert.rejects(beans.studio(stranger),code('CREATOR_REQUIRED'));
+ const lots=await rewardLot(referrer,s.id);assert.equal(lots.length,1,'once');assert.deepEqual([lots[0].bucket,lots[0].available],['promotion',100]);assert.ok(lots[0].expires_at,'expires like other promotional beans');
+ const w=await beans.wallet(referrer);assert.equal(w.withdrawableBeans,0,'not withdrawable');assert.equal(w.spendableBreakdown.promotion,100,'usable for tips');
+ await assert.rejects(beans.studio(referrer),code('CREATOR_REQUIRED'),'bean payouts stay creator-only');
 });
 
-test('refunding the rewarding payment claws the reward back',async()=>{
+test('refunding the rewarding payment claws back what is left of the reward',async()=>{
  const s=await signupOf(invitee),charge=await db.beanCharge.findUniqueOrThrow({where:{id:s.reward_source_id}});
  await beans.refundCharge(invitee,charge.id,{requestId:randomUUID()});
- assert.equal((await signupOf(invitee)).reward_status,'clawed_back');const lot=await db.beanLot.findFirstOrThrow({where:{member_id:referrer,grant_id:s.id}});assert.deepEqual([lot.available,lot.frozen],[0,true]);
- assert.equal((await beans.wallet(referrer)).withdrawableBeans,0);
+ assert.equal((await signupOf(invitee)).reward_status,'clawed_back');const [lot]=await rewardLot(referrer,s.id);assert.deepEqual([lot.available,lot.frozen],[0,true]);
+ assert.equal((await beans.wallet(referrer)).spendableBreakdown.promotion,0);
 });
 
-test('a reward already paid out becomes an open bean receivable at the net amount',async()=>{
+test('reward beans already used for tips are not reclaimed: no receivable, the company absorbs them',async()=>{
  const code2=(await referrals.ensureReferral(db,stranger)).id;await db.$transaction(tx=>referrals.linkReferralSignup(tx,code2,second));
- const o=await buy(beans,second);await grantDue();const s=await signupOf(second),lot=await db.beanLot.findFirstOrThrow({where:{member_id:stranger,grant_id:s.id}});
- await db.beanLot.update({where:{id:lot.id},data:{available:40}});// 60 beans left in an earlier payout
+ const o=await buy(beans,second);await grantDue();const s=await signupOf(second),[lot]=await rewardLot(stranger,s.id);
+ await db.beanLot.update({where:{id:lot.id},data:{available:40}});// 60 beans already used for tips
  await db.$transaction(tx=>referrals.clawBackReferralReward(tx,'bean_charge',o.id));
- const r=await db.creatorReceivable.findFirstOrThrow({where:{creator_id:stranger,kind:'beans'}});assert.deepEqual([r.amount,r.status],[4800,'open']);
+ assert.equal((await signupOf(second)).reward_status,'clawed_back');
+ assert.equal(await db.creatorReceivable.count({where:{creator_id:stranger,kind:'beans'}}),0,'no receivable');
+ const [after]=await rewardLot(stranger,s.id);assert.deepEqual([after.available,after.frozen],[0,true]);
+});
+
+test('a disabled referrer forfeits a due reward so the queue keeps moving',async()=>{
+ const owner=randomUUID(),friend=randomUUID();
+ for(const id of [owner,friend])await db.member.create({data:{id,email:id+'@forfeit.invalid',name:'Forfeit fixture',nickname:'Forfeit fixture',preferred_username:id,email_verified:true}});
+ try{
+  const ref=await referrals.ensureReferral(db,owner);await db.$transaction(tx=>referrals.linkReferralSignup(tx,ref.id,friend));
+  await buy(beans,friend);await db.member.update({where:{id:owner},data:{enabled:false}});
+  await grantDue();const s=await signupOf(friend);assert.equal(s.reward_status,'forfeited');assert.equal((await rewardLot(owner,s.id)).length,0);
+  assert.equal((await referrals.referralHistory(db,owner)).items[0].status,'forfeited');
+ }finally{await db.member.update({where:{id:owner},data:{enabled:true}});await db.referralSignup.deleteMany({where:{OR:[{member_id:friend},{referrer_id:owner}]}});await db.referral.deleteMany({where:{member_id:{in:[owner,friend]}}});}
 });
 
 test('a valid referral link admits signup without an operator invite only while the switch is on',async()=>{
