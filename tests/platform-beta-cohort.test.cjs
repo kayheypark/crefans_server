@@ -35,7 +35,7 @@ after(async()=>{try{
  const members=Object.values(ids),ownerIds=creators.map(c=>ids[c]);
  for(const table of['billingNotice','memberNotification'])await db[table].deleteMany({where:{member_id:{in:members}}});
  await db.revenueEntry.deleteMany({where:{creator_id:{in:ownerIds}}});await db.checkoutOrder.deleteMany({where:{member_id:{in:members}}});await db.subscription.deleteMany({where:{subscriber_id:{in:members}}});
- await db.billingMethod.deleteMany({where:{member_id:{in:members}}});await db.membershipItem.deleteMany({where:{creator_id:{in:ownerIds}}});await db.creator.deleteMany({where:{user_id:{in:ownerIds}}});await db.admin.deleteMany({where:{user_sub:{in:members}}});await db.member.deleteMany({where:{id:{in:members}}});
+ await db.billingMethod.deleteMany({where:{member_id:{in:members}}});await db.membershipItem.deleteMany({where:{creator_id:{in:ownerIds}}});await db.creator.deleteMany({where:{user_id:{in:ownerIds}}});await db.adminSession.deleteMany({where:{admin:{user_sub:{in:members}}}}).catch(()=>db.adminSession.deleteMany({where:{admin_id:admin?.id}}));await db.admin.deleteMany({where:{user_sub:{in:members}}});await db.member.deleteMany({where:{id:{in:members}}});
  if(policy)await db.financialPolicy.update({where:{id:'platform'},data:policy});
  }finally{await db.$disconnect();await release?.();}});
 test('17 accounts establish 0/2/10 subscribers with exactly 12 charges and 20 percent fee ledger',async()=>{
@@ -58,10 +58,13 @@ test('18 roles including guest cross all 3 creators and public/tier/exact/adult/
   for(const [p,expected]of cases){assert.equal(await service.access(p,ids[role]),!!expected,`${role}/${creator}/${JSON.stringify(p)}`);checks++;}
  }
  assert.equal(checks,432);
- const guard=new PlatformAdminGuard(service),ctx=role=>({switchToHttp:()=>({getRequest:()=>({user:{sub:ids[role]}})})});
- for(const role of roles.filter(r=>r!=='A0'))await assert.rejects(guard.canActivate(ctx(role)),code('ADMIN_REQUIRED'));
- assert.equal(await guard.canActivate(ctx('A0')),true);
- await db.admin.update({where:{id:admin.id},data:{is_active:false}});await assert.rejects(guard.canActivate(ctx('A0')),code('ADMIN_REQUIRED'));
+ // Since 2026-10-28 the console has its own operator session (admin_access_token); a member session never reaches it.
+ const {Reflector}=require('@nestjs/core'),adminCookie=require('./admin-session.cjs'),guard=new PlatformAdminGuard(service,new Reflector());
+ const ctx=(req)=>({getHandler:()=>undefined,getClass:()=>undefined,switchToHttp:()=>({getRequest:()=>req})});
+ for(const role of roles.filter(r=>r!=='A0'))await assert.rejects(guard.canActivate(ctx({user:{sub:ids[role]},cookies:{}})),code('UNAUTHORIZED'),role+' member session must not open the console');
+ const token=(await adminCookie(db,admin.id)).split('=')[1];
+ assert.equal(await guard.canActivate(ctx({cookies:{admin_access_token:token}})),true);
+ await db.admin.update({where:{id:admin.id},data:{is_active:false}});await assert.rejects(guard.canActivate(ctx({cookies:{admin_access_token:token}})),code('UNAUTHORIZED'),'deactivated operator');
  await db.admin.update({where:{id:admin.id},data:{is_active:true}});
 });
 test('same cohort keeps paid access on cancellation, loses expired/refunded rights, renews once and rejects consumed refunds',async()=>{

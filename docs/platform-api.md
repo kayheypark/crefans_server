@@ -61,7 +61,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 
 | Method | 경로 | 동작 |
 | --- | --- | --- |
-| GET | /creators | 공개 검색; query/category/cursor, 20개 + nextCursor, 공개 검색 설정 준수 |
+| GET | /creators | 공개 검색; query/category/cursor, 20개 + nextCursor. 첫 페이지는 newCreators(등록일 내림차순·동일 시각 id 내림차순 최신6명)도 반환하며 후속 페이지는 빈 배열. 신규 목록은 첫 페이지 20명과 독립 조회하고 같은 검색어·분야·활성/검색 공개/회원 활성 조건 적용 |
 | GET | /profiles/:id | UUID·회원 핸들·크리에이터 핸들 조회; 판매 멤버십 포함 |
 | GET | /profiles/:id/connections | kind=followers/following, offset 기본0·20명. 비공개는 소유자 외403 CONNECTIONS_PRIVATE. show_followers/show_following 기본true, 비활성 회원 제외 |
 | GET | /profiles/:id/following | 팔로잉 공개 또는 본인만 조회 |
@@ -81,7 +81,8 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | PUT | /members/:id/messages/read | 회원; ids 1~100개. 인증된 수신자 + 지정 발신자 + 요청한 메시지 ID만 읽음 처리; readIds 반환 |
 | POST | /reports | 회원; id, kind=USER/POSTING/COMMENT(삭제·숨김 아닌 댓글만, 없으면 404) |
 | PUT | /notifications/read | 회원; ids, 본인 알림만 처리 |
-| PUT | /me/profile | 회원; name(닉네임), bio |
+| GET | /me/handle-availability | 회원; 필수 handle(영문 소문자·숫자·밑줄 3~24자), 본인 제외 회원·크리에이터 핸들 중복 확인(비활성 포함). {handle, available}만 반환, 예약/변경 없음, private no-store |
+| PUT | /me/profile | 회원; name(사용자명), bio, 선택 handle(크리에이터 핸들도 동기화). 저장 시 중복 재검사, 충돌 409 HANDLE_TAKEN |
 | PUT | /me/settings | 회원; section=password/notifications/privacy 등 |
 | POST | /me/email/request | 회원; 새 email과 현재 비밀번호(currentPassword, 회원별 10분 5회 제한), 현재 회원과 대상에 묶인 코드 |
 | POST | /me/email/confirm | 회원; email/code, 변경 후 세션 철회 |
@@ -191,7 +192,14 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /admin/financial-policy | 운영 설정 조회 권한; 현재 DB 수수료율/정산 보류·version 조회 |
 | PUT | /admin/financial-policy | 운영 설정 수정 권한; expectedVersion/platformFeeBps/settlementHoldDays/reason와 confirmation='정책 변경'(정확히 일치, 아니면 400 CONFIRMATION_REQUIRED), 충돌409·감사 기록 원자 반영 |
 | GET | /admin/financial-policy/history | 운영 설정 조회 권한; 최근 정책 변경100건 |
-| POST | /admin/categories | 활동 분야 등록/활성화 |
+| GET | /categories/:id/icon/:version | 공개 분야 아이콘 WebP. 현재 분야에 연결된 버전만 조회 가능 |
+| GET | /admin/categories/:id/icon/:version | 콘솔용 분야 이미지 조회, content.view. image/webp 바이너리 |
+| PUT | /admin/categories/order | content.update. 전체 ids와 expectedIds(현재 순서)를 검증 후 정렬 원자 저장. 중복/누락 400, 동시 편집 409, 각 분야 변경 전후 순서 감사 기록 |
+| PUT | /admin/categories/:id | content.update. name(1~40자)·active 수정, 기존 크리에이터 연결 유지, 중복 이름 409 |
+| POST | /admin/categories/:id/icon | content.update. multipart file PNG/JPG/WebP 2MiB 이하 정지 이미지. 확장자·실제 디코딩·1600만 픽셀 한도 검사, 128×128 WebP 변환. 새 UUID로 저장 후 연결 변경 및 감사 기록, 이전 파일 정리 |
+| DELETE | /admin/categories/:id/icon | content.update. 사용자 이미지 해제·기본 아이콘 복원, 감사 기록 |
+| GET | /admin/categories | 활동 분야 목록(미사용 포함, 삭제 제외): content.view. id/name/active/sortOrder/iconUrl/customIcon, 정렬 순서·이름 순 |
+| POST | /admin/categories | 신규 등록: content.create / 기존 상태 변경: content.update, content.view 공통 필수. active 생략 시 생성만 가능하며 중복 이름은 409. active 지정은 boolean만 허용하고 없는 분야는 404. 변경·감사 이력 원자 저장 |
 | POST | /admin/creators/:id/promotion | 주목할 크리에이터 광고 배치 설정 |
 | PUT | /admin/creators/:id/verification | 회원·크리에이터 수정 권한; 크리에이터 인증 배지 부여·해제. body isVerified:boolean, 감사 이력 동시 저장 |
 | POST | /admin/auth/login | 운영자 전용 계정(admins) 로그인. 팬·크리에이터 회원 계정으로는 불가. 이메일당 10분10회, 실패 시 동일 응답·동일 해시 비용. HttpOnly·SameSite=Strict·콘솔 도메인 전용 admin_access_token(1시간)/admin_refresh_token(7일). 2차 인증(2026-10-30, 안전성 확보조치 기준 제6조제2항 2026-10-31 시행): 등록 운영자는 code(TOTP 6자리) 또는 recoveryCode 필요(401 TOTP_REQUIRED/TOTP_INVALID, 5분 5회 제한, 같은 시간창 재사용 거부). 미등록 운영자는 첫 로그인부터 7일 유예 후 본인(self) 경로만 허용(403 TOTP_ENROLLMENT_REQUIRED) |
@@ -247,8 +255,8 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 - 수수료·보류일은 기존 DB version 정책을 유지한다. 선택값은2000bps/7일이며 배포 때 `GET /admin/financial-policy`의 현재 version을 받아 `PUT`에 expectedVersion/2000/7/reason을 보내 적용·이력을 확인한다. 이번 작업은 운영 DB 값을 변경하지 않았다. 기존 결제 snapshot은 보존한다.
 - 최소 출금100,000원(2026-10-27 사용자 결정으로 10,000원에서 상향, 콩 출금 최소 1,000콩=총액100,000원과 동일). 보류기간이 끝났어도 `receipt_confirmed_at/received_amount/receipt_reference`가 없는 수익은 출금 가능액에서 제외한다. 대사는 수동 PG·은행 기록 확인 API이며 실제 은행 조회를 했다는 보장이 아니다. 신규 지급은 수요일(KST), 이미 처리 중인 송금의 결과 확인은 다른 요일에도 가능하다. 베타는 모두 실송금 금지. 공휴일·신청마감은 실결제 전 별도 확정한다.
 - 2026-10-31(계약서 7⑥): `GET /studio/finance`의 `settlements[].holdReasons`는 대기 사유를 `period`(보류기간 중)·`receipt`(PG 입금 대사 미기록 또는 입금액 부족)로 구분한다. 판정은 `settlementPending`과 같은 규칙이며, 스튜디오 정산 내역은 건별 '대기 사유'로 표시한다.
-- 2026-10-31 실결제·수동 지급 스위치: `LIVE_PAYMENTS_ENABLED`면 베타에서도 토스 운영 키만 허용(아니면 테스트 키만), `MANUAL_PAYOUTS_ENABLED`면 계좌 확인·이체를 운영자가 콘솔에서 기록(은행 API 없음). `/admin/me`에 `livePayments`·`manualPayouts`, `/admin/withdrawals?status=open`은 접수·처리 중만. 절차·문구 개정안은 `docs/live-payment-launch-20261031.md`.
 - 2026-10-31 출금 신청 마감(사용자 결정): 수요일(KST) 처리 대상은 그 주 수요일 0시(KST) 이전에 접수된 신청(`created_at`)뿐이다. 수요일에 접수된 신청은 다음 주로 넘어가며, 그날 처리·수동 기록 시도는 409 `PAYOUT_SCHEDULED`. 공통 규칙은 `src/platform/beta-policy.ts`의 `payoutCutoff`·`inPayoutBatch`·`payoutQueue`(멤버십·콩 출금·작업자 공통). 수요일이 공휴일이면 운영자가 다음 영업일에 이체·기록한다(코드는 공휴일을 판정하지 않음).
+- 2026-10-31 실결제·수동 지급 스위치: `LIVE_PAYMENTS_ENABLED`면 베타에서도 토스 운영 키만 허용(아니면 테스트 키만), `MANUAL_PAYOUTS_ENABLED`면 계좌 확인·이체를 운영자가 콘솔에서 기록(은행 API 없음). `/admin/me`에 `livePayments`·`manualPayouts`, `/admin/withdrawals?status=open`은 접수·처리 중만. 절차·문구 개정안은 `docs/live-payment-launch-20261031.md`.
 - 설정의 광고 동의 활성화에는 최신 marketingVersion이 필요하다. 회원가입·설정·메일 수신거부가 MemberConsent 이력과 AccountPreference 동의 ID를 같은 트랜잭션에 보존한다. 기존 true값만 있고 증빙 ID가 없으면 광고 대상에서 제외한다. 큐 등록/발송 직전 현재 동의·계정 활성·이메일 인증을 다시 확인하고 수신거부와 회원 잠금으로 직렬화한다.
 - 광고 메일은 `(광고)` 제목, 발신자/연락처, 로그인 없는 수신거부 링크를 사용한다. 처리결과와2년 동의 확인은 비광고 안내다. 기한이 지난 확인 안내가 미접수이면 광고를 보류한다. SMTP 결과 불명 또는15분 이상 중단된 발송은 uncertain으로 남기고 자동 재전송하지 않는다. worker 오류 보고로 운영 확인한다. `MARKETING_MAIL_ENABLED=false` 기본이며 실제 발송은 미실행이다. List-Unsubscribe 헤더는 준비했지만 운영 DKIM 및 수신처의 one-click 인식은 검증하지 않았다.
 - 추가 migration2개는 `20261025100000_beta_policy`, `20261025110000_marketing_delivery_claim`이다. 격리 테스트 DB만 적용했으며 운영과 개발 DB에는 적용하지 않았다. API/worker 배포 전에 두 migration과 DB 정책·환경값을 함께 확인한다.
@@ -470,3 +478,16 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 
 AdProduct 응답: id/name/description/terms/placement/amount/durationDays/visible/onSale/sortOrder/version/deletedAt/createdAt/updatedAt. placement는 featured_creator, amount는 VAT 포함 원 단위 정수100~10,000,000, durationDays는1~365 정수, sortOrder는-100,000~100,000 정수. 문자열 제한은 name100/description3000/terms5000자. 가격·기간은 관리자 입력이며 실제 운영 시드 없음. 변경 감사와 상품 쓰기는 같은 트랜잭션이고 행 잠금+version으로 동시 수정 충돌을 거절한다. PG 구매/노출 적용 정책 선택 대기.
 
+### 2026-10-30 보낸 후원 sourceType 필터 (운영 반영: bean-tip-filter-20261030)
+
+`GET /api/v1/beans/tips?sourceType=post` 또는 `sourceType=profile`로 후원 구분을 선택한다. 생략하면 전체이며 다른 문자열·배열·객체는400 `INVALID_HISTORY_FILTER`다. 본인 sender_id·기간·q 조건에 AND로 결합하고, `post_id`의 유무로 구분하여 정렬·20개 페이지네이션 전에 적용한다. `total`도 같은 조건을 사용하며 삭제된 게시물의 후원도 게시물 후원으로 유지한다. 아바타·핸들·인증 표시 필드는 기존 응답 그대로. 신규 DB/금융 정책 변경 없음.
+
+운영 배포 및 검증 증거는 프론트 `.local/bean-tip-filter-deploy-20261030/verification.json`과 양쪽 `PROGRESS.md`의 같은 릴리스 항목에 기록한다. 운영 브라우저 확인은 목업 자료와 비로그인 접근 제한이며, 본인 범위의 실제 API 필터는 격리 DB/E2E로 검증했다.
+
+### 활동 분야 순서·아이콘 (2026-10-31)
+
+기존 CreatorCategory.sort_order/icon 컬럼을 사용한다. 신규 migration 없이 운영자 순서를 bootstrap·스튜디오 분야 선택 목록에 일관되게 적용한다. bootstrap.data.categoryIcons는 분야 이름→아이콘 URL/null 사전이며 미사용 분야의 기존 프로필 태그도 표시할 수 있다. 목업의 라이프스타일·뷰티·코스프레·피트니스·음악·여행·게임·아트·일상은 기존 기본 이미지를 제공하며 업로드한 이미지가 우선한다. ‘목업 순서로 정렬’은 현재 등록된 분야만 재배치하고 새로운 운영 데이터를 생성하지 않는다.
+
+업로드는 운영자 수정 권한·기존 Origin 검사·10분 30회 제한을 적용한다. 저장 모드는 icon에 local:/s3: UUID로 기록하고 기존 비공개 S3 저장소를 재사용한다. 공개 조회는 해당 분야에 연결된 현재 아이콘만 허용하며 회원 미디어의 접근 권한을 변경하지 않는다. 외부 URL·SVG·움직이는 이미지 업로드는 받지 않는다. 실패한 업로드와 교체된 파일을 정리하며 정리 실패는 서버 로그에 파일 ID로 남긴다. 프로세스 중단으로 남은 비참조 파일의 자동 스캔 복구는 이번 범위에 포함하지 않았다.
+
+근거: [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), 2026-10-31 확인. 확장자·실제 형식·용량·권한을 함께 검사하고 애플리케이션 생성 파일명과 이미지 재인코딩을 적용한다. PNG/JPG/WebP 2MiB·128px 출력은 작은 칩 아이콘 용도에 맞춘 구현 기준이다. 검증 증거는 각 리포 `.local/category-management-20261031/`에 저장하며 대역 S3 검증과 운영 실업로드를 구분한다.

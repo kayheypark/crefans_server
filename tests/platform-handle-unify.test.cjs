@@ -45,3 +45,33 @@ test('migration: a chosen creator address becomes the user name unless taken; ev
  assert.equal((await db.member.findUniqueOrThrow({where:{id:ids.a}})).preferred_username,'a'+tag+'new','a taken name is not copied');
  assert.equal((await db.creator.findUniqueOrThrow({where:{user_id:ids.a}})).handle,'a'+tag+'new','the address follows the user name');
 });
+
+
+test('handle availability is authenticated, excludes self, covers both tables and does not change data',async()=>{
+ const own=(await db.member.findUniqueOrThrow({where:{id:ids.a}})).preferred_username;
+ const available=handle=>api('/me/handle-availability?handle='+encodeURIComponent(handle),'a',undefined,'GET');
+ assert.equal((await api('/me/handle-availability?handle=example',null,undefined,'GET')).status,401);
+ for(const value of ['', 'ab', 'Bad-Name', 'a'.repeat(25)])assert.equal((await available(value)).errorCode,'INVALID_HANDLE');
+ assert.deepEqual((await available(own)).data,{handle:own,available:true});
+ const unused='free_'+tag;assert.deepEqual((await available(unused)).data,{handle:unused,available:true});
+ assert.equal((await available('b'+tag+'tkn')).data.available,false);
+ await db.member.update({where:{id:ids.b},data:{enabled:false}});
+ try{assert.equal((await available('b'+tag+'tkn')).data.available,false);}finally{await db.member.update({where:{id:ids.b},data:{enabled:true}});}
+ const original=(await db.creator.findUniqueOrThrow({where:{user_id:ids.d}})).handle,legacy='legacy_'+tag;
+ await db.creator.update({where:{user_id:ids.d},data:{handle:legacy}});
+ try{assert.equal((await available(legacy)).data.available,false);}finally{await db.creator.update({where:{user_id:ids.d},data:{handle:original}});}
+ const response=await fetch(origin+'/api/v1/me/handle-availability?handle='+unused,{headers:{cookie:cookies.a}});
+ assert.equal(response.headers.get('cache-control'),'private, no-store');
+ assert.equal((await db.member.findUniqueOrThrow({where:{id:ids.a}})).preferred_username,own);
+});
+
+test('availability does not reserve a handle; a later claim is rejected at save without partial changes',async()=>{
+ const handle='claim_'+tag,body={name:'중복 선점 검증',bio:'변경하지 않아야 함',handle};
+ const prior=await db.member.findUniqueOrThrow({where:{id:ids.a}}),priorCreator=await db.creator.findUniqueOrThrow({where:{user_id:ids.a}});
+ for(const who of ['a','b'])assert.equal((await api('/me/handle-availability?handle='+handle,who,undefined,'GET')).data.available,true);
+ assert.equal((await api('/me/profile','b',body,'PUT')).status,200);
+ const failed=await api('/me/profile','a',body,'PUT');assert.equal(failed.status,409);assert.equal(failed.errorCode,'HANDLE_TAKEN');
+ assert.equal((await db.member.findUniqueOrThrow({where:{id:ids.a}})).preferred_username,prior.preferred_username);
+ assert.equal((await db.member.findUniqueOrThrow({where:{id:ids.a}})).nickname,prior.nickname);
+ assert.equal((await db.creator.findUniqueOrThrow({where:{user_id:ids.a}})).handle,priorCreator.handle);
+});

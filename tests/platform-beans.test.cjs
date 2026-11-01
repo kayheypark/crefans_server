@@ -5,7 +5,7 @@ const WED=(()=>{const d=new Date();d.setUTCHours(0,0,0,0);do{d.setUTCDate(d.getU
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),{randomUUID}=require('crypto'),{PrismaClient}=require('@prisma/client'),{ConfigService}=require('@nestjs/config');
 assert.equal(process.env.CREFANS_E2E,'true');const source=process.env.DATABASE_URL;assert.match(source,/@127\.0\.0\.1:3307\/crefans_platform_dev$/);const url=new URL(source);url.pathname='/crefans_platform_e2e';process.env.DATABASE_URL=url.toString();
 const {BeansService}=require('../dist/src/platform/beans.service'),{PlatformService}=require('../dist/src/platform/service'),{PlatformFinanceService}=require('../dist/src/platform/finance.service'),{hashPassword}=require('../dist/src/auth/local/credentials');
-const db=new PrismaClient(),ids=Array.from({length:4},()=>randomUUID()),[fan,creator,stranger,adminId]=ids,pg=new Map();let release,charges=0,transfers=0,lost=false,bankStatus='paid',account,firstCharge;
+const db=new PrismaClient(),ids=Array.from({length:5},()=>randomUUID()),[fan,creator,stranger,adminId]=ids,pg=new Map();let release,charges=0,transfers=0,lost=false,bankStatus='paid',account,firstCharge;
 const config=new ConfigService({BEAN_LEDGER_ENABLED:'true',BEAN_LIVE_PAYMENTS_APPROVED:'true',BANK_PAYOUTS_ENABLED:'true',BETA_MODE:'false'}),provider={configForClient:()=>({clientKey:'live_ck_synthetic'}),decrypt:x=>x,encrypt:x=>x,lookup:async id=>pg.get(id)||null,confirm:async(key,o)=>{charges++;const r={status:'DONE',currency:'KRW',totalAmount:o.amount,balanceAmount:o.amount,paymentKey:key,orderId:o.id,approvedAt:new Date(Date.now()-8*86400000).toISOString()};pg.set(o.id,r);if(lost){lost=false;throw Error('Synthetic lost response');}return r;}},bank={transfer:async(...args)=>{transfers++;return{status:bankStatus};}},service=new PlatformService(db,undefined,config),finance=new PlatformFinanceService(service,provider,config,bank),beans=new BeansService(service,finance,provider,bank,config),tipNow=beans.tip.bind(beans),admin={is_active:true,role:'SUPER_ADMIN',user_sub:adminId},code=c=>e=>e.getResponse?.().code===c;
 // Received beans now wait 7 days from the tip (beanPolicy.tipHoldDays). Payout tests below run as if that week passed: each tip's lots move back 7 days, keeping any later source maturity they test.
 beans.tip=async(member,creator,input)=>{const before=new Date();const r=await tipNow(member,creator,{creatorProvision:'2026-10-30.1',...input});const lots=await db.beanLot.findMany({where:{member_id:creator,bucket:{in:['earned-paid','earned-promotion']},created_at:{gte:new Date(before.getTime()-1000)}}});for(const lot of lots)await db.beanLot.update({where:{id:lot.id},data:{release_at:new Date(lot.release_at.getTime()-7*86400000)}});return r;};
@@ -342,6 +342,26 @@ test('a membership receivable does not stop bean payouts; a bean receivable does
  await assert.rejects(beans.review(creator,{quantity:1000,accountId:account.id}),code('RECEIVABLE_OPEN'));
  await db.creatorReceivable.deleteMany({where:{id:{in:[membership.id,bean.id]}}});
 });
+
+test('tip source filter preserves ownership, totals and page two, including unavailable posts',async()=>{
+ const created=[],day='2020-03-15',at=Date.parse(day+'T00:00:00+09:00'),query={from:day,to:day},postId=randomUUID();
+ const add=async(sender,post,i,message='Source filter fixture',time=at+i*1000)=>{const id=randomUUID();await db.beanTip.create({data:{id,request_key:'source-filter:'+id,sender_id:sender,creator_id:creator,post_id:post?postId:null,quantity:1,paid_quantity:1,promotion_quantity:0,message,created_at:new Date(time)}});created.push(id);};
+ try{
+  for(let i=0;i<27;i++)await add(fan,true,i,i===26?'needle':'Source filter fixture');
+  for(let i=0;i<4;i++)await add(fan,false,30+i);
+  await add(stranger,true,40);await add(fan,true,0,'Outside period',at-1);
+  const one=await beans.tips(fan,false,1,{...query,sourceType:'post'}),two=await beans.tips(fan,false,2,{...query,sourceType:'post'});
+  assert.equal(one.total,27);assert.equal(one.items.length,20);assert.equal(two.items.length,7);
+  assert.equal(new Set([...one.items,...two.items].map(t=>t.id)).size,27);
+  assert.ok([...one.items,...two.items].every(t=>t.sender_id===fan&&t.sourceType==='post'&&t.postAvailable===false));
+  const profile=await beans.tips(fan,false,1,{...query,sourceType:'profile'});assert.equal(profile.total,4);assert.ok(profile.items.every(t=>t.post_id===null&&t.sourceType==='profile'));
+  assert.equal((await beans.tips(fan,false,1,query)).total,31);
+  assert.equal((await beans.tips(fan,false,1,{...query,sourceType:'post',q:'needle'})).total,1);
+  assert.equal((await beans.tips(fan,false,1,{...query,sourceType:'profile',q:'needle'})).total,0);
+  assert.equal((await beans.tips(stranger,false,1,{...query,sourceType:'post'})).total,1);
+  for(const sourceType of ['all','invalid',"' OR 1=1",['post'],{not:null}])await assert.rejects(beans.tips(fan,false,1,{sourceType}),code('INVALID_HISTORY_FILTER'));
+ }finally{await db.beanTip.deleteMany({where:{id:{in:created}}});}
+});
 test('manual payout mode: a Wednesday claim parks the payout without a bank call; the operator transfer is recorded once',async()=>{
  // 2026-10-31 user decision: beta pays creators by operator bank transfer recorded in the console (MANUAL_PAYOUTS_ENABLED).
  const {BankProvider}=require('../dist/src/platform/bank-provider');const manualConfig=new ConfigService({BEAN_LEDGER_ENABLED:'true',BEAN_LIVE_PAYMENTS_APPROVED:'true',BETA_MODE:'true',MANUAL_PAYOUTS_ENABLED:'true'});
@@ -356,3 +376,44 @@ test('manual payout mode: a Wednesday claim parks the payout without a bank call
  assert.equal(await db.beanMovement.count({where:{request_key:`payout-result:${p.id}`}}),1,'ledger result applied once');
  await assert.rejects(manual.manualResult(admin,p.id,{result:'paid',reference:'BANK-REF-1'},new Date(WED)),code('PAYOUT_NOT_PROCESSING'),'a recorded payout cannot be recorded again');
  assert.equal(await db.platformAuditLog.count({where:{entity_id:p.id,action:'bean.payout_manual_result'}}),1);});
+
+test('unapproved terminal PG orders release their reservation exactly once without a locally saved payment key',async()=>{
+ const originalConfirm=charges;
+ for(const status of ['EXPIRED','ABORTED']){
+  const stockBefore=(await db.beanAccount.findUniqueOrThrow({where:{id:'bean-stock'}})).balance;
+  const o=await beans.createCharge(ids[4],{quantity:3,requestId:randomUUID()});
+  pg.set(o.id,{orderId:o.id,paymentKey:'unapproved-'+o.id,totalAmount:o.amount,balanceAmount:o.amount,currency:'KRW',status,approvedAt:null});
+  await beans.reconcileCharge(o.id);await beans.reconcileCharge(o.id);
+  const after=await db.beanCharge.findUniqueOrThrow({where:{id:o.id}});
+  assert.equal(after.status,'failed');assert.equal(after.payment_key,null);assert.equal(after.paid_at,null);
+  assert.equal(await db.beanMovement.count({where:{request_key:'charge-release:'+o.id}}),1);
+  assert.equal(await db.beanMovement.count({where:{request_key:'charge-paid:'+o.id}}),0);
+  assert.equal(await db.beanLot.count({where:{charge_id:o.id}}),0);
+  assert.equal((await db.beanAccount.findUniqueOrThrow({where:{id:'bean-stock'}})).balance,stockBefore);
+ }
+ assert.equal(charges,originalConfirm,'reconciliation never approves a payment');
+});
+
+test('terminal reconciliation keeps order, amount, currency, approval and existing payment identity guards',async()=>{
+ const o=await beans.createCharge(ids[4],{quantity:3,requestId:randomUUID()}),base={orderId:o.id,paymentKey:'unapproved-'+o.id,totalAmount:o.amount,balanceAmount:o.amount,currency:'KRW',status:'EXPIRED',approvedAt:null};
+ for(const patch of [{orderId:'wrong-order'},{totalAmount:o.amount+1},{currency:'USD'},{approvedAt:new Date().toISOString()},{paymentKey:''},{status:'READY'},{status:'IN_PROGRESS'},{status:'CANCELED'}]){
+  pg.set(o.id,{...base,...patch});await assert.rejects(beans.reconcileCharge(o.id),code('PAYMENT_MISMATCH'));
+  assert.equal((await db.beanCharge.findUniqueOrThrow({where:{id:o.id}})).status,'pending');
+  assert.equal(await db.beanMovement.count({where:{request_key:'charge-release:'+o.id}}),0);
+ }
+ await db.beanCharge.update({where:{id:o.id},data:{payment_key:'saved-other-'+o.id}});pg.set(o.id,base);
+ await assert.rejects(beans.reconcileCharge(o.id),code('PAYMENT_MISMATCH'));
+ await db.beanCharge.update({where:{id:o.id},data:{payment_key:null,status:'processing'}});
+ await assert.rejects(beans.reconcileCharge(o.id),code('PAYMENT_MISMATCH'));
+ await db.beanCharge.update({where:{id:o.id},data:{status:'pending'}});await beans.reconcileCharge(o.id);
+ assert.equal(await db.beanLot.count({where:{charge_id:o.id}}),0);
+});
+
+test('completed reconciliation still requires exact amount and creates one credit without a browser return',async()=>{
+ const o=await beans.createCharge(ids[4],{quantity:3,requestId:randomUUID()}),base={orderId:o.id,paymentKey:'approved-'+o.id,totalAmount:o.amount,balanceAmount:o.amount,currency:'KRW',status:'DONE',approvedAt:new Date().toISOString()};
+ pg.set(o.id,{...base,totalAmount:o.amount+1});await assert.rejects(beans.reconcileCharge(o.id),code('PAYMENT_MISMATCH'));assert.equal(await db.beanLot.count({where:{charge_id:o.id}}),0);
+ pg.set(o.id,base);await beans.reconcileCharge(o.id);await beans.reconcileCharge(o.id);
+ assert.equal((await db.beanCharge.findUniqueOrThrow({where:{id:o.id}})).status,'paid');
+ assert.equal(await db.beanMovement.count({where:{request_key:'charge-paid:'+o.id}}),1);assert.equal(await db.beanMovement.count({where:{request_key:'charge-release:'+o.id}}),0);
+ assert.equal(await db.beanLot.count({where:{charge_id:o.id}}),1);
+});

@@ -312,6 +312,12 @@ CDN구성:4명Pro15달러;40명100분Business200달러(요청10M초과),300분Pr
 
 - [Toss 웹훅](https://docs.tosspayments.com/guides/v2/webhook), 확인2026-10-25: 빠른 접수 응답과 재시도에 대비한 멱등 처리. 본문은 재조회 신호로만 사용하며 서버 API 조회를 최종 근거로 삼는다.
 
+### 2026-10-31 미승인 콩 충전 만료 대사
+
+토스 결제창에서 인증·승인 완료 경로로 돌아오지 않은 주문은 서버의 `payment_key`가 비어 있어도 PG에서 `EXPIRED`로 조회될 수 있다. `beans.service.ts`는 **pending + 저장 결제키 null + PG EXPIRED/ABORTED + approvedAt null + 응답 결제키 존재**인 경우에만 결제키 비교의 예외를 허용한다. 이때도 주문번호·저장 금액·KRW가 일치해야 하며 기존 `releaseCharge`로 실패 종료 및 회사 충전 예약 재고 반환 원장을 한 번만 기록한다. 사용자 콩·결제 승인·환불·출금은 실행하지 않는다. processing/paid 주문, 저장된 결제키 불일치, 금액·주문·통화 불일치는 기존대로 차단한다. DONE 대사는 기존 검증과 멱등 지급을 유지한다. 이미 failed/cancelled로 종료한 주문의 재대사는 추가 조회나 원장 이동 없이 종료한다.
+
+근거 확인일 2026-10-31: [Toss 코어 API](https://docs.tosspayments.com/reference)의 Payment 상태(EXPIRED는 30분 유효 시간 만료, ABORTED는 승인 실패), nullable approvedAt, orderId 조회 응답을 확인했다. [결제 흐름](https://docs.tosspayments.com/guides/v2/get-started/payment-flow)의 원주문·최종 금액 검증을 유지한다. 이는 미승인 주문의 오류 처리 수정이며 금액 검증 완화나 금융 정책 변경이 아니다. 실제 운영 테스트키 주문3건은 조회 시 EXPIRED·approvedAt=null·지급lot0, 키만 로컬 미저장인 것을 확인했다. 로컬 공급사 대역·격리 DB 회귀와 운영 조회/자연 배치 결과를 구분하며 상세 증거는 PROGRESS 최신 사고 로그에 연결한다.
+
 ### 2026-10-25 충전 VAT 포함 가격 정책
 
 사용자가 기존 충전가에10% 추가하고 각 상품에 VAT 포함 가격 표기를 지시했다. 신규 주문만110원/콩으로 저장하며 주문 amount가 결제창·서버승인·관리자 현금유입의 기준이다. 기존 주문 amount는 변경하지 않는다. 받은콩 지급은100원/콩 기준20%를 차감, 최소1,000콩 그대로다. [Toss 세금 처리](https://docs.tosspayments.com/guides/v2/learn/tax)와 [결제창 연동](https://docs.tosspayments.com/guides/v2/payment-window/integration)을2026-10-25 확인: 과세금액의 공급가/부가세와 총액 구분, 요청·승인 amount 대조를 적용한다. 상점 과세유형은 계약 사항이고 환금성 콩의 법정 공급시기/회계는 별도 확인 대상이다. 가격정책 구현을 세무분류 또는실PG 승인확인으로 확대하지 않는다. 기존판매gate 유지. [검증·배포](../../crefans_front/docs/audit/bean-vat-deployment-20261025.json).

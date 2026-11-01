@@ -5,6 +5,9 @@
 - 크레팬스(팬·크리에이터 멤버십 플랫폼) 백엔드. NestJS + Prisma + MySQL. AWS Cognito 제거·자체 회원 인증·단일 원서버(docker compose, host Postfix SMTP) 배포를 준비 중. `dev`는 승인된 개발 기준, `prod`는 기존 운영 기준이다. 새 작업은 `dev`에서 `feat/<작업명>` 브랜치로 진행한다.
 - 작업 전에 `PROGRESS.md`를 먼저 읽고, 작업 후 갱신한다. 신규 서비스 기준은 `docs/platform-api.md`, `docs/platform-implementation.md`, `infra/platform/`이다. `docs/local-member-migration.md`와 `infra/single-instance/`는 구형 인증 전환 참고 자료다. `docs/prd.md`·`docs/deployment-setup.md`의 Cognito 전제 내용은 구식.
 - 운영 DB에 `migrate dev`/`db push`/`seed`를 실행하지 않는다. 비밀번호·인증 코드·AWS 키를 로그에 남기지 않는다.
+- 활동 분야 정렬·아이콘은 `categories.service.ts`와 `category-catalog.ts`를 사용한다. 기존 sort_order/icon 컬럼·권한·Origin·감사 이력을 유지하고, 업로드는 제한된 이미지 재인코딩 후 저장한다. 공개 분야 아이콘 경로를 유료 미디어 공개 경로로 재사용하지 않는다.
+- 핸들 중복 확인은 인증된 `/me/handle-availability`에서 본인을 제외한 회원·크리에이터(비활성 포함)를 확인하고 boolean만 반환한다. 예약하지 않으며 저장 시 재검사와 DB 고유 제약을 유지한다. 중복 충돌은 HANDLE_TAKEN으로 반환한다.
+- `/creators`의 신규 목록은 첫 페이지 20명과 독립적으로 등록일·id 내림차순 최신6명을 조회한다. 광고 여부와 무관하며 검색어·분야·검색 공개·회원/크리에이터 활성 조건을 함께 적용한다.
 - 프론트(crefans_front)의 인증 화면 계약: 회원가입 화면 안에서 이메일 코드 인증을 완료한다. PASS 필수/임시 이메일 가입은 서버 signupRequirements에 따른다. 코드 유효 10분, 재전송 쿨다운 3분.
 
 - 신규 실제 서비스는 `src/platform/`의 독립 런타임(`/api/v1`)이다. API/구조/검증은 `docs/platform-implementation.md`, `docs/platform-api.md`, 외부 경계는 `docs/provider-contracts.md`. `/preview` 목업은 유지한다. 기존 비버전/Cognito 런타임에 신규 API를 섞지 않는다.
@@ -50,5 +53,7 @@
 - 운영 SSH: 2026-10-24 사용자가 현재 집 IP의 지속 허용을 승인했다. AWS `crefans-beta`의 TCP 22 관리 규칙 `sgr-0042cbcbcd1b74b35`은 기한 없이 유지하고 배포 후 정리에서 삭제하지 않는다. 정확한 /32·검증은 server `.local/home-ssh-20261024/verification.json`, 공개 증거는 server `docs/home-ssh-access-20261024.json`. IP 변경 시 허용 범위를 임의로 넓히지 않는다.
 
 - 2026-10-25 베타 선택·개방 조건은 프론트 `docs/beta-role-test-plan.md`, 서버 적용 계약은 `docs/platform-api.md` 최신 베타 절을 따른다. BETA_MODE의 테스트 결제/실송금 차단, 신규 환불 snapshot·기존 계약 보존, PG 입금 대사와 광고 동의/철회 이력을 우회하지 않는다. 실제 처리 사실이 미확정이면 법률문서 signupReady를 임의로 해제하지 않는다.
+
+- 콩 충전 대사는 미승인 pending·결제키 미저장 주문의 PG EXPIRED/ABORTED(approvedAt=null)만 주문번호·금액·KRW 검증 후 재고 예약을 종료할 수 있다. 저장된 결제키 불일치나 승인 결과 불일치를 무시하지 않고, 대사에서 새 결제 승인을 요청하지 않는다.
 
 - 콩 후원은 server `docs/platform-implementation.md`의 콩 확장 설계를 따른다. 구형 Wallet/Transfer와 신규 Bean 원장을 자동 혼합하지 않고, 충전·후원·출금은 중복 집계하지 않는다. 공유 지갑/후원/출금과 독립 콘솔은 연결되어 있다. 기능/live 판매 기본 off 및 실공급자 미확인 경계·배포 상태는 PROGRESS.md에서 확인한다.

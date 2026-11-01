@@ -23,7 +23,13 @@
 | POST | `/api/v1/admin/beans/withdrawals/:id/approve` | `src/platform/beans.controller.ts::approve` |
 | POST | `/api/v1/admin/beans/withdrawals/:id/manual-result` | `src/platform/beans.controller.ts::manualResult` |
 | POST | `/api/v1/admin/beans/withdrawals/:id/reject` | `src/platform/beans.controller.ts::reject` |
+| GET | `/api/v1/admin/categories` | `src/platform/admin.controller.ts::categories` |
 | POST | `/api/v1/admin/categories` | `src/platform/admin.controller.ts::category` |
+| PUT | `/api/v1/admin/categories/:id` | `src/platform/admin.controller.ts::updateCategory` |
+| DELETE | `/api/v1/admin/categories/:id/icon` | `src/platform/admin.controller.ts::resetCategoryIcon` |
+| POST | `/api/v1/admin/categories/:id/icon` | `src/platform/admin.controller.ts::categoryIcon` |
+| GET | `/api/v1/admin/categories/:id/icon/:version` | `src/platform/admin.controller.ts::categoryImage` |
+| PUT | `/api/v1/admin/categories/order` | `src/platform/admin.controller.ts::categoryOrder` |
 | POST | `/api/v1/admin/client-errors` | `src/platform/admin.controller.ts::clientError` |
 | GET | `/api/v1/admin/comments/:id/moderation` | `src/platform/moderation.ts::commentHistory` |
 | POST | `/api/v1/admin/comments/:id/moderation` | `src/platform/moderation.ts::comment` |
@@ -52,6 +58,7 @@
 | POST | `/api/v1/admin/me/totp/setup` | `src/platform/admin-totp.ts::setup` |
 | GET | `/api/v1/admin/members` | `src/platform/admin.controller.ts::members` |
 | POST | `/api/v1/admin/members/:id/erase` | `src/platform/moderation.ts::erase` |
+| POST | `/api/v1/admin/members/:id/referral` | `src/platform/admin.controller.ts::referralLink` |
 | GET | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::memberHistory` |
 | POST | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::member` |
 | GET | `/api/v1/admin/members/:id/terms` | `src/platform/signup-invites.controller.ts::terms` |
@@ -67,6 +74,8 @@
 | GET | `/api/v1/admin/posts/:id/moderation` | `src/platform/moderation.ts::postHistory` |
 | POST | `/api/v1/admin/posts/:id/moderation` | `src/platform/moderation.ts::post` |
 | POST | `/api/v1/admin/posts/:id/review` | `src/platform/moderation.ts::review` |
+| GET | `/api/v1/admin/referrals` | `src/platform/admin.controller.ts::referrals` |
+| PUT | `/api/v1/admin/referrals/settings` | `src/platform/admin.controller.ts::referralSettings` |
 | GET | `/api/v1/admin/reports` | `src/platform/admin.controller.ts::reports` |
 | POST | `/api/v1/admin/reports/:id/resolve` | `src/platform/admin.controller.ts::resolve` |
 | GET | `/api/v1/admin/revenue` | `src/platform/admin.controller.ts::revenue` |
@@ -98,6 +107,7 @@
 | PUT | `/api/v1/billing/methods/:id` | `src/platform/finance.controller.ts::methodState` |
 | POST | `/api/v1/billing/registrations` | `src/platform/finance.controller.ts::registration` |
 | GET | `/api/v1/bootstrap` | `src/platform/controller.ts::bootstrap` |
+| GET | `/api/v1/categories/:id/icon/:version` | `src/platform/controller.ts::categoryIcon` |
 | POST | `/api/v1/checkout` | `src/platform/finance.controller.ts::checkout` |
 | GET | `/api/v1/checkout/:id` | `src/platform/finance.controller.ts::order` |
 | POST | `/api/v1/checkout/:id/confirm` | `src/platform/finance.controller.ts::confirm` |
@@ -117,14 +127,19 @@
 | POST | `/api/v1/marketing/unsubscribe` | `src/platform/marketing.controller.ts::unsubscribe` |
 | POST | `/api/v1/me/email/confirm` | `src/platform/controller.ts::emailConfirm` |
 | POST | `/api/v1/me/email/request` | `src/platform/controller.ts::emailRequest` |
+| GET | `/api/v1/me/handle-availability` | `src/platform/controller.ts::handleAvailability` |
 | POST | `/api/v1/me/inquiries` | `src/platform/controller.ts::inquiry` |
 | PUT | `/api/v1/me/profile` | `src/platform/controller.ts::profile` |
+| PUT | `/api/v1/me/profile/photos` | `src/platform/controller.ts::profilePhotos` |
+| GET | `/api/v1/me/referral` | `src/platform/controller.ts::referral` |
+| GET | `/api/v1/me/referral/history` | `src/platform/controller.ts::referralHistoryList` |
 | PUT | `/api/v1/me/settings` | `src/platform/controller.ts::settings` |
 | POST | `/api/v1/me/withdraw` | `src/platform/controller.ts::withdraw` |
 | POST | `/api/v1/media` | `src/platform/media.controller.ts::upload` |
 | GET | `/api/v1/media/:id/edge-authorize` | `src/platform/media.controller.ts::edgeAuthorize` |
 | GET | `/api/v1/media/:id/file` | `src/platform/media.controller.ts::download` |
 | GET | `/api/v1/media/:id/origin-file` | `src/platform/media.controller.ts::originDownload` |
+| GET | `/api/v1/media/:id/status` | `src/platform/media.controller.ts::status` |
 | PUT | `/api/v1/members/:id/block` | `src/platform/controller.ts::block` |
 | PUT | `/api/v1/members/:id/follow` | `src/platform/controller.ts::follow` |
 | POST | `/api/v1/members/:id/messages` | `src/platform/controller.ts::message` |
@@ -186,6 +201,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/beans` | 지갑 |
 | `/preview/beans/charges` | 충전 주문 |
 | `/preview/beans/history` | 콩 이동 내역 |
+| `/preview/beans/referral` | 친구 초대 |
 | `/preview/beans/tips` | 보낸 후원 |
 | `/preview/beans/charge` | 콩 충전 |
 | `/preview/beans/success` | 콩 충전 완료 |
@@ -339,8 +355,13 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261030140000_comment_edited`
 - `20261030200000_pilot_followups`
 - `20261030230000_admin_totp`
+- `20261031180000_unify_handles`
+- `20261031230000_profile_cover`
+- `20261101090000_referrals`
+- `20261101120000_referral_hold`
+- `20261101150000_platform_settings`
 
-## Prisma 전체 정의 (82 models · 15 enums)
+## Prisma 전체 정의 (85 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -361,6 +382,8 @@ model UserProfile {
   user_id    String   @id
   /// 소개글
   bio        String?  @db.Text
+  /// 프로필 배경 사진(media original_url). 크리에이터는 creators.cover 와 같은 값
+  cover      String?  @db.Text
   /// 생성 일시
   created_at DateTime @default(now())
   /// 수정 일시
@@ -2168,5 +2191,44 @@ model MemberNotice {
  created_at DateTime @default(now())
  @@index([completed_at,retry_at])
  @@map("member_notices")
+}
+
+/// 레퍼럴(친구 초대). 회원당 1행이며 id 가 초대 링크의 코드다(2026-11-01).
+model Referral {
+ id String @id @default(uuid())
+ member_id String @unique @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@map("referrals")
+}
+/// 레퍼럴로 가입한 회원과 보상 상태. 보상은 직접 초대한 회원(referrer_id)에게만, 초대받은 회원의 첫 유료 결제 1회에 지급.
+model ReferralSignup {
+ id String @id @default(uuid())
+ referral_id String
+ referrer_id String @db.VarChar(191)
+ member_id String @unique @db.VarChar(191)
+ /// pending → qualified(첫 실결제, 7일 보류) → granted → clawed_back. 월 상한 초과 시 capped
+ reward_status String @default("pending") @db.VarChar(20)
+ reward_quantity Int @default(0)
+ reward_source String? @db.VarChar(20)
+ reward_source_id String? @db.VarChar(191)
+ rewarded_at DateTime?
+ /// 첫 실결제 후 보상 확정 예정 시각(환불 기간 7일). qualified 상태에서만 값이 있다.
+ grant_due_at DateTime?
+ clawed_back_at DateTime?
+ created_at DateTime @default(now())
+ @@index([referral_id])
+ @@index([referrer_id,created_at])
+ @@index([reward_source,reward_source_id])
+ @@index([reward_status,grant_due_at])
+ @@map("referral_signups")
+}
+
+/// 운영 콘솔에서 바꾸는 서비스 설정(키-값). 2026-11-01: referral.enabled(친구 초대 보상 스위치).
+model PlatformSetting {
+ key String @id @db.VarChar(64)
+ value Json
+ updated_by String? @db.VarChar(191)
+ updated_at DateTime @updatedAt
+ @@map("platform_settings")
 }
 ```

@@ -1,5 +1,23 @@
 # PROGRESS: crefans_server
 
+## 2026-11-01 저녁 /pilot-work 결정 동기화 (커밋 완료·배포 대기)
+- 결정(클릭 답): 보상 출금 불가·남은 만큼 회수·일부 환불 전체 회수(약관 명시 예정)·비활성 소멸·상한 초과 종결·내역 고지·부정 문구 완화, 원천징수는 회사가 플랫폼 수수료 안에서 부담, 가이드 틀린3+누락5, SEO 새 주소+301·www→apex, 로딩 일괄 정리, 업로드 상한+감시, 재시도+안내, 오프사이트 백업 나중에, 관리자 수수료 그대로.
+- 커밋: 서버 ebb3406(레퍼럴 출금 불가)·46fe73e(관리자 소멸 상태)·b65f083(API 설명 7건·설계 문서)·384f5ea(Caddy www 301), 프론트 d2af2a6(초대 카드·내역)·0c1d481(이벤트 주소 301), 관리자 93f4c28, 가이드 ee0aed7·053ac97. 미커밋 유지: 계약 폴더(docs/contracts 전체가 미추적), 프론트 docs/audit manifest·evidence(다른 세션 변경과 섞임).
+- 검증: 서버 referrals+beans+openapi 57 pass(보상 로트 되돌리면 3 fail), 프론트 초대 테스트 5 pass(HEAD 카드면 1 fail), 이벤트 301 테스트(302면 1 fail)·개발 서버 curl 301, Caddy validate(APP_DOMAIN=www면 실패), 가이드 사본 check-guides 링크·앵커 1345(앵커 훼손 대조 검출), 계약 PDF v2.36 7쪽 자동 PASS·전 쪽 육안, check:docs PASS.
+- 배포 대기: video-harden-20261101(API·워커·프론트, 이미지 운영 서버 적재·진단 기동 성공, deploy.sh 실행은 승인 필요로 미실행), 레퍼럴·이벤트 주소·Caddy·가이드는 아직 빌드 전.
+- 미해결: ① 약관 개정(11-30 시행본은 10-30 공지 완료 — 레퍼럴 조항·원천징수 문구를 여기에 넣을지 별도 개정으로 할지) ② 운영 APP_DOMAIN이 www가 아닌지 배포 전 확인(같으면 Caddy 기동 실패) ③ 가이드 check:guides 소스 잠금 52건 차이(전체 재검토 필요), beans/referral 가이드 매핑 없음 ④ 배포·미커밋 67개(night-work/drift-20261101.md) ⑤ 로딩 규칙 12곳 진행 중.
+- 사고: 18:33 서버 docs/platform-api.md를 스크립트 실수로 0바이트로 만듦 → 10/31 사본+codex 기록 1건 재적용으로 복원, 기록 해시 f27e3b36 일치 확인 후 행 추가.
+- 19:10 추가: 사용자 결정 '기능 묶음별 커밋'으로 배포·미커밋 67개 정리 → 재측정 결과 세 저장소 모두 0개(남은 운영≠HEAD는 커밋 후 배포 대기분). 서버 2c3e5ae·e6472c9·fd999f0·910bf63·3b56003, 프론트 f81a056~fca06d0(9개)·5f95e58, 관리자 514e53c·4de157b·be481cc. 각 커밋은 배포 사본 SHA-256 일치 확인, 스냅숏 검사: 서버 tsc·build·openapi 11 pass, 프론트 tsc·전체 455 pass, 관리자 tsc·11 pass. 다른 세션의 미배포 테스트(서버 tests/*, platform-categories·new-creators 테스트)는 아직 미커밋.
+- 로딩 규칙 12곳(서브에이전트): 프론트 fd3fba7, 관리자 b04aaf7. 스냅숏 474 pass, ApiState 되돌리면 2 fail. 프론트 e2e/advertising 문구는 미실행.
+- 약관: 사용자 결정 '별도 개정으로 새로 공지' — 레퍼럴 조항·원천징수 회사 부담 문구를 담은 새 개정본(30일 전 공지)을 준비할 차례. 공지 게시·시행일은 사용자 확인 필요.
+- 19:25 video-harden-20261101 운영 배포 완료(사용자 '배포' 승인): API·워커·프론트 교체, 관리자·DB·프록시 유지, 마이그레이션 없음. 배포 직전 기준선 API save-fix·프론트 message-read 일치, 진단 기동 성공. 배포 후 APP_RELEASE=video-harden-20261101, /service/feed·/api/v1/health 200, media status 무인증 401, api healthy, 워커 5분 로그 오류 0건. 이미지 정리 --keep 3(롤백용 save-fix·message-read·ad-form 보호) 로컬·원격 각 3개 삭제. 증거: crefans_front/.local/video-harden-deploy-20261101/. 실제 아이폰 영상 업로드·10분/4K 거부·재시도는 운영에서 직접 시험하지 않음.
+
+
+## 2026-11-01 15:43 night-work 조사 문서
+
+- 위치: `crefans_front/.local/night-work/2026-11-01-1543.md`(읽기 전용 조사, 코드 변경 없음).
+- 상위: ① 변환 중 아이폰 영상이 든 게시물 저장 시 409(studio.service 트랜잭션 재검사가 COMPLETED만 허용, 운영 반영) ② 운영 코드 76개 파일이 git에 없음 ③ 변환이 384MB 워커에서 돌고 감시 없음 ④ 서버 밖 백업 꺼짐 ⑤ 친구 초대 내역·약관·계약 제6조③·회수 알림 정합성과 보상 결함(G1·G3·G7).
+
 ## 2026-11-01 메시지 전송됨·읽음 표시 — message-read-20261101 운영 배포(API·프론트)
 
 - 내 메시지 아래 체크 1개+"전송됨", 상대가 읽으면 체크 2개+"읽음"(브랜드 색). 상대 메시지는 표시 없음. 서버 inbox가 내 메시지에 read(read_at 존재)를 붙임.
@@ -24,6 +42,364 @@
 - 검증: 서버 tests/platform-video-transcode.test.cjs 3건(대조 2종 실패), 기존 media·studio·jobs 회귀 통과, Docker와 운영 워커 컨테이너에서 HEVC .mov → H.264 720p 실제 변환·위치 태그 제거 확인. 프론트 npm test 442.
 - 미확인: 실제 아이폰 업로드부터 게시·재생까지(사용자 실기기 시험 필요), 긴 4K 영상의 변환 시간과 서버 부하(2코어). 증거 `.local/mov-transcode-deploy-20261101/`.
 
+## 2026-10-31 21:50 KST 콩 충전 만료 배치 PAYMENT_MISMATCH 수정·운영 배포
+- 요청/합격 조건: 21:34 KST 텔레그램 beans-charge 오류3건의 실제 주문/PG 상태를 대조하고, 미승인 만료 주문만 멱등 종료한다. 금액·통화·주문·기존 결제키/승인 검증을 유지하고 자연 배치 연속2회 무오류 및 처리 완료 알림 전송을 확인한다.
+- 원인: 실제 Toss 테스트키 GET 조회에서 주문3건 모두 EXPIRED·approvedAt=null·금액/주문/KRW 일치·지급lot0. 브라우저가 승인 경로로 복귀하지 않아 로컬 payment_key=null인데 무조건 키를 비교해 매분 PAYMENT_MISMATCH가 발생했다. 서버 배치에는 접속 요청이 없어 IP unknown인 것이며 이 알림을 외부 침입 증거로 해석하지 않는다.
+- 수정: src/platform/beans.service.ts만 운영 코드 변경. pending·로컬키 없음·EXPIRED/ABORTED·미승인·PG키 존재 조건에서만 키 비교 예외를 허용하고 기존 releaseCharge로 실패 종료/예약 재고 반환. failed/cancelled 재대사 no-op, DONE 멱등 지급과 금액·통화·주문번호·저장키 검증 유지. 새로운 PG 승인·환불·출금, 금융 정책 및 스키마 변경 없음.
+- 검증: npm run build PASS; CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-beans.test.cjs tests/platform-bean-ledger.test.cjs tests/platform-provider-lifecycle.test.cjs tests/platform-payment-lifecycle.test.cjs 101/101 PASS. 실제 격리 MySQL3307·PG/은행 대역. 원본 코드 대조에서 PAYMENT_MISMATCH 재현. 초기 fixture의 비활성 회원 공유와 과거 고정일 payout fixture를 보정했고, 종료 주문 반복 대사 실패를 발견해 제품 재대사 no-op 보강 후 재검증했다. 최초 실패 로그 보존.
+- 배포: charge-expiry-20261031, 21:49:15 KST. 실제 운영 handle-check 소스236파일 중 beans.service.ts 1파일만 변경한 immutable amd64 이미지. 직전6컨테이너 ID/image 대조 후 API/worker만 교체, frontend(action-dialog)/admin/DB/proxy 동일 ID 보존. health200·인증 없는 handle 조회401·페이지200·재시작0·OOM없음. env는 API_IMAGE/APP_RELEASE만 변경, 자동 복구/직전 이미지 유지.
+- 운영 확인: 자연 배치가 문제3건을 failed로 종료하고 예약 재고20,010콩을 회사 stock으로 각1회 반환, 사용자 지급0·lot0. 연속2회 failures={} 확인. worker.completed(processed3) Telegram 전송은 21:49:18 KST 1회 성공(last_error=null). 두 번째 배치 전의 조기 확인은 횟수 부족으로 실패 기록 후 정상 시각에 재확인했다. 수신자 열람 여부와 실제 live 결제 검증으로 확대하지 않는다.
+- 보존/증거: 로컬·원격 이미지 keep3 계획 확인 후 미사용 API new-creators만 삭제, 현행과 직전2개 보존. 다른 미커밋 변경 보존, 이번 커밋/푸시 없음. [검증 증거](docs/bean-charge-expiry-20261031.json)에 HEAD·파일 SHA256·명령/시각/종료 코드·운영 결과·공식 Toss 근거 및 비공개 로그 위치 기록. 문서 현행화는 이 기록 검토 후 프론트 docs:record/check:docs로 검사하며 제품 검증과 구분한다.
+
+
+## 2026-10-31 18:55 KST 프로필 핸들 중복 확인·설정 하단 스튜디오 링크 운영 배포
+- 요청/합격 조건: 프로필 수정에서 핸들 사용 가능 여부를 확인하고, 변경한 핸들은 최신 확인 성공 후에만 저장한다. 중복·잘못된 형식·요청 실패·늦은 응답·저장 직전 선점은 거부한다. 설정 하단에서 PC·모바일 모두 스튜디오로 이동한다. 앞선 사용자명/활동명/소개 우선순위 툴팁도 함께 배포한다.
+- 구현: 인증된 GET /api/v1/me/handle-availability?handle=..., private/no-store, 본인 제외 회원 핸들과 크리에이터 주소를 함께 조회하며 타인 정보는 반환하지 않는다. 저장 시 재확인 및 DB 고유 제약을 유지하고 실제 Prisma P2002 충돌을 HANDLE_TAKEN으로 변환한다. 스키마/마이그레이션 변경 없음. 프론트는 공통 Field에 중복 확인 버튼·상태 문구, 입력/재진입 시 확인 무효화·늦은 응답 무시, 실패 재시도, 변경 없는 기존 핸들 호환을 적용했다. 하단 링크는 현재 basePath의 /studio를 사용한다.
+- 호환 보완: 현행 핸들 형식(소문자·숫자·밑줄3~24자)과 다른 기존 핸들은 그대로 두고 이름·소개를 수정할 수 있다. 바꾸는 경우에만 새 형식과 중복 확인을 요구한다. 목업은 fixture 중복만 확인하며 실서비스 API 성공으로 간주하지 않는다.
+- 근거 조사(2026-10-31): Prisma6 공식 API https://www.prisma.io/docs/orm/v6/reference/prisma-client-reference 및 예외 처리 https://docs.prisma.io/docs/orm/prisma-client/debugging-and-troubleshooting/handling-exceptions-and-errors . 조회 결과는 예약이 아니므로 최종 저장의 unique/P2002 처리를 유지한다는 기술적 판단이다.
+- 로컬 검증: server npm run build PASS, handle-unify5건+OpenAPI11건 총16/16 PASS. front npm run check(레이어·TS·단위426/426) PASS. 격리 DB E2E PC Chromium/iPhone13 WebKit 총4/4 PASS(툴팁2·중복확인/실제 저장/공개 주소/스튜디오 이동2). 저장 전 다른 계정 선점409, 인증 없음401, 유효하지 않은 핸들400, 본인 핸들 허용, 응답 불일치/지연/오류·입력 변경 무효화 포함. 실제 iPhone은 검사하지 않았다.
+- 최초 실패/조치: 새 링크와 API 때문에 예전 링크 목록/177→178·73→74 OpenAPI 기대값 갱신. E2E가 기존 형식 핸들의 저장 비활성화를 발견해 제품 호환 수정 및 단위 회귀 추가. 로그인 effect 이동 대기, 운영 goto/waitForURL의 전체 load 대기를 DOM 및 실제 UI 표시 대기로 바꿔 재실행했다. 실패 로그도 보존했다.
+- 배포: handle-check-20261031, 2026-10-31 18:52:36 KST 완료. 직전 실제 운영 handle-sync-20261031 소스에서 front10·server3파일만 반영, immutable source manifest·이미지 내부 파일 SHA-256·amd64 확인 후 배포 직전 6컨테이너 ID/image 기준선 대조. API/worker/frontend 교체, admin/DB/proxy 동일 ID 유지, 재시작0·OOM없음, health/페이지200·비로그인 중복조회401. env 변경은 API_IMAGE/FRONTEND_IMAGE/APP_RELEASE만, 자동 복구 스크립트·직전 이미지 보존.
+- 운영 검증: 승인된 합성 팬 테스트 계정으로 crefans.com PC Chromium·iPhone13 WebKit 각각 기능 시나리오 PASS. 중복 핸들 거부·사용 가능 표시·재입력 시 저장 비활성·기존값 불변·툴팁·스튜디오 이동 확인. 운영 프로필 저장0회, 로컬에서만 실제 변경 검증. WebKit에서 요청 범위 밖 explore/messages의 Next RSC 사전 로딩 access-control 오류2건 관찰, 기능 검증과 분리해 그대로 기록했으며 원인은 미확정이다. 전체 사이트 오류0 주장 아님.
+- 증거: 프론트 .local/handle-check-20261031/ (before, 최종 테스트 로그, results 캡처, verification.json), .local/handle-check-deploy-20261031/ (source-delta/manifests, builds, source-freeze, images, deployment-command, runtime-after, production-browser 및 PC·모바일 캡처, retention JSON). 프론트553540e·서버ba8df97 위 미커밋 변경이며 다른 세션 파일 보존, 이 작업의 커밋/푸시 없음. 문서 계약과 의미 설명을 갱신한 뒤 docs:record/check:docs 결과를 verification.json에 기록한다. 기록 갱신은 제품 테스트를 대체하지 않는다.
+
+## 2026-10-31 18:25 KST 사용자 이름 단일화·스튜디오 깜빡임·대시보드 문구 — handle-sync-20261031 운영 배포, 프로필 사진 수정 시안
+- 요청: ①공식 계정(khpark@gmail.com) 전환 후 핸들이 예전 회원 핸들로 고정되고 프로필 주소는 따로 받음 → 하나로, 프로필 수정에서 변경, 전환 시 별도 설정 없음 ②'로그인이 필요해요' 깜빡임 ③대시보드 '반가워요' 아래 설명 삭제 ④프로필 페이지에서 배경·프로필 사진 수정(시안 먼저).
+- 원인: members.preferred_username(가입 시 임의, 수정 불가)과 creators.handle(전환·스튜디오에서 입력)이 별도. 깜빡임은 StudioRouter가 회원 정보 로딩 전에 signedIn(빈 기본값 false)을 먼저 검사.
+- 변경: server ba8df97(PUT /me/profile handle, 크리에이터 주소 동기화, HANDLE_TAKEN/INVALID_HANDLE, 스튜디오 저장은 사용자 이름 사용, 마이그레이션 20261031180000_unify_handles: 직접 정한 크리에이터 주소를 사용자 이름으로(중복 제외) 후 모든 크리에이터 주소 일치), front 553540e(설정 > 프로필 수정의 사용자 이름 편집, 전환·스튜디오 '프로필 주소' 읽기 전용, StudioRouter 로딩 우선, 대시보드 설명 삭제, e2e/handle-studio, qa-journey 갱신).
+- 검증: server platform-handle-unify 3/3(주소 동기화 제거 대조 FAIL), openapi 11/11, legal 11/11, 스테이징 스냅숏 tsc 0. front tsc 0, unit 423/423, e2e handle-studio 2/2(로딩 순서 되돌리면 깜빡임 검사 FAIL), 관련 E2E 38 통과.
+- 배포(`crefans_front/.local/handle-sync-deploy-20261031/`): 폴더 생성 전 운영 확인 결과 다른 세션 배포로 API/front=new-creators-20261031, admin=financial-tooltip-20261031 → 이를 기준으로 사용. new-creators가 service.ts·openapi-contract.ts를 바꿨으므로 운영본에 제 수정분만 patch(충돌 없음), 나머지 front 5파일은 운영본=수정 전 커밋 대조 후 교체. ship 직전 운영 태그=기준 확인(BASELINE OK). 마이그레이션 적용(deploy.sh가 직전 DB 백업). 18:22 KST 완료. 운영 확인: 크리에이터 목록 '관악구 실시간 @crefans' 주소로 프로필 조회 성공, newCreators 필드 유지, health·스튜디오·콘솔 200. 이미지 정리 keep 3+new-creators·financial-tooltip 보호.
+- 미검증: 공식 계정으로 로그인한 상태의 설정 화면·스튜디오(운영 계정 필요).
+- 시안(미구현·미배포): `crefans_front/.local/profile-photo-mock-20261031/` 4장. 내 프로필 배경 오른쪽 아래 '배경 사진 변경', 프로필 사진 카메라 배지, '프로필 사진 변경' 창(PC 가운데·모바일 하단 시트, 프로필 원형·배경 3:1 미리보기, 사진 선택·삭제, JPG·PNG·WEBP 5MB(서버 이미지 제한과 동일), 저장 시 크리에이터 프로필에도 같은 사진). 현재 서버·스튜디오 모두 프로필·배경 업로드 API 없음 → 구현 시 서버 저장 API·스튜디오 반영 필요.
+
+## 2026-10-31 17:39 KST 신규 크리에이터 탐색 응답·운영 배포
+- 요청/합격 기준: 실서비스 검색에 광고 우선 첫20명과 독립된 신규 목록을 제공한다. 크리에이터 created_at DESC/id DESC 최신6명, 동일 검색어·분야·검색 공개·크리에이터/회원 활성 조건을 적용한다. 프로필 수정일은 순위에 사용하지 않는다.
+- 구현: `PlatformService.directory`의 첫 페이지에 newCreators 추가, 후속 페이지는 빈 배열. 공통 where 조건과 비활성 회원 제외 조회를 사용하고 중복 프로필 변환을 캐시한다. DB 구조/개인정보 노출 필드 변경 없이 기존 공개 프로필 DTO 재사용. OpenAPI 응답·`docs/platform-api.md` 업데이트, 총 API177개 유지.
+- 검증: npm run build 및 `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-new-creators.test.cjs tests/platform-openapi.test.cjs` 14/14 PASS. 실제 Nest HTTP·격리 MySQL에서 광고 첫 페이지 밖 신규 포함, 프로필 수정 후 순서 유지, 동일 시각 id 안정 정렬, 검색/분야·비활성·검색 비공개 제외·잘못된 검색·빈 결과·후속 페이지를 검증했다. 테스트 fixture는 정리했다. UI PC/Pixel7 4건은 프론트의 대역/목업 검사.
+- 운영: `crefans-api:new-creators-20261031` API/worker 및 프론트 17:39 KST 반영. 직전 policy-sync2 검증 소스에 service/openapi-contract 두 파일만 덮어쓴 amd64 이미지의 소스 해시 확인, 기존 활동 분야·정책 변경 보존. 콘솔/DB/proxy 유지·schema migration 없음. 공개 newCreators 응답과 실제 DB 최신순 조회 일치 확인(현재 공개 조건 충족0명), health·페이지·새싹 이미지200. 비어 있지 않은 실운영 신규 카드는 현재 데이터 부재로 확인 불가이며 로컬 실제 DB 시험과 구분한다.
+- 증거: `.local/new-creators-20261031/{baseline,verification}.json`, build.log/tests.log; 형제 프론트 `.local/new-creators-deploy-20261031/`의 source manifest·builds·deployment-command·after·browser-after. 기존 타 작업 보존, 본 작업 커밋·푸시 없음.
+
+## 2026-10-31 17:37 KST /pilot-work 확정 정책 동기화 + 운영 배포 policy-sync2-20261031·가이드 (사용자 결정)
+- 결정(/pilot-work 질문): ①실결제 문구는 약관 '시행 예정본+공지' 방식, ②시행일은 토스 승인 후 확정, ③원천징수 회사 부담·출금 화요일 마감은 안내·가이드에 지금 반영하고 약관 제6조는 실결제 개정본에, ④beta.crefans.com 링크는 crefans.com으로 지금 교체. 추가 지시: 초대제 안내 '베타기간(~26년 11월)'→'현재 기간(~26년 11월)'.
+- 변경·커밋(푸시 없음): server 20563e4(마케팅 메일 기본 주소·설정 예시 crefans.com, 초대 안내 문구, live-payment-launch 원천징수 조사·결정·약관 제6조 개정 초안), front c0b8c6c(payoutTaxNote: 스튜디오 정산 안내·FAQ·서비스 가이드, 명함 소개 링크 crefans.com, 테스트 기대 문구), guide 9259cf6(수익과 출금·출금 설정·서비스 소개·소개서 PDF·가입 안내·문제 해결, beta 링크 22파일→crefans.com, 링크 검사기, 원본 잠금).
+- 약관(`legal-documents.ts`)은 미변경: 개정 초안은 server docs/live-payment-launch-20261031.md 4절 표(4조·6조 세금·일정·실결제). 시행일·공지는 토스 승인 후.
+- 검증: server build, platform-beta-policy 11/11·platform-legal 11/11(처음 실행은 다른 세션의 테스트 DB 점유로 실패→재실행 통과), front tsc 0·check 422/422, guide check:guides 통과(서비스 링크 44)·빌드 28쪽·소개서 PDF 13쪽 넘침 검사 통과·10쪽 육안 확인.
+- **사고와 교정**: 첫 배포 policy-sync-20261031(17:2x KST)이 payout-cutoff/beta-closed 기준 소스로 빌드됨. 그사이 다른 세션이 category-management-20261031(분야 관리, 마이그레이션 없음)을 배포해 두었고, capture_before가 배포 직전 상태를 새 기준으로 기록해 guard가 막지 못함 → 분야 관리 변경이 약 10분간 운영에서 빠짐. 즉시 category-management 소스를 기준으로 제 6파일만 얹은 policy-sync2-20261031을 17:33 KST에 재배포(운영본=수정 전 커밋 대조, 분야 관리 콘솔 API 4개 경로 존재 확인(비로그인 400, 404 아님)). DB 변경 없음. 재발 방지: 배포 폴더 생성 직전과 ship 직전에 release-before의 이미지 태그가 기준 릴리스와 같은지 확인할 것.
+- 운영 확인(policy-sync2): API health 200, crefans.com 탐색 200, 콘솔 로그인 200, FAQ 원천징수·화요일 마감 문구, 명함→crefans.com/service/landing 이동, API·worker MARKETING_PUBLIC_ORIGIN=https://crefans.com(deploy.sh 검사). 이미지 정리 keep 3+category-management 보호. 가이드(`crefans_guide/.local/deploy-policy-sync-20261031/`): 운영 44파일 해시 일치, 컨테이너·Caddy 불변, 가입 안내에 전체 동의·로그인하러 가기.
+- 남은 것: 프론트 docs:record는 다른 세션의 분야 아이콘 API 설명 누락으로 실패(그 세션 몫), guide check:guides는 다른 세션의 미배포 '새 크리에이터' 변경(CreatorPages·service.ts)으로 잠금 불일치(그 세션 몫). 원천징수 gross-up·지급명세서 운영·주민번호 수집은 세무사 확인 후.
+
+## 2026-10-31 17:23 KST 활동 분야 순서·아이콘 API 및 운영 배포
+- 요청/합격 기준: 운영 콘솔에서 활동 분야 순서·이름·사용 상태·아이콘을 관리하고 공개 목록·스튜디오 순서 및 프론트 아이콘에 반영한다. DB 영속성, 권한·Origin 차단, 동시 순서 변경409, 유효하지 않은 파일 거부, 감사 이력과 업로드 교체/복원을 검증한다.
+- `category-catalog.ts`·`categories.service.ts` 추가. 기존 CreatorCategory.icon/sort_order 사용(마이그레이션 없음), 전체 목록 잠금과 expectedIds로 순서 저장 충돌 감지, 이름·상태·순서·아이콘 변경 감사 기록. 업로드는 PNG/JPG/WebP 최대2MiB·16M픽셀 정지 이미지만 실제 디코딩 후 128×128 WebP 재인코딩, UUID 키·비공개 S3 또는 개발 로컬 저장. 현재 버전만 공개 이미지 API로 제공하며 기존 유료 미디어 권한 경로는 유지한다. 교체/실패 후 정리 실패는 오류 기록, 장애로 남은 고아 파일 자동 순회 정리는 범위 밖이다.
+- API/Swagger: 관리자 목록 확장, 순서 저장·편집·아이콘 업로드/복원·인증된 아이콘 조회 및 공개 아이콘 조회. bootstrap.categoryIcons와 공개/스튜디오 sortOrder 반영. 177개 실제 API와 3종 명세 일치. 근거/공식 OWASP File Upload 문서 확인(2026-10-31)은 `docs/platform-api.md`에 기록.
+- 로컬: `npm run build`, `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-categories.test.cjs tests/platform-admin-console.test.cjs tests/platform-openapi.test.cjs` 29/29 PASS. 실제 Nest HTTP·격리 MySQL에서 저장/오류/권한/Origin/감사/파일 검증·교체·복원 확인. S3 저장·읽기·삭제는 공급사 대역이며 운영 버킷 신규 업로드 검증이 아니다. 최초 공유 DB 병렬 실행 실패는 순차 실행으로 수정, 테스트용 스튜디오 회원 fixture와 추가 API 명세 기대값 보완 후 통과.
+- 운영: `crefans-api:category-management-20261031` API/worker 및 프론트/콘솔 17:23 KST 배포. 기존 payout-cutoff 소스에 본 작업 9파일만 적용한 격리 amd64 이미지 내부 해시 일치. 공개 bootstrap 계약/기본 아이콘200, 신규 관리자 API 비로그인401, 존재하지 않는 공개 아이콘404, 전체 running/restart0/OOM없음. DB/proxy ID 유지, 운영 목록 재정렬·생성·업로드·마이그레이션·금융 설정 변경 없음.
+- 증거: `.local/category-management-20261031/verification.json`, `tests-verified.log`, `build-final.log`. 배포는 형제 프론트 `.local/category-management-deploy-20261031/`의 manifest·source-delta·builds·deployment-command·after.json. 기준 HEAD 569ea972; 기존 타 작업 변경 보존, 본 작업 커밋·푸시 없음.
+
+## 2026-10-31 17:12 KST 원천징수 정책 확정·계약서 v2.35 (사용자 결정)
+- 결정: "출금 수수료 20%에 원천징수 대응까지 감안. 회사가 대신 부담." → 법령상 회사에 원천징수 의무가 있으면 그 세액은 회사가 부담해 신고·납부, 크리에이터에게는 공제 없이 지급. 크리에이터의 소득세 신고·납부와 사업자 크리에이터의 세무 증빙은 크리에이터 몫. 이전 결정 '원천징수 없이 지급'을 대체(live-payment-launch 1절 표 갱신).
+- 계약서: 별지 A 세무 칸 확정 문구, html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 2f767864e7b809c3012a6ef0becd504aed8533196cdd8de334ca5ad4d75a7991, 6쪽 150dpi 확대(`.local/contract-review/v2.35-tax.png`) 확인. 별지 A에 '확정 필요' 칸 0개. 계약 체결·발송·커밋 없음.
+- 후속(미착수): 회사 부담분의 소득 가산(gross-up) 여부 세무사 확인, 원천징수 신고·지급명세서 운영 절차와 주민등록번호 수집(처리방침·출금 화면), 의무 여부 서면질의. 코드에는 원천징수 로직 없음.
+
+## 2026-10-31 16:40 KST payout-cutoff-20261031 운영 배포 (사용자 지시 '커밋과 배포')
+- 커밋: server 569ea97(출금 화요일 23:59 KST 마감), front 4769848(출금 안내 문구), admin 6e34949(수동 지급 패널 안내). 다른 세션 미커밋 변경 제외(서버는 수정 전 사본 대비 패치·API 문서는 해당 문단만), 서버 스테이징 스냅숏 tsc 0. 푸시 없음.
+- 배포(`crefans_front/.local/payout-cutoff-deploy-20261031/`): 기준 API payout-switch, 프론트 signup-page, 콘솔 mobile-table-sticky(다른 세션 배포본) 소스에 server 4·front 3·admin 1 파일만 덮어씀(나머지 manifest 일치, 각 파일의 운영본=수정 전 커밋본 확인). 마이그레이션 없음. deploy.sh 자체 검사 통과(신규 콘솔 API 비로그인 401/403, 결제 스위치 꺼짐, DB·proxy 유지). 배포 후 .env/runtime 세 이미지·APP_RELEASE=payout-cutoff-20261031. 운영 확인: 고객센터 FAQ·크리에이터 가이드에 '화요일 23:59' 문구. 이미지 정리 keep 3+직전 3개 보호, signup-success·qa-categories 삭제, 오류 0.
+- 미검증: 실제 수요일 처리(다음 수요일 11-04), 로그인한 스튜디오 출금 안내 화면.
+- 세무(원천징수) 조사 결과는 server `docs/live-payment-launch-20261031.md` 5절에 출처·확인일과 함께 기록. 결론 미확정(세무사·서면질의 필요).
+
+## 2026-10-31 16:31 KST 출금 신청 마감·공휴일 지급일 확정 및 반영 (사용자 결정)
+- 결정(사용자, 16:31 KST): 출금 신청 마감 화요일 23:59(KST), 매주 수요일 지급, 수요일 공휴일이면 다음 영업일(추천안). 참고 사례: 포스타입 매월 1일 마감·10일 지급·휴일이면 이전 영업일(help.postype.com '수익 입금 날짜', 2026-10-31 확인) — 수동 이체 운영이라 다음 영업일 선택.
+- server: `beta-policy.ts` payoutCutoff/inPayoutBatch/payoutQueue/PAYOUT_SCHEDULE_MESSAGE, `finance.service.ts`·`beans.service.ts` payout 검사와 작업자 큐, `jobs.service.ts` 큐가 수요일 0시 이전 접수분만 처리. 테스트 `tests/payout-cutoff.test.cjs`(경계 2건), `platform-manual-payouts` +1(수요일 접수분 거부). 검증: cutoff 2/2, manual-payouts 5/5, beans 32/32, provider-lifecycle 17/17. 대조: 마감 조건 제거 시 cutoff 1건·manual 1건 FAIL, 복원 후 PASS. 문서: platform-api.md 출금 마감 절, live-payment-launch 약관 제6조 행.
+- front: `lib/crefans/creator-payout-policy.ts` payoutScheduleNote(스튜디오 멤버십·콩 출금 안내), `support.ts` FAQ, `ServiceGuidePage.tsx` 가이드 문장. 같은 문장 속 '베타에서는 실제 송금하지 않습니다'는 실결제 문구 개정 때 별도. 검증 tsc 0, unit 422/422.
+- admin: `ManualPayouts.tsx` 안내문에 마감·공휴일. tsc 0.
+- 계약서 v2.34 별지 A 확정 문구, PDF sha256 40f63f95ceda80e5ba5021c40b636f7666dfa549812ebedbd5000da1ec55794d, 6쪽 확대 확인.
+- 미완: 커밋·배포 안 함. 약관 본문(제6조)은 개정 시행 때. 공휴일 판정은 코드에 없음(운영자 처리).
+
+## 2026-10-31 16:26 KST 계약서 v2.33 정산 보류 기간 행 (사용자 지시)
+- 변경(TXT): `정산 보류 기간: 멤버십 정산 보류 기간 [기본 7일 / 특약       일] / 후원받은 재화 출금 보류 기간 [7일]`.
+- 검증: html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 e14ad575ef1dd7f7ea6e53fbf53c1be34b9493e0478af7b11442c24cbb52556b, 6쪽 150dpi 확대(`.local/contract-review/v2.33-hold.png`) 확인(두 줄, 넘침 없음). 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:24 KST 계약서 v2.32 '최소 신청 금액' (사용자 지시)
+- 변경: TXT 별지 A '최소 신청' → '최소 신청 금액'. 사용자 질문 '정산 보류 기본 7일'은 제7조③·제9조① 근거로 답변(코드·문서 변경 없음).
+- 검증: html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 4916af20d150cd1a80aa02bb90e5e04bad0064af90f756b9f5c28b79a4c7b35a, 6쪽 150dpi 확대(`.local/contract-review/v2.32-min.png`) 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:23 KST 계약서 v2.31 멤버십 공제율 설명 (사용자 지시)
+- 변경: 별지 A 행 제목 아래 설명 기능(`build-contract-html.py` desc 사전, `contract.css` .annex th .desc 8pt #666) 추가, '멤버십 공제율' 아래 '회원(팬 등)의 멤버십 구매 시 수수료율'(사용자 문구의 '구매시'는 띄어쓰기만 '구매 시'로).
+- 검증: html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 3643cbdc36625a9cc1b428fe3ab109a706f7441941623fbdc1301b41980e918b, 6쪽 200dpi 확대(`.local/contract-review/v2.31-desc.png`) 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:21 KST 계약서 v2.30 제8조 문구 수정 (사용자 결정)
+- 변경(TXT 제8조): ① "…팬 수의 기준·확인일·확인 방법은 별지에 기재하고, 적용 대상 수익·율·시작일·종료일은 별도 서면으로 정하여 쌍방이 확인한다." ② "우대 조건을 별도 서면으로 정하지 않으면 기본 조건이 적용된다." ③ "종료 후 복귀할 기본율도 그 서면에 미리 정한다." 이전 TXT는 세션 스크래치패드 agreement-v2.29.txt.
+- 검증: html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 92a9e53ba74e345520d5b51c2a5dc112d02480e633b81e31aa18f17f444221f1, PDF 텍스트·4쪽 PNG 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:19 KST 계약서 v2.29 별지 A 두 행 삭제 (사용자 지시)
+- 변경(TXT): 별지 A '우대 대상·시작일·종료일·종료 후 기본율', '약관·운영정책 버전 및 시행일' 행 삭제. 별지 A는 계약 기간·멤버십 공제율·후원 출금 수수료율·정산 보류·최소 신청·신청 마감·세무·팬 수 정의·별도 홍보 9행.
+- 검증: html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 14f6fa5d30ac484c514697a0f7a6d67a7754cb3c817e56c3d332f2863b2f99bd, 6쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+- 충돌 → (16:21 KST) 사용자 결정 '제8조 문구 수정'으로 해소(v2.30). 원래 충돌: 제8조①("팬 수의 기준·확인일·확인 방법, 적용 대상 수익·율·시작일·종료일을 별지에 기재")·제8조③("종료 후 복귀할 기본율도 미리 기재")은 삭제된 우대 행을 기재란으로 전제함. 팬 수 행은 남아 있으나 우대율·기간·종료 후 기본율을 적을 칸이 없음.
+
+## 2026-10-31 16:18 KST 계약서 v2.28 별지 A 안내문 삭제 (사용자 지시)
+- 변경: 별지 A 아래 ※ 안내문 삭제(생성 스크립트 note 문단·TXT ※ 줄). 파서의 ※ 줄 건너뛰기 규칙은 유지.
+- 검증: html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 ae57c3fe0af65499d8f178f7bd83e516ec7a25b1e775133906d6ece5b15b6422, 생성 HTML '공란은' 0건, 6쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+- 참고: 공란이 자동 우대가 아니라는 내용은 제8조②("단순 상담·영업자의 구두 설명·팬 수 증가만으로 우대가 자동 발생하지 않는다")에 남아 있음.
+
+## 2026-10-31 16:17 KST 계약서 v2.27 전자계약·간인 문장 (사용자 지시)
+- 지시 취지: 전자계약이면 문서 동일성은 전자계약 서비스에 맡기고, 수기면 간인으로 확인. 문장: "이 계약을 전자계약으로 체결하는 경우 계약서의 동일성은 해당 전자계약 서비스의 전자서명과 체결 기록으로 확인하고, 서면으로 체결하는 경우 양 당사자가 각 장에 간인하여 그 내용을 확인한다." 서명 쪽 날짜 위·TXT 서명 부분에 추가.
+- 검증: html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 eb59f666539982f4a18c47b5b2cb127e0b33361427a7fd355d3a783bf4b303ff, 7쪽 PNG 육안 확인. 법률 검토는 아님. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:16 KST 계약서 v2.26 베타 문구 정리 (사용자 지시)
+- 변경(TXT): 제5조② '② 현 베타는 일반 콘텐츠만 제공한다.' → '② 서비스는 일반 콘텐츠만 제공한다.'(성인 콘텐츠 제한 유지), 제3조① '임시 이메일 가입은 본인·성인 인증을…' → '이메일 인증만으로는 본인·성인 인증을…', 별지 A '운영 모드' 행 삭제. 이전 TXT는 세션 스크래치패드 agreement-v2.25.txt.
+- 검증: html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 5824c01e93a9f39da09f578ee2c97f131beb91e0378d08651468ad17b8167084, PDF 텍스트 재검색 베타·테스트·임시·시범·체험·운영 모드 0건, 6쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+- 남은 일(개시 전 확정): 통신판매업 신고번호, 제7조⑤·별지 A의 신청 마감·공휴일 지급일과 세무 유형·증빙·원천징수(세무사 확인), 이용약관 제4·6조 등 '테스트 결제' 문구 개정(docs/live-payment-launch-20261031.md 4절).
+
+## 2026-10-31 16:14 KST 계약서 v2.25 별지 B 삭제·베타/테스트 잔재 조사 (사용자 결정·지시)
+- 결정: 별지 B 처리 3안 중 '삭제(오픈 서비스 전용 계약서)'. 이유: 다음 주 결제·출금 개발 완료 후 쓸 계약서를 미리 작성.
+- 변경: TXT 별지 B 삭제, `build-contract-html.py` 별지 B 파싱·렌더 제거, `verify-contract-pdf.py` annexes 1·'별지 B' 부재 검사, README v2.25, `docs/live-payment-launch-20261031.md` 문구 개정표 별지 B 행 갱신. 이전 TXT·스크립트 사본은 세션 스크래치패드 *-v2.24.*.
+- 검증: html→pdf→verify PASS(7쪽·13조·별지 1), PDF sha256 fc2ba9ea34e6c43369cf4629371a2ec5b610fff79175a412b4be2b3b3b242804, 생성 HTML '별지 B' 0건, 6·7쪽 PNG 육안 확인. 검사기 대조(별지 B가 있는 PDF로 FAIL 확인)는 실행 안 함. 계약 체결·발송·커밋 없음.
+- 잔재 조사(PDF 텍스트 전수 검색: 베타·테스트·시험·임시·초대·시범·체험·현·실결제·실거래·청구·송금·준비 중·예정·확정 필요·검토·현재): ①제5조② "현 베타는 일반 콘텐츠만 제공한다…" ②별지 A 운영 모드 '☐ 테스트 베타' 선택지 ③제3조① "임시 이메일 가입은 본인·성인 인증을 대신하지 않는다"(베타 email-only 가입 모드 전제) ④개시 전 조건 문구: 제1조② "유료 서비스 개시 전에 통신판매업을 신고", 제7조⑤ "오픈 서비스 전에 별지로 확정", 별지 A 안내문 "미확정 오픈 서비스 필수사항은 체결·개시 전에 확정", 별지 A '확정 필요' 2칸(신청 마감·공휴일 지급일, 세무 유형·증빙·원천징수). 처리 방향은 사용자 결정 대기. → (16:16 KST) 사용자 '3곳 정리' 결정: ①②③ 수정·삭제 완료(v2.26), ④ 개시 전 조건 문구는 오픈 서비스에도 맞으므로 유지하고 실결제 전에 내용 확정.
+
+## 2026-10-31 16:09 KST 계약서 v2.24 계약일·적용 시작일 밑줄 (사용자 지시)
+- 변경: `layout/parties.html` 두 날짜 칸의 전각 공백을 밑줄(18·11·11mm)+년·월·일로 교체. '☐ 계약일과 같음'은 유지.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 eb00aeb502cc6a57c3e2327a3ebc088cd71c80b8fb6c0a03d85a8bb1a7c06979, 150dpi 확대(`.local/contract-review/v2.24-dates.png`) 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:08 KST 계약서 v2.23 주소 제목 (사용자 지시)
+- 변경: `layout/parties.html` 주소 제목 → '주소<br>(사업자의 경우 사업장 주소)'.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 a4fd65c6b0074ec12f24164420d39d5a3d6e315f63d7fd3b53d6fe9e9556c116, 150dpi 확대(`.local/contract-review/v2.23-address-title.png`) 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:08 KST 계약서 v2.22 을 입력란 높이 (사용자 지시)
+- 지시 "엔터 좀 더" → 확인 질문 답 '을 입력란 높이'. 변경: `layout/contract.css` .parties td.ex padding-bottom 6.5mm → 12mm.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 13b0472547aef39e5d16bdf8b1fa83b7f3292c23b9e06fb6409bd5b0158941cb, 1·2쪽 PNG 육안 확인(제1조 2쪽 시작). 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:06 KST 계약서 v2.21 을 사업자등록번호 칸 안내 (사용자 지시)
+- 변경: `layout/parties.html` 을 사업자등록번호 칸 왼쪽 위에 '(사업자인 경우)'(예시 '예) 000-00-00000'은 유지).
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 09113b14346323e02d3448cbf3b7547fd872550d25fc75361541e25234c492f6, 150dpi 확대(`.local/contract-review/v2.21-bizno.png`) 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:05 KST 계약서 v2.20 회사 성명 칸 (사용자 지시)
+- 변경: `layout/parties.html` 회사 성명 '대표자 박경호' → '박경호'.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 44f86467a4996af47393cf07c3d9c38e42f2f5e94ccfd3b5d08c08374382160a, 150dpi 확대(`.local/contract-review/v2.20-name.png`) 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:04 KST 계약서 v2.19 적용 시작일 '계약일과 같음' 체크박스 (사용자 지시)
+- 변경: `layout/parties.html` 적용 시작일 칸 오른쪽에 '☐ 계약일과 같음'(float right).
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 a12d5c30dd153c567f834160be6b486ff3fc82b7bc3ceccd8ec7937392155849, 200dpi 확대(`.local/contract-review/v2.19-start-date.png`) 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:04 KST 계약서 v2.18 활동명 행 삭제 (사용자 지시)
+- 변경: `layout/parties.html` 활동명 행 삭제, TXT 7행 '/ 활동명 [ ]' 삭제. 계약서 TXT·표에 '활동명' 0건. 당사자 표는 구분·상호·대표자·성명·사업자 여부·사업자등록번호·주소·이메일·전화번호·계약일·적용 시작일 11행.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 eb8e082076285a62c247986c37ef4cfea5046519543ec892bacfda7983623d1b, 1쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:03 KST 계약서 v2.17 회원 식별자 행 삭제 (사용자 지시)
+- 변경: `layout/parties.html` 회원 식별자 행 삭제, TXT 8행 '회원 식별자 [ ] /' 삭제. 계약서 TXT·표·생성 스크립트에 '회원 식별자' 0건.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 914f8b9564e9199247f974d6539e0584dc568c671edf33c4857eef6e69cfc5eb, 1쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:02 KST 계약서 v2.16 주소 예시 호수 추가 (사용자 지시)
+- 변경: `layout/parties.html` 을 주소 예시 → '예) 서울특별시 ○○구 ○○로 00, 000호'.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 635d53e5f628e7beaf84bcd0975b3c533344e6cf159fef98260a9fce498332c2, 주소 칸 300dpi 렌더(`.local/contract-review/v2.16-address-300dpi.png`) 한 줄 표시 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:01 KST 계약서 v2.15 예시 글자 최소화 (사용자 지시)
+- 변경: `layout/contract.css` .parties .ph 8.5pt → 6pt, 색 #b5b5b5 → #999(6pt 연회색은 인쇄 시 흐려질 수 있어 조금 진하게).
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 6c155210043b6b042a726d9b3049afba67bd9350005e0cb2175afaf238a4aaa6. 1쪽 을 열 300dpi 렌더(`.local/contract-review/v2.15-placeholder-300dpi.png`)에서 9칸 예시 판독 확인. 실제 인쇄물 확인은 안 함. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 16:00 KST 계약서 v2.14 예시 글자 축소 (사용자 지시)
+- 변경: `layout/contract.css` .parties .ph 10pt → 8.5pt.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 ac2558ec8bc36a14d569f432ff48937af9ceba0858eb80679f746a6b79af6296, 1쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 15:59 KST 계약서 v2.13 을 입력란 예시 (사용자 지시)
+- 변경: 당사자 표 을 열 9칸에 가상 예시(예) 길동스튜디오·홍길동·길동TV·000-00-00000·서울특별시 ○○구 ○○로 00·creator@example.com·010-0000-0000·@gildong)를 연한 10pt로 오른쪽 아래 배치. 이전 표는 세션 스크래치패드 parties-v2.12.html.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 a75dc0642f34bcd682c5d53cd0aad8630b7f335b25f19933d67632d945d52e9e, 1쪽 PNG 육안 확인(기존 '(사업자인 경우)'와 겹침 없음). 계약 체결·발송·커밋 없음.
+- 참고: '회원 식별자'의 의미(회원 ID·프로필 아이디·가입 이메일 중 무엇인지)는 계약서에 정의가 없어 예시는 프로필 아이디 형태로 둠.
+
+## 2026-10-31 15:58 KST 계약서 v2.12 회사 사업자 여부 (사용자 지시)
+- 변경: `layout/parties.html` 회사 '사업자 여부' 칸 '-' → '개인사업자'(사용자 제공 사실).
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 392f96dcc9ba5e9b097ade6e441e081710e36a84a8c382507eaf7dcd852186d5, 1쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 15:57 KST 계약서 v2.11 회사 성명 칸 (사용자 지시)
+- 변경: `layout/parties.html` 회사 '성명' 칸 '-' → '대표자 박경호'.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 e8ba01123e6736be622dd89e72ff1968a455771fe12eccfa47fdf4dfa598e589, 1쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 15:56 KST 계약서 v2.10 당사자 표·서명란 항목 행 분리 (사용자 지시)
+- 지시: "성명 · 상호 말고 따로 행 분리, 다른 곳도 모두 분리". 변경: `layout/parties.html` 12행 구조(상호/대표자/성명/활동명/사업자 여부/사업자등록번호/주소/이메일/전화번호/회원 식별자/계약일/적용 시작일), `build-contract-html.py` 서명란 크리에이터 성명·상호(해당 시)·대표자(해당 시) 분리 및 회사 칸 빈 줄로 서명선 정렬. 이전 표는 세션 스크래치패드 parties-v2.9.html.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 a5dc56b53e302fcd77b28209d142c27a5dd1f2b7b4b3f601fa2e61bccddd75bd, 1·2·8쪽 PNG 육안 확인(1쪽은 표만, 제1조 2쪽 시작). 첫 생성에서 서명선 높이 불일치를 발견해 수정. 계약 체결·발송·커밋 없음.
+- 참고: 회사 사업자 여부는 확인 근거 없이 적지 않고 '-'로 둠.
+
+## 2026-10-31 15:53 KST 계약서 v2.8 별지 A 운영 모드 '오픈 서비스' (사용자 지시)
+- 변경: TXT `운영 모드: [테스트 베타 / 오픈 서비스]`.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 2476bf84512f9b1e2ebff593a684c80a547a9dbd31a927a5153b8afddde3cc62, 6쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+- 결정(15:54 KST, 사용자): 3곳도 '오픈 서비스'로 통일 → v2.9. 계약서 TXT·build-contract-html.py에 '유료 운영' 0건. 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 4339dd7cb7ddfe44fc99ce92c2d4efe6623160b1e6172c0b0af2c83537425231, 3·7쪽 PNG 육안 확인, 별지 A 안내문은 생성 HTML에서 확인.
+
+## 2026-10-31 15:51 KST 계약서 v2.7 별지 A 계약 기간 날짜 밑줄 (사용자 지시)
+- 변경: TXT `계약 기간: [년 월 일] ~ [년 월 일]`, `build-contract-html.py` bracket()에 '[년 월 일]' → 밑줄(16·9·9mm)+년·월·일 렌더 추가. 다른 칸 영향 없음.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 f218b401d0cbd257c782c571cf6bb09938312a9662b264b3262f9ede3bde04e2, 6쪽 PNG 육안 확인(한 줄 표시, 칸 높이 감소로 ※ 안내문이 6쪽으로 이동). 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 15:51 KST 계약서 v2.6 별지 A 입력란 테두리 제거 (사용자 지시)
+- 지시: 별지에서 계약 기간, 신청 마감·공휴일 지급일, 세무 유형·증빙·원천징수 "등"의 입력란 테두리를 없앰 → 같은 큰 입력란(.box) 6곳 모두 적용. 높이 11mm·표 칸 구분선·체크박스·밑줄 입력란은 유지.
+- 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 2b883b460a650b0f1cd55af0f58f183c129701baaabd0d34bb2565c8254056f8, 6·7쪽 PNG 육안 확인. 계약 체결·발송·커밋 없음.
+
+## 2026-10-31 15:58 KST 계약서 v2.4 본문 '을' 통일·당사자 표 구분 행 (사용자 지시)
+- 결정: 본문도 '을'로(사용자 답), 표 구분 행은 '크레팬스(회사)'·'크리에이터(을)'(작업 중 추가 지시).
+- 변경: TXT 본문 15곳을 조사와 함께 교체(크리에이터는→을은, 가→을이, 의/수익→을의, 에게→을에게, 판매자는 크리에이터다→을이다, 해당 크리에이터의 상품→을의 상품). 남긴 곳: 1행 표제, 7행 당사자 기입란, 102행 별지 서명 기입란, 서명란 머리글(회사·크리에이터). `layout/parties.html` 구분 행 변경.
+- 검증: build-contract-html → pdf → verify PASS(8쪽·13조·별지 2), PDF sha256 d3d5e5fa70b8976b000afbe47ff7a65705f77226b15a08dd3b32560adad361ba, 1·3·4·5·8쪽 PNG 육안 확인. 수정 전 TXT 사본은 세션 스크래치패드 agreement-v2.3.txt.
+- 결정(사용자, 15:59 KST): 서명란 머리글(회사/크리에이터)은 그대로 둔다.
+- 결정 변경(사용자, 15:49 KST): 서명란 머리글도 표처럼 맞춤 → v2.5. `build-contract-html.py` 서명란 '크레팬스(회사)'·'크리에이터(을)'. 검증: html→pdf→verify PASS(8쪽·13조·별지 2), PDF sha256 52a1a08ad693368cd84ac62fbfaa4928e84f2b3eae41636da336798fab1b5584, 8쪽 PNG 육안 확인.
+
+## 2026-10-31 15:47 KST 계약서 v2.3 서문 변경 (사용자 지시)
+- 변경: `docs/contracts/build-contract-html.py` 고정 서문 "아래 회사와 크리에이터는 크레팬스 플랫폼 이용에 관하여…" → "아래 크레팬스(이하 '회사')와 크리에이터(이하 '을')는 회사 플랫폼 이용에 관하여 다음과 같이 계약을 체결한다." README v2.3 기록. 계약 체결·발송 없음, 커밋 없음(계약 폴더는 미추적).
+- 검증: build-contract-html → build-contract-pdf → verify-contract-pdf PASS(8쪽·13조·별지 2), PDF sha256 c8ff3ff2bf9e7c22d0b6e9f208240ccf14652a6dd1349f024e2e8ee021d707cf, 1·2쪽 PNG 육안 확인(서문 한 줄, 이후 배치 변화 없음). 처음 수정 때 작은따옴표가 스크립트 문자열을 끊어 HTML 생성이 실패했고 그때 PDF는 예전 HTML이었음 → 이스케이프 후 재생성. 프론트 docs:record·check:docs PASS.
+- 남은 확인: 본문 16곳은 여전히 '크리에이터'로 표기되어 서문에서 정의한 '을'이 본문에 쓰이지 않음(사용자 결정 필요).
+
+## 2026-10-31 14:45 KST 커밋 정리·탈퇴 회원 재초대 수정·payout-switch-20261031 운영 배포
+- /ask-me 결정(14:05 KST): 이 세션 변경만 기능별 커밋(푸시 없음), 스위치 끈 채 운영 배포, 이메일 실제 SMTP QA는 나중에, QA 보고서 v1.2는 이메일 QA 후 한 번에.
+- 사용자 요청(작업 중): 운영콘솔 초대→가입→본인/콘솔 탈퇴 후 같은 이메일 재초대 불가 → 수정. 원인: 본인 탈퇴는 30일 파기 전까지 회원 행이 이메일·본인확인값(둘 다 unique)을 보유해 MEMBER_EXISTS, 콘솔 삭제는 사용 완료 초대가 남아 INVITE_USED. 수정: 탈퇴 회원 이메일 재초대 시 사용 완료 초대 재발급(admin.signup_invite_reissued), 30일 전이면 탈퇴 회원의 이메일·identity_hash만 즉시 해제(member.email_released), 나머지 개인정보는 기존 30일 파기 유지. 약관·처리방침에 재가입 제한 약속 없음 확인.
+- 커밋: server 8f686f2(실결제·수동 지급 스위치·대기 사유)·71ae325(재초대), admin 50833e5(수동 지급 패널), front 7d27533(settledShot·QA-F01·이메일 QA 규약)·6fd7109(대기 사유 표시·통신판매업 번호 자리). 다른 세션의 미커밋 변경(분야 관리 categories, 콩 sourceType 필터, 코호트·통합 테스트, 갤러리·공유 스펙, 가입 완료 화면 등)은 hunk 단위로 제외, 스테이징 스냅숏 tsc 0(server·admin·front). 계약서 폴더(docs/contracts, 미추적)와 PROGRESS·manifest(혼합)는 커밋 안 함.
+- 결함 수정: OpenAPI 테스트와 콘솔 manual-payouts 스펙에서 주석이 같은 줄 코드(경로 목록 비교, 마지막 스크린샷)를 삼키던 것.
+- 검증(로컬 13:55~14:30 KST): signup-invites 8/8(신규 테스트는 수정 전 MEMBER_EXISTS로 FAIL→수정 후 PASS), openapi 11/11, manual-payouts 4/4, hold-reasons 1/1, beans 32/32(CREFANS_E2E=true), provider-lifecycle 17/17, admin-console 14/14, pilot-followups 4/4, server tsc 0, 콘솔 manual-payouts E2E 1/1, admin tsc 0.
+- 운영 배포 payout-switch-20261031(14:41 KST 완료, 프론트 `.local/payout-switch-deploy-20261031/`): 기준 API invite-fix, 콘솔 qa-categories, 프론트 signup-success(다른 세션 14:17 배포본)에 이 세션 파일만 얹음(server 12·admin 3·front 4 파일, 나머지 manifest 일치). 마이그레이션 없음. deploy.sh 자체 검사 통과: 신규 콘솔 API 비로그인 401/403, API·worker의 LIVE_PAYMENTS_ENABLED·MANUAL_PAYOUTS_ENABLED 꺼짐, DB·proxy 미재생성. 배포 후 .env/runtime: 세 이미지·APP_RELEASE=payout-switch-20261031. 공개 화면 12개(PC·Pixel 7) 배포 전후 픽셀 비교 11개 동일, 모바일 소개 1개는 같은 배포본 두 번 촬영에서도 같은 영역이 달라 움직이는 요소로 판단. 이미지 정리 keep 3 + 직전 릴리스 보호, 로컬·원격 guide-sync·signup-open 3개 삭제, 오류 0.
+- 미검증: 운영에서 실제 탈퇴→재초대→재가입(운영 계정 필요), 로그인 화면의 대기 사유 표시(운영 크리에이터 정산 필요). 스위치는 꺼져 있어 실결제·수동 지급은 동작하지 않음.
+
+## 2026-10-31 13:54 KST 토스 심사용 사이트 점검 (읽기 전용, 코드·배포 변경 없음)
+- 공식 기준(2026-10-31 확인, https://docs.tosspayments.com/guides/v2/get-started/payment-products "서류 및 홈페이지 심사"): ① 판매 가능한 상품 1개 이상, 빈 카테고리 금지, 상품 이미지 누락·반복·오류 금지, 품절/샘플 상품 불가, 비회원도 구매 가능 ② 하단에 상호·사업자등록번호·대표자·주소·유선번호(070·휴대폰 등 대체 가능) ③ 선택 결제수단의 결제창이 뜰 것(테스트 키 가능). 카드사 심사는 그 뒤(FAQ: 상품 형태·정기결제 여부·결제창 확인). 공지 79번 본문은 조회되지 않음(미확인).
+- 대조(crefans.com 비로그인, Playwright PC 1440×900·Pixel 7, 13:50 KST): 크리에이터 0명·게시물 0개·공개 멤버십 0개(탐색 "아직 크리에이터가 없어요") → 기준 ① 미충족. 소개 화면 "지금 주목할 크리에이터" 5명은 `crefans_front/lib/content/landing.ts`의 고정 예시(가상 인물·팔로워 수)로 샘플 상품 판정 위험. 콩 충전·멤버십 결제는 로그인 필요, 가입은 초대제 → 비회원 구매 불가, 심사자가 결제창까지 갈 수 없음. 사업자 정보: PC는 왼쪽 메뉴 맨 아래(900px 높이에서 화면 밖), 모바일은 홈·로그인 안내 하단에만 있고 소개 화면에는 없음. 통신판매업 번호 미표시(미보유). 이미지 깨짐 0건. 로딩 0.6~1.4초(앞서 숨겨진 브라우저 창에서 본 30초 지연은 측정 환경 문제로 확인).
+- 결정 필요: 심사용 실제 상품(운영자 크리에이터·실가격·이미지), 심사자 접근 방법(비회원 결제 또는 심사용 계정), 하단 사업자 정보 위치, 소개 화면 예시 크리에이터 처리.
+- 사용자 결정(/ask-me, 13:58 KST): ① 운영자(대표) 계정으로 실제 크리에이터·멤버십(실가격·실이미지)·공개 게시물을 운영 사이트에 직접 등록 ② 비회원 구매 대신 회원제 구독 서비스임을 토스 담당자에게 설명하고 심사 전용 계정 제공(계정 생성·전달은 사용자 직접) ③ 사업자 정보 위치는 현행 유지(보완 요청 시 수정) ④ 소개 화면 예시 크리에이터 현행 유지(샘플 판정 반려 위험 감수). 코드·배포 변경 없음.
+- 사용자 직접 할 일: 운영 사이트에 크리에이터 프로필(이미지 포함)·멤버십 1개 이상·공개 게시물 등록, 심사 계정 초대 등록 후 가입, 테스트 키 상태에서 심사 계정으로 멤버십 결제창이 뜨는지 확인, 토스에 심사 계정과 이용 경로 전달. 품절·샘플·빈 카테고리가 없도록 확인.
+- 증거: `.local/toss-onboarding-20261031/review-site-check/`(스크린샷 12장, check.cjs, SHA256SUMS; shasum exit 0). front HEAD `5dcf63c`, server HEAD `1734563`, 기존 미커밋 변경 보존.
+
+## 2026-10-31 13:42 KST 토스 신청서 접수 완료 확인 (심사 결과 대기)
+- 사용자 첨부 완료 화면과 기존 Chrome 탭 1623370393을 대조. 현재 URL은 onboarding.tosspayments.com의 registration/.../in-review, 본문은 ‘신청서 접수 완료! 카카오 알림톡 또는 메일로 심사 결과를 안내드릴게요’. MID `crefanhx5f` 확인. 이전 13:28/13:31의 가입비 결제 대기 상태는 과거 이력이며 현재는 접수 완료·심사 결과 대기.
+- 확인 범위: 신청 접수 상태만 확인. 실제 가입비 결제 영수증·결제 승인액·계약 최종 승인·카드사 승인·빌링 추가 계약·라이브 키 발급은 이 화면만으로 확인되지 않음. 이전 기한 표시의 원인도 미확인이나 접수 화면으로 진행한 사실은 확인됨.
+- 다음: 심사 보완 요청 대응, 승인 후 서비스별 MID/일반결제·빌링 계약 범위와 운영 키 확인. 심사용 사이트의 하단 상호명·실제 판매 상품·빈 카테고리·이미지 오류 점검 필요. 이번에 제품 코드·환경·배포·결제 실행 없음.
+- 증거: 사용자 2026-10-31 13:42 스크린샷 및 같은 시각 CUA AX 본문 8, 심사 준비 10~15의 실제 화면 대조. 서버 HEAD `1734563`, 기존 미커밋 변경 보존, 이번 수정은 PROGRESS 기록만.
+
+## 2026-10-31 13:31 KST 토스 가입비 결제 화면 준비 (사용자 직접 결제 대기)
+- 사용자 ‘가입비결제 할게’에 따라 기존 로그인 탭에서 가입비 결제 안내 화면까지 이동. 실제 청구 표시: 합계 330,000원 = 최초 가입비 220,000원 + 연관리비 110,000원. 연관리비 설명은 계약일 기준 1년 단위로 별도 청구 또는 정산대금 자동 차감 가능.
+- 화면에 결제기한 **2026-01-02**가 표시되어 사용자 기준 현재일(2026-10-31)보다 과거임. 만료/표시 오류 여부 미확인. 기존 신청 유효성을 확인한 뒤 결제하도록 안내하며 결제 완료·심사 개시를 주장하지 않음. 같은 날 다른 작업 기록의 ‘심사 중’은 여전히 실제 확인 상태와 다름(실제 UI: 결제대기).
+- 결제수단 입력·약관 체크 변경·330,000원 결제하기 클릭 없음. 결제 창을 handoff 상태로 유지. 제품 코드·환경·배포 변경 없음, 다른 세션 미커밋 작업 보존.
+- 증거: Chrome 탭 1623370393, onboarding.tosspayments.com의 join-fee/checkout 화면 및 연관리비 안내 AX 직접 확인. 스크린샷 `.local/toss-onboarding-20261031/join-fee-checkout.jpg` 38,830 bytes, SHA-256 `4ca69a7615ab2bc9445a0bd22b94141d630bfb63cc05e3c475ebd5914fecd22d`(Python 파일 확인 exit 0). 다음: 사용자 결제 여부/신청 유효성 회신 후 상점관리자 상태 재확인.
+
+## 2026-10-31 베타 실결제·수동 지급 준비 구현 (로컬, 미커밋·미배포)
+- 결정(/ask-me): 토스 일반결제·자동결제·지급대행 신청(심사 중), 송금은 운영자 수동 이체+콘솔 기록, 통신판매업은 토스 등록 시 신고, 문구 개정·공지 후 개시(토스 승인·신고번호 확인 후), BETA_MODE 유지+스위치, 원천징수 없이 지급(세무 확인 필요 위험 기록).
+- server: `beta-policy.ts` livePayments/manualPayouts — LIVE_PAYMENTS_ENABLED면 베타에서 live_ck/live_sk만(섞인 키 LIVE_KEYS_REQUIRED), 아니면 기존 test 키만. `bank-provider.ts` 수동 모드: 계좌 확인 MANUAL_ACCOUNT_REVIEW 안내, 이체는 pending 반환(동기 오류 동작 유지). `finance.service.ts` manualResult/manualVerifyAccount, payout 베타 차단은 수동 모드면 허용. `beans.service.ts` manualResult(기존 payout 클레임+finishPayout 원장 경로 재사용). `jobs.service.ts`·콩 작업자 수동 모드에서 수요일 처리 중 전환. admin API 4개(withdrawals/:id/manual-result, settlement-accounts 목록·verify, beans withdrawals/:id/manual-result), /admin/me livePayments·manualPayouts, /admin/withdrawals?status=open(+note·account_label). 권한 revenue.create·beans.update. openapi(171 operations)·platform-api.md 갱신.
+- admin: `ManualPayouts.tsx`(매출·정산 아래 수동 지급 패널: 확인 대기 계좌, 이체할 멤버십 출금, 이체 완료 기록·반려 양식, table-wrap), Beans "이체 완료 기록", Console Admin 타입·연결. `e2e/manual-payouts.spec.ts`(ADMIN_E2E_MANUAL_PAYOUTS=1일 때만, tests/admin-console-server.cjs가 그때만 시드).
+- front: `lib/content/business.ts` mailOrderNumber(null) — 값이 있으면 BusinessInfo 하단에 통신판매업 신고번호 표시.
+- 문서: `crefans_server/docs/live-payment-launch-20261031.md`(결정·스위치·운영 절차·문구 개정 초안·남은 위험), manifest 등록.
+- 검증: tests/platform-manual-payouts 4/4(대조: 수동 허용 제거 시 FAIL→복원 PASS), platform-beans 32/32(수동 콩 지급 추가), provider-lifecycle 17/17(transfer async 회귀 발견·수정), openapi 11/11, 서버 전체 416 PASS·0 FAIL(레거시 DB·실 AWS 2파일 제외), 콘솔 manual-payouts PC·Mobile PASS(최초 권한 이름·모바일 표 넘침 결함 발견·수정), front check 422/422, admin tsc, check:docs PASS. 콘솔 전체 E2E(PC) 38 PASS·1 FAIL(기존 QA-P03 대시보드 축소 넘침)·1 skip(수동 지급 스펙은 전용 환경에서만).
+- 미적용: 약관·가이드·화면·계약서 문구 개정(초안만), 운영 배포, 운영 키 교체(사용자 직접), 통신판매업 번호 입력.
+
+## 2026-10-31 13:28 KST 토스 상점관리자 실제 상태 확인 (읽기 전용)
+- 사용자 제공 `https://app.tosspayments.com/`의 기존 Chrome 로그인 탭에서 확인. 상점 ‘좋아하는일해야지’의 신청 현황은 **결제 대기**, ‘가입비 결제’ 버튼 및 가입비 결제 후 심사 결과를 안내한다는 문구가 표시됨.
+- 같은 날 앞선 작업 기록의 ‘심사 중’은 이번 실제 화면의 ‘가입비 결제 대기’로 정정하여 판단. 화면에서 최종 계약 승인·카드사 심사 완료는 확인되지 않음. API 키 페이지는 열지 않았으므로 개별 키 발급 여부는 별도로 미확인.
+- 다음: 가입비 금액·신청 조건 확인 후 사용자 의사에 따라 결제 진행, 일반결제·빌링·콩 충전/후원/출금 구조의 계약 승인 범위 확인. 이번에는 결제 버튼 클릭·결제·계약 수락·키 변경 없음.
+- 증거: CUA Chrome 탭 `1623370393`, 페이지 제목 ‘홈 | 토스페이먼츠 전자결제’, AX 신청 현황 영역(38~43). 서버 HEAD `1734563`, 기존 미커밋 변경 유지, 이번 수정은 이 기록뿐. 원본 화면의 사업자번호는 기록에서 제외.
+
+## 2026-10-31 토스페이먼츠 운영 키 획득 절차 조사 (설정·코드·배포 변경 없음)
+- 공식 확인: 라이브 API 키는 계약 완료 후 발급. 상점 로그인 → 상점 이름 → 개발 정보 또는 개발자센터 API 키에서 확인. 실 카드 결제는 카드사 심사 완료도 필요. 일반결제와 자동결제(빌링)는 서비스별 MID·키를 확인해야 하며 빌링에는 리스크 검토·추가 계약 필요.
+- 신청 준비: 개인사업자는 사업자등록증·휴대폰 본인확인, 심사 가능한 실제 상품/가격·사업자 표시·테스트 결제창. 공식 안내상 서류/홈페이지 심사 1~2일, 카드사 최대 14일(개별 일정 보장 아님). 회원제 구독 서비스의 비회원 구매 요건 적용, 콩 충전→후원→크리에이터 현금 출금 및 실제 콘텐츠 취급 범위는 계약 담당자에게 설명하고 승인 범위를 서면 확인할 사항.
+- 현재 진행은 이 문서의 같은 날 `/ask-me 베타 실결제·송금 개시 결정`에 신청·심사 중으로 기록되어 있음. 이번 조사에서 상점관리자에 로그인하거나 계약 상태·실제 운영 환경을 조회하지 않았으므로 심사 완료/키 발급 여부는 미확인. 10/21의 가입비 미결제 기록만으로 현재 상태를 단정하지 않음.
+- 코드 확인: `src/platform/payment-provider.ts:14,20`은 단건/빌링에 `TOSS_CLIENT_KEY`·`TOSS_SECRET_KEY` 한 쌍을 공용 사용. 발급 MID 구성을 확인하여 결제 종류별 키 선택과 기존 결제 조회·취소의 원 상점 선택을 점검해야 함. `beta-policy.ts`의 미커밋 `LIVE_PAYMENTS_ENABLED` 분기와 `beans.service.ts:35`의 `BEAN_LIVE_PAYMENTS_APPROVED` 차단이 있으므로 키 교체만으로 운영 전환 완료라고 안내하지 않음. 라이브 키·스위치 수정 및 실제 결제는 실행하지 않음.
+- 출처(2026-10-31 KST 확인): https://docs.tosspayments.com/resources/faq / https://docs.tosspayments.com/reference/using-api/api-keys / https://docs.tosspayments.com/guides/v2/billing / https://docs.tosspayments.com/guides/v2/get-started/payment-products / https://www.tosspayments.com/ . 계약 문의 1544-7772, support@tosspayments.com. 가입비·보증보험 등 실제 비용은 신청 조건으로 확인하며 일괄 금액을 단정하지 않음.
+- 검증: macOS 로컬, 2026-10-31 13:22~13:23 KST, 공식 웹 조회 및 `rg`/`sed` 정적 확인(exit 0), 서버 HEAD `173456311a0ee0500d6da6df91aab6f397278649`, 작업 전 다수 미커밋 변경 존재·보존. Python SHA-256 확인(exit 0): payment-provider.ts `3985759e5738c8d3dc6125b0a2af85205bd4cb6802d1dd990a0b141b97ae6fb0`, beta-policy.ts `2017c883d795026fc89dff15afbcccee4b27aced382b2f3ca431305dac39465f`, beans.service.ts `576b3cfebee2c8ae9abb700e7775286324f0b09b91081ba48c837e00c7c6f060`. 최초 shasum은 시스템 locale 오류(exit 9)로 실패하여 Python으로 재확인. 제품 테스트·실공급자 결제 검증은 이번 조사 범위에서 미실행.
+
+## 2026-10-31 /ask-me 베타 실결제·송금 개시 결정 (구현 전)
+- 사용자 결정: ① 토스페이먼츠 일반결제(콩 충전)·자동결제(빌링·구독)·지급대행 모두 신청, 아직 심사 중 ② 크리에이터 송금은 운영자 수동 이체 + 콘솔 지급 기록(토스 지급대행 미연동: bank-provider.ts는 자체 규격만) ③ 통신판매업은 토스 등록 과정에서 신고(번호 미보유) ④ 약관·안내·계약서 문구 개정·공지 후 개시, 시행은 토스 승인·통신판매 번호 확인 후 ⑤ BETA_MODE 유지 + 실결제·수동 지급 스위치 별도 추가 ⑥ 출금 시 원천징수 없이 지급.
+- 확인된 사실: assertBetaPayment가 BETA_MODE에서 test_ck/test_sk만 허용, 출금은 BETA_PAYOUT_DISABLED·BANK_PAYOUTS_ENABLED로 차단. 약관 4조·계약서 별지 B·화면 안내는 '베타 실제 청구·송금 없음'.
+- 위험(미확정): 소득세법 127조·129조상 원천징수 대상 사업소득(인적용역) 지급자는 3%(+지방 0.3%) 원천징수·지급명세서 의무(2차 자료, 확인 2026-10-31: taxly.kr/post/326, watax.kr/employment/business-income-withholding). 크레팬스는 멤버십 판매자=크리에이터(회사=중개)라 멤버십 정산금·콩 후원 수익 지급의 원천징수 대상 여부는 세무사 확인 필요. '원천징수 없이 지급'은 사업자 결정으로 기록하며 확정 법적 판단 아님. 2026-08 인적용역 원천세율 2.2% 인하 입법예고 보도 있음(미확정).
+- 운영 키 입력: 실 운영 시크릿 키(live_sk)는 사용자가 서버 env에 직접 입력(수행자는 운영 키를 입력하지 않음).
+- 다음 작업 후보: 서버 LIVE_PAYMENTS·MANUAL_PAYOUTS 스위치와 수동 지급 기록(처리자·이체 참조·시각·감사), 약관 4조·계약서 별지 B·화면 안내 개정안(시행일 미정), 통신판매업 번호 표시 자리.
+
+## 2026-10-31 계약서 별지 A 기입 양식화 (사용자 지시, 미커밋)
+- build-contract-html.py가 별지 A 값을 손 기입 양식으로 렌더: `[a / b ___]`→체크박스(☐)와 밑줄 기입란, `[ ]`·`[확정 필요…]`→넓은 기입 상자(+작은 안내). TXT 원문은 그대로. contract.css에 .opt/.line/.box/.hint, 표 행 쪽 나눔 방지.
+- 검증: verify PASS(8쪽·13조·별지2), 별지 A 한 쪽 수용·행 잘림 없음 육안 확인. PDF sha256 531c1077…eae2.
+
+## 2026-10-31 계약서 v2.2 당사자표·표지 정리 (사용자 지시, 미커밋)
+- 크리에이터란: '성명·상호/활동명' → '성명/활동명', '사업자 여부/등록번호' → '사업자 여부(☐ 개인사업자 ☐ 일반사업자 ☐ 없음)/사업자등록번호'(layout/parties.html, TXT 당사자 줄 동기화). 선택지는 각 항목이 줄 중간에서 끊기지 않게 처리.
+- 삭제: 표지 '검토용 초안 v2.1 · 조사일…' 줄, '본 문서는 정부 인증 표준계약서가 아닌 크레팬스 맞춤 초안…' 안내(build-contract-html.py), TXT 머리 2줄. 버전 이력은 README·PROGRESS에만 유지.
+- 검증: build-contract-html/pdf + verify PASS(7쪽·13조·별지2), 1쪽 육안 확인. PDF sha256 fc622b20…5a28, TXT 51b95389…fc3c. 생성 HTML에 삭제 문구 0건.
+
+## 2026-10-31 /pilot-work 계약서 v2.1 재검사·보류 사유 표시 (계약서 수정, 코드 로컬·미커밋·미배포)
+- 재검사: 약관·정산 정책 원본(legal-documents·bean-policy·beta-policy·creator-payout-policy)은 v2 이후 변경 없음, 계약 핵심 값 11개 일치. v2 이후 변경(초대 재등록 수정·분야 관리·미수금 알림 배포·운영 정책 20%/7일 사용자 확인)은 계약과 충돌 없음(8③ 소급·자동 우대 없음과 같은 방향, 9③ 알림 약속 이행).
+- 결정(클릭): ① 7⑥ 보류 사유 → 코드로 이행 ② 2①·12④ 사본 제공 → "요청 시 고객센터를 통해 전자문서로" 명시.
+- 계약서 v2.1: 2①·12④ 문구, 표제 v2.1, README 변경 기록. PDF 재생성·verify PASS(7쪽·13조·별지2), 전 쪽 육안 확인. PDF sha256 cdc075cf…55d6, TXT d607a252…a875.
+- 코드: server `settlement-receipts.ts` settlementHoldReasons(period/receipt, settlementPending과 같은 규칙), `finance.service.ts` settlements[].holdReasons, openapi-contract·platform-api.md 갱신. front 타입·`studio/FinancePages.tsx` 건별 "대기 사유" 표시(사유 없는 응답은 기존 종료일 문구).
+- 검증: tests/settlement-hold-reasons.test.cjs 1/1, platform-finance 9/9, openapi 11/11, pilot-followups 4/4, front check 422/422, qa-journey J10 PC·Mobile PASS(사유 표시 단언 추가). 대조: 서버 holdReasons 제거 시 J10 FAIL → 복원 PASS. docs:record·check:docs PASS. 운영 배포는 2026-10-31 사용자 결정으로 "다음 배포에 포함"(서버 settlement-receipts·finance.service·openapi-contract + 프론트 FinancePages·타입).
+
+## 2026-10-31 실제 SMTP·Gmail 수신 QA 및 기존 보고서 v1.2 보강 (Codex 현재 세션)
+- 범위: 기존 Astra 회원가입 / Opus 후속 E2E 이력은 보존하고 이메일 증거만 보강. 로컬 실제 DB·API·도메인·큐 + Google SMTP, 수신 주소는 승인된 Gmail 1개로 고정. PG 대역이며 운영 결제·기존 회원 암호·수신 설정 변경 없음.
+- 11개 시나리오(인증 3, 업무 알림 4, 광고/수신 설정 4), fixture 교정 재발송 1통 포함 12통 모두 외부 Gmail INBOX. Message-ID·SPF/DKIM/DMARC·From·CID 로고·앰대시 미포함 대조. 실제 받은편지함 화면 첨부, OTP·토큰 비공개.
+- 실제 베타 PC/Mobile 비밀번호 재설정 요청은 코드 입력 단계까지 확인. test-fan-1/2 별칭의 발송 사본은 있으나 받은편지함 검색 0건: 독립 수신 BLOCKED. 기존 계정 비밀번호 변경 제출 안 함.
+- 수신 MIME HTML 390px Chromium/WebKit 22건 가로 넘침·깨진 이미지 0. 실기기 메일 앱은 BLOCKED로 구분. 관련 회귀 67/67 PASS. 임시 회원 정리 후 잔여 0.
+- 최초 MAIL-05 시간 fixture가 베타 복구 기한보다 짧아 실패 → 5일 경과로 교정하여 재검증 PASS. 최초 로컬 operations outbox Telegram RATE_LIMITED 2건 확인 후 재실행은 봇 설정·작업 시작 hook 격리. 성공 전송은 확인되지 않음.
+- 미구현 발견: account-changed/payment-completed/renewal-upcoming/subscription-cancelled/subscription-ended/refund-completed/withdrawal-received/withdrawal-completed/withdrawal-failed 9종은 템플릿만 있고 실제 이벤트 발송 연결 없음. 이번에 제품 코드/운영 배포는 하지 않음.
+- 산출물: front `output/pdf/crefans-qa-pcmo-20261031-mail-v1.2/`의 PC·Mobile·통합 HTML/PDF. 기존 PDF 원본을 뒤에 보존하며 신규 증거는 `mail/`. 실행 증거·비공개 원본: server `.local/mail-qa-20261031/`. 기존 코드 미커밋 변경 보존.
+- 최종 PDF PC 282쪽·Mobile 362쪽·통합 24쪽(전체 668쪽 렌더). 새 45쪽 검토, 기존 623쪽 원본과 픽셀 일치. check:docs는 동시 작업 포함 기존 문서/소스와 이번 문서 추가의 증거 해시 만료로 exit 1; 무조건 스냅샷 갱신하지 않고 mail/docs-check.log에 기록.
+
+## 2026-10-31 운영 콘솔 초대 재등록 "확인 문구" 차단 수정 (로컬, 미커밋·미배포)
+- 사용자 보고(admin.crefans.com, 요청 ID ff53edf6…): 수수료·출금 칸을 모두 비운 초대 등록이 "확인 문구를 정확히 입력해주세요"로 거부되고 콘솔에는 확인 단계가 없음. 운영 로그에서 해당 요청(SUPER_ADMIN, release qa-categories-20261031) 확인(읽기만).
+- 원인: 취소된 같은 이메일의 초대 행을 복구할 때 서버가 그 행의 옛 개별 조건과 비교해 "조건 변경"으로 판단(saveInvite). 콘솔은 새 초대로 보고 빈 조건이면 확인 단계를 띄우지 않음. 금융 권한 없는 운영자에게는 403으로 나타남.
+- 수정: `src/platform/signup-invites.ts` 취소된 초대를 다시 만들 때(id 없음+revoked) 비교 기준을 null로(새 초대와 동일). 새 조건을 넣으면 여전히 settings.update+확인 문구 필요. 옛 조건은 복구되지 않음.
+- 검증: tests/platform-signup-invites.test.cjs 회귀 케이스 추가 — 수정 전 FAIL(403) → 수정 후 7/7. platform-admin-console 14/14, platform-openapi 11/11, tsc 통과. 운영 반영은 배포 승인 필요.
+
+## 2026-10-31 /ask-me 결정 반영·운영 배포 qa-categories-20261031
+- 사용자 결정(클릭): ① QA 수정분 커밋 먼저 ② 분야 관리 서버·콘솔 배포 ③ QA-P01·P02는 다음 배포에 포함 ④ 운영 금융 정책 20%·7일 맞음(사용자 확인, QA-E01 해소 기록).
+- 커밋(푸시 없음): front 0b24a4e fix(메시지 대화방 유지·KST 시각), 5dcf63c test(qa-journey·qa-cohort·QA 설정·모바일 현행화) / server 1734563 test(e2e-server QA 동작) / admin 197a780 test(QA 설정). 다른 세션 변경(post-*/preview 스펙, AccountPages, PROGRESS·docs/audit, beans.spec 등)은 제외.
+- 배포: 기준선 guide-sync-20261031(배포 직전 운영 확인) 위에 승인 파일만 덧씌움 — server admin.controller·openapi-contract(분야 GET/POST)·finance·beans.service(미수금 알림 원거래·이의 안내), admin Categories·Console·Operators·globals.css, front useServiceModel·SocialPages·studio 3·display-time. 미배포 제외: front AccountPages.tsx(다른 세션 가입 화면 수정). 이미지 내부 소스 해시 대조·amd64 확인, 배포 스크립트 확인(새 API, 비로그인 /admin/categories 401, 설정 변경 범위, DB·프록시 유지) 통과. 배포 후 실제 베타 비로그인 11화면 PC·Mobile 200, /admin/categories 404→401. 공개 분야는 0건 → 운영자 콘솔에서 분야 추가 필요.
+- 이미지 보관: 로컬·원격 keep 3 적용(원격은 직전 콘솔 guide-sync를 --protect). 증거 `crefans_front/.local/qa-categories-deploy-20261031/`.
+- QA-P03 원인: 콘솔 대시보드 recharts 숨은 툴팁이 넓은 화면 위치(right 460)에 남아 축소 시 가로 넘침. 분야 변경과 무관, 미수정(후속).
+- QA 보고서 v1.1로 결정·배포 결과 반영, PDF 전 쪽 재검사(빈 쪽·영역 밖 글자 0, 케이스 ID 누락 0). /ask-me 스킬 신설(~/.claude/skills/ask-me).
+
+## 2026-10-31 PC·Mobile E2E QA 후속 (qa-pcmo-20261031-0743, 미커밋·미배포)
+- 테스트 전용 `tests/e2e-server.cjs`에 QA 동작 추가: category/category-remove(실행 범위 분야), qa-beans(대역 충전), qa-policy(격리 DB 금융 정책 조회). 서버 제품 코드 변경 없음.
+- 서버 49파일 순차 실행: 409/412 PASS. platform-access·platform.integration은 API 미기동으로 최초 fetch failed → 격리 런타임 3005 기동 후 6/6·13/13. local-members(레거시 _test DB)·platform-media-cloud(실 AWS opt-in) NOT_RUN.
+- 발견: 격리 E2E DB financial_policies = 1000bps·보류 0일(테스트 데이터). 운영 DB 값(20%·7일 기대) 미확인(QA-E01). 실제 베타 /api/v1/admin/categories 404(분야 관리 미배포).
+- 원시 증거 `crefans_front/.local/qa-pcmo-20261031-0743/`(명령·시각·종료 코드·로그 SHA-256: logs/*.json, 소스 상태 source-state.json), 보고서 `crefans_front/output/pdf/crefans-qa-pcmo-20261031-0743/`(PC·Mobile·통합 HTML/PDF, traceability CSV/JSON, README, SHA256SUMS).
+
+## 2026-10-31 운영 콘솔 활동 분야 관리 연결 (QA 후속, 미커밋·미배포)
+- 합격 기준: 보호된 목록 API, 생성·수정 권한 분리, 중복/경쟁 요청 거부, 감사 이력 동시 저장, 등록 선택지 반영. `src/platform/admin.controller.ts` GET /admin/categories 추가(content.view): 삭제 제외·미사용 포함, 정렬 순서/이름 순, id/name/active만 반환.
+- POST의 upsert를 생성/상태변경으로 분리했다. active 생략은 content.create로 생성만, 지정은 boolean 검증·content.update로 존재하는 분야만 변경. 중복 생성409 CATEGORY_EXISTS(동시 요청 포함), 없는/삭제된 분야 수정404, 중복 생성으로 미사용 분야 재활성화 불가. 변경 없는 저장은 감사 원장 중복 기록 없이 반환한다. 상태 변경 행잠금·변경/감사 원자성 유지. DB migration 없음.
+- 기존 감사 action admin.category_saved 유지: 처리자/역할/IP/request ID/대상/변경 전후. OWASP Authorization Cheat Sheet의 최소권한·매 요청 서버 검증 기준을 적용(확인2026-10-31, https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html). 기존 content 권한을 유지하고 금융 settings 권한으로 분야 관리 권한을 확장하지 않았다.
+- `tests/platform-admin-console.test.cjs` 추가2건: 익명·회원·비활성401, 잘못된 권한403, 빈/40자초과/타입400, 경쟁 생성1성공·2중복409, 미사용 보존·삭제 제외·감사 이력, 분야 추가→studio overview/bootstrap→studio/start 실제 저장, 비활성 이후 선택 거부. 관련 admin-console14 + operators7 + OpenAPI11 =32/32 통과, build 통과(07:24~07:25 KST). 최초 OpenAPI 응답 속성 오타는 빌드에서 발견·수정.
+- 콘솔 전체 Playwright39/39(격리실API+대역) 및 타입·단위11/11·최종 빌드, 390px/PC 화면 확인. test fixture 정리는 실행별 cat-ui- 접두사로 제한. Swagger 총167경로·console69/user72/studio45(공유 경로 중복 포함), 의미 문서/생성 계약 갱신.
+- 원시 실행 증거는 형제 admin `.local/creator-categories-20261031/`, 소스/HEAD/기존 미커밋 상태 및 실행 결과 해시 저장. 기존 QA 및 계약서/콩 변경 보존. 이번 검증은 로컬 격리 DB이며 운영 배포·실베타 분야 추가·TOTP 우회 없음.
+
+## 2026-10-31 /pilot-work: 크리에이터 계약서 v2 ↔ 약관·코드 동기화 (미커밋·미배포)
+- 대조: 계약서 13조·별지 ↔ legal-documents.ts(현행 2026-10-30.3·개정 2026-11-30.1)·creator-payout-policy.ts·bean-policy·beta-policy·moderation·미수금 코드. 수수료20%/보류7일/최소10만원·1000콩/수요일/콩 출금·후원 규칙/환불7일/제재 통지(대상·사유·기간·이의)는 일치.
+- 사용자 결정 4건 반영: ① 제1조② 거래 구조를 개정 약관처럼 확정(통신판매중개자·판매자 크리에이터·콩 회사 직접 판매·통신판매업 신고 표시) ② 제9조③ "미수금 정리 전 출금·회원 탈퇴 제한될 수 있음" 추가 ③ 미수금 알림 2곳(finance.service recordReceivable, beans.service recordReceivables)에 원거래(결제일·상품명 / 콩 출금 신청일)와 "이의가 있으면 고객센터" 안내 추가 — 계약 9③ 약속 이행 ④ 회사 주소 301호(신림동)로 TXT·layout/parties.html 통일. 서명 전 안내의 "판매자 역할" 항목 삭제, 표제 v2.
+- 멤버십 미수금은 이후 수익으로 자동 상계되므로 알림에 "미수금이 있으면 출금 불가"는 넣지 않음(콩은 RECEIVABLE_OPEN으로 실제 차단).
+- 검증(2026-10-31 07:01~07:03 KST): build-contract-html/pdf + verify PASS(7쪽·13조·별지2), PDF sha256 45e7c7b6…d270, TXT sha256 0aebd4c5…7682, 전 7쪽 PNG 육안 확인. npm run build·tsc 0. tests/platform-pilot-followups 4/4(원거래·이의 안내 assert 추가), platform-beans 31/31(콩 알림 새 문구는 기존 금액 assert만 — 해당 테스트 파일은 다른 세션 미커밋이라 수정 안 함). 대조 검사: 원거래 문구 제거 시 pilot-followups 1 FAIL → 복원 후 4/4. 프론트 docs:record·check:docs PASS.
+- 미결: 커밋 전. 미수금 알림 문구는 2026-10-31 사용자 결정으로 "다음 운영 배포 때 함께" 반영(단독 배포 안 함). 계약서 별지 공란·PG 계약·세무·공휴일 마감은 그대로 미결정.
+
+## 2026-10-31 시나리오 QA 재검증 (qa-20261031-final, 테스트 변경·미배포)
+- 최종 서버48파일433/433 통과(키 유무 추가 환경으로49실행), build 종료0. platform.integration의 키 부재503/설정201·200, 미완성 등록400/미결합403을 구분하고 Origin을 테스트 설정으로 일치시켰다. 기존 실패는 환경에 결합된 기대값이었으며 금융·권한 제품 코드를 완화하지 않음.
+- tests/admin-console-server.cjs에 크기 검사 전용 admin3/admin4를 시드/정리해 동일 이메일 로그인 제한의 검사 간 간섭 제거. 전체 콘솔E2E37/37. 최초 공유DB 충돌 시도는 무효로 보존하고 모든 DB 공유 검사 순차 재실행.
+- 문서상 폐기 가능한 127.0.0.1:3307/crefans_auth_test의 구형 스키마를 현재 Prisma로 동기화(운영·devDB 아님). runner의 AUTH_PROVIDER/LOCAL_AUTH_SECRET 유입을 제거 후 local-members12/12, 실MySQL security19/19. 실패 원본은 attempts/auth-*에 보존. 실AWS cloud opt-in 미실행.
+- 실베타16회원 HTTP검사27통과·1실패: 활동 분야0개로 등록 불가. 사용자 승인 테스트 분야 추가는 관리자 TOTP 거부로 미완료, 직접DB/인증우회 없음. 실PG·은행·운영저장소 권한 전체 미검증. 프로덕션 의존성 npm audit 8건(high2/moderate6)은 실제 도달 가능성·호환 패치 평가 필요.
+- 결과물은 front output/pdf/crefans-qa-20261031/ PDF/HTML/120요구사항 추적표, 원시증거 front .local/qa-20261031-final/. 커밋·푸시·운영배포 없음, 기존 계약서 등 타 작업 보존. 문서 검증 로그는 front 해당 증거폴더 logs/docs-*.json. 실제 QA계정16·메시지1·미결제주문1만 유지, 금융 이동 없음.
+
+## 2026-10-31 계약서 편집·재생성 인수인계 영구화
+- docs/contracts/README.txt에 파일지도/재생성/검수/미결정/적용약관 주의사항 정리. 임시 생성기를 build-contract-html.py, build-contract-pdf.cjs, verify-contract-pdf.py로 영구화하고 layout/contract.css·parties.html 분리. 기기 고정 폰트경로는 형제리포 기본+환경변수로 교체.
+- 영구 소스에서 13조 HTML 재생성 확인. PDF는 기존 사용자 승인본 유지(내용/PDF 미수정). 검증 생성물이 법률검토를 대신하지 않는 점, TXT와 별도 표제·당사자·서명문구 동기화 위치 명시. 계약/배포/코드정책 변경 없음.
+
+
+## 2026-10-31 계약서 공식 서식 참고 재편집
+- 서울시 공식 MCN 표준계약서 HWPX 원본 다운로드·XML에서 제목/조문/표 구조 확인. 플랫폼 계약 내용은 유지하고 중앙제목·당사자표·11pt본문/항들여쓰기·별지조건표·독립서명면으로 A4 7쪽 재편집. output/pdf/crefans-creator-agreement-draft.pdf 교체.
+- PyMuPDF 13조/별지2개/7쪽 및 전페이지 텍스트경계 검사, 전체페이지 렌더 시각검수. 증거 docs/contracts/contract-pdf-layout-20261031.json. 이전 원본 첨부 미검토 기록은 당시 범위이며 이번에는 서식 확인만 추가(내용 법률검토 완료 아님). 운영변경 없음.
+
+
+## 2026-10-31 크리에이터 계약서 PDF 출력
+- 기존 초안 본문을 수정하지 않고 output/pdf/crefans-creator-agreement-draft.pdf로 A4 5쪽 생성. Pretendard 내장, 페이지 번호, 조항 제목·서명란 정리. PyMuPDF로 전페이지 렌더 및 13조·별지2개 텍스트 보존 검사 통과. 원본 검토용 상태 유지, 운영 변경 없음.
+
+
+## 2026-10-31 오픈베타 역할별 QA 실행 (runId qa-20261030-2351, 테스트만 수정·미커밋)
+- 보고서·증거: `crefans_front/.local/qa-20261030-2351/`. 서버 49파일 410건: 405 PASS, 2 FAIL(QA-D03: platform.integration 6·13이 결제 키 부재 전제 — 환경별 분리 필요), NOT_RUN 2(local-members 구형 _test DB, media-cloud 실 AWS opt-in), skip 1.
+- 테스트 수정: `platform-beta-cohort`(콘솔 가드를 10-28 운영자 세션 구조로: 회원 세션 401·운영자 세션 허용·비활성 거부, 3/3), `platform.integration`(차단 해제로 순서 의존 제거, 회원 쿠키 콘솔 401, 진단 메시지 보강; 개발 API 3001 기준 11/13), `e2e-server.cjs` QA 코호트 제어(`cohort`, `cohort-expire`).
+- 제품 코드 결함은 재현되지 않음. 운영 배포 없음.
+
+## 2026-10-30 크리에이터 플랫폼 계약서 초안·공식 조사
+- docs/contracts/crefans-creator-agreement-draft-20261030.txt: 비독점 플랫폼 계약13조·조건별지·베타특약·서명란. 기본20%/보류7일/최소10만원/후원1000콩·수요일 기준 대조. 영업팬수 우대는 미결정 숫자 없이 별지로 확정. 권리귀속·서비스한정허락·환불/차지백·종료후구독·개인정보·책임 절차 포함.
+- 공식 서울시 MCN 표준계약서 배포페이지·약관법·전자상거래법·저작권법·개인정보법 조사. 첨부표준계약서 전문 미검토이며 정부인증/법률검토 완료 아님. 조사와 미결정 항목 docs/contracts/creator-agreement-research-20261030.txt, 해시/검증 creator-agreement-verification-20261030.json.
+- 현재/2026-11-30 약관개정예정 공존 확인. 서명 전 PG 판매자역할/세무/공휴일마감/적용버전/종료조건 결정 및 추천절차 구현대조 필요. 초안 자체는 운영약관·코드 변경 아님. 13조/별지2/서명/금액 대조 통과, 필수문서검사는 프론트에서 실행. 배포·외부발송·DB쓰기·커밋 없음.
+
+
+## 2026-10-30 QA 이메일 최소 수 산정 (조사·설계만)
+- 기존0/2/10구독자와97개 출시시나리오/콩·콘솔 추가 기능을 대조. 신규 별칭16개=크리에이터3+팬13(12구독자/1비구독), 기존 최고 관리자 이메일 포함 고유 주소17개. 제한 운영자는 N0와 같은 이메일로 독립 Admin 계정 생성 가능(회원/관리자 테이블·인증 분리), 따라서 실제 로그인18계정. 기존17계정 표와 추가 운영자를 구분. 기존 별칭2개라면 총18/30,12개 여유.
+- 조건: 초기 역할은 분리, 권한 교차 두 세션 유지, 상태·주문별 증거 기록, 정지/탈퇴는 마지막 또는 격리 fixture. 모든 상태 동시보존/상시 기준점 유지라면 별도 계정 추가. 선택 여유2개는 최소 아님. +주소 지원은 Google 공식문서와 normalizeEmail 코드로 확인, 실수신 미검증.
+- 근거·실행경계: front docs/beta-role-test-plan.md 최신 산정절과 `.local/qa-mail-account-count-20261030/verification.json`.97개ID 누락0/산식 확인, 제품테스트·계정/메일별칭 생성·초대·운영변경 없음. PASS/실PG/은행·부하/복구 완료를 계정수로 주장하지 않음. 다음은 사용자가 생성 요청하면16개 또는 여유포함18개만 별칭으로 구성하고 초대·실수신 확인.
+
 ## 2026-10-31 /pilot-work: 소개서·가이드 동기화 결정 반영 (운영 배포 guide-sync-20261031 + 가이드 guide-sync-20261031, 커밋 완료·푸시 안 함)
 - 근거: night-work `crefans_front/.local/night-work/2026-10-30-2213.md`. 사용자 결정(클릭): 약관 개정 바로 공지·30일 뒤 시행, 세금은 가이드에 개정 예정 주석, 비구독 전용 게시물 후원 막기, 신고자 결과 앱 알림, 앱 FAQ·안내 보강, 가이드 원본 해시+숫자 대조, 명칭 '오픈베타(가입은 초대 이메일)', 약관에서 '17개' 삭제, 이벤트 일정 미정 유지(유효기간 문장만), 콘솔 공지로 게시까지, 배포+커밋.
 - 서버: `legal-documents.ts` 2026-11-30 시행 개정판(약관 1·2·6·8·9조 수정, 11조 콩 신설, 운영정책 신고 절) — `catalog(now)`가 KST 시행일 전에는 `upcoming`으로, 당일부터 terms·policy로 자동 교체. 처리방침은 그대로. `/common` legal에 `terms-next`·`policy-next`. `beans.tip` 볼 수 없는 게시물 403 POST_ACCESS_REQUIRED. 신고 처리 시 신고자 앱 알림(type moderation, 내부 메모 미포함). 공지 원문 `infra/platform/notices/terms-20261130.json`(배포 스크립트가 검증 후 id 고정 upsert, 덮어쓰지 않음).
@@ -36,6 +412,35 @@
 ## 2026-10-30 밤 night-work: 소개서·가이드 ↔ 정책·코드 동기화 조사 (문서만, 코드 변경 없음)
 - 문서: `crefans_front/.local/night-work/2026-10-30-2213.md` (22:13~22:21, 범위 소진으로 조기 종료).
 - 숫자·소개서 수익 계산은 코드와 일치. 상위: 콩 규칙이 시행 약관에 없음(개정 공지 시점 결정), 구독·후원 제공 동의·보관 기간·즉시 삭제·재가입 30일 제한이 가이드·앱 FAQ에 없음, 세금 문구 약관 불일치, 전용 게시물 비구독자 후원 가능(가이드와 다름), 회사 귀책 환불은 운영자만, 가이드 검사가 원본 변경을 감지 못함, `FinancePages.tsx:67` 최소 출금 하드코딩. 결정 필요 9건은 문서 요약 참조.
+
+## 2026-10-30 보낸 후원 구분 필터 운영 배포 (bean-tip-filter-20261030)
+- 사용자 배포 요청으로 전체 후원/게시물 후원/프로필 후원 셀렉트와 API sourceType 필터를 프론트·API/worker에 반영. 직전 bean-history-20261030 대비 제품 소스 프론트3파일·서버3파일. DB migration·금융 정책 변경 없음, admin/DB/proxy 컨테이너 보존.
+- 직전 구현 검증(front check420개, server build+beans31/openapi11=42개, E2E10개)의 제품·테스트 소스 SHA 일치를 확인하여 기존 결과를 사용. amd64 빌드2개 종료0, 이미지 내부 소스해시 서버230/프론트692파일 일치, 전송 checksum·이미지 검증·전환 종료0.
+- 격리 빌드 및 운영 Chromium390/1280에서 전체28건→게시물14건/프로필14건, 2페이지→조건 변경 시1페이지, 검색 교집합0건, 초기화 전체복원, 가로넘침·페이지오류0 확인. 운영 /service/beans/tips 로그인 보호와 sourceType post/profile 비로그인 API401 확인. 모바일 캡처 육안 검수. 운영 회원의 실제 후원 내역은 조회하지 않았으며 실API 필터·타인 격리 검증은 로컬 격리DB/E2E 결과다. PG/은행은 대역, 운영 금융 쓰기 없음.
+- 증거 front `.local/bean-tip-filter-deploy-20261030/verification.json`, 빌드·배포·운영 브라우저 로그와 스크린샷. 복구 설정 `/opt/crefans-backup-bean-tip-filter-20261030`, 직전 bean-history 이미지 보존. 이미지 keep3 정리 로컬·운영 각2개 삭제·오류0. 새 commit/push 없이 기존 미커밋 작업 보존. 앞선 미배포 항목은 당시 기록이며 이번 릴리스로 필터 배포 완료.
+
+## 2026-10-30 보낸 후원 구분 셀렉트 필터 (로컬, 운영 미배포)
+- 공용 SelectField로 기간 아래 전체 후원/게시물 후원/프로필 후원 추가. sourceType 상태·쿼리·초기화·빈 결과 연결, 선택 변경 시1페이지 복귀. 목업과 실제 API 모두 전체 내역에서 필터 후20건씩 페이지네이션·total 계산. 기존 검색/기간과 AND, 지갑 잔액/다른 내역 필터 불변.
+- 서버 `beanHistoryFilter`가 post/profile만 허용(배열·객체·잘못된 문자열400). `BeansService.tips`에 post_id 유무 조건을 추가하며 본인 sender조건 유지. 제목/게시물 삭제 상태와 무관하게 후원구분 유지. OpenAPI와 관련 문서 갱신, DB 변경 없음.
+- 검증: front check420개/타입/레이어, server build+beans31/openapi11=42개, E2E10개 모두 종료0. 27건 게시물 후원의20+7페이지/4건 프로필/타인내역/기간·검색 교집합/빈 결과/잘못된값 검사. 390/1280에서 공용 셀렉트 선택·2페이지→필터 변경 복귀·검색0건·초기화·실API query전달 확인, 가로넘침없음. 최초 단위 테스트 작성 중 잘못 중복된 기대값(profile)을 post로 수정 후 전체 재통과. 모바일 캡처는 셀렉트 애니메이션 완료 후 재촬영·육안검수.
+- 증거 front `.local/bean-tip-source-filter-20261030/verification.json`, 실행로그·select/filtered 스크린샷. 실제 DB/API+PG/은행 대역 검증이며 운영 결제 없음. 현재 운영은 bean-history-20261030으로 이 필터는 미포함. 요청 시 프론트와 API/worker 함께 배포 필요. 기존 미커밋 변경 보존, commit/push 없음.
+
+## 2026-10-30 콩 내역·후원 구분/신원 표시 운영 배포 (bean-history-20261030)
+- 사용자 배포 요청으로 누적된 충전 주문·콩 이동·보낸 후원의 모바일 전체너비/간격, 아바타·인증배지·핸들, 아바타 위 후원 구분·18px 동전·메시지 위16px를 반영. 목업/실서비스 공용 표시 컴포넌트. 서버 후원목록 creatorAvatar/creatorHandle/creatorIsVerified 추가. 이전 tip-consent 기준 프론트6파일·서버1파일만 변경.
+- 검증: front check 레이어/타입/419검사, server build+후원30검사, beans E2E7검사 모두 종료0. 추가 격리 DB에서 신원 필드 값·미등록null/false·타인내역0 확인(초기 검사 fixture의 필수 message 누락 수정 후 통과; 데이터는 롤백). PG·은행은 대역이며 운영 결제/후원은 실행하지 않음.
+- amd64 API/프론트 순차 빌드 종료0, 이미지 내부 서버230/프론트692파일 소스해시 일치. 격리 빌드 컨테이너3페이지200·390/1280 메시지 간격/동전/배지 확인 후 제거. 운영 전송 checksum·이미지 검증·전환 종료0. API/worker/frontend 교체, admin/DB/proxy 컨테이너 보존, migration/정책 변경 없음. 건강검사200·비로그인후원목록401·기존가입/개인정보버전 유지.
+- 운영 Chromium390/767/1280 ×3페이지9조합: 모바일 끝맞춤/16px 내부여백, 후원 구분 위치·동전18px·아바타·배지·핸들·메시지16px, 가로넘침/페이지오류0. /service 세페이지 로그인 보호 확인. 실제 운영 회원 후원내역을 로그인해서 열어보지는 않음. 모바일 운영 스크린샷 육안 확인.
+- 증거 front `.local/bean-history-deploy-20261030/verification.json`, 빌드/검사/운영로그·스크린샷 같은 폴더. 복구 설정 `/opt/crefans-backup-bean-history-20261030`, 직전 이미지 tip-consent-20261030 보존. 이미지 보존규칙 keep3 적용: 로컬·운영 각2개 삭제, 오류0. 집IP SSH 지속허용 유지. 이번 배포에서 새 commit/push 없음; 기존 미커밋 작업 보존. 앞선 미배포 기록은 해당 시점 상태이며 이 항목으로 배포 완료.
+
+## 2026-10-30 보낸 후원 인증배지·핸들
+- 아바타 옆 이름에 공용 CreatorName 인증배지, 아래 @핸들에 공용 MarqueeText 적용. BeanTip creatorHandle/creatorIsVerified를 목업 초기내역·새후원 및 실제 서버 후원목록 응답에 연결. 미인증은 배지없음, 핸들없음은 행생략.
+- 단위9개·프론트typecheck·서버build 통과. 목업 PC/모바일 표시 검증은 front `.local/bean-history-edge-20261030/identity-*`. 운영 미배포·실API 응답 검증 미실행.
+
+
+## 2026-10-30 보낸 후원 크리에이터 아바타
+- 공용 BeanHistoryView 크리에이터 링크에 공용 Avatar36px 추가. creatorAvatar 선택필드를 BeanTip 및 목업 초기내역/새후원 데이터에 연결. 서버 후원목록 creators조회에서 avatar를 선택해 creatorAvatar로 반환(미등록null), 기존권한/결제/후원처리 불변.
+- 검증: 프론트 bean-history/bean-wallet-pages 9검사·typecheck 종료0, 서버 npm run build 종료0. 목업 Chromium390/1280에서 각20항목 아바타20개·이미지로드·가로넘침없음 확인, 모바일 육안확인. 증거 front `.local/bean-history-edge-20261030/avatar-*`. 실API 수신 검증과 운영 배포는 미실행.
+
 
 ## 2026-10-30 콩 후원 시 크리에이터 제공 동의 (운영 배포 tip-consent-20261030, 커밋 완료·푸시 안 함)
 - 사용자 지시 "지금 하고": 받은 후원 목록에서 크리에이터가 후원자 닉네임·수량·메시지·일시·게시물을 보므로 구독과 같은 제3자 제공 동의를 받는다.
@@ -1355,3 +1760,18 @@
 - 검증: `npm run test:openapi` 빌드+11/11 통과. 세 문서 유효성/합집합98/정확한 공통 목록/전용 API·모델/권한/HEAD/정적파일/실패시차단/누락 대조. amd64 배포 이미지 생성55/36/25 확인. 운영181파일 대조에서 openapi.ts만 변경, 패키지/Prisma 동일. [검증 증거](docs/swagger-three-20261023.json)에 시각·명령·해시·배포 단계 저장.
 - 운영: `swagger-three-20261023` API/worker 배포. 실제 관리자 브라우저에서 서로 다른3개 제목·전환 링크·각각55/36/25 API 표시·스튜디오 검색·경고/오류 없음 확인. 두 도메인/3문서 HTML·JSON·YAML·assets 비로그인401, health200. DB/frontend/admin/proxy 유지, migration/seed/사업 정책 변경 없음. 임시 SSH 규칙 삭제와 기존 관리 PC 규칙만 남은 상태 확인.
 - 검증 경계: 일반회원/비활성 관리자 행렬 및 인증된 원문 HTTP 검사는 로컬 인증·DB 대역이고 실운영은 기존 관리자 UI/비로그인 HTTP 검사. 실제 PG/PASS/은행·전체 사업 로직 검증 아님. 기존 의존성 경고는 이전 배포 기록 참고. 다음 API 추가 시 분류·공통 호출 목록도 함께 검사한다.
+
+## 2026-10-31 프로필·배경 사진 변경 (미배포)
+- 사용자 요청: 내 프로필 페이지에서 프로필 사진·배경 사진 수정, 시안에서 색은 빼고. 카메라 배지가 아바타 원형 영역(overflow hidden)에 잘리지 않게 바깥에 둠.
+- 서버 7aa2568: `PUT me/profile/photos`(본인 업로드 이미지만, null=삭제), 원본은 members.picture·user_profiles.cover(신규 컬럼, 마이그레이션 20261031230000_profile_cover), 크리에이터면 creators.avatar/cover 동기화. 사용 중인 사진만 공개 조회. 테스트 tests/platform-profile-photos.test.cjs(대조 검사 포함).
+- 프론트 df17378: ProfilePhotoDialog + ProfileHeader onEditPhotos, viewer.cover, accountActions.updatePhotos(실서비스·목업). 캡처 crefans_front/.local/profile-photo-20261031/.
+- 남은 일: 운영 배포(사용자 승인 필요, 다른 세션의 미커밋 변경이 같은 파일에 있어 배포 기준선 확인 필수), 로그인 상태 실서비스 업로드 확인.
+- 2026-10-31 22:5x KST 운영 배포 `profile-photo-20261031`(API·worker·front, admin 유지). 기준선 API charge-expiry·front action-dialog 위에 이 변경만 얹음(배포 직전 BASELINE OK). DB 백업 후 마이그레이션 20261031230000_profile_cover 적용. 추가 반영: 배경 없을 때 연회색(#dde1e7)+흰 로고(27be9e7), 삭제 버튼 항상 표시·없으면 비활성(8665df1). 운영 /preview/me PC·모바일 동작 확인, 이미지 보존 정리(--protect charge-expiry/action-dialog). 증거 crefans_front/.local/profile-photo-deploy-20261031/. 미확인: 로그인한 실계정 업로드.
+
+## 2026-11-01 레퍼럴(친구 초대) 보상 — 서버 구현 완료, 스위치 off, 미배포
+- 사용자 결정: 직접 초대 1단계만, 초대받은 회원의 첫 실결제 1회 → 7일(환불 기간) 뒤 미환불이면 출금 가능 프로모션콩 100개, 추천인당 KST 월 10건(초과 capped), 환불 시 회수(출금분은 콩 미수금), 출금 조건은 후원콩과 동일·팬도 출금, 레퍼럴 링크는 운영자 초대 없이 가입 허용(REFERRAL_ENABLED 기본 off), 약관 조항은 실결제 개정 예정본에 포함.
+- 커밋 e664ce9·2548228(구현, Header import 누락 보정)·c779306(7일 보류·월 상한)·1b18040(약관 초안 행). 설계·법령 조사(출처·확인일) docs/referral-design-20261101.md.
+- 검증: tests/platform-referrals.test.cjs 8건 + 대조 4종(출처·live·상한·보류 제거 시 실패), 회귀 openapi·beans·signup-invites·payment-lifecycle 104건, platform-jobs 2건(로컬 dev DB에 migrate deploy 적용 후).
+- 남은 일: 운영 배포(마이그레이션 2개), 약관·처리방침 본문 반영(개정본), 세무사 확인(소득 구분), 선불전자지급수단 해당성 자문 여부, 1인 상한 외 부정 가입 탐지(동일 기기·결제수단) 미구현.
+- 2026-11-01 레퍼럴 스위치를 콘솔 설정으로 이전(8e27809, 2f1edd6): platform_settings referral.enabled(기본 꺼짐, 감사), GET admin/referrals·PUT admin/referrals/settings·POST admin/members/:id/referral, admin/members?type=fan|creator, 권한 메뉴 referrals. 환경변수 REFERRAL_ENABLED 미사용. 테스트 9건(스위치 무시 시 7건 실패), 회귀 121건.
+- 2026-11-01 운영 배포 `referral-20261101`(API·worker·front·admin). 기준 API profile-photo·front nobeta·admin handle-sync. 1차 시도는 배포 스크립트 내 파이썬 문법 오류(빈 for)로 자동 롤백(이전 이미지 복구, 마이그레이션 3개는 추가 테이블만이라 유지), 수정·내장 파이썬 블록 컴파일 검사 후 2차 성공. DB 백업 후 마이그레이션 referrals·referral_hold·platform_settings, platform_settings 0행(스위치 꺼짐) 확인. 운영: /me/referral·/admin/referrals 비로그인 401, /service/beans/withdraw·/console/referrals 200, 목업 초대 카드·출금 화면 확인, 이미지 보존 정리. 미확인: 운영자 로그인 상태 콘솔 레퍼럴 화면, 실제 보상 계정 출금. 증거 crefans_front/.local/referral-deploy-20261101/.

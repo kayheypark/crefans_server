@@ -107,3 +107,68 @@ test('creator verification requires an active administrator, persists both trans
   await db.creator.delete({where:{user_id:fan}});await db.creatorCategory.delete({where:{id:category.id}});
  }
 });
+
+test('activity fields enforce list/create/update permissions, validation, uniqueness and audit records',async()=>{
+ const name='qa-'+randomUUID().slice(0,28),other='qa-'+randomUUID(),deleted='qa-'+randomUUID();
+ const admin=await db.admin.findFirstOrThrow({where:{user_sub:members[1]}});
+ try{
+  for(const user of ['none','fan','disabled'])assert.equal((await api('categories',user)).status,401,user);
+  assert.equal((await api('categories','moderator')).status,200);
+  assert.equal((await api('categories','moderator',{name})).status,403);
+  await db.admin.update({where:{id:admin.id},data:{permissions:{settings:{view:true,update:true}}}});
+  assert.equal((await api('categories','admin')).status,403,'financial settings permission does not grant category access');
+  assert.equal((await api('categories','admin',{name})).status,403);
+  await db.admin.update({where:{id:admin.id},data:{permissions:{content:{view:true,create:true}}}});
+  for(const input of [{},{name:''},{name:'   '},{name:'가'.repeat(41)},{name:123}])assert.equal((await api('categories','admin',input)).status,400);
+  const concurrent=await Promise.all([1,2,3].map(()=>api('categories','admin',{name:'  '+name+'  '})));
+  assert.deepEqual(concurrent.map(r=>r.status).sort(),[201,409,409]);
+  assert.ok(concurrent.filter(r=>r.status===409).every(r=>r.errorCode==='CATEGORY_EXISTS'));
+  const row=await db.creatorCategory.findUniqueOrThrow({where:{name}});
+  assert.equal(row.is_active,true);
+  assert.equal((await api('categories','admin',{name,active:false})).status,403,'create is not update');
+  for(const active of [null,'false',0,{}])assert.equal((await api('categories','moderator',{name,active})).status,400);
+  const missing=await api('categories','moderator',{name:other,active:false});assert.equal(missing.status,404);assert.equal(missing.errorCode,'CATEGORY_NOT_FOUND');
+  assert.equal(await db.creatorCategory.count({where:{name:other}}),0,'update cannot create');
+  assert.equal((await api('categories','moderator',{name,active:false})).status,201);
+  assert.equal((await api('categories','admin',{name})).status,409);
+  assert.equal((await db.creatorCategory.findUniqueOrThrow({where:{name}})).is_active,false,'duplicate creation cannot reactivate');
+  const deactivated=await Promise.all([1,2].map(()=>api('categories','moderator',{name,active:false})));assert.ok(deactivated.every(r=>r.status===201));
+  await db.creatorCategory.create({data:{name:deleted,is_deleted:true,is_active:true}});
+  assert.equal((await api('categories','admin',{name:deleted})).status,409);
+  assert.equal((await api('categories','moderator',{name:deleted,active:true})).status,404);
+  const list=(await api('categories','moderator')).data;
+  assert.deepEqual(list.find(c=>c.id===row.id),{id:row.id,name,active:false,sortOrder:row.sort_order,iconUrl:null,customIcon:false});assert.equal(list.some(c=>c.name===deleted),false);
+  for(const item of list)assert.deepEqual(Object.keys(item).sort(),['active','customIcon','iconUrl','id','name','sortOrder']);
+  const logs=await db.platformAuditLog.findMany({where:{entity_id:row.id,action:'admin.category_saved'},orderBy:{occurred_at:'asc'}});
+  assert.equal(logs.length,2,'duplicates and no-op updates do not add false changes');
+  assert.equal(logs[0].metadata.after.is_active,true);assert.equal(logs[1].metadata.before.is_active,true);assert.equal(logs[1].metadata.after.is_active,false);
+  for(const log of logs){assert.ok(members.includes(log.actor_id));assert.ok(['ADMIN','MODERATOR'].includes(log.actor_role));assert.equal(log.ip,'127.0.0.1');assert.ok(log.request_id);}
+ }finally{
+  await db.admin.update({where:{id:admin.id},data:{permissions:require('@prisma/client').Prisma.DbNull}});
+  const rows=await db.creatorCategory.findMany({where:{name:{in:[name,other,deleted]}}});
+  await db.platformAuditLog.deleteMany({where:{entity_id:{in:rows.map(r=>r.id)}}});await db.creatorCategory.deleteMany({where:{id:{in:rows.map(r=>r.id)}}});
+ }
+});
+
+test('a category added by console API reaches creator onboarding and inactive fields cannot be selected',async()=>{
+ const name='qa-'+randomUUID();
+ const profile={name:'분야 연동 검증',handle:'category_'+fan.replaceAll('-','').slice(0,20),category:name};
+ async function memberApi(path,body){const r=await fetch(origin+'/api/v1/'+path,{method:body?'POST':'GET',headers:{Cookie:cookies.fan,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,...await r.json()};}
+ try{
+  assert.equal((await memberApi('studio/start',profile)).status,400);
+  assert.equal((await api('categories','admin',{name})).status,201);
+  assert.ok((await memberApi('studio/overview')).data.categories.includes(name));
+  assert.ok((await memberApi('bootstrap')).data.data.categories.includes(name));
+  assert.equal((await memberApi('studio/start',profile)).status,201);
+  const created=await db.creator.findUniqueOrThrow({where:{user_id:fan},include:{category:true}});assert.equal(created.category.name,name);
+  assert.equal((await api('categories','moderator',{name,active:false})).status,201);
+  assert.equal((await memberApi('studio/overview')).data.categories.includes(name),false);
+  assert.equal((await memberApi('studio/start',profile)).status,400);
+ }finally{
+  await db.creator.deleteMany({where:{user_id:fan}});
+  const row=await db.creatorCategory.findUnique({where:{name}});
+  await db.platformAuditLog.deleteMany({where:{OR:[{entity_id:row?.id||'missing'},{entity_id:fan}]}});
+  await db.platformOperationalEvent.deleteMany({where:{data:{path:'$.memberId',equals:fan}}});
+  await db.creatorCategory.deleteMany({where:{name}});
+ }
+});
