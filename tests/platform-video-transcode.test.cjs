@@ -58,3 +58,20 @@ test('only the uploader can poll conversion status: processing, then completed o
  await db.media.update({where:{id},data:{processing_status:'COMPLETED'}});assert.deepEqual(await c.status(id,{user:{sub:member}}),{status:'completed'});
  await db.media.update({where:{id},data:{processing_status:'FAILED'}});assert.deepEqual(await c.status(id,{user:{sub:member}}),{status:'failed'});
 });
+
+test('a converting iPhone video can be saved, scheduled and published; the post shows it as optimizing; a failed one is refused',async()=>{
+ const {PlatformService}=require('../dist/src/platform/service'),{PlatformStudioService}=require('../dist/src/platform/studio.service'),{ConfigService}=require('@nestjs/config');
+ const service=new PlatformService(db,undefined,new ConfigService({BETA_MODE:'false'})),studio=new PlatformStudioService(service);
+ if(!await db.member.findUnique({where:{id:member}}))await db.member.create({data:{id:member,email:member+'@transcode.invalid',name:'Transcode fixture',nickname:'Transcode fixture',preferred_username:member,email_verified:true}});
+ if(!await db.creator.findUnique({where:{user_id:member}}))await db.creator.create({data:{user_id:member}});
+ const {id}=await upload(movHeader),media=[{id,type:'video',url:`/api/v1/media/${id}/file`}];
+ const base={title:'아이폰 영상',body:'본문',media,commentsEnabled:true,tipsEnabled:true,accessPlanId:null,accessLevel:null};
+ try{
+  const draft=await studio.saveContent(member,{...base,status:'draft',scheduledAt:null});assert.ok(draft.id,'draft saved while converting');
+  await studio.saveContent(member,{...base,id:draft.id,status:'scheduled',scheduledAt:new Date(Date.now()+3600000).toISOString()});
+  await studio.saveContent(member,{...base,id:draft.id,status:'published',scheduledAt:null});
+  const detail=await service.postDetail(draft.id);assert.deepEqual(detail.post.media.map(m=>m.processing),[true],'viewers see the optimizing notice');
+  const failed=await upload(movHeader);await db.media.update({where:{id:failed.id},data:{processing_status:'FAILED'}});
+  await assert.rejects(studio.saveContent(member,{...base,id:draft.id,status:'published',scheduledAt:null,media:[{id:failed.id,type:'video',url:failed.url}]}),error=>error.getResponse?.().code==='INVALID_MEDIA');
+ }finally{await db.postingMedia.deleteMany({where:{posting:{user_sub:member}}}).catch(()=>{});await db.posting.deleteMany({where:{user_sub:member}});await db.creator.deleteMany({where:{user_id:member}});await db.member.deleteMany({where:{id:member}});}
+});
