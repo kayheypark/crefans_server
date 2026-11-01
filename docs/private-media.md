@@ -70,3 +70,18 @@ AWS 원본 → CloudFront 전송은 $0/GB. Lambda@Edge는 100만 호출당 $0.60
 
 
 2026-10-22 확인한 직접 근거: [OWASP 요청별 권한 검증](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html), [AWS 외부 인증 구조](https://aws.amazon.com/blogs/networking-and-content-delivery/external-server-authorization-with-lambdaedge/), [트리거 실행 순서](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-cloudfront-trigger-events.html), [S3 OAC](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html), [Lambda@Edge 제약](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-edge-function-restrictions.html), [함수 조합 제약](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/edge-function-restrictions-all.html), [S3 Range](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html). 공식 지원 패턴을 크레팬스의 현재 권한 정책에 적용한 것이며 모든 업계의 의무 표준이라고 주장하지 않는다.
+
+## 새 크리에이터 게시물 워터마크 (2026-11-01)
+
+사용자 확정 범위: 배포 후 활성 크리에이터가 새로 업로드한 **게시물** 사진·동영상만 오른쪽 아래 `https://crefans.com/{업로드 시점 핸들}`을 파일에 합성한다. 프로필·배경·멤버십 대표 사진과 배포 전 업로드는 제외한다. 기존 게시물을 다시 저장해도 예전 파일을 변환하지 않으며, 기존 콘텐츠 일괄 변환 작업은 없다. 핸들이 바뀌어도 이미 저장된 워터마크는 갱신하지 않는다.
+
+- `media.controller.ts`가 신규 업로드의 metadata에 적용 버전·서버 회원 핸들을 저장한다. 업로드만으로는 변환하지 않는다.
+- `studio.service.ts`에서 게시물에 연결할 때만 `media-watermark.ts`가 원본 소유권·적용 대상 여부를 확인하고 새 UUID의 파생 Media와 `media_watermark_jobs`를 같은 트랜잭션으로 만든다. source_id/target_id 고유 제약과 원본 행 잠금으로 재저장·중복 실행을 제어한다.
+- 게시물은 파생 파일을 참조하고, 원본은 덮어쓰지 않는다. 사진은 WebP(긴 변 최대2560px, 작은 이미지는 확대하지 않음), 영상은 H.264/AAC MP4(긴 변 최대1280px)로 변환한다. MOV는 기존 MP4 정규화 다음 워터마크를 합성한다. 이미지 방향·영상 비율을 유지하고 위치 등 메타데이터는 제거한다.
+- `worker.ts`의 미디어 루프는 금융 배치와 독립이고 한 번에 한 건만 처리한다. 작업 임대25분, FFmpeg 상한20분, 실패 시2분 뒤 최대3회 시도한다. 완료 전에는 기존 미디어 권한 검사가 파일을 제공하지 않는다. 최종 실패는 스튜디오에서 삭제 후 다시 업로드하며, 운영 감시에 실패·임대 만료 건수를 기록한다.
+- 키는 기존 `platform/{새 UUID}` 규격이므로 CDN 캐시와 서명·구독 검사 계약을 바꾸지 않는다. GET/HEAD/Range 접근 제어는 기존 공통 경로를 그대로 사용한다. 처리 대기·진행·실패 작업의 원본과 파생 파일은 고아 정리 대상에서 보호한다. 완료된 뒤 참조 없는 원본은 기존 정리 유예 정책을 따른다.
+- DB 변경은 `20261101150000_media_watermark`의 작업 테이블 추가뿐이다. 배포 전 백업 후 `migrate deploy`하며, 앱 롤백 시 추가 테이블과 원본은 유지한다. 롤백 중 새 작업은 진행되지 않으므로 재배포 후 재개한다.
+
+확인일2026-11-01 공식 근거: [FFmpeg drawtext](https://ffmpeg.org/ffmpeg-filters.html#drawtext)의 textfile·expansion=none을 사용하고 사용자 문자열을 필터 문법에 삽입하지 않는다. [Sharp composite](https://sharp.pixelplumbing.com/api-composite/)에 따라 방향 정규화 뒤 작은 SVG 스트립을 합성한다. [OWASP 파일 업로드 지침](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)의 형식·크기·소유권 검사 및 비공개 저장 원칙을 유지한다. 이 근거는 워터마크의 제거 불가능성이나 저작권 보호를 보장하지 않는다.
+
+검증: `tests/platform-watermark.test.cjs`는 격리 MySQL·실제 이미지 처리·S3 대역으로 신규/기존/비크리에이터·소유권·재시도·중복·정리 보호를 검사한다. `tests/platform-watermark-render.integration.cjs`는 배포 Linux 이미지의 실제 FFmpeg·Sharp로 가로/세로 MP4/WebM·오디오·회전·고해상도 사진을 검사한다. 운영 반영 및 실행 결과는 PROGRESS와 해당 릴리스 증거에 별도로 기록한다.

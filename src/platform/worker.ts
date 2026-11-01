@@ -4,6 +4,7 @@ import {PlatformModule} from './module';
 import {PlatformOperationsService} from './operations.service';
 import {PlatformJobsService} from './jobs.service';
 import {PlatformMediaStorage} from './media-storage';
+import {watermarkNextMedia} from './media-watermark';
 import {transcodeNextVideo} from './video-transcode';
 async function run(){
  const app=await NestFactory.createApplicationContext(PlatformModule,{logger:['error','warn']}),jobs=app.get(PlatformJobsService),operations=app.get(PlatformOperationsService);operations.installFatalHandlers();let busy=false;
@@ -15,7 +16,7 @@ async function run(){
  await tick();const timer=setInterval(()=>void tick(),60000);
  // Video conversion runs in its own loop so a long ffmpeg job never delays billing and other ticks (2026-11-01).
  const storage=app.get(PlatformMediaStorage),db=(jobs as any).db;let converting=false;
- const convert=async()=>{if(converting)return;converting=true;try{while(await transcodeNextVideo(db,storage)>0);}catch(error){await operations.error('worker.error',error,{job:'video-transcode'});}finally{converting=false;}};
+ const convert=async()=>{if(converting)return;converting=true;try{while(await transcodeNextVideo(db,storage)>0);while(await watermarkNextMedia(db,storage)>0);}catch(error){await operations.error('worker.error',error,{job:'media-conversion'});}finally{converting=false;}};
  void convert();const converter=setInterval(()=>void convert(),15000);
  for(const signal of['SIGINT','SIGTERM'])process.on(signal,async()=>{clearInterval(timer);clearInterval(converter);await app.close();process.exit(0);});
 }

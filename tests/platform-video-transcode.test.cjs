@@ -7,7 +7,7 @@ assert.equal(process.env.CREFANS_E2E,'true');const source=process.env.DATABASE_U
 const {PlatformMediaController}=require('../dist/src/platform/media.controller'),video=require('../dist/src/platform/video-transcode');
 const db=new PrismaClient(),member=randomUUID(),root=fs.mkdtempSync(path.join(os.tmpdir(),'crefans-transcode-'));
 const movHeader=Buffer.concat([Buffer.from([0,0,0,20]),Buffer.from('ftypqt  '),Buffer.alloc(64)]);
-function controller(puts){return new PlatformMediaController({db},{get:key=>({MEDIA_ROOT:root})[key]},{enabled:true,put:async(...args)=>puts.push(args)});}
+function controller(puts){return new PlatformMediaController({db,member:id=>db.member.findUniqueOrThrow({where:{id}})},{get:key=>({MEDIA_ROOT:root})[key]},{enabled:true,put:async(...args)=>puts.push(args)});}
 async function upload(bytes,mimetype='video/quicktime',originalname='IMG_0001.MOV'){
  const file=path.join(root,'.upload-'+randomUUID());fs.writeFileSync(file,bytes);
  return controller([]).upload({path:file,mimetype,originalname,size:bytes.length},{user:{sub:member}});
@@ -15,7 +15,7 @@ async function upload(bytes,mimetype='video/quicktime',originalname='IMG_0001.MO
 // No ffprobe on developer machines: the probe is replaced; limit tests set their own answers.
 const probeAnswer={seconds:12,side:1920};video.videoTools.probe=async()=>{if(probeAnswer.fail)throw new Error('probe failed');return probeAnswer;};
 before(async()=>{await db.$connect();});
-after(async()=>{await db.media.deleteMany({where:{user_sub:member}});await db.$disconnect();fs.rmSync(root,{recursive:true,force:true});});
+after(async()=>{await db.mediaWatermarkJob.deleteMany({where:{creator_id:member}});await db.media.deleteMany({where:{user_sub:member}});await db.$disconnect();fs.rmSync(root,{recursive:true,force:true});});
 
 test('QuickTime uploads are kept as an original and wait for conversion; a fake .mov is rejected',async()=>{
  const result=await upload(movHeader);
@@ -64,7 +64,7 @@ test('only the uploader can poll conversion status: processing, then completed o
 test('a converting iPhone video can be saved, scheduled and published; the post shows it as optimizing; a failed one is refused',async()=>{
  const {PlatformService}=require('../dist/src/platform/service'),{PlatformStudioService}=require('../dist/src/platform/studio.service'),{ConfigService}=require('@nestjs/config');
  const service=new PlatformService(db,undefined,new ConfigService({BETA_MODE:'false'})),studio=new PlatformStudioService(service);
- if(!await db.member.findUnique({where:{id:member}}))await db.member.create({data:{id:member,email:member+'@transcode.invalid',name:'Transcode fixture',nickname:'Transcode fixture',preferred_username:member,email_verified:true}});
+ if(!await db.member.findUnique({where:{id:member}}))await db.member.create({data:{id:member,email:member+'@transcode.invalid',name:'Transcode fixture',nickname:'Transcode fixture',preferred_username:'video_'+member.slice(0,8),email_verified:true}});
  if(!await db.creator.findUnique({where:{user_id:member}}))await db.creator.create({data:{user_id:member}});
  const {id}=await upload(movHeader),media=[{id,type:'video',url:`/api/v1/media/${id}/file`}];
  const base={title:'아이폰 영상',body:'본문',media,commentsEnabled:true,tipsEnabled:true,accessPlanId:null,accessLevel:null};

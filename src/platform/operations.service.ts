@@ -55,6 +55,8 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
    ['beans.charge_stuck',()=>this.db.beanCharge.count({where:{status:'processing',created_at:{lt:ago(30)}}})],
    ['marketing.uncertain',()=>this.db.marketingDelivery.count({where:{status:'uncertain'}})],
    // iPhone video conversion (2026-11-01): waiting over 30 minutes, or failed within the last hour.
+   ['media.watermark_failed',()=>this.db.mediaWatermarkJob.count({where:{status:'failed'}})],
+   ['media.watermark_stuck',()=>this.db.mediaWatermarkJob.count({where:{status:'processing',locked_until:{lt:now}}})],
    ['media.transcode_stuck',()=>this.db.media.count({where:{type:'VIDEO',mime_type:'video/quicktime',processing_status:'PROCESSING',is_deleted:false,created_at:{lt:ago(30)}}})],
    ['media.transcode_failed',()=>this.db.media.count({where:{type:'VIDEO',mime_type:'video/quicktime',processing_status:'FAILED',updated_at:{gte:ago(60)}}})],
    ['audit.retention_lagging',()=>Number.isInteger(access)&&access>0?this.db.platformAuditLog.count({where:{category:'request',actor_role:null,occurred_at:{lt:new Date(+now-(access+2)*86400000)}}}):Promise.resolve(0)],

@@ -63,3 +63,5 @@
 - 새 작업은 최신 `origin/prod`에서 `feat/<작업명>` 생성 → `dev` 통합·검증 → `prod` 승격한다. `dev`에서 새 작업을 분기하지 않는다.
 - dev/prod 직접 기능 개발·prod 직행·force push 금지. 기본 PR, 사용자 직접 통합 요청은 같은 순서의 로컬 merge와 일반 push 허용.
 - 실행 방법·증거 기준은 `docs/branch-workflow.md`. prod 반영과 운영 배포는 별개다.
+
+- 게시물 워터마크는 업로드 metadata의 watermarkEligible 버전이 있는 신규 크리에이터 미디어만 대상으로 한다. 기존 파일을 재저장 시 추론해 변환하거나 일괄 소급하지 않는다. 원본은 프로필·멤버십 사진을 위해 보존하고, 게시물만 새 UUID의 파생 파일을 참조한다. 완료 전 비공개·기존 구독/GET/HEAD/Range 권한을 유지한다. 상세는 docs/private-media.md.

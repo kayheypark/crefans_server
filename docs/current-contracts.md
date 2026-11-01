@@ -359,9 +359,10 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261031230000_profile_cover`
 - `20261101090000_referrals`
 - `20261101120000_referral_hold`
+- `20261101150000_media_watermark`
 - `20261101150000_platform_settings`
 
-## Prisma 전체 정의 (85 models · 15 enums)
+## Prisma 전체 정의 (86 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -2230,5 +2231,24 @@ model PlatformSetting {
  updated_by String? @db.VarChar(191)
  updated_at DateTime @updatedAt
  @@map("platform_settings")
+}
+
+// Immutable watermarked derivative; original media remains private/reusable for profile images.
+model MediaWatermarkJob {
+  id String @id @default(uuid())
+  source_id String @unique
+  target_id String @unique
+  creator_id String
+  handle String @db.VarChar(24)
+  version Int @default(1)
+  status String @default("pending") @db.VarChar(16)
+  attempts Int @default(0)
+  next_attempt_at DateTime @default(now())
+  locked_until DateTime?
+  error_code String? @db.VarChar(64)
+  created_at DateTime @default(now())
+  completed_at DateTime?
+  @@index([status, next_attempt_at])
+  @@map("media_watermark_jobs")
 }
 ```

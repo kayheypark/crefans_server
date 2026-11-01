@@ -3,7 +3,7 @@ WORKDIR /app
 ARG APP_RELEASE=unversioned
 ENV APP_RELEASE=$APP_RELEASE
 # ffmpeg converts iPhone QuickTime uploads to MP4 in the worker (src/platform/video-transcode.ts).
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates ffmpeg fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 RUN npm ci
 COPY prisma ./prisma
