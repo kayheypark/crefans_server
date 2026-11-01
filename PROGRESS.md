@@ -1797,3 +1797,7 @@
 ### 원격 통합 완료 확인
 - dev→prod 승격 및 dev fast-forward 동기화 완료. 최초 검증 SHA `4951bf156ed12305ef0376c5ee66a3c6542a53f2`: 로컬 dev/prod와 origin/dev/origin/prod 동일, 미커밋 없음 확인. 본 완료 기록도 같은 작업 브랜치→dev→prod 순서로 통합한다.
 - 최종 검사: 프론트488/관리자11 단위와 타입·백엔드빌드 통과, 문서75개 계약/링크 검사 및 검사기 대조검사 통과. 문서 증거는 snapshot-only로 전체 제품 QA 증명이 아님. 다음 새 작업은 최신 origin/prod에서 새 feat 브랜치를 만든다. 이전 작업트리는 보존했으며 그 위치에서 후속 작업할 때도 이 지침을 적용한다.
+
+## 2026-11-02 지갑 메뉴 명칭 문서 동기화
+- 최신 origin/prod에서 feat/wallet-navigation-labels 분기. 프론트 요청의 친구 초대 이벤트/충전 내역/콩 내역/후원 내역 명칭과 순서를 docs/current-contracts.md에 생성 반영. API/DB/금융 로직·관리자 용어 변경 없음.
+- 프론트 npm run docs:contracts 생성 및 문서 계약 검사로 검증. 상세 증거는 프론트 `.local/wallet-navigation-labels-20261102/`. backend 빌드·실금융 검증은 문서만 변경되어 미실행. AGENTS 불변 규약 유지. 운영 미배포; 통합 시 프론트 화면 카탈로그 변경과 함께 반영해야 함.
