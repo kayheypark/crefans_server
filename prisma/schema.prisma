@@ -1083,6 +1083,8 @@ model Member {
   // Withdrawal (decision 2026-10-29): personal data is purged 30 days after withdrawn_at; purged_at marks completion.
   withdrawn_at       DateTime?
   purged_at          DateTime?
+  founding_badge_claimed_at DateTime?
+  founding_badge_visible Boolean @default(false)
   sessions           MemberSession[]
   challenges         MemberChallenge[]
   @@index([nickname])
