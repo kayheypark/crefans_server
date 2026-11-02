@@ -1,0 +1,63 @@
+{
+  "recordedAt": "2026-11-02T17:27:42.820371+00:00",
+  "repository": "crefans_server",
+  "baseCommit": "d4238d922641277f6e5364f27d2484a8641afdb1",
+  "branch": "feat/promotion-beans-claim",
+  "state": "uncommitted at verification; isolated feature branch",
+  "eligibility": "existing policy: confirmed13fans, explicitly configured IDs; operating list UNSET; expansion question unanswered",
+  "deployment": "NOT_RUN",
+  "actualUserGrant": "NOT_RUN",
+  "migration": "none",
+  "sourceSha256": {
+    "src/platform/beans.service.ts": "ab7eaf57565fbe63ef627481dc3491229f669788c5bc9d94c4b949859337f497",
+    "src/platform/beans.controller.ts": "f495c046db084ae2e32a7acac56af67ea8f545713174b15b5c5e637a04750924",
+    "src/platform/openapi-contract.ts": "351f8829385ef4c66d5cf0a2ddbade91ab4b2bf41bf6c50dd2cff2bd1f85ba06",
+    "infra/platform/runtime.env.example": "1fbcc71229fbebfe610b9998191212fa0e922b00aa2d70e4dc9856efcb5b5c14",
+    "tests/platform-event-claim.test.cjs": "0a805eb797a47acb3fba43381e87ccfe9c57fa975ff9b74946360bb2802f3ed0",
+    "tests/platform-openapi.test.cjs": "b840d757573a7519a808896b54247f458b22221d6e15fe87f3dfc7ba1209eabc"
+  },
+  "commands": [
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "log": "/Users/ethan/repository/crefans_server-event-claim/.local/event-claim-20261103/build.log",
+      "logModifiedAt": "2026-11-02T17:15:32.442966+00:00",
+      "logSha256": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2",
+      "result": "PASS"
+    },
+    {
+      "command": "CREFANS_E2E=true node --test tests/platform-event-claim.test.cjs",
+      "exitCode": 0,
+      "log": "/Users/ethan/repository/crefans_server-event-claim/.local/event-claim-20261103/db-tests-final.log",
+      "logModifiedAt": "2026-11-02T17:25:08.754208+00:00",
+      "logSha256": "df10e74eecc6f96e04cad14d62167ea57707e82c9c51bfe87387bf2b683d6f97",
+      "pass": 8,
+      "fail": 0,
+      "database": "isolated MySQL loopback:3307/crefans_platform_e2e"
+    },
+    {
+      "command": "CREFANS_E2E=true node --test tests/platform-openapi.test.cjs",
+      "exitCode": 0,
+      "log": "/Users/ethan/repository/crefans_server-event-claim/.local/event-claim-20261103/openapi-retest.log",
+      "logModifiedAt": "2026-11-02T17:19:49.492882+00:00",
+      "logSha256": "928aca8109df827dd8f90341856fdd9c8c39dc2d55c4af9adebedaa81e22267a",
+      "pass": 12,
+      "fail": 0,
+      "scope": "real HTTP, authentication/DB doubles"
+    },
+    {
+      "command": "node --test --test-name-pattern=credits exactly100 tests/platform-event-claim.test.cjs (compiled quantity 101 mutation)",
+      "exitCode": 1,
+      "log": "/Users/ethan/repository/crefans_server-event-claim/.local/event-claim-20261103/negative-quantity.log",
+      "logModifiedAt": "2026-11-02T17:24:54.834786+00:00",
+      "logSha256": "93f8b760c13fe9638d28f015058b54b4fb73e42d6004e892070890f0e6479a5a",
+      "expectedFailure": true,
+      "restored": true
+    }
+  ],
+  "limitations": [
+    "No production configuration/list changes",
+    "No real PG/bank/email/production authentication verification",
+    "Eligibility is an operator-confirmed list; identity duplicate review is manual"
+  ]
+}

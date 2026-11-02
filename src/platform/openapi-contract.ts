@@ -197,6 +197,9 @@ add('post','admin/revenue/{id}/receipt','금융 정책','PG 실제 입금 수동
 // Bean support is independent from membership checkout and income ledgers.
 const beanQuantity={type:'integer' as const,minimum:1,maximum:100000};
 const beanInput=object({quantity:beanQuantity,requestId:maxString(100)},['quantity','requestId']);
+const eventClaimResponse=object({status:enumeration('available','claimed','ineligible','unavailable'),quantity:integer,claimedAt:{type:'string',format:'date-time',nullable:true}});
+add('get','events/promotion-beans','콩','프로모션 100콩 이벤트 수령 상태',{response:eventClaimResponse,description:'본인 상태만 조회. 운영자가 지정한 확정 팬13명, 이벤트 전체13회·계정당1회100콩. 명단 미설정/오류 또는 콩 기능 중지 시 신규 지급 불가. 지급 명단/다른 회원 정보는 반환하지 않습니다.'});
+add('post','events/promotion-beans/claim','콩','프로모션 100콩 즉시 받기',{body:object({}),response:eventClaimResponse,description:'빈 객체만 허용. 수량·회원·멱등키는 서버 고정. 회사 지갑 잠금 안에서 대상/누적13회/이전 수령을 재검사하고 재고·원장·유효5년 프로모션 로트·감사를 함께 커밋. 재시도는 기존 지급 시각 반환. 본인 지급 콩은 출금 불가, 후원 수익 조건은 기존 정책 유지.'});
 add('get','beans/wallet','콩','내 콩 지갑·이동 내역',{query:[query('page',integer),query('from',date),query('to',date),query('status',enumeration('pending','processing','paid','failed','cancelled','disputed')),query('direction',enumeration('in','out'))],response:json,description:'본인 지갑만 조회. 기간은 KST 날짜 양끝 포함. 충전 주문 status/이동 delta 부호 direction 필터를 전체 목록에 적용한 뒤 각각20개씩 페이지네이션. chargesTotal/entriesTotal은 필터 적용 총수. charges[].createdAt은 주문 생성 ISO 시각으로 화면 CF-YYYYMMDDHHmmss(KST) 표시용. UUID id는 결제/권한 식별에 계속 사용. BigInt 잔액/증감은10진 문자열이며 지갑 잔액은 필터와 무관. 후원 이동은 movement.tip에 sourceType/postTitle/postTitleSource/postAvailable을 제공합니다. 기존 원장 reason은 수정하지 않습니다.'});
 add('post','beans/charges','콩','일회성 콩 충전 주문·재고 예약',{body:beanInput,response:json});
 add('get','beans/charges/{id}','콩','본인 충전 주문 조회',{response:json});

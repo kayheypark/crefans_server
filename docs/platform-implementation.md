@@ -338,3 +338,6 @@ CDN구성:4명Pro15달러;40명100분Business200달러(요청10M초과),300분Pr
 - [OWASP Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html): 기본 거부·요청마다 권한 검사. 상품 API는 회원/운영자 세션 분리와 advertising 메뉴 권한을 실제 HTTP로 검증했다.
 
 검증: server23/23(광고5·운영자7·OpenAPI11), front382/382·브라우저6/6, admin8/8·브라우저4/4. 브라우저 API 대역과 실제 로컬 격리 MySQL 검증을 구분한다. 상품 관리 검사가 결제 기능의 완성을 증명하지 않는다. [전역 증거](../../crefans_front/docs/audit/advertising-20261029.json), 각 저장소 `.local/advertising-20261029/`에 실행 로그.
+
+### 2026-11-03 이벤트 100콩 즉시 수령
+BeansService.promotionEvent/claimPromotionEvent와 회원 guard를 공유하는 GET/POST 이벤트 경로. 기존 확정 팬13명·1회100콩 범위, 비공개 명단 설정 전에는 받을 수 없다. 회사 선행 잠금·고유 키를 재사용하여 이벤트 전체 한도와 중복을 함께 검사한다. 회사 재고·프로모션 잔액·5년 로트·감사/outbox를 한 트랜잭션으로 쓰므로 오류 후 부분 지급은 없다. 상세 설정과 경계는 [API 계약](./platform-api.md)의 즉시 받기 절. 로컬 MySQL/HTTP 검증이며 운영 지급·배포 아님.

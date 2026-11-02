@@ -11,6 +11,8 @@ import {Permit} from './admin-permissions';
 @Controller() @UseGuards(PlatformAuthGuard)
 export class BeansController {
  constructor(private beans:BeansService){}
+ @Get('events/promotion-beans') promotionEvent(@Req() r:any){return this.beans.promotionEvent(r.user.sub);}
+ @Post('events/promotion-beans/claim') claimPromotionEvent(@Req() r:any,@Body() b:any){return this.beans.claimPromotionEvent(r.user.sub,b);}
  @Get('beans/wallet') wallet(@Req() r:any,@Query() query:any){return this.beans.wallet(r.user.sub,query.page,query);}
  @Post('beans/charges') create(@Req() r:any,@Body() b:any){return this.beans.createCharge(r.user.sub,b);}
  @Get('beans/charges/:id') charge(@Req() r:any,@Param('id') id:string){return this.beans.charge(r.user.sub,id);}

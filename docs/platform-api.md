@@ -347,6 +347,8 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 
 | Method | 경로 | 의미·검증 |
 | --- | --- | --- |
+| GET | /events/promotion-beans | 회원 본인 이벤트 상태만. available/claimed/ineligible/unavailable, quantity100, claimedAt. 원장 변경 없음, 대상 명단 비공개 |
+| POST | /events/promotion-beans/claim | 회원 본인 고정100콩 즉시 수령. 빈 객체만 허용(400 INVALID_EVENT_CLAIM). 대상 명단/총13회 재검사, 회사/회원 잠금과 BeanPromotion 고유 키로 중복 방지. 잔액·로트·감사 원자적 반영. 재시도는 기존 지급 시각 반환, 신규 지급 없이 ineligible/unavailable 반환 가능 |
 | GET | /beans/wallet | 세션 본인 지갑 멱등 생성·5원장잔액·사용가용 합/일반·프로모션 세부합·일반·프로모션 후원 출처 심사 후 출금가용 합/종류별 합·필터 후 충전/이동 각20건·총수, page/from/to/status/direction (후속 필터는 로컬 반영) |
 | POST | /beans/charges | quantity(1~100000 정수), requestId; 110원/콩(VAT 포함) 서버 계산, 환경 snapshot·30분 주문·회사재고 예약, 미완료 최대5건 |
 | GET | /beans/charges/:id | 본인 충전 상태, 타인404, paymentKey 미노출 |
@@ -494,3 +496,8 @@ AdProduct 응답: id/name/description/terms/placement/amount/durationDays/visibl
 근거: [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), 2026-10-31 확인. 확장자·실제 형식·용량·권한을 함께 검사하고 애플리케이션 생성 파일명과 이미지 재인코딩을 적용한다. PNG/JPG/WebP 2MiB·128px 출력은 작은 칩 아이콘 용도에 맞춘 구현 기준이다. 검증 증거는 각 리포 `.local/category-management-20261031/`에 저장하며 대역 S3 검증과 운영 실업로드를 구분한다.
 
 - 2026-11-02: `/studio/finance`의 `creatorTerms`는 개별 조건이 없어도 현재 DB 기본값을 반영한 적용 조건을 반환한다. 멤버십 예상 수익은 `platformFeeBps` 기준이며 기존 주문·구독의 공제율 스냅샷은 변경하지 않는다.
+
+### 프로모션 100콩 이벤트 즉시 받기 (2026-11-03, 미배포)
+기존 확정 팬13명·1인1회 정책을 구현한다. `PROMOTION_EVENT_MEMBER_IDS`는 운영자가 확인한 팬 회원 ID의 JSON 배열(중복 없이1~13명). 미설정·잘못된 값은 신규 지급 불가이며 명단을 공개 API에 반환하지 않는다. 대상 확대는 별도 결정이며 이메일 패턴/가입 순서/현재 로그인만으로 선정하지 않는다. 이전 수동 지급 여부와 동일인의 중복 계정을 운영자가 확인한 후 지정한다. 현재 명단은 설정하지 않았다.
+`BEAN_LEDGER_ENABLED=true`와 활성·이메일 확인 회원·명단 포함·누적13회 미만을 검사한다. 회사 지갑을 먼저 잠근 뒤 모두 재검사하고 고정100을 재고→promotion으로 이동한다. 같은 트랜잭션에서 BeanPromotion(`event:promotion-beans-v1:`+회원ID SHA256 키), 유효5년 BeanLot, 감사/운영 outbox를 기록한다. Actor는 `system:event:promotion-beans-v1`로 운영자 수동 지급의 일한도와 분리하되 캠페인 누적13회/1300콩 상한을 별도 강제한다. 대상 명단 교체로 총한도가 초기화되지 않으며 이전 수령 상태는 명단 제외·기능 중지 뒤에도 조회된다. 재고 부족/동결/저장 실패 시 전부 취소된다. 출금 조건과 후원 수익 출처 검증은 기존 프로모션과 같다. 신규 DB migration 없음.
+검증은 tests/platform-event-claim.test.cjs의 로컬 MySQL8건과 platform-openapi.test.cjs의 대역 인증 HTTP12건. 실제 PG·은행·메일·운영 명단/지급/배포는 미실행. 근거(2026-11-03): [OWASP 원자적 업무 검증](https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html), [Prisma6 트랜잭션·멱등성](https://www.prisma.io/docs/orm/v6/prisma-client/queries/transactions).

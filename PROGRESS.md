@@ -1,3 +1,12 @@
+## 2026-11-03 프로모션100콩 즉시 수령 — 구현·로컬 검증 완료, 미배포
+- origin/prod d4238d9 기준 feat/promotion-beans-claim. 기존 확정 팬13명·1인1회 정책 유지, 대상 확대 질문 답변은 아직 없음. 서버의 비공개 명단(최대13계정)과 이벤트 누적13회 제한. 명단 미설정 시 지급하지 않으며 운영 명단·환경·DB는 변경하지 않았다.
+- GET events/promotion-beans와 POST events/promotion-beans/claim. 인증 세션 본인/활성·이메일 확인/대상 검증, 빈 body, 고정100·서버고정키, 회사 선행 잠금 안 재검사. 회사 재고→promotion·5년 로트·감사/outbox 원자적 반영. 재시도는 이전 지급 시각. 기존 수동 지급 정책/후원 수익 출금 조건 유지, migration 없음.
+- 검증: Nest build 통과. 로컬 MySQL의 전용 crefans_platform_e2e DB8건(16동시요청1회, 손실응답 재시도, 대상/수량 조작 거절, 중지/비활성, 명단 교체 후에도 총13회, 저장실패 롤백, 재고/동결) 통과. 실제 HTTP+인증 대역 OpenAPI12건(새2경로 무인증/잘못된 쿠키401, 세션회원 전달 포함) 통과. 수량을101로 바꾸면 검사 실패, 컴파일 파일 원복 후8건 재통과. 테스트 회원·지급·원장 정리.
+- 최초 실패: 감사 분류 beans는 허용 enum이 아니어서 build 실패→finance로 수정. OpenAPI 하드코딩 건수186/유저78→신규2경로를 반영한188/80으로 변경 후 통과. 기타 studio46/console82는 유지.
+- 근거 2026-11-03: OWASP Business Logic Security 및 Prisma6 transactions 공식 안내(정확한 URL은 docs/platform-api.md). 원자성/고유 키를 적용했으며 대상·금액은 기존 사용자 결정. 검증 증거 docs/promotion-event-claim-20261103.json, 원본 .local/event-claim-20261103/.
+- 한계/다음: 운영자가 실제 확정 팬의 중복/기존 지급 여부를 확인해 명단 지정 필요. 대상 범위를 넓히려면 사용자 결정부터 반영한다. 운영 배포·실계정 지급·PG/은행/메일 검증은 미실행. 다음 요청 시 dev 통합→prod 승격 후 프론트와 함께 배포한다.
+
+
 ## 2026-11-03 멤버십 삭제 확인·적용 공제율 — 운영 배포 완료
 - 사용자 배포 승인에 따라 feat/membership-confirmation→dev fefc3ee(통합 build·6건 통과)→prod d99e010 순서로 반영. 프론트 prod73fbc85와 `membership-20261103`으로 API·worker·front 함께 배포. 이후 배포 증거 커밋은 문서만 변경한다.
 - 이름 직접 입력 일치 검사·잠금 후 재확인 및 유효 구독 보호, 현재 DB 금융 정책/개별 조건에 맞는 studioTerms 적용. 기존 수익·구독·결제 snapshot은 변경하지 않으며 migration 없음.
