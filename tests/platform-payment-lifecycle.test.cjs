@@ -146,11 +146,20 @@ test('one-time checkout rejects foreign orders and tampered amounts, grants one 
  await assert.rejects(f.finance.confirmPayment(f.creator,f.order.id,input),code('ORDER_NOT_FOUND'));
  await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{...input,amount:1}),code('PAYMENT_MISMATCH'));
  await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{...input,orderId:'forged'}),code('PAYMENT_MISMATCH'));
- await assert.rejects(f.finance.pay(f.fan,f.order.id),code('PAYMENT_AUTH_REQUIRED'));
  await f.finance.confirmPayment(f.fan,f.order.id,input);await f.finance.confirmPayment(f.fan,f.order.id,input);
  assert.equal(confirmations,1);const sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});assert.equal(sub.auto_renew,false);assert.equal(sub.next_billing_date,null);assert.equal(sub.billing_method_id,null);assert.equal(await db.revenueEntry.count({where:{order_id:f.order.id}}),1);
  await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{...input,paymentKey:'other'}),code('PAYMENT_MISMATCH'));
  await f.finance.refund(f.fan,f.order.id);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'refunded');
+});
+// 2026-11-02 user decision: closing the one-time window must not lock the order out of the monthly card payment.
+test('a closed one-time window returns the order to the monthly card payment under a new order id; a late window approval is refused',async()=>{
+ const f=await fixture();const prepared=await f.finance.paymentWindow(f.fan,f.order.id);let confirmations=0;f.provider.confirm=async()=>{confirmations++;throw new Error('must not approve');};
+ const paid=await f.finance.pay(f.fan,f.order.id);assert.equal(paid.order.status,'paid');assert.notEqual(paid.order.snapshot.paymentMode,'one-time');
+ assert.equal(f.calls.length,1);assert.equal(f.calls[0].order.attempts,1,'the card charge uses a new provider order id');assert.notEqual(f.calls[0].order.id+'_'+f.calls[0].order.attempts,prepared.orderId);
+ const sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});assert.equal(sub.auto_renew,true);assert.ok(sub.next_billing_date);
+ await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{orderId:prepared.orderId,amount:prepared.amount,paymentKey:'late-window-'+f.order.id}),code('PAYMENT_MISMATCH'));assert.equal(confirmations,0);
+ const other=await fixture();await other.finance.paymentWindow(other.fan,other.order.id);await db.billingMethod.update({where:{id:other.card.id},data:{deleted_at:new Date(),is_default:false}});
+ await assert.rejects(other.finance.pay(other.fan,other.order.id),code('PAYMENT_METHOD_REQUIRED'));assert.equal(other.calls.length,0);
 });
 test('one-time approval lost response recovers by lookup without charging a billing card',async()=>{
  const f=await fixture();await f.finance.paymentWindow(f.fan,f.order.id);let calls=0;f.provider.confirm=async(key,o)=>{calls++;f.approved.set(o.id,{status:'DONE',orderId:o.id,totalAmount:o.amount,paymentKey:key});reject(503,'PAYMENT_UNCERTAIN','lost');};

@@ -76,7 +76,9 @@ export class PlatformFinanceService {
    const o=await tx.checkoutOrder.findFirst({where:{id,member_id:member}});if(!o)reject(404,'ORDER_NOT_FOUND','주문을 찾을 수 없습니다.');if(o.status==='paid')return o;if((o.snapshot as any).paymentEnvironment&&((o.snapshot as any).paymentEnvironment!==currentEnvironment)||currentEnvironment==='live'&&(o.snapshot as any).paymentEnvironment!=='live')reject(409,'PAYMENT_ENVIRONMENT_CHANGED','테스트 구독은 실제 결제로 전환되지 않습니다. 새 결제 동의와 주문이 필요합니다.');
    if(!['pending','processing'].includes(o.status))reject(409,'INVALID_ORDER_STATE','결제할 수 없는 주문입니다.');
    if(o.locked_until&&o.locked_until>new Date())reject(409,'PAYMENT_IN_PROGRESS','결제 결과를 확인 중입니다. 잠시 후 다시 확인해주세요.');
-   const oneTime=(o.snapshot as any).paymentMode==='one-time';
+   // 2026-11-02 user decision: closing the one-time payment window must not lock the order out of the monthly card payment.
+   // A pending order with no approved window returns to subscription under a new provider order id, so a late window approval no longer matches.
+   const reopened=(o.snapshot as any).paymentMode==='one-time'&&!windowKey&&!o.payment_key&&o.status==='pending',oneTime=(o.snapshot as any).paymentMode==='one-time'&&!reopened;
    if(windowKey&&!oneTime||oneTime&&!windowKey&&!o.payment_key)reject(409,'PAYMENT_AUTH_REQUIRED','결제창에서 인증을 완료해주세요.');
    if(windowKey&&o.payment_key&&o.payment_key!==windowKey)reject(409,'PAYMENT_MISMATCH','다른 결제 요청입니다.');
    recover=o.status==='processing';if(!recover&&o.expires_at<=new Date())reject(409,'ORDER_EXPIRED','주문이 만료되었습니다.');
@@ -89,9 +91,9 @@ export class PlatformFinanceService {
     if(await tx.checkoutOrder.count({where:{member_id:member,status:'processing',NOT:{id}}}))reject(409,'PAYMENT_IN_PROGRESS','다른 주문 결제가 진행 중입니다.');
    }
    method=await tx.billingMethod.findFirst({where:{member_id:member,...(!recover?{deleted_at:null}:{}),...(!recover&&o.subscription_id?{id:renewalMethodId||''}:o.billing_method_id?{id:o.billing_method_id}:methodId?{id:methodId}:{is_default:true})}});
-   if(!recover&&(o.snapshot as any).paymentMode!=='one-time'&&!method)reject(409,'PAYMENT_METHOD_REQUIRED','결제수단을 등록해주세요.');
+   if(!recover&&!oneTime&&!method)reject(409,'PAYMENT_METHOD_REQUIRED','결제수단을 등록해주세요.');
    if(!recover&&!oneTime&&method?.unavailable_at)reject(409,'PAYMENT_METHOD_UNAVAILABLE','사용할 수 없는 카드입니다. 다른 카드를 기본 결제수단으로 설정해주세요.');
-   return tx.checkoutOrder.update({where:{id},data:{status:'processing',locked_until:new Date(Date.now()+90000),...(!recover?{billing_method_id:oneTime?null:method.id,...(oneTime?{payment_key:windowKey}:{}),processing_started_at:new Date(),snapshot:{...(o.snapshot as any),...(!o.subscription_id?await paymentPolicy(tx,(o.snapshot as any).creatorId):{})}}:{})}});
+   return tx.checkoutOrder.update({where:{id},data:{status:'processing',locked_until:new Date(Date.now()+90000),...(!recover?{billing_method_id:oneTime?null:method.id,...(oneTime?{payment_key:windowKey}:{}),processing_started_at:new Date(),...(reopened?{attempts:{increment:1}}:{}),snapshot:{...(o.snapshot as any),...(reopened?{paymentMode:'subscription'}:{}),...(!o.subscription_id?await paymentPolicy(tx,(o.snapshot as any).creatorId):{})}}:{})}});
   });
   if(order.status==='paid')return{message:'가입이 완료되었습니다.',order:this.orderView(order)};
   try{
