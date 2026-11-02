@@ -1,3 +1,4 @@
+import {lockHandlePolicy,availableSignupHandle} from './handles';
 import {ensureBeanWallet} from './bean-ledger';
 import {recordMarketingChoice} from './marketing.service';
 import {LegalDocumentsService} from './legal-documents';
@@ -53,7 +54,7 @@ export class PlatformAuthService {
    if(!policy.identityRequired&&input.ageAcknowledged!==true)reject(400,'AGE_ACKNOWLEDGEMENT_REQUIRED','만 19세 이상 가입 조건을 확인해주세요.');
    const password_hash=await hashPassword(password);
    await this.db.$transaction(async tx=>{
-     const challenge=await tx.signupChallenge.findUnique({where:{email}});
+     await lockHandlePolicy(tx);const challenge=await tx.signupChallenge.findUnique({where:{email}});
      if(!challenge?.verified_at||challenge.expires_at<=new Date()||challenge.proof_hash!==digest(text(input.emailProof,100)))reject(403,'EMAIL_VERIFICATION_REQUIRED','이메일 인증이 필요합니다.');
      let identity_hash:string|null=null,verifiedName='';
      if(policy.identityRequired){
@@ -63,7 +64,7 @@ export class PlatformAuthService {
        const consumed=await tx.identityProof.updateMany({where:{id:proof.id,consumed_at:null},data:{consumed_at:new Date()}});if(consumed.count!==1)reject(409,'PROOF_USED','사용된 본인인증입니다.');
        identity_hash=proof.identity_hash;verifiedName=text(proof.verified_name,80);
      }
-     const consents=this.legal.consents(input);const member=await tx.member.create({data:{id:randomUUID(),email,password_hash,name:verifiedName,nickname,preferred_username:randomBytes(7).toString('hex'),email_verified:true,status:'CONFIRMED',identity_hash}});
+     const consents=this.legal.consents(input);const member=await tx.member.create({data:{id:randomUUID(),email,password_hash,name:verifiedName,nickname,preferred_username:await availableSignupHandle(tx),email_verified:true,status:'CONFIRMED',identity_hash}});
      // A console invite revoked after the check above must not still let this email in.
      if(!await consumeInvite(tx,email,member.id)&&policy.inviteOnly&&!policy.listed(email)&&!referred)reject(403,'SIGNUP_INVITE_REQUIRED',INVITE_REQUIRED_MESSAGE);
      if(referred&&!await linkReferralSignup(tx,input.referralCode,member.id))reject(400,'INVALID_REFERRAL','초대 링크를 확인해주세요.');

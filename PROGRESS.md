@@ -46,6 +46,15 @@
 - 근거 2026-11-03: OWASP Business Logic Security 및 Prisma6 transactions 공식 안내(정확한 URL은 docs/platform-api.md). 원자성/고유 키를 적용했으며 대상·금액은 기존 사용자 결정. 검증 증거 docs/promotion-event-claim-20261103.json, 원본 .local/event-claim-20261103/.
 - 한계/다음: 운영자가 실제 확정 팬의 중복/기존 지급 여부를 확인해 명단 지정 필요. 대상 범위를 넓히려면 사용자 결정부터 반영한다. 운영 배포·실계정 지급·PG/은행/메일 검증은 미실행. 다음 요청 시 dev 통합→prod 승격 후 프론트와 함께 배포한다.
 
+## 2026-11-03 예약 핸들 관리 — 로컬 완료·미배포
+- origin/prod d4238d9 → feat/reserved-handles. 콘솔 짝 crefans_admin-reserved-handles(origin/prod602cecf), 문서 계약 짝 crefans_front-reserved-handles-docs(origin/prod88237ff). 기존 체크아웃·미커밋 작업 보존.
+- 사용자 승인: 제안 원본62개와 허용되는 밑줄 제거 변형을 합친103개를 즉시 예약 상태로 초기화. migration20261103010000_reserved_handles에 담았으며 실제 운영 DB 반영은 아직 하지 않았다. 정확 일치이며 와일드카드 없음. 기존 현재 보유자 유지, 후보는 차단하지 않음, retired_handles 보호는 독립 유지.
+- 콘솔 독립 권한 메뉴(view/create/update/delete)와 목록/검색/상태/페이지, 후보·예약 등록/편집/해제/삭제/복구/변경 이력. API5개, 소프트 삭제·사유 필수·버전 충돌409·삭제 핸들 직접 확인. 변경/버전/변경 이력/감사 원장 원자적 저장. 초기 예약은 별도 초기 이력.
+- 가입 자동 핸들·팬 프로필 중복 확인/저장·스튜디오 동기화 연결. platform_settings handles.policy 행을 일반 조회보다 먼저 잠가 아직 예약 행이 없는 이름까지 직렬화한다. 신규 예약 취득만 차단하며 현재 보유자의 다른 정보 수정은 유지.
+- 검증: build 통과, 격리 MySQL3307 crefans_platform_e2e·로컬 HTTP에서 신규8+기존 핸들5+OpenAPI11=24/24 통과. 무권한·Origin·입력 거절/공개 응답 개인정보 제한, 실제 상태 저장·충돌·삭제/복구·감사·기존 보유자·동시 예약 후 저장 대기·가입 난수 충돌 회피 포함. 예약 차단을 끈 대조 검사8중6 실패 확인, 컴파일 원본 SHA 복원 후24/24 재통과.
+- 최초 실패는 OpenAPI 경로 수 기대값(186→191, 콘솔82→87)과 팬 API 테스트 Origin을 수정하여 재검증. 콘솔 PC Chromium2/모바일 WebKit2=4/4 통과, 등록·새로고침 지속·예약·동시 수정 충돌·삭제 직접 입력·삭제 필터/이력/복구·권한/빈 결과 확인. API 대역은 읽기 전용·무권한 UI 검사2건뿐이며 변경 생애주기2건은 실제 격리 DB 사용.
+- 증거: [검증 기록](docs/reserved-handles-20261103.json), 상세 .local/reserved-handles-20261103/. 문서 계약·manifest를 짝 프론트에서 갱신·검증한다. 운영/물리 iPhone/부하·외부 공급사는 미실행이며 출시 전체 검증을 뜻하지 않는다.
+- 다음: 배포 요청 시 feature→dev 검증→prod 승격. DB 백업 후 migration→API/worker→콘솔 순서로 함께 적용하고 초기103개·기존 보유자·운영 차단을 재검증한다. 현재 미푸시·미통합·미배포. 회원 핸들 강제 변경 없음.
 
 ## 2026-11-03 멤버십 삭제 확인·적용 공제율 — 운영 배포 완료
 - 사용자 배포 승인에 따라 feat/membership-confirmation→dev fefc3ee(통합 build·6건 통과)→prod d99e010 순서로 반영. 프론트 prod73fbc85와 `membership-20261103`으로 API·worker·front 함께 배포. 이후 배포 증거 커밋은 문서만 변경한다.

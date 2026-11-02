@@ -79,6 +79,11 @@
 | PUT | `/api/v1/admin/referrals/settings` | `src/platform/admin.controller.ts::referralSettings` |
 | GET | `/api/v1/admin/reports` | `src/platform/admin.controller.ts::reports` |
 | POST | `/api/v1/admin/reports/:id/resolve` | `src/platform/admin.controller.ts::resolve` |
+| GET | `/api/v1/admin/reserved-handles` | `src/platform/admin.controller.ts::reservedHandles` |
+| POST | `/api/v1/admin/reserved-handles` | `src/platform/admin.controller.ts::createReservedHandle` |
+| DELETE | `/api/v1/admin/reserved-handles/:id` | `src/platform/admin.controller.ts::removeReservedHandle` |
+| PUT | `/api/v1/admin/reserved-handles/:id` | `src/platform/admin.controller.ts::updateReservedHandle` |
+| GET | `/api/v1/admin/reserved-handles/:id/history` | `src/platform/admin.controller.ts::reservedHistory` |
 | GET | `/api/v1/admin/revenue` | `src/platform/admin.controller.ts::revenue` |
 | POST | `/api/v1/admin/revenue/:id/receipt` | `src/platform/admin.controller.ts::receipt` |
 | GET | `/api/v1/admin/settlement-accounts` | `src/platform/admin.controller.ts::settlementAccounts` |
@@ -372,8 +377,9 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261102161000_referral_revoke`
 - `20261103083000_shared_short_bio`
 - `20261103120000_founding_badge_claim`
+- `20261103010000_reserved_handles`
 
-## Prisma 전체 정의 (87 models · 15 enums)
+## Prisma 전체 정의 (89 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -2278,5 +2284,34 @@ model RetiredHandle {
   retired_at DateTime @default(now())
   @@index([member_id])
   @@map("retired_handles")
+}
+
+// Operator-managed exact-match names; retired member handles remain independently protected.
+model ReservedHandle {
+ id String @id @default(uuid())
+ handle String @unique @db.VarChar(24)
+ status String @default("candidate") @db.VarChar(16)
+ reason String @db.VarChar(500)
+ version Int @default(0)
+ created_by String? @db.VarChar(191)
+ updated_by String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([status, updated_at])
+ @@map("reserved_handles")
+}
+model ReservedHandleChange {
+ id String @id @default(uuid())
+ reservation_id String
+ version Int
+ before_handle String? @db.VarChar(24)
+ handle String @db.VarChar(24)
+ before_status String? @db.VarChar(16)
+ status String @db.VarChar(16)
+ reason String @db.VarChar(500)
+ changed_by String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@unique([reservation_id, version])
+ @@map("reserved_handle_changes")
 }
 ```

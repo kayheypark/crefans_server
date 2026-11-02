@@ -6,6 +6,7 @@
 - 작업 전에 `PROGRESS.md`를 먼저 읽고, 작업 후 갱신한다. 신규 서비스 기준은 `docs/platform-api.md`, `docs/platform-implementation.md`, `infra/platform/`이다. `docs/local-member-migration.md`와 `infra/single-instance/`는 구형 인증 전환 참고 자료다. `docs/prd.md`·`docs/deployment-setup.md`의 Cognito 전제 내용은 구식.
 - 운영 DB에 `migrate dev`/`db push`/`seed`를 실행하지 않는다. 비밀번호·인증 코드·AWS 키를 로그에 남기지 않는다.
 - 활동 분야 정렬·아이콘은 `categories.service.ts`와 `category-catalog.ts`를 사용한다. 기존 sort_order/icon 컬럼·권한·Origin·감사 이력을 유지하고, 업로드는 제한된 이미지 재인코딩 후 저장한다. 공개 분야 아이콘 경로를 유료 미디어 공개 경로로 재사용하지 않는다.
+- 예약 핸들은 `handles.ts`·`reserved-handles.ts`의 정확 일치 규칙을 사용한다. 후보는 차단하지 않고 예약 중만 신규 취득을 막는다. 기존 현재 보유자와 별도 이전 핸들 보호를 유지하며, 핸들 쓰기·예약 변경은 `handles.policy` 행 잠금 후 재검사한다. 콘솔 권한은 `reserved-handles`이며 변경·이력·감사는 같은 트랜잭션이다.
 - 핸들 중복 확인은 인증된 `/me/handle-availability`에서 본인을 제외한 회원·크리에이터(비활성 포함)를 확인하고 boolean만 반환한다. 예약하지 않으며 저장 시 재검사와 DB 고유 제약을 유지한다. 중복 충돌은 HANDLE_TAKEN으로 반환한다.
 - `/creators`의 신규 목록은 첫 페이지 20명과 독립적으로 등록일·id 내림차순 최신6명을 조회한다. 광고 여부와 무관하며 검색어·분야·검색 공개·회원/크리에이터 활성 조건을 함께 적용한다.
 - 프론트(crefans_front)의 인증 화면 계약: 회원가입 화면 안에서 이메일 코드 인증을 완료한다. PASS 필수/임시 이메일 가입은 서버 signupRequirements에 따른다. 코드 유효 10분, 재전송 쿨다운 3분.

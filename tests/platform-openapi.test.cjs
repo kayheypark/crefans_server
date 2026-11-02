@@ -119,7 +119,7 @@ test('media is documented as binary, JSON APIs have common envelope, key materia
 test('three valid documents isolate business APIs, retain required shared calls and cover all operations',async()=>{
  const operations=doc=>Object.entries(doc.paths).flatMap(([path,item])=>Object.keys(item).map(method=>method+' '+path));
  const user=operations(documents.user),studio=operations(documents.studio),console=operations(documents.console);
- assert.equal(user.length,83);assert.equal(studio.length,46);assert.equal(console.length,82);
+ assert.equal(user.length,83);assert.equal(studio.length,46);assert.equal(console.length,87);
  assert.deepEqual([...new Set([...user,...studio,...console])].sort(),operations(document).sort());
  const auth=['post /api/v1/auth/login','post /api/v1/auth/logout','post /api/v1/auth/refresh'];
  assert.deepEqual(user.filter(key=>console.includes(key)).sort(),auth);
