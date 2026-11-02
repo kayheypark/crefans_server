@@ -14,7 +14,7 @@ export class BeansController {
  @Get('beans/wallet') wallet(@Req() r:any,@Query() query:any){return this.beans.wallet(r.user.sub,query.page,query);}
  @Post('beans/charges') create(@Req() r:any,@Body() b:any){return this.beans.createCharge(r.user.sub,b);}
  @Get('beans/charges/:id') charge(@Req() r:any,@Param('id') id:string){return this.beans.charge(r.user.sub,id);}
- @Post('beans/charges/:id/payment-window') window(@Req() r:any,@Param('id') id:string){return this.beans.paymentWindow(r.user.sub,id);}
+ @Post('beans/charges/:id/payment-window') window(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.paymentWindow(r.user.sub,id,b?.paymentTerms??null);}
  @Get('beans/charges/:id/refund-quote') refundQuote(@Req() r:any,@Param('id') id:string){return this.beans.refundQuote(r.user.sub,id);}
  @Post('beans/charges/:id/refund') refund(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.refundCharge(r.user.sub,id,b);}
  @Post('beans/charges/:id/confirm') confirm(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.beans.confirm(r.user.sub,id,b);}
