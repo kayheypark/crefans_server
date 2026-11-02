@@ -39,6 +39,8 @@ API 응답 envelope는 기존 4개 필드를 유지한다. 요청 ID는 `X-Reque
 
 [platform-audit-export.cjs](../scripts/platform-audit-export.cjs)는 DB 감사 원장을 기간 지정 JSONL로 내보낸다. 실행 환경의 DATABASE_URL만 사용하며 기본 .env를 자동 읽지 않는다. 인자는 `from-ISO to-ISO absolute-output.jsonl`, 최대31일이다. 새 파일0600, 기존 파일 덮어쓰기 거부, 출력은 건수/기간/SHA-256만. 내용을 stdout에 덤프하지 않는다. 실행 중 변경되는 DB의 시점 백업·외부 자동 보관·복원 보장은 아니며, 파일은 접근 통제된 별도 저장소로 옮기고 해시를 대조한다.
 
+텔레그램 운영 알림(2026-11-02 사용자 결정)은 `memberId`·`creatorId`를 서버 비밀값 기반 HMAC 앞 12자리(`h:…`)로만 보낸다. 원래 값은 DB 운영 이벤트에 남으므로 운영자는 알림의 `기록 ID`로 콘솔 운영 기록에서 확인한다. 신고(user_reports, 처리 완료 기준)와 제재 이력(moderation_actions, 기간이 있으면 종료 시점 기준)은 3년이 지나면 워커 `moderation-retention`이 매일 삭제한다.
+
 ## 외부 장애 감시 준비
 
 [platform-external-monitor.cjs](../scripts/platform-external-monitor.cjs), [환경 예시](../infra/platform/external-monitor.env.example), [service](../infra/platform/crefans-monitor.service), [timer](../infra/platform/crefans-monitor.timer)를 **별도 호스트**에 설치한다. Node20 이상과 flock/systemd를 사용한다. 운영 서버와 같은 EC2에 두면 전체 장애 감시가 되지 않는다. 서비스/API·관리자 HTTPS 3곳을 검사하고 3회 연속 실패와 복구 전환에만 `[crefans] operations` 채널로 보낸다. 설정값/쿠키/응답본문/예외 원문은 알림에 넣지 않는다. 타이머 주기는 실행 종료 후60초이며 API/worker의 기존1시간 요약과 독립이다.
