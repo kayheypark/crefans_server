@@ -37,10 +37,10 @@ before(async()=>{
 });
 after(async()=>{await app?.close();});
 const request=(path,cookie)=>fetch(base+path,{headers:cookie?{cookie}:{},redirect:'manual'});
-test('OpenAPI 3 validates, has all 183 runtime operations and no legacy controllers',async()=>{
+test('OpenAPI 3 validates, has all 191 runtime operations and no legacy controllers',async()=>{
  await Parser.validate(structuredClone(document));
  const operations=Object.entries(document.paths).flatMap(([path,item])=>Object.keys(item).filter(method=>['get','post','put','patch','delete','head','options'].includes(method)).map(method=>method+' '+path));
- assert.equal(operations.length,186);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 171: +4 manual payout routes, +1 GET categories (2026-10-31), +1 PUT me/profile/photos, +1 GET me/referral, +3 admin referrals, +1 GET media/:id/status, +1 POST admin/referrals/:id/revoke (2026-11-02) (2026-11-01)
+ assert.equal(operations.length,191);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 171: +4 manual payout routes, +1 GET categories (2026-10-31), +1 PUT me/profile/photos, +1 GET me/referral, +3 admin referrals, +1 GET media/:id/status, +1 POST admin/referrals/:id/revoke (2026-11-02) (2026-11-01)
  assert.ok(operations.every(key=>key.includes(' /api/v1/')));assert.equal(document.info.version,'v1');
  assert.equal(document.components.securitySchemes.memberSession.name,'access_token');
  assert.equal(document.paths['/api/v1/admin/me'].get.security[0].adminSession.length,0);assert.equal(document.paths['/api/v1/admin/me'].get.security[0].memberSession,undefined,'console uses the operator session only');assert.equal(document.components.securitySchemes.adminSession.name,'admin_access_token');
@@ -119,7 +119,7 @@ test('media is documented as binary, JSON APIs have common envelope, key materia
 test('three valid documents isolate business APIs, retain required shared calls and cover all operations',async()=>{
  const operations=doc=>Object.entries(doc.paths).flatMap(([path,item])=>Object.keys(item).map(method=>method+' '+path));
  const user=operations(documents.user),studio=operations(documents.studio),console=operations(documents.console);
- assert.equal(user.length,78);assert.equal(studio.length,46);assert.equal(console.length,82);
+ assert.equal(user.length,83);assert.equal(studio.length,46);assert.equal(console.length,82);
  assert.deepEqual([...new Set([...user,...studio,...console])].sort(),operations(document).sort());
  const auth=['post /api/v1/auth/login','post /api/v1/auth/logout','post /api/v1/auth/refresh'];
  assert.deepEqual(user.filter(key=>console.includes(key)).sort(),auth);
@@ -144,4 +144,29 @@ test('entry redirects to user page, all three pages link to each other and HEAD 
   const response=await fetch(base+path+'/openapi.json',{method:'HEAD'});assert.equal(response.status,401);
   const init=await request(path+'/swagger-ui-init.js','admin_access_token='+ADMIN_TOKEN);assert.ok((await init.text()).includes(documents[audience].info.title));
  }
+});
+
+test('promotion event routes require a member session and derive the recipient from it',async()=>{
+ const {BeansService}=require('../dist/src/platform/beans.service'),beans=app.get(BeansService),originalGet=beans.promotionEvent,originalClaim=beans.claimPromotionEvent,calls=[];
+ beans.promotionEvent=async member=>{calls.push(['get',member]);return{status:'available',quantity:100,claimedAt:null};};
+ beans.claimPromotionEvent=async(member,body)=>{calls.push(['post',member,body]);return{status:'claimed',quantity:100,claimedAt:'2026-11-03T00:00:00.000Z'};};
+ try{for(const [path,method] of [['events/promotion-beans','GET'],['events/promotion-beans/claim','POST']]){
+  for(const cookie of ['', 'access_token=invalid']){const r=await fetch(base+'/api/v1/'+path,{method,headers:{cookie,'Content-Type':'application/json'},...(method==='POST'?{body:'{}'}:{})});assert.equal(r.status,401);}
+  assert.equal(calls.length,method==='GET'?0:1);
+  const r=await fetch(base+'/api/v1/'+path,{method,headers:{cookie:'access_token=member','Content-Type':'application/json'},...(method==='POST'?{body:'{}'}:{})});assert.ok(r.ok);assert.equal((await r.json()).success,true);
+ }
+ assert.deepEqual(calls,[['get','member'],['post','member',{}]]);
+ }finally{beans.promotionEvent=originalGet;beans.claimPromotionEvent=originalClaim;}
+});
+
+test('founding badge routes are authenticated and only forward the current session member',async()=>{
+ const service=app.get(PlatformService),names=['foundingBadge','claimBadge','badgeVisibility'],originals=names.map(n=>service[n]),calls=[];
+ for(const name of names)service[name]=async(...args)=>{calls.push([name,...args]);return{status:'claimed',visible:true,claimedAt:'2026-11-03T00:00:00Z'};};
+ try{for(const [index,[path,method,body]]of [['events/founding-badge','GET'],['events/founding-badge/claim','POST',{}],['me/founding-badge','PUT',{visible:false}]].entries()){
+  for(const cookie of ['', 'access_token=invalid'])assert.equal((await fetch(base+'/api/v1/'+path,{method,headers:{cookie,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})})).status,401);
+  assert.equal(calls.length,index);
+  const result=await fetch(base+'/api/v1/'+path,{method,headers:{cookie:'access_token=member','Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});assert.ok(result.ok);
+ }
+ assert.deepEqual(calls,[['foundingBadge','member'],['claimBadge','member',{}],['badgeVisibility','member',{visible:false}]]);
+ }finally{names.forEach((n,i)=>service[n]=originals[i]);}
 });

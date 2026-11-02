@@ -27,6 +27,8 @@ const validUntil=(from:Date)=>{const d=new Date(from);d.setFullYear(d.getFullYea
 // Operator promotion grants (2026-11-02 user decision): SUPER_ADMIN only, at most 10,000 beans per grant and 10,000 per KST day
 // across all operators. Automatic friend-invite rewards (actor system:*) are not operator grants and are not counted.
 export const PROMOTION_DAILY_LIMIT=10000;
+// Existing event policy: operator-confirmed 13 fans, 100 beans each. Never infer eligibility from signup alone.
+const EVENT_ACTOR='system:event:promotion-beans-v1',EVENT_PREFIX='event:promotion-beans-v1:',EVENT_LIMIT=13,EVENT_QUANTITY=100;
 const quantity=(v:any)=>{if(!Number.isSafeInteger(v)||v<1||v>100000)reject(400,'INVALID_BEAN_QUANTITY','1~100,000콩 사이의 정수로 입력해주세요.');return v as number;};
 const view=(v:any):any=>JSON.parse(JSON.stringify(v,(_k,x)=>typeof x==='bigint'?x.toString():x));
 const pageOf=(v:any)=>{const p=Number(v||1);if(!Number.isSafeInteger(p)||p<1||p>10000)reject(400,'INVALID_PAGE','페이지를 확인해주세요.');return p;};
@@ -54,6 +56,39 @@ export class BeansService {
  }
  private transaction<T>(fn:(tx:any)=>Promise<T>):Promise<T>{return this.db.$transaction(fn,{isolationLevel:'ReadCommitted',timeout:20000});}
  private async event(tx:any,type:string,id:string,member:string,amount?:number){await enqueueOperation(tx,type,{memberId:member,targetId:id},`${type}:${id}`,{amount});}
+ private promotionEventMembers():string[]|null{
+  try{const ids=JSON.parse(this.config.get('PROMOTION_EVENT_MEMBER_IDS')||'[]');return Array.isArray(ids)&&ids.length>0&&ids.length<=EVENT_LIMIT&&new Set(ids).size===ids.length&&ids.every(id=>typeof id==='string'&&/^[a-zA-Z0-9_-]{1,191}$/.test(id))?ids:null;}catch{return null;}
+ }
+ private async promotionEventStatus(db:any,member:string){
+  const user=await db.member.findUnique({where:{id:member}});
+  if(!user?.enabled||user.withdrawn_at||!user.email_verified)reject(403,'MEMBER_INACTIVE','이용할 수 없는 계정입니다.');
+  const old=await db.beanPromotion.findUnique({where:{request_key:EVENT_PREFIX+digest(member)}});
+  if(old){if(old.member_id!==member||old.quantity!==EVENT_QUANTITY||old.actor_id!==EVENT_ACTOR)reject(409,'BEAN_REQUEST_CONFLICT','지급 이력 확인이 필요합니다. 고객센터로 문의해주세요.');return{status:'claimed',quantity:EVENT_QUANTITY,claimedAt:old.created_at.toISOString()};}
+  const members=this.promotionEventMembers(),base={quantity:EVENT_QUANTITY,claimedAt:null};
+  if(!this.available()||!members)return{...base,status:'unavailable'};
+  if(!members.includes(member))return{...base,status:'ineligible'};
+  // Lifetime campaign ceiling survives changes to the configured participant list.
+  const used=await db.beanPromotion.count({where:{request_key:{startsWith:EVENT_PREFIX}}});
+  return{...base,status:used>=EVENT_LIMIT?'unavailable':'available'};
+ }
+ async promotionEvent(member:string){return this.promotionEventStatus(this.db,member);}
+ async claimPromotionEvent(member:string,input:any={}){
+  if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).length)reject(400,'INVALID_EVENT_CLAIM','지급 수량과 대상은 서버에서 확인합니다.');
+  const initial=await this.promotionEventStatus(this.db,member);
+  if(initial.status!=='available')return initial;
+  return this.transaction(async tx=>{
+   // Same company-first locking order as all other bean grants and transfers.
+   await this.lock(tx,[member],true);
+   const status=await this.promotionEventStatus(tx,member);
+   if(status.status!=='available')return status;
+   const now=new Date(),reason='프로모션 100콩 이벤트',grant=await tx.beanPromotion.create({data:{request_key:EVENT_PREFIX+digest(member),member_id:member,quantity:EVENT_QUANTITY,reason,actor_id:EVENT_ACTOR,created_at:now}});
+   await this.move(tx,`promotion:${grant.id}`,'promotion',EVENT_ACTOR,reason,grant.id,[{member:'company',bucket:'stock',delta:-EVENT_QUANTITY},{member,bucket:'promotion',delta:EVENT_QUANTITY}]);
+   await tx.beanLot.create({data:{member_id:member,bucket:'promotion',grant_id:grant.id,available:EVENT_QUANTITY,release_at:now,expires_at:validUntil(now)}});
+   await appendAudit(tx,{category:'finance',action:'beans.event_claimed',entityId:grant.id,data:{memberId:member}});
+   await this.event(tx,'beans.promotion',grant.id,member);
+   return{status:'claimed',quantity:EVENT_QUANTITY,claimedAt:now.toISOString()};
+  });
+ }
  private chargeView(o:any){return{id:o.id,quantity:o.quantity,amount:o.amount,environment:o.environment,status:o.status,createdAt:o.created_at,expiresAt:o.expires_at,paidAt:o.paid_at,failureCode:o.failure_code,refundedQuantity:o.refunded_quantity,refundedAmount:o.refunded_amount};}
  async wallet(member:string,page:any=1,query:any={}){
   this.enabled();const p=pageOf(page),filter=beanHistoryFilter(query);

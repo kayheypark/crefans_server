@@ -13,7 +13,7 @@ export const ref=(name:string):ReferenceObject=>({$ref:'#/components/schemas/'+n
 const enumeration=(...values:string[]):SchemaObject=>({type:'string',enum:values});
 const maxString=(maxLength:number,description?:string):SchemaObject=>({...str(description),maxLength});
 const secret=(description:string):SchemaObject=>({...str(description),writeOnly:true});
-const person=object({id:str(),name:str(),handle:str(),image:str(),isVerified:{type:'boolean',description:'운영자가 직접 부여한 크리에이터 인증 배지. PASS 본인인증과 별도이며 기본 false.'}});
+const person=object({id:str(),name:str(),handle:str(),image:str(),isFoundingMember:{type:'boolean',description:'수령 완료하고 표시를 선택한 원년멤버 기념 배지. 인증 배지와 별개.'},isVerified:{type:'boolean',description:'운영자가 직접 부여한 크리에이터 인증 배지. PASS 본인인증과 별도이며 기본 false.'}});
 const media=object({id:str(),type:enumeration('image','video'),url:str()});
 const commentFields={id:str(),body:str(),time,author:person,mentions:list(json)};
 const metrics=object({newSubscriptions:integer,paymentCount:integer,gross:money,refunds:money,netSales:money,platformFees:money});
@@ -197,6 +197,9 @@ add('post','admin/revenue/{id}/receipt','금융 정책','PG 실제 입금 수동
 // Bean support is independent from membership checkout and income ledgers.
 const beanQuantity={type:'integer' as const,minimum:1,maximum:100000};
 const beanInput=object({quantity:beanQuantity,requestId:maxString(100)},['quantity','requestId']);
+const eventClaimResponse=object({status:enumeration('available','claimed','ineligible','unavailable'),quantity:integer,claimedAt:{type:'string',format:'date-time',nullable:true}});
+add('get','events/promotion-beans','콩','프로모션 100콩 이벤트 수령 상태',{response:eventClaimResponse,description:'본인 상태만 조회. 운영자가 지정한 확정 팬13명, 이벤트 전체13회·계정당1회100콩. 명단 미설정/오류 또는 콩 기능 중지 시 신규 지급 불가. 지급 명단/다른 회원 정보는 반환하지 않습니다.'});
+add('post','events/promotion-beans/claim','콩','프로모션 100콩 즉시 받기',{body:object({}),response:eventClaimResponse,description:'빈 객체만 허용. 수량·회원·멱등키는 서버 고정. 회사 지갑 잠금 안에서 대상/누적13회/이전 수령을 재검사하고 재고·원장·유효5년 프로모션 로트·감사를 함께 커밋. 재시도는 기존 지급 시각 반환. 본인 지급 콩은 출금 불가, 후원 수익 조건은 기존 정책 유지.'});
 add('get','beans/wallet','콩','내 콩 지갑·이동 내역',{query:[query('page',integer),query('from',date),query('to',date),query('status',enumeration('pending','processing','paid','failed','cancelled','disputed')),query('direction',enumeration('in','out'))],response:json,description:'본인 지갑만 조회. 기간은 KST 날짜 양끝 포함. 충전 주문 status/이동 delta 부호 direction 필터를 전체 목록에 적용한 뒤 각각20개씩 페이지네이션. chargesTotal/entriesTotal은 필터 적용 총수. charges[].createdAt은 주문 생성 ISO 시각으로 화면 CF-YYYYMMDDHHmmss(KST) 표시용. UUID id는 결제/권한 식별에 계속 사용. BigInt 잔액/증감은10진 문자열이며 지갑 잔액은 필터와 무관. 후원 이동은 movement.tip에 sourceType/postTitle/postTitleSource/postAvailable을 제공합니다. 기존 원장 reason은 수정하지 않습니다.'});
 add('post','beans/charges','콩','일회성 콩 충전 주문·재고 예약',{body:beanInput,response:json});
 add('get','beans/charges/{id}','콩','본인 충전 주문 조회',{response:json});
@@ -260,3 +263,8 @@ add('post','admin/referrals/{id}/revoke','관리자','친구 초대 보상 제�
 add('get','admin/members/{id}/suspension','관리자','회원 이용 제한 이력',{response:list(moderationEntry),description:'members.view. 최신 100건.'});
 add('get','admin/members/{id}/terms','관리자','크리에이터 개별 수수료·출금 조건 조회',{response:object({terms:ref('CreatorTerms'),version:integer,defaults:ref('CreatorTerms'),history:list(object({version:integer,terms:ref('CreatorTerms'),source:enumeration('admin','invite','backfill'),changedBy:nullable(str()),changedByName:nullable(str()),reason:str(),createdAt:time}))}),description:'members.view. null은 플랫폼 기본값 적용. history는 최신 버전부터 최대 100건(변경자·사유·출처).'});
 add('put','admin/members/{id}/terms','관리자','크리에이터 개별 수수료·출금 조건 변경',{body:object({...termsConfirm,reason:maxString(500),expectedVersion:integer},['expectedVersion','reason']),response:object({terms:ref('CreatorTerms'),version:integer,message:str()}),description:'members.update + settings.update, 확인 문구 \'정책 변경\'. 이후 신규 구독 결제·출금 신청부터 적용. 기존 결제와 진행 중 정기결제 조건은 유지. 변경 사유 필수, 저장마다 creator_financial_term_changes에 이력 1행.'});
+
+const foundingBadge=object({status:enumeration('available','claimed','ineligible','unavailable'),claimedAt:nullable(time),visible:bool});
+add('get','events/founding-badge','계정','원년멤버 배지 수령 상태',{response:foundingBadge,description:'인증된 본인만 조회. 확정 참여자 명단 최대16명. 수령하지 않으면 표시되지 않습니다.'});
+add('post','events/founding-badge/claim','계정','원년멤버 배지 받기',{body:{type:'object',properties:{},additionalProperties:false},response:foundingBadge,description:'세션 본인에게1회 지급. 동시·재시도는 기존 수령 기록 반환. 신규 지급 누적16명, 빈/오류 명단은 중지.'});
+add('put','me/founding-badge','계정','원년멤버 배지 표시·숨김',{body:object({visible:bool},['visible']),response:foundingBadge,description:'이미 수령한 본인의 표시 여부만 변경. 미수령 계정에 배지를 부여하지 않습니다.'});
