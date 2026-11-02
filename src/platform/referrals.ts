@@ -131,7 +131,9 @@ export async function referralSummary(db:any,member:string){
 }
 // 2026-11-02 user decision: the referrer sees the invitee's masked email instead of the nickname, and the invitee agrees to
 // that on the referral signup screen. The agreement is stored in member_consents; signups without it show no identifier.
-export const REFERRAL_DISCLOSURE={version:'2026-11-02.1',agreement:'초대한 회원에게 내 이메일 일부(예: ab***@n***.com)와 가입·보상 진행 상태가 표시되는 것에 동의합니다.'};
+// 2026-11-02.2: the five items a third-party provision consent must state (개인정보 보호법 제17조제2항): recipient, purpose,
+// items, retention and the right to refuse with its consequence.
+export const REFERRAL_DISCLOSURE={version:'2026-11-02.2',agreement:'제공받는 자: 나를 초대한 회원 / 목적: 친구 초대 보상 진행 확인 / 항목: 이메일 일부(아이디 앞 두 글자와 도메인 첫 글자·최상위 도메인, 예: ab***@n***.com), 가입일, 보상 진행 상태·확정 예정일·지급일 / 보유·이용 기간: 내가 탈퇴할 때까지(탈퇴 후에는 "탈퇴한 회원"으로 표시) / 동의를 거부할 수 있으며, 거부하면 초대 링크로는 가입할 수 없습니다.'};
 export const REFERRAL_DISCLOSURE_KIND='referral-disclosure';
 /** ab***@n***.com: two characters of the local part, the first of the domain, and the top-level domain. */
 export function maskReferralEmail(email:string){

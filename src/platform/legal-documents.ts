@@ -60,25 +60,46 @@ const catalog:LegalCatalog={documents:{terms,privacy,policy:document('운영정�
 // 2026-11-30 revision of the terms and the operating policy (notice posted 2026-10-30, 30 days ahead because some changes are
 // unfavourable: bean refund deduction, expiry, receivables, creator closing). Source: docs/terms-draft-20261030.md rows 1-5, 7-11
 // (row 6 grade change and row 18 temporary-measure wording wait for features/legal check). The privacy policy is unchanged.
-export const NEXT_TERMS_EFFECTIVE='2026-11-30';
-const nextVersion='2026-11-30.1';
+// 2026-11-02 user decision: the separate revision (withholding paid by the company, payout schedule, promotional bean scope,
+// friend invites, watermark) is merged into this scheduled revision and re-announced. Some changes are unfavourable, so the
+// effective date moves to 30 days after the new notice. Draft: crefans_front/.local/legal-draft-20261102/revision-draft.md.
+// LEGAL_NOTICE_DATE must be the day this version is deployed (KST): the privacy revision takes effect that day and signups stay
+// closed while a document's effective date is in the future. If the deploy slips, move both dates (notice + 30 days).
+export const LEGAL_NOTICE_DATE='2026-11-02';
+export const NEXT_TERMS_EFFECTIVE='2026-12-02';
+const nextVersion='2026-12-02.1';
 const revise=(doc:LegalDocument,edits:Record<string,Array<[string,string]>>,extra:LegalSection[]=[]):LegalDocument=>{
  const sections=doc.sections.map(sec=>{let body=sec.body;for(const [from,to] of edits[sec.title]||[]){if(!body.includes(from))throw Error(`Legal revision anchor missing in ${sec.title}`);body=body.replace(from,to);}return{...sec,body};});
- return{...doc,version:nextVersion,updatedAt:'2026-10-30',publishedAt:'2026-10-30',effectiveAt:NEXT_TERMS_EFFECTIVE,notice:'2026년 10월 30일 공지했고 2026년 11월 30일부터 적용합니다. 오픈베타 기간에는 사전 협의된 초대 이메일로 가입하며, 실제 결제와 정산 송금은 준비를 마친 뒤 시작합니다.',sections:[...sections,...extra]};
+ return{...doc,version:nextVersion,updatedAt:LEGAL_NOTICE_DATE,publishedAt:LEGAL_NOTICE_DATE,effectiveAt:NEXT_TERMS_EFFECTIVE,notice:'2026년 11월 2일 공지했고 2026년 12월 2일부터 적용합니다(2026년 10월 30일 공지한 11월 30일 시행 예정본에 친구 초대·프로모션콩·워터마크·원천징수·지급일 내용을 더해 다시 공지). 오픈베타 기간에는 사전 협의된 초대 이메일로 가입하며, 실제 결제와 정산 송금은 준비를 마친 뒤 시작합니다.',sections:[...sections,...extra]};
 };
 const nextTerms=revise(terms,{
  '1. 목적과 적용 범위':[['통신판매업 신고번호는 확인 중이며, 유료 서비스 개시 전에 신고·표시 의무 적용 여부와 실제 정보를 확인합니다. 신규 이용계약 체결은 가입 개방 후 별도 동의를 받아 진행합니다. 크리에이터가 판매자이고 크레팬스가 중개·결제·정산을 제공하는 기본안이며 실제 PG·세무 및 계약상 역할을 확인한 뒤 유료 운영합니다.','회사는 유료 서비스 개시 전에 통신판매업을 신고하고 신고번호를 이 조와 서비스 하단 사업자 정보에 표시합니다. 크레팬스는 크리에이터 멤버십 거래의 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다. 콩은 크레팬스가 직접 판매합니다.']],
  '2. 가입과 계정 관리':[['초기 베타는 초대된 17개 계정부터 일반 콘텐츠로 2026년 11월까지 운영하며, 준비 완료 후 시작일을 안내합니다.','오픈베타 기간(2026년 11월까지)에는 사전 협의된 초대 이메일로 가입하며 일반 콘텐츠만 제공합니다.']],
- '6. 크리에이터 수수료·정산·출금':[['크리에이터 본인의 세금과 법정 원천징수는 별도입니다.','세금 처리 방식(원천징수 여부 포함)은 정식 정산 전에 안내합니다.'],
+ '6. 크리에이터 수수료·정산·출금':[['크리에이터 본인의 세금과 법정 원천징수는 별도입니다.','법령상 회사에 원천징수 의무가 있으면 그 세액은 회사가 부담하여 신고·납부하고, 크리에이터에게는 공제 없이 지급합니다. 크리에이터 본인의 소득세 신고·납부와 사업자인 크리에이터의 세무 증빙은 크리에이터가 합니다.'],
+  ['공휴일·신청 마감 등 세부 일정과 PG·세무 계약은 실제 유료 운영 전에 확정·안내합니다.','출금은 화요일 23:59(한국 시간)까지 신청한 건을 그 주 수요일에 지급하며, 수요일이 공휴일이면 다음 영업일에 지급합니다. PG 계약은 실제 유료 운영 전에 확정·안내합니다.'],
   ['전액 환불이 완료되면 해당 결제의 수수료와 수익도 함께 취소합니다.','전액 환불이 완료되면 해당 결제의 수수료와 수익도 함께 취소합니다. 이미 출금된 수익에 결제 취소·환불·카드사 이의제기가 생기면 그 금액을 미수금으로 기록해 이후 정산에서 차감하고 크리에이터에게 알립니다. 미수금이 남아 있으면 출금과 탈퇴가 제한될 수 있습니다.'],
   ['초기 이체 수수료는 플랫폼이 부담합니다.','초기 이체 수수료는 플랫폼이 부담합니다. 후원받은 콩은 후원 후 7일이 지나야 출금을 신청할 수 있고, 일반콩은 충전 대금의 실제 입금 확인도 필요합니다.']],
+ '7. 게시물의 권리와 금지행위':[['서비스 운영에 필요한 저장·전송·표시 범위에서만 콘텐츠를 처리합니다.','서비스 운영에 필요한 저장·전송·표시 범위에서만 콘텐츠를 처리합니다. 회사는 무단 유출 방지와 출처 표시를 위해 크리에이터가 게시물에 새로 올린 사진·동영상의 오른쪽 아래에 크리에이터 프로필 주소(https://crefans.com/핸들)를 표식으로 합성한 사본을 만들어 게시물에 표시하며, 화면 재생에 맞게 크기를 줄이거나(사진은 긴 변 2,560px, 동영상은 1,280px 이하) 형식을 변환하고 위치정보 등 메타데이터를 제거할 수 있습니다. 원본 파일은 바꾸지 않고 크리에이터 본인만 이용할 수 있도록 보관합니다. 이 표식은 크리에이터가 끌 수 없습니다.']],
  '8. 신고·이용 제한·이의제기':[['이용자는 게시물과 메시지의 신고 기능 또는 고객센터를 통해 권리 침해와 위법 행위를 알릴 수 있습니다.','이용자는 게시물·댓글·메시지의 신고 기능 또는 고객센터를 통해 권리 침해와 위법 행위를 알릴 수 있습니다. 권리 침해·불법촬영물·저작권 침해 신고는 대표 박경호(khpark@crefans.com)가 이메일로 접수합니다. 신고를 처리하면 신고한 회원에게 앱 알림으로 검토 결과를 알립니다.'],
   ['제한 사유와 이의제기 방법은 가능한 범위에서 당사자에게 안내합니다.','게시물·댓글을 숨기거나 이용을 제한하면 앱 알림과 이메일로 공개 사유와 이의제기 방법을 당사자에게 알립니다. 크리에이터가 차단한 회원은 그 크리에이터에게 메시지를 보내거나 그 게시물에 새 댓글·답글을 달 수 없으며, 이미 쓴 댓글은 남습니다.']],
  '9. 서비스 변경·장애·탈퇴':[['자동 갱신 구독이나 처리 중인 출금이 있으면 먼저 정리해야 할 내역을 안내합니다.','자동 갱신 구독, 처리 중인 출금, 남은 충전콩(먼저 환불 신청)이나 후원받은 콩(먼저 출금)이 있으면 먼저 정리해야 할 내역을 안내하며, 남은 프로모션콩은 탈퇴하면 소멸합니다. 유료 구독자가 있는 크리에이터는 판매를 먼저 중단하고, 이미 결제된 구독 기간이 모두 끝나고 미지급 수익·미수금 정산이 끝난 뒤 탈퇴할 수 있습니다.']],
-},[{title:'11. 콩',body:'콩은 크리에이터 후원에만 쓰며 멤버십·콘텐츠 이용권이 아닙니다. 프로모션콩이 있으면 먼저 사용합니다. 후원은 게시물 열람 권한을 제공하지 않으며, 볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다.\n충전 후 7일 이내 쓰지 않은 콩은 전액 청약철회할 수 있고, 7일이 지난 뒤 쓰지 않은 콩은 10%를 공제하고 환불합니다. 회사 귀책 사유가 있으면 고객센터 요청에 따라 공제하지 않고 환불합니다. 사용한 콩과 운영자가 지급한 프로모션콩은 환불·출금 대상이 아닙니다.\n충전콩은 결제일, 운영자가 지급한 프로모션콩은 지급일로부터 5년간 쓸 수 있으며, 만료 30일 전에 알리고 만료되면 남은 콩은 소멸합니다.'}]);
+},[{title:'11. 콩',body:'콩은 크리에이터 후원에만 쓰며 멤버십·콘텐츠 이용권이 아닙니다. 프로모션콩이 있으면 먼저 사용합니다. 후원은 게시물 열람 권한을 제공하지 않으며, 볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다.\n충전 후 7일 이내 쓰지 않은 콩은 전액 청약철회할 수 있고, 7일이 지난 뒤 쓰지 않은 콩은 10%를 공제하고 환불합니다. 회사 귀책 사유가 있으면 고객센터 요청에 따라 공제하지 않고 환불합니다. 사용한 콩과 회사가 운영자 지급·이벤트·친구 초대 보상 등으로 무상 지급한 프로모션콩은 환불·출금 대상이 아닙니다.\n충전콩은 결제일, 프로모션콩은 지급일로부터 5년간 쓸 수 있으며, 만료 30일 전에 알리고 만료되면 남은 콩은 소멸합니다.'},{title:'12. 친구 초대',body:'회사는 친구 초대 기능을 운영하는 동안 회원에게 초대 링크를 제공합니다. 초대 링크로 가입한 회원의 첫 실결제가 결제 후 7일 동안 환불되지 않으면, 직접 초대한 회원에게 후원에만 쓸 수 있는 프로모션콩 100개를 지급합니다. 보상은 초대받은 회원 1명당 한 번, 초대한 회원 1명당 한국 시간 기준 한 달에 최대 10건이며, 출금·환불할 수 없습니다.\n보상을 지급한 결제가 일부라도 환불되거나 결제 이의제기가 생기면 지급한 보상 중 사용하지 않은 콩을 회수하며, 이미 후원에 쓴 몫은 회수하지 않습니다. 자기 초대, 같은 사람의 여러 계정, 부정 결제 등 정상적인 초대가 아니라고 확인되면 회사는 사유를 기록하고 보상에서 제외하거나 지급한 보상 중 남은 콩을 회수할 수 있으며, 이의가 있으면 고객센터에 자료를 제출할 수 있습니다.\n보상 지급 시점에 초대한 회원의 계정이 이용 정지·탈퇴 상태이면 보상은 소멸합니다. 회사는 친구 초대 기능을 시작하거나 중단할 수 있으며, 중단한 동안에는 새 초대 가입과 새 보상 자격이 생기지 않고 이미 확정 대기 중인 보상은 다시 시작할 때까지 지급이 보류됩니다. 초대 링크로 가입하는 회원은 초대한 회원에게 이메일 일부와 가입·보상 진행 상태가 제공되는 것에 동의해야 합니다(개인정보처리방침 8조).'}]);
 const nextPolicy=revise(catalog.documents.policy,{
  '신고와 이의제기':[['게시물·메시지의 신고 기능과 고객센터 문의로 문제를 알릴 수 있습니다.','게시물·댓글·메시지의 신고 기능과 고객센터 문의로 문제를 알릴 수 있습니다. 권리 침해·불법촬영물·저작권 침해 신고는 대표 박경호(khpark@crefans.com)가 이메일로 접수하며, 신고를 처리하면 신고한 회원에게 앱 알림으로 결과를 알립니다. 크리에이터가 차단한 회원은 그 크리에이터에게 메시지와 새 댓글을 보낼 수 없습니다.'],['초기 베타에서는 일반 콘텐츠만 제공합니다.','오픈베타에서는 일반 콘텐츠만 제공합니다.']],
 });
+// Privacy policy revision (2026-11-02 user decisions): it describes processing already running or switched off, so it takes
+// effect on the notice day instead of waiting 30 days. Same anchored-edit rule as the terms revision.
+const privacyEdits:Record<string,Array<[string,string]>>={
+ '3. 프로필·콘텐츠·소통 정보':[['이용자가 입력하거나 기능을 실행할 때 수집되며 서비스 제공과 콘텐츠 접근 제어에 사용합니다.','이용자가 입력하거나 기능을 실행할 때 수집되며 서비스 제공과 콘텐츠 접근 제어에 사용합니다. 사진은 저장할 때 WebP로 다시 만들며 촬영 위치 등 메타데이터를 남기지 않고, MP4·WebM 동영상은 저장 전에, 아이폰 MOV 동영상은 MP4로 변환할 때 위치정보 등 메타데이터를 제거합니다. 활성 크리에이터의 게시물 사진·동영상에는 프로필 주소(핸들) 표식을 합성한 사본을 만들어 표시합니다.']],
+ '4. 구독·결제·정산 정보':[['본인확인된 예금주명','크리에이터가 입력한 예금주명과 운영자가 통장 사본 등으로 확인한 결과']],
+ '7. 보유기간과 파기':[['문의·신고 기록은 소비자 분쟁 대응을 위해 파기 후 3년간 보존한 뒤 삭제합니다.','문의 기록은 소비자 분쟁 대응을 위해 파기 후 3년간 보존한 뒤 삭제합니다. 신고 기록은 처리를 마친 날부터 3년, 운영자의 숨김·이용 제한 등 제재 이력은 조치가 끝난 날(기간이 정해지지 않은 조치는 조치한 날)부터 3년이 지나면 삭제합니다. 운영자가 초대한 가입 명단(초대 이메일, 메모, 가입한 회원 연결, 초대별 정산 조건)과 친구 초대 기록(초대한·초대받은 회원 식별자, 보상 상태·수량·일시, 운영자 제외·회수 사유)은 정산·보상 조건과 회수·분쟁 대응의 근거로 회원 정보 파기 후 5년간 보관한 뒤 삭제합니다. 탈퇴한 회원이 프로필 주소로 쓰던 핸들과 이전에 바꾼 핸들은 게시물 표식에 남은 주소를 다른 사람이 가져가 사칭하지 못하도록 회원 정보와 연결을 끊은 문자열만 재사용 금지 목록으로 서비스 운영 기간 동안 보관합니다.']],
+ '8. 처리 위탁과 제3자 제공':[['요청·기록·회원·거래 식별자와 처리 결과가 포함될 수 있습니다.','요청·기록·거래 식별자와 처리 결과가 포함될 수 있으며, 회원·크리에이터 식별자는 서버 비밀값으로 만든 해시 값(앞 12자리)으로만 보냅니다.'],
+  ['후원 확인 화면에서 동의를 받으며, 동의하지 않으면 후원할 수 없습니다.','후원 확인 화면에서 동의를 받으며, 동의하지 않으면 후원할 수 없습니다. 친구 초대 링크로 가입하면 초대한 회원에게 이메일 일부(아이디 앞 두 글자와 도메인 첫 글자·최상위 도메인, 예: ab***@n***.com), 가입일과 보상 진행 상태(첫 결제 전·확정 대기·지급·회수 등)·확정 예정일·지급일을 친구 초대 보상 진행 확인을 위해 제공하고, 초대받은 회원이 탈퇴할 때까지 초대한 회원의 초대 내역에 표시합니다(탈퇴 후에는 “탈퇴한 회원”). 가입 화면에서 동의를 받으며, 동의하지 않으면 초대 링크로는 가입할 수 없습니다.']],
+ '9. 국외 이전':[['Telegram Messenger Inc.(연락처는 Telegram 앱 내 문의와 개인정보처리방침 안내에 따름): 운영 오류·보안 알림을 보낼 때마다 접속 IP와 요청·기록·회원·거래 식별자가','Telegram Messenger Inc.(개인정보 문의: Telegram 앱 설정의 질문하기, 유럽 개인정보 대리인 European Data Protection Office(EDPO) 온라인 신청서 https://edpo.com/telegram-gdpr-data-request/ 또는 Avenue Huart Hamoir 71, 1030 Brussels, Belgium): 운영 오류·보안 알림을 보낼 때마다 접속 IP와 요청·기록·거래 식별자, 해시 처리한 회원 식별자가']],
+ '14. 변경과 시행':[['이 문서는 2026년 10월 22일 공개했고, 2026년 10월 30일부터 신규 가입에 적용합니다.','이 문서는 2026년 10월 22일 공개해 2026년 10월 30일부터 적용했고, 2026년 11월 2일 개정해 같은 날부터 적용합니다. 주요 변경: 미디어 메타데이터 제거·표식(3조), 예금주명 확인 방식(4조), 신고·제재 이력 보관기간과 초대 기록·탈퇴 핸들 보관(7조), 친구 초대 정보 제공과 운영 알림 식별자 해시(8조), 텔레그램 연락처(9조).']],
+};
+const privacySections=privacy.sections.map(sec=>{let body=sec.body;for(const [from,to] of privacyEdits[sec.title]||[]){if(!body.includes(from))throw Error(`Privacy revision anchor missing in ${sec.title}`);body=body.replace(from,to);}return{...sec,body};});
+catalog.documents.privacy={...privacy,version:`${LEGAL_NOTICE_DATE}.1`,updatedAt:LEGAL_NOTICE_DATE,publishedAt:LEGAL_NOTICE_DATE,effectiveAt:LEGAL_NOTICE_DATE,notice:'2026년 11월 2일 개정해 같은 날부터 적용합니다. 이전 버전(2026-10-30.3)과 동의 당시 사본은 보존합니다.',sections:privacySections};
 const nextCatalog:LegalCatalog={...catalog,documents:{...catalog.documents,terms:nextTerms,policy:nextPolicy}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
