@@ -30,6 +30,8 @@ before(async()=>{
  Object.assign(process.env,{CREFANS_E2E:'true',MEDIA_EDGE_SECRET:edgeSecret,MEDIA_STORAGE:'s3',MEDIA_ROOT:root,AWS_REGION:resources.region,S3_MEDIA_BUCKET:resources.bucket,TELEGRAM_OPERATIONS_ENABLED:'false',TELEGRAM_OPERATIONS_BOT_TOKEN:'',SMTP_HOST:'',SMTP_USER:'',SMTP_PASS:''});
  // Use the local SDK profile, never copy access keys into test artifacts.
  for(const key of ['AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_SESSION_TOKEN'])delete process.env[key];
+ // No ffprobe/ffmpeg on developer machines (MP4 length check and metadata rewrite, 2026-11-02): the upload keeps the bytes as they are.
+ Object.assign(require('../dist/src/platform/video-transcode').videoTools,{probe:async()=>({seconds:5,side:640}),strip:(input,output)=>fs.copyFile(input,output)});
  app=await NestFactory.create(require('../dist/src/platform/module').PlatformModule,{logger:false});
  app.setGlobalPrefix('api/v1');app.use(require('cookie-parser')());app.useGlobalInterceptors(new EnvelopeInterceptor());app.useGlobalFilters(new PlatformExceptionFilter());await app.listen(3012,'127.0.0.1');
  storage=app.get(PlatformMediaStorage);s3=new S3Client({region:resources.region});

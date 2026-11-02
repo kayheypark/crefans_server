@@ -1,6 +1,7 @@
 import {spawn} from 'child_process';
 import {rename,stat,unlink} from 'fs/promises';
 import {join,resolve} from 'path';
+import {noticeMediaFailed} from './post-notices';
 
 // iPhone videos arrive as QuickTime (.mov), usually HEVC, which many Chrome/Android/Firefox viewers cannot play
 // (user decision 2026-11-01: convert on the server). The upload keeps the original beside the media file and marks
@@ -35,10 +36,10 @@ export function runFfmpeg(args:string[],timeoutMs=TRANSCODE_TIMEOUT_MS,binary=pr
  });
 }
 
-/** Reads duration and the largest side of an uploaded QuickTime file; refuses what the worker should not convert. */
-export function probeVideo(path:string,binary=process.env.FFPROBE_PATH||'ffprobe'){
+/** Reads duration and the largest side of an uploaded video; refuses what the worker should not convert. */
+export function probeVideo(path:string,format:'mov'|'matroska'='mov',binary=process.env.FFPROBE_PATH||'ffprobe'){
  return new Promise<{seconds:number;side:number}>((done,fail)=>{
-  const child=spawn(binary,['-v','error','-f','mov','-protocol_whitelist','file','-show_entries','format=duration:stream=width,height','-of','json',path],{stdio:['ignore','pipe','ignore']});let out='';
+  const child=spawn(binary,['-v','error','-f',format,'-protocol_whitelist','file','-show_entries','format=duration:stream=width,height','-of','json',path],{stdio:['ignore','pipe','ignore']});let out='';
   const timer=setTimeout(()=>child.kill('SIGKILL'),20000);
   child.stdout.on('data',chunk=>{if(out.length<20000)out+=String(chunk);});
   child.on('error',reason=>{clearTimeout(timer);fail(reason);});
@@ -46,8 +47,16 @@ export function probeVideo(path:string,binary=process.env.FFPROBE_PATH||'ffprobe
  });
 }
 
-/** Swappable in tests (no ffprobe on developer machines). */
-export const videoTools={probe:probeVideo};
+/** MP4/WebM uploads keep their streams but lose container and stream metadata such as location (2026-11-02 user decision). */
+export function stripMetadataArgs(input:string,output:string,mime:string){
+ const format=mime==='video/webm'?'matroska':'mov';
+ return['-nostdin','-hide_banner','-loglevel','error','-y','-f',format,'-protocol_whitelist','file','-i',input,'-map','0:v:0','-map','0:a:0?','-map_metadata','-1','-map_metadata:s','-1','-map_chapters','-1','-c','copy',
+  ...(mime==='video/webm'?['-f','webm']:['-movflags','+faststart','-f','mp4']),output];
+}
+export const stripVideoMetadata=(input:string,output:string,mime:string)=>runFfmpeg(stripMetadataArgs(input,output,mime),120000);
+
+/** Swappable in tests (no ffprobe/ffmpeg on developer machines). */
+export const videoTools={probe:probeVideo,strip:stripVideoMetadata};
 
 type Storage={enabled:boolean;put(id:string,path:string,mime:string,size:number):Promise<void>};
 /**
@@ -63,7 +72,7 @@ export async function transcodeNextVideo(db:any,storage:Storage,root=resolve(pro
  const source=sourcePath(root,row.id),output=join(root,`${row.id}.mp4.tmp`);
  const finish=async()=>{await unlink(output).catch(()=>{});await unlink(source).catch(()=>{});};
  // A claim that keeps dying (worker killed mid-conversion) is given up after the attempt limit.
- if(attempt>MAX_TRANSCODE_ATTEMPTS){await db.media.update({where:{id:row.id},data:{processing_status:'FAILED'}});await finish();return 1;}
+ if(attempt>MAX_TRANSCODE_ATTEMPTS){await db.media.update({where:{id:row.id},data:{processing_status:'FAILED'}});await finish();await noticeMediaFailed(db,row.id).catch(()=>{});return 1;}
  try{
   await ffmpeg(transcodeArgs(source,output));
   const size=(await stat(output)).size;
@@ -74,7 +83,7 @@ export async function transcodeNextVideo(db:any,storage:Storage,root=resolve(pro
  }catch(error){
   await unlink(output).catch(()=>{});
   // The file itself cannot be converted, or attempts are used up: FAILED and the original (with location metadata) is removed.
-  if(error instanceof TranscodeInputError||attempt>=MAX_TRANSCODE_ATTEMPTS){await db.media.update({where:{id:row.id},data:{processing_status:'FAILED'}});await unlink(source).catch(()=>{});}
+  if(error instanceof TranscodeInputError||attempt>=MAX_TRANSCODE_ATTEMPTS){await db.media.update({where:{id:row.id},data:{processing_status:'FAILED'}});await unlink(source).catch(()=>{});await noticeMediaFailed(db,row.id).catch(()=>{});}
   // Storage or database trouble: keep the original and retry in about two minutes.
   else await db.media.update({where:{id:row.id},data:{processed_at:new Date(now.getTime()-STALE_MS+RETRY_AFTER_MS)}}).catch(()=>{});
   throw error;
