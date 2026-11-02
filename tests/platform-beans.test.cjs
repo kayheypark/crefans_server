@@ -432,3 +432,22 @@ test('a bean payment window needs the current payment terms and records the cons
  await assert.rejects(beans.paymentWindow(fan,o.id,null),code('PAYMENT_TERMS_REQUIRED'));await beans.paymentWindow(fan,o.id,'2026-11-02.1');
  const saved=await db.memberConsent.findMany({where:{member_id:fan,kind:'payment-terms'},orderBy:{accepted_at:'desc'}});assert.equal(saved.length,before+1);assert.equal(saved[0].document_snapshot.chargeId,o.id);assert.equal(saved[0].document_snapshot.amount,o.amount);
 });
+
+test('operator promotion grants and payout processing are SUPER_ADMIN only; 10,000 beans per grant and per KST day, invite rewards not counted',async()=>{
+ // 2026-11-02 user decision. Usage is shared by every test run of the day, so the day is filled with synthetic rows (no ledger) and they are removed after.
+ const operator={...admin,role:'ADMIN',permissions:{beans:{view:true,create:true,update:true}}},input=q=>({memberId:fan,quantity:q,requestId:randomUUID(),reason:'한도 검증'});
+ await assert.rejects(beans.grant(operator,input(1)),code('SUPER_ADMIN_REQUIRED'));
+ await assert.rejects(beans.payout(randomUUID(),operator),code('SUPER_ADMIN_REQUIRED'));
+ await assert.rejects(beans.manualResult(operator,randomUUID(),{result:'paid',reference:'X'}),code('SUPER_ADMIN_REQUIRED'));
+ await assert.rejects(beans.grant(admin,input(10001)),code('PROMOTION_GRANT_TOO_LARGE'));
+ const synthetic=[];
+ try{
+  const {used,limit}=(await beans.adminData(admin)).promotionToday;assert.equal(limit,10000);
+  synthetic.push((await db.beanPromotion.create({data:{request_key:randomUUID(),member_id:fan,quantity:limit-used-3,reason:'synthetic usage',actor_id:adminId}})).id);
+  synthetic.push((await db.beanPromotion.create({data:{request_key:randomUUID(),member_id:fan,quantity:50000,reason:'synthetic invite reward',actor_id:'system:referral'}})).id);
+  assert.deepEqual((await beans.adminData(admin)).promotionToday,{used:limit-3,limit});
+  await assert.rejects(beans.grant(admin,input(4)),e=>e.getResponse?.().code==='PROMOTION_DAILY_LIMIT'&&/3콩/.test(e.getResponse().message));
+  const last=input(3);await beans.grant(admin,last);await beans.grant(admin,last);
+  await assert.rejects(beans.grant(admin,input(1)),code('PROMOTION_DAILY_LIMIT'));
+ }finally{await db.beanPromotion.deleteMany({where:{id:{in:synthetic}}});}
+});
