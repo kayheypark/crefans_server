@@ -227,3 +227,17 @@ test('a new order needs consent to show the subscriber to the creator, and keeps
  const consent=await db.memberConsent.findFirstOrThrow({where:{member_id:f.fan,kind:'creator-provision',document_snapshot:{path:'$.orderId',equals:order.id}}});
  assert.equal(consent.document_id,'code:creator-provision:2026-10-30.1');assert.equal(consent.document_snapshot.creatorId,f.creator);assert.match(consent.document_snapshot.items,/닉네임/);
 });
+// 2026-11-02 user decisions: card-only approvals and a fresh idempotency key after a refused refund.
+test('a one-time approval paid by a non-card method is held unconfirmed; a card in an easy-pay wallet is accepted',async()=>{
+ const f=await fixture();const w=await f.finance.paymentWindow(f.fan,f.order.id);f.provider.confirm=async(key,o)=>({status:'DONE',method:'가상계좌',orderId:w.orderId,totalAmount:o.amount,paymentKey:key});
+ await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{orderId:w.orderId,amount:w.amount,paymentKey:'window-va-'+f.order.id}),code('PAYMENT_UNCERTAIN'));
+ assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'processing','held for the stuck-payment watchdog, not paid');
+ const g=await fixture();const v=await g.finance.paymentWindow(g.fan,g.order.id);g.provider.confirm=async(key,o)=>({status:'DONE',method:'간편결제',orderId:v.orderId,totalAmount:o.amount,paymentKey:key});
+ await g.finance.confirmPayment(g.fan,g.order.id,{orderId:v.orderId,amount:v.amount,paymentKey:'window-easy-'+g.order.id});assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:g.order.id}})).status,'paid');
+});
+test('a refused membership refund is retried under a new idempotency key instead of replaying the refusal',async()=>{
+ const f=await fixture();await f.finance.pay(f.fan,f.order.id);const keys=[],original=f.provider.cancel;
+ f.provider.cancel=async(paymentKey,reason,key)=>{keys.push(key);if(keys.length===1)reject(400,'PAYMENT_FAILED','환불이 거절되었습니다.');return original(paymentKey,reason,key);};
+ await assert.rejects(f.finance.refund(f.fan,f.order.id),code('PAYMENT_FAILED'));assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'paid');
+ await f.finance.refund(f.fan,f.order.id);assert.deepEqual(keys,[`refund-${f.order.id}`,`refund-${f.order.id}_r1`]);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'refunded');
+});

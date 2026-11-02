@@ -417,3 +417,13 @@ test('completed reconciliation still requires exact amount and creates one credi
  assert.equal(await db.beanMovement.count({where:{request_key:'charge-paid:'+o.id}}),1);assert.equal(await db.beanMovement.count({where:{request_key:'charge-release:'+o.id}}),0);
  assert.equal(await db.beanLot.count({where:{charge_id:o.id}}),1);
 });
+// 2026-11-02 user decisions: the bean window gets the random billing customer key (Toss: customerKey must not be guessable), and only card approvals mint beans.
+test('the bean payment window uses the random customer key; a non-card approval is held, an easy-pay card is accepted',async()=>{
+ const o=await beans.createCharge(fan,{quantity:10,requestId:randomUUID()});const w=await beans.paymentWindow(fan,o.id);
+ assert.notEqual(w.customerKey,fan);assert.equal(w.customerKey,(await db.billingCustomer.findUniqueOrThrow({where:{member_id:fan}})).customer_key);
+ const original=provider.confirm,approve=method=>async(key,x)=>{const r={status:'DONE',method,currency:'KRW',totalAmount:x.amount,balanceAmount:x.amount,paymentKey:key,orderId:x.id,approvedAt:new Date(Date.now()-60000).toISOString()};pg.set(x.id,r);return r;};
+ try{
+  provider.confirm=approve('가상계좌');await assert.rejects(beans.confirm(fan,o.id,{paymentKey:'synthetic-'+o.id,orderId:o.id,amount:o.amount}),code('PAYMENT_UNCERTAIN'));assert.notEqual((await db.beanCharge.findUniqueOrThrow({where:{id:o.id}})).status,'paid');pg.delete(o.id);
+  const easy=await beans.createCharge(fan,{quantity:10,requestId:randomUUID()});provider.confirm=approve('간편결제');await beans.confirm(fan,easy.id,{paymentKey:'synthetic-'+easy.id,orderId:easy.id,amount:easy.amount});assert.equal((await db.beanCharge.findUniqueOrThrow({where:{id:easy.id}})).status,'paid');
+ }finally{provider.confirm=original;}
+});

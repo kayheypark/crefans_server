@@ -12,7 +12,7 @@ import {paymentPolicy} from './financial-policy';
 import {studioTerms,withdrawalTerms} from './signup-invites';
 import {billingCard} from './billing-card';
 import {PlatformService} from './service';
-import {PaymentProvider,providerOrderId} from './payment-provider';
+import {PaymentProvider,providerOrderId,acceptedPaymentMethod} from './payment-provider';
 import {BankProvider} from './bank-provider';
 import {digest} from '../auth/local/credentials';
 import {hashPassword,verifyPassword} from '../auth/local/credentials';
@@ -111,7 +111,7 @@ export class PlatformFinanceService {
    }
    if(response&&['ABORTED','EXPIRED'].includes(response.status)&&response.totalAmount===order.amount&&response.orderId===providerOrderId(order))reject(400,'PAYMENT_FAILED','결제가 승인되지 않았습니다.');
    if((order.snapshot as any).paymentMode==='one-time'&&response?.paymentKey!==order.payment_key)reject(503,'PAYMENT_UNCERTAIN','결제 식별자 확인이 필요합니다.');
-   if(response?.status!=='DONE'||response.totalAmount!==order.amount||response.orderId!==providerOrderId(order)||!response.paymentKey)reject(503,'PAYMENT_UNCERTAIN','결제 응답 확인이 필요합니다.');
+   if(response?.status!=='DONE'||response.totalAmount!==order.amount||response.orderId!==providerOrderId(order)||!response.paymentKey||!acceptedPaymentMethod(response))reject(503,'PAYMENT_UNCERTAIN','결제 응답 확인이 필요합니다.');
    await this.finalize(order.id,response.paymentKey);return{message:'가입이 완료되었습니다.',order:await this.order(member,id)};
   }catch(error:any){
    if(paymentFailureCodes.has(error.getResponse?.()?.code))await this.recordPaymentFailure(order,error.getResponse().code,error.providerCode);
@@ -194,8 +194,10 @@ export class PlatformFinanceService {
    let result=await this.provider.lookup(providerOrderId(o));
    if(!result||!['DONE','CANCELED'].includes(result.status)||result.orderId!==providerOrderId(o)||result.paymentKey!==o.payment_key||result.totalAmount!==o.amount)reject(503,'REFUND_UNCERTAIN','환불할 결제 확인이 필요합니다.');
    if(result.status==='DONE'){
-    try{result=await this.provider.cancel(o.payment_key,'사용자 환불 요청',`refund-${id}`);}catch(error:any){
-     if(error.getResponse?.().code==='PAYMENT_FAILED')await this.db.checkoutOrder.updateMany({where:{id,status:'refunding'},data:{status:'paid',locked_until:null}});
+    // 2026-11-02 user decision: a refused refund is retried under a new idempotency key; reusing the old one could replay the refusal for 15 days.
+    const refundAttempt=Number((o.snapshot as any).refundAttempt)||0;
+    try{result=await this.provider.cancel(o.payment_key,'사용자 환불 요청',`refund-${id}${refundAttempt?`_r${refundAttempt}`:''}`);}catch(error:any){
+     if(error.getResponse?.().code==='PAYMENT_FAILED')await this.db.checkoutOrder.updateMany({where:{id,status:'refunding'},data:{status:'paid',locked_until:null,snapshot:{...(o.snapshot as any),refundAttempt:refundAttempt+1}}});
      throw error;
     }
    }
