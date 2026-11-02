@@ -11,9 +11,9 @@ export class PlatformFinanceController {
  @Post('checkout') checkout(@Body() b:any,@Req() r:any){return this.finance.createOrder(r.user.sub,b);}
  @Get('checkout/:id') order(@Param('id') id:string,@Req() r:any){return this.finance.order(r.user.sub,id);}
  @Post('checkout/:id/retry') retry(@Param('id') id:string,@Req() r:any){return this.finance.retryPayment(r.user.sub,id);}
- @Post('checkout/:id/payment-window') window(@Param('id') id:string,@Req() r:any){return this.finance.paymentWindow(r.user.sub,id);}
+ @Post('checkout/:id/payment-window') window(@Param('id') id:string,@Body() b:any,@Req() r:any){return this.finance.paymentWindow(r.user.sub,id,b?.paymentTerms??null);}
  @Post('checkout/:id/confirm') confirm(@Param('id') id:string,@Body() b:any,@Req() r:any){return this.finance.confirmPayment(r.user.sub,id,b);}
- @Post('checkout/:id/pay') pay(@Param('id') id:string,@Body('methodId') method:string,@Req() r:any){return this.finance.pay(r.user.sub,id,method);}
+ @Post('checkout/:id/pay') pay(@Param('id') id:string,@Body('methodId') method:string,@Body('paymentTerms') terms:unknown,@Req() r:any){return this.finance.pay(r.user.sub,id,method,undefined,terms??null);}
  @Post('subscriptions/:creator/cancel') cancel(@Param('creator') id:string,@Req() r:any){return this.finance.cancelSubscription(r.user.sub,id);}
  @Get('checkout/:id/refund-eligibility') refundEligibility(@Param('id') id:string,@Req() r:any){return this.finance.refundEligibility(r.user.sub,id);}
  @Post('checkout/:id/refund') refund(@Param('id') id:string,@Req() r:any){return this.finance.refund(r.user.sub,id);}

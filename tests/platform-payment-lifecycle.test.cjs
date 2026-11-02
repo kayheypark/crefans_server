@@ -146,11 +146,20 @@ test('one-time checkout rejects foreign orders and tampered amounts, grants one 
  await assert.rejects(f.finance.confirmPayment(f.creator,f.order.id,input),code('ORDER_NOT_FOUND'));
  await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{...input,amount:1}),code('PAYMENT_MISMATCH'));
  await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{...input,orderId:'forged'}),code('PAYMENT_MISMATCH'));
- await assert.rejects(f.finance.pay(f.fan,f.order.id),code('PAYMENT_AUTH_REQUIRED'));
  await f.finance.confirmPayment(f.fan,f.order.id,input);await f.finance.confirmPayment(f.fan,f.order.id,input);
  assert.equal(confirmations,1);const sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});assert.equal(sub.auto_renew,false);assert.equal(sub.next_billing_date,null);assert.equal(sub.billing_method_id,null);assert.equal(await db.revenueEntry.count({where:{order_id:f.order.id}}),1);
  await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{...input,paymentKey:'other'}),code('PAYMENT_MISMATCH'));
  await f.finance.refund(f.fan,f.order.id);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'refunded');
+});
+// 2026-11-02 user decision: closing the one-time window must not lock the order out of the monthly card payment.
+test('a closed one-time window returns the order to the monthly card payment under a new order id; a late window approval is refused',async()=>{
+ const f=await fixture();const prepared=await f.finance.paymentWindow(f.fan,f.order.id);let confirmations=0;f.provider.confirm=async()=>{confirmations++;throw new Error('must not approve');};
+ const paid=await f.finance.pay(f.fan,f.order.id);assert.equal(paid.order.status,'paid');assert.notEqual(paid.order.snapshot.paymentMode,'one-time');
+ assert.equal(f.calls.length,1);assert.equal(f.calls[0].order.attempts,1,'the card charge uses a new provider order id');assert.notEqual(f.calls[0].order.id+'_'+f.calls[0].order.attempts,prepared.orderId);
+ const sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});assert.equal(sub.auto_renew,true);assert.ok(sub.next_billing_date);
+ await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{orderId:prepared.orderId,amount:prepared.amount,paymentKey:'late-window-'+f.order.id}),code('PAYMENT_MISMATCH'));assert.equal(confirmations,0);
+ const other=await fixture();await other.finance.paymentWindow(other.fan,other.order.id);await db.billingMethod.update({where:{id:other.card.id},data:{deleted_at:new Date(),is_default:false}});
+ await assert.rejects(other.finance.pay(other.fan,other.order.id),code('PAYMENT_METHOD_REQUIRED'));assert.equal(other.calls.length,0);
 });
 test('one-time approval lost response recovers by lookup without charging a billing card',async()=>{
  const f=await fixture();await f.finance.paymentWindow(f.fan,f.order.id);let calls=0;f.provider.confirm=async(key,o)=>{calls++;f.approved.set(o.id,{status:'DONE',orderId:o.id,totalAmount:o.amount,paymentKey:key});reject(503,'PAYMENT_UNCERTAIN','lost');};
@@ -217,4 +226,27 @@ test('a new order needs consent to show the subscriber to the creator, and keeps
  const order=await f.finance.createOrder(f.fan,{planId:f.plan.id,requestId:randomUUID(),creatorProvision:'2026-10-30.1'});
  const consent=await db.memberConsent.findFirstOrThrow({where:{member_id:f.fan,kind:'creator-provision',document_snapshot:{path:'$.orderId',equals:order.id}}});
  assert.equal(consent.document_id,'code:creator-provision:2026-10-30.1');assert.equal(consent.document_snapshot.creatorId,f.creator);assert.match(consent.document_snapshot.items,/닉네임/);
+});
+// 2026-11-02 user decisions: card-only approvals and a fresh idempotency key after a refused refund.
+test('a one-time approval paid by a non-card method is held unconfirmed; a card in an easy-pay wallet is accepted',async()=>{
+ const f=await fixture();const w=await f.finance.paymentWindow(f.fan,f.order.id);f.provider.confirm=async(key,o)=>({status:'DONE',method:'가상계좌',orderId:w.orderId,totalAmount:o.amount,paymentKey:key});
+ await assert.rejects(f.finance.confirmPayment(f.fan,f.order.id,{orderId:w.orderId,amount:w.amount,paymentKey:'window-va-'+f.order.id}),code('PAYMENT_UNCERTAIN'));
+ assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'processing','held for the stuck-payment watchdog, not paid');
+ const g=await fixture();const v=await g.finance.paymentWindow(g.fan,g.order.id);g.provider.confirm=async(key,o)=>({status:'DONE',method:'간편결제',orderId:v.orderId,totalAmount:o.amount,paymentKey:key});
+ await g.finance.confirmPayment(g.fan,g.order.id,{orderId:v.orderId,amount:v.amount,paymentKey:'window-easy-'+g.order.id});assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:g.order.id}})).status,'paid');
+});
+test('a refused membership refund is retried under a new idempotency key instead of replaying the refusal',async()=>{
+ const f=await fixture();await f.finance.pay(f.fan,f.order.id);const keys=[],original=f.provider.cancel;
+ f.provider.cancel=async(paymentKey,reason,key)=>{keys.push(key);if(keys.length===1)reject(400,'PAYMENT_FAILED','환불이 거절되었습니다.');return original(paymentKey,reason,key);};
+ await assert.rejects(f.finance.refund(f.fan,f.order.id),code('PAYMENT_FAILED'));assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'paid');
+ await f.finance.refund(f.fan,f.order.id);assert.deepEqual(keys,[`refund-${f.order.id}`,`refund-${f.order.id}_r1`]);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'refunded');
+});
+// 2026-11-02 user decision: paying needs the agreement shown right before the payment button; it is kept in member_consents.
+test('a payment request without the current payment terms is refused; an agreed request records the consent',async()=>{
+ const f=await fixture();const consents=()=>db.memberConsent.findMany({where:{member_id:f.fan,kind:'payment-terms'}});
+ await assert.rejects(f.finance.pay(f.fan,f.order.id,undefined,undefined,null),code('PAYMENT_TERMS_REQUIRED'));await assert.rejects(f.finance.pay(f.fan,f.order.id,undefined,undefined,'2026-01-01.1'),code('PAYMENT_TERMS_REQUIRED'));
+ assert.equal(f.calls.length,0);assert.equal((await consents()).length,0);
+ await f.finance.pay(f.fan,f.order.id,undefined,undefined,'2026-11-02.1');const saved=await consents();assert.equal(saved.length,1);assert.equal(saved[0].document_id,'code:payment-terms:2026-11-02.1');assert.deepEqual([saved[0].document_snapshot.orderId,saved[0].document_snapshot.amount,saved[0].document_snapshot.paymentMode],[f.order.id,f.order.amount,'subscription']);
+ const g=await fixture();await assert.rejects(g.finance.paymentWindow(g.fan,g.order.id,null),code('PAYMENT_TERMS_REQUIRED'));await g.finance.paymentWindow(g.fan,g.order.id,'2026-11-02.1');
+ assert.equal((await db.memberConsent.findFirstOrThrow({where:{member_id:g.fan,kind:'payment-terms'}})).document_snapshot.paymentMode,'one-time');
 });

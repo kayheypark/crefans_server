@@ -8,6 +8,10 @@ import axios from 'axios';
 import {createCipheriv,createDecipheriv,randomBytes,randomUUID} from 'crypto';
 import {reject} from './http';
 export const providerOrderId=(order:any)=>order.attempts?`${order.id}_${order.attempts}`:order.id;
+// 2026-11-02 user decision: only card payments are accepted. Toss reports a card paid through an easy-pay wallet as '간편결제'
+// (docs.tosspayments.com/guides/v2/easypay-response, checked 2026-11-02); any other method (virtual account, phone, transfer...) is held
+// as unconfirmed so the stuck-payment watchdog alerts an operator. Toss always returns method; test fixtures that omit it model card payments.
+export const acceptedPaymentMethod=(response:any)=>response?.method==null||['카드','간편결제'].includes(response.method);
 @Injectable()
 export class PaymentProvider {
  constructor(private config:ConfigService,@Optional() private db?:PrismaService){}
@@ -29,5 +33,5 @@ export class PaymentProvider {
  revoke(billingKey:string,key:string){return this.request(`/billing/${encodeURIComponent(billingKey)}`,undefined,key,'DELETE',{operation:'billing.revoke',entityId:key});}
  lookup(orderId:string){return this.request(`/payments/orders/${encodeURIComponent(orderId)}`,undefined,orderId,'GET',{operation:'payment.lookup',entityId:orderId.replace(/_\d+$/,'')});}
  // cancelAmount makes a partial cancel (Toss v1 POST /payments/{paymentKey}/cancel, docs.tosspayments.com/guides/v2/cancel-payment, checked 2026-10-30).
- cancel(paymentKey:string,reason:string,key:string,cancelAmount?:number){return this.request(`/payments/${encodeURIComponent(paymentKey)}/cancel`,cancelAmount===undefined?{cancelReason:reason}:{cancelReason:reason,cancelAmount},key,'POST',{operation:'payment.refund',entityId:key.replace(/^(bean-)?refund-/,''),...(cancelAmount===undefined?{}:{amount:cancelAmount})});}
+ cancel(paymentKey:string,reason:string,key:string,cancelAmount?:number){return this.request(`/payments/${encodeURIComponent(paymentKey)}/cancel`,cancelAmount===undefined?{cancelReason:reason}:{cancelReason:reason,cancelAmount},key,'POST',{operation:'payment.refund',entityId:key.replace(/^(bean-)?refund-/,'').replace(/_r\d+$/,''),...(cancelAmount===undefined?{}:{amount:cancelAmount})});}
 }
