@@ -1,12 +1,13 @@
 import {randomUUID} from 'crypto';
 import {createWriteStream} from 'fs';
 import {Transform} from 'stream';
-import {mkdir,mkdtemp,copyFile,stat,rename,rm} from 'fs/promises';
+import {mkdir,mkdtemp,copyFile,stat,rename,rm,readdir} from 'fs/promises';
 import {join,resolve} from 'path';
 import {pipeline} from 'stream/promises';
 import {watermarkImage,watermarkVideo,watermarkText,WATERMARK_VERSION} from './media-watermark-render';
 import {managedMediaKey,PlatformMediaStorage} from './media-storage';
 import {reject} from './http';
+import {noticeMediaFailed} from './post-notices';
 
 export const WATERMARK_PENDING='watermark:v1';
 const LEASE_MS=25*60000,MAX_ATTEMPTS=3;
@@ -26,6 +27,15 @@ export async function ensureWatermarkedMedia(tx:any,sourceId:string,creatorId:st
  await tx.media.create({data:{id,user_sub:creatorId,type:source.type,original_name:source.original_name,file_name:id,file_size:0,mime_type:source.type==='IMAGE'?'image/webp':'video/mp4',original_url:`/api/v1/media/${id}/file`,s3_upload_key:`${remote?'platform':'local'}/${id}`,processing_status:'PROCESSING',processing_job_id:WATERMARK_PENDING,metadata:{watermark:{version:WATERMARK_VERSION,handle,sourceId}}}});
  await tx.mediaWatermarkJob.create({data:{source_id:sourceId,target_id:id,creator_id:creatorId,handle,version:WATERMARK_VERSION}});
  return id;
+}
+/** Worker start (2026-11-02 user decision): a killed worker (memory limit, deploy) leaves job folders and partial MP4s behind
+ * on the disk shared with the database. Only leftovers older than a lease are removed, so a running job is never touched. */
+export async function cleanMediaTemp(root=resolve(process.env.MEDIA_ROOT||'.local/media'),now=new Date()){
+ let removed=0;const old=async(path:string)=>{try{return +now-+(await stat(path)).mtime>LEASE_MS;}catch{return false;}};
+ const jobs=join(root,'.watermark');
+ for(const name of await readdir(jobs).catch(()=>[] as string[]))if(/^job-/.test(name)&&await old(join(jobs,name))){await rm(join(jobs,name),{recursive:true,force:true});removed++;}
+ for(const name of await readdir(root).catch(()=>[] as string[]))if(/\.mp4\.tmp$/.test(name)&&await old(join(root,name))){await rm(join(root,name),{force:true});removed++;}
+ return removed;
 }
 /** Single bounded conversion, separate from billing ticks; only a finished derivative becomes readable. */
 export async function watermarkNextMedia(db:any,storage:PlatformMediaStorage,root=resolve(process.env.MEDIA_ROOT||'.local/media'),render={image:watermarkImage,video:watermarkVideo},now=new Date()){
@@ -59,6 +69,7 @@ export async function watermarkNextMedia(db:any,storage:PlatformMediaStorage,roo
  }catch(error){
   const failed=attempts>=MAX_ATTEMPTS;
   await db.$transaction(async(tx:any)=>{await tx.mediaWatermarkJob.update({where:{id:job.id},data:{status:failed?'failed':'pending',locked_until:null,next_attempt_at:new Date(now.getTime()+120000),error_code:'WATERMARK_CONVERSION_FAILED'}});if(failed&&target&&!target.is_deleted)await tx.media.update({where:{id:target.id},data:{processing_status:'FAILED'}});});
+  if(failed&&target&&!target.is_deleted)await noticeMediaFailed(db,target.id).catch(()=>{});
   // No original bytes/handles/provider response in operations logs.
   throw new Error('WATERMARK_CONVERSION_FAILED');
  }finally{if(directory)await rm(directory,{recursive:true,force:true});}
