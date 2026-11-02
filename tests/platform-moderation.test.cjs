@@ -62,7 +62,8 @@ test('withdrawal waits 30 days, then posts are deleted, personal data is erased 
  await db.posting.update({where:{id:postId},data:{hidden_at:null}});
  const id=randomUUID(),email=`leaving-${tag}@moderation.test.invalid`;
  await db.member.create({data:{id,email,password_hash:await hashPassword(password),nickname:'떠나는 크리에이터',name:'실명',preferred_username:'leave'+tag,phone_number:'01000000000',picture:'/p.png',email_verified:true,status:'CONFIRMED'}});
- await db.creator.create({data:{user_id:id,display_name:'떠나는 크리에이터',handle:'leave'+tag,bio:'소개'}});
+ await db.creator.create({data:{user_id:id,display_name:'떠나는 크리에이터',handle:'leave'+tag}});
+ await db.userProfile.create({data:{user_id:id,bio:'소개'}});
  const post=await db.posting.create({data:{user_sub:id,title:'남길 글',content:'본문',status:'PUBLISHED',is_public:true}});
  const comment=await db.comment.create({data:{posting_id:postId,author_id:id,content:'남긴 댓글'}});
  await db.billingMethod.create({data:{member_id:id,billing_key_encrypted:'x',label:'카드',last_four:'1234'}});
@@ -75,7 +76,7 @@ test('withdrawal waits 30 days, then posts are deleted, personal data is erased 
  row=await db.member.findUnique({where:{id}});
  assert.deepEqual([row.email,row.name,row.nickname,row.phone_number,row.picture,row.password_hash,row.identity_hash],[`withdrawn-${id}@deleted.invalid`,'','탈퇴한 사용자','',null,null,null]);assert.ok(row.purged_at);
  assert.equal((await db.posting.findUnique({where:{id:post.id}})).is_deleted,true);
- const c=await db.creator.findUnique({where:{user_id:id}});assert.deepEqual([c.display_name,c.handle,c.bio],['탈퇴한 사용자',null,null]);
+ const c=await db.creator.findUnique({where:{user_id:id}});assert.deepEqual([c.display_name,c.handle],['탈퇴한 사용자',null]);assert.equal(await db.userProfile.findUnique({where:{user_id:id}}),null);
  assert.equal((await db.comment.findUnique({where:{id:comment.id}})).content,'남긴 댓글','comments stay, anonymized at display');
  await session('fan',ids.fan);const listed=await api(`/posts/${postId}/comments`,'fan');assert.ok(JSON.stringify(listed.data).includes('탈퇴한 사용자'));assert.equal(JSON.stringify(listed.data).includes('떠나는 크리에이터'),false);
  assert.equal(await purgeWithdrawnMembers(db),0,'purge runs once');

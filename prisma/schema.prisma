@@ -189,7 +189,6 @@ model Creator {
   category_id String?
   display_name String?
   handle String? @unique
-  bio String? @db.Text
   about String? @db.Text
   links Json?
   avatar String? @db.Text
