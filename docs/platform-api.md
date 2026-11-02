@@ -98,6 +98,10 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 
 피드·탐색·댓글은 서버 페이지 조회를 사용한다. bootstrap의 최초 공개 크리에이터/게시물 목록은 제한된 초기 데이터이며, 직접 프로필·저장/좋아요·구독/팔로우·메시지 관계는 추가 조회한다. 다른 회원의 이메일·실명·CI·계좌 번호는 공개 DTO에 포함하지 않는다. 탈퇴한 댓글 작성자는 익명 표시한다.
 
+프로필 상단의 짧은 소개(`bio`, 최대 120자)는 `user_profiles.bio` 하나를 사용한다. 회원 프로필 수정과 스튜디오 프로필 수정 모두 같은 값을 저장하고 bootstrap·공개 프로필·검색·스튜디오 조회에 반영한다. 스튜디오에서 `bio`를 생략하면 유지하고 빈 문자열이면 지운다. `creators.about`(최대 1,000자)는 소개 탭의 별도 상세 소개이며, 생략 시 유지한다.
+
+2026-11-03 이전 migration은 현재 공개되던 크리에이터의 비어 있지 않은 짧은 소개를 우선 보존하고, 없으면 기존 회원 소개를 유지한 뒤 `creators.bio`를 제거한다. 상세 소개·배경 사진·원래 프로필 생성 시각은 보존한다. **운영 미적용**: DB 백업 후 이전 API/worker를 중지하고 migration과 새 API/worker를 함께 반영해야 한다. 이전 이미지만 재실행하는 롤백은 불가하며 구형 컬럼 복원과 데이터 복구 절차가 필요하다. Prisma 6.9 기준 [공식 custom migration 안내](https://www.prisma.io/docs/orm/v6/prisma-migrate/workflows/customizing-migrations)를 확인(2026-11-03)하여 데이터 복사 후 컬럼 삭제 순서를 적용했다. 검증은 `tests/platform-shared-bio.test.cjs`의 로컬 격리 DB/HTTP 검사이며 실제 운영 이전 검증과 구분한다.
+
 ## 크리에이터 스튜디오
 
 | Method | 경로 | 동작 |
@@ -444,7 +448,7 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 ## 운영자·메뉴 권한 (2026-10-28)
 
 - 모든 `/admin/*` 경로는 `@Permit`로 메뉴·동작을 선언하고 `PlatformAdminGuard`가 매 요청 확인한다. 선언 없는 경로는 기본 거부(OWASP Authorization Cheat Sheet: deny by default, 모든 요청 검증, 최소 권한; 2026-10-28 확인).
-- 메뉴와 실제 존재하는 동작만 부여할 수 있다: 대시보드(조회), 회원·크리에이터(조회·수정), 콘텐츠·신고(조회·생성·수정), 매출·정산(조회·생성=입금 대사), 콩 후원·출금(조회·생성=프로모션 지급·입금 대사, 수정=출금 승인·반려), 고객지원(조회·생성·수정), 운영 설정(조회·수정), 운영 로그(조회). 현재 삭제 동작이 있는 메뉴는 없다. 다른 동작은 조회 권한이 있어야 줄 수 있다.
+- 메뉴와 실제 존재하는 동작만 부여할 수 있다: 대시보드(조회), 회원·크리에이터(조회·수정), 콘텐츠·신고(조회·생성·수정), 매출·정산(조회·생성=입금 대사), 콩 후원·출금(조회·생성=프로모션 지급·입금 대사, 수정=출금 승인·반려), 고객지원(조회·생성·수정), 운영 설정(조회·수정), 운영 로그(조회). 현재 광고상품·초대 회원·예약 핸들 메뉴에는 삭제 동작도 제공한다(2026-11-03 현행화). 다른 동작은 조회 권한이 있어야 줄 수 있다.
 - SUPER_ADMIN은 전체 권한. 운영자·권한 관리와 광고 메일 등록은 SUPER_ADMIN 전용이며 위임하지 않는다(권한 상승 방지). 사용자 결정(2026-10-28): 금융 실행(출금 승인·지급·정책 변경)도 권한표로 위임 허용.
 - `admins.permissions`가 null인 기존 ADMIN/MODERATOR는 이전 역할 범위를 그대로 쓴다. 신규 부운영자는 role=ADMIN + permissions JSON.
 - 임시 비밀번호(`must_change_password`) 상태에서는 me·me/profile 조회·me/password 외 모든 관리자 경로가 403 PASSWORD_CHANGE_REQUIRED.
@@ -510,3 +514,24 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 전체 활성·미탈퇴·미정지·이메일 인증 회원이 계정당1회 수령한다. 명단과16명 상한을 제거했으며 조회나 가입만으로 지급하지 않는다. 회원 행 잠금과 ReadCommitted 트랜잭션 안에서 재검사·기록·감사를 원자적으로 처리한다. 이전 migration의 campaign 잠금용 행은 이력으로 보존하되 더 이상 사용하지 않는다. 콩 재고·금융 원장과 독립적이며 배지에는30일 만료가 없다.
 `founding_badge_claimed_at`과 `founding_badge_visible`에 기록한다. 숨김 이후 재수령 요청이 표시 설정을 강제로 켜지 않는다. 공개 isFoundingMember는 활성·미탈퇴·실제수령·visible일 때만 true이며 isVerified와 독립적이다. 수령 후 본인 표시 여부만 변경할 수 있다.
 검증: `tests/platform-founding-badge.test.cjs`(실제 로컬 MySQL:18명 수령·동시 클릭·표시설정·감사롤백)와 `platform-openapi.test.cjs`. 실회원 지급과 브라우저 API대역 검증을 구분하며 최신 결과는 PROGRESS.md에 기록한다.
+
+## 예약 핸들 관리 (2026-11-03, 구현 후 운영 배포 별도)
+
+콘솔 `/console/reserved-handles`에서 정확 일치하는 핸들을 관리한다. 사용자 결정에 따라 기존 제안 62개와 허용되는 밑줄 제거 변형을 중복 제거한 103개를 초기 `reserved` 상태로 등록한다. 마이그레이션 `20261103010000_reserved_handles`가 원본 목록이며 현재 형식에서 불가능한 점·하이픈 변형은 포함하지 않는다. 전체 접두사·부분 일치·정규식 차단은 없다.
+
+| Method | 경로 | 권한·계약 |
+| --- | --- | --- |
+| GET | /admin/reserved-handles | reserved-handles.view. page/search/status(candidate·reserved·deleted), 20개씩. 상태 미지정은 삭제 제외. 사용 중·이전 핸들 보호·사용자 없음만 표시하며 회원 이메일은 반환하지 않는다. |
+| POST | /admin/reserved-handles | reserved-handles.create. handle/status/reason 필수. 소문자 정규화·3~24자 영문 소문자/숫자/밑줄. 삭제 상태 포함 중복409. |
+| PUT | /admin/reserved-handles/:id | reserved-handles.update. handle/status/reason/expectedVersion 필수. 후보 전환으로 예약 해제, 삭제 항목 복구도 가능. 버전 충돌409. |
+| DELETE | /admin/reserved-handles/:id | reserved-handles.delete. expectedVersion/reason/confirmation(현재 핸들 정확히 입력). 소프트 삭제·이력 보존. |
+| GET | /admin/reserved-handles/:id/history | reserved-handles.view. 버전 내림차순, 20개 페이지. 전후 핸들/상태·사유·처리자 ID/이름·시각. |
+
+- 후보(`candidate`)는 신규 취득을 차단하지 않는다. 예약(`reserved`)만 신규 취득 차단, 삭제(`deleted`)는 예약 차단 해제다. 기존 현재 보유자는 그대로 유지하고 본인 핸들 유지·다른 프로필 정보 수정이 가능하다. 이미 사용 중이라는 표시를 공식 계정 인증으로 해석하지 않는다.
+- 이전에 사용한 핸들 `retired_handles`는 별도 보호다. 운영 예약 해제/삭제로 이전 주소를 다른 사람에게 열지 않는다. 현재 보유자가 예약 핸들을 떠난 뒤 다시 취득하는 경우에는 운영 예약이 적용된다.
+- 회원 가입은 사용자가 핸들을 지정하지 않고 난수로 생성한다. 생성 시에도 운영 예약·사용 중·이전 핸들을 피한다. 팬 프로필 중복 확인과 직접 저장, 스튜디오 현재 핸들 동기화는 같은 규칙을 사용한다. 중복 확인은 예약이 아니므로 저장 시 다시 검사한다.
+- 예약 테이블에 행이 없는 이름도 경쟁할 수 있어, `platform_settings`의 고정 `handles.policy` 행을 먼저 잠근 뒤 예약 변경·가입 핸들 생성·프로필 저장·스튜디오 동기화를 직렬 처리한다. 가입의 이메일 proof 등 일반 조회보다 먼저 잠가 오래된 트랜잭션 스냅샷을 사용하지 않는다. 잠금 행이 없으면503으로 실패하고 예약 검사를 건너뛰지 않는다.
+- 새 테이블 `reserved_handles`·`reserved_handle_changes`; 변경과 버전·변경 이력·`admin.reserved_handle_changed` 감사를 같은 트랜잭션에 저장한다. 삭제 후에도 이력을 보존한다. 감사 원장에는 사유/핸들 원문을 추가하지 않고 해시·전후 상태·버전·처리자만 기록한다. 초기103개는 변경 이력에서 초기 예약으로 구분한다.
+- 기존 운영자에게 새 권한을 자동 부여하지 않는다. 최고관리자는 기존 규칙대로 전체 권한, 부운영자는 운영자·권한에서 메뉴별 입장/생성/수정/삭제를 지정한다. 서버의 세션·Origin·OTP·`@Permit` 검사를 유지한다.
+- 2026-11-03 확인: [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)의 기본 거부·매 요청 서버 권한 검증, [Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html)의 서버 허용 형식 검증을 적용했다. 예약할 이름과 기존 보유자 유지 범위는 사용자 결정이다.
+- 검증: `tests/platform-reserved-handles.test.cjs`, 기존 `tests/platform-handle-unify.test.cjs`, `tests/platform-openapi.test.cjs`. 콘솔 `e2e/reserved-handles.spec.ts`는 실제 로컬 격리 API·DB를 사용한다. 운영 배포 시 DB 백업→마이그레이션→API/worker→콘솔 순서가 필요하며 현재 운영 반영 여부는 PROGRESS.md를 따른다.

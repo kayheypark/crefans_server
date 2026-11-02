@@ -10,17 +10,18 @@ before(async()=>{
  await db.creatorCategory.createMany({data:categories.map((id,i)=>({id,name:prefix+'-'+i}))});
  for(const [i,id]of ids.entries()){
   await db.member.create({data:{id,email:id+'@example.invalid',name:'Discovery QA',nickname:prefix+' '+i,preferred_username:id,password_hash:'unused',email_verified:true,status:'CONFIRMED',enabled:i!==26}});
-  await db.creator.create({data:{user_id:id,display_name:prefix+' '+i,category_id:categories[i===23?1:0],is_active:i!==25,promoted:i<20,created_at:new Date(Date.UTC(2020,0,i+1)),bio:i===22?'unique-newcomer':''}});
+  await db.creator.create({data:{user_id:id,display_name:prefix+' '+i,category_id:categories[i===23?1:0],is_active:i!==25,promoted:i<20,created_at:new Date(Date.UTC(2020,0,i+1))}});
  }
+ await db.userProfile.create({data:{user_id:ids[22],bio:'unique-newcomer'}});
  await db.accountPreference.create({data:{member_id:ids[27],allow_search:false}});
  await db.creator.update({where:{user_id:ids[24]},data:{is_active:false}});
  app=await NestFactory.create(PlatformModule,{logger:false});app.setGlobalPrefix('api/v1');app.useGlobalInterceptors(new EnvelopeInterceptor());app.useGlobalFilters(new PlatformExceptionFilter());await app.listen(0,'127.0.0.1');origin=await app.getUrl();
 });
-after(async()=>{try{await app?.close();await db.accountPreference.deleteMany({where:{member_id:{in:ids}}});await db.creator.deleteMany({where:{user_id:{in:ids}}});await db.member.deleteMany({where:{id:{in:ids}}});await db.creatorCategory.deleteMany({where:{id:{in:categories}}});}finally{await db.$disconnect();await release?.();}});
+after(async()=>{try{await app?.close();await db.accountPreference.deleteMany({where:{member_id:{in:ids}}});await db.creator.deleteMany({where:{user_id:{in:ids}}});await db.userProfile.deleteMany({where:{user_id:{in:ids}}});await db.member.deleteMany({where:{id:{in:ids}}});await db.creatorCategory.deleteMany({where:{id:{in:categories}}});}finally{await db.$disconnect();await release?.();}});
 test('newest six are registration-ordered independently of the promoted first page',async()=>{
  const r=await get();assert.equal(r.status,200);assert.equal(r.data.creators.length,20);assert.ok(r.data.nextCursor);
  assert.deepEqual(r.data.newCreators.map(c=>c.id),ids.slice(18,24).reverse());assert.ok(!r.data.creators.some(c=>c.id===ids[23]));
- await db.creator.update({where:{user_id:ids[0]},data:{bio:'edited old profile'}});
+ await db.userProfile.upsert({where:{user_id:ids[0]},create:{user_id:ids[0],bio:'edited old profile'},update:{bio:'edited old profile'}});
  assert.deepEqual((await get()).data.newCreators.map(c=>c.id),ids.slice(18,24).reverse());
  const next=await get({cursor:r.data.nextCursor});assert.equal(next.data.creators.length,4);assert.deepEqual(next.data.newCreators,[]);assert.equal(next.data.nextCursor,null);
  assert.equal(new Set([...r.data.creators,...next.data.creators].map(c=>c.id)).size,24);

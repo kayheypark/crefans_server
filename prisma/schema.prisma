@@ -189,7 +189,6 @@ model Creator {
   category_id String?
   display_name String?
   handle String? @unique
-  bio String? @db.Text
   about String? @db.Text
   links Json?
   avatar String? @db.Text
@@ -1899,4 +1898,33 @@ model RetiredHandle {
   retired_at DateTime @default(now())
   @@index([member_id])
   @@map("retired_handles")
+}
+
+// Operator-managed exact-match names; retired member handles remain independently protected.
+model ReservedHandle {
+ id String @id @default(uuid())
+ handle String @unique @db.VarChar(24)
+ status String @default("candidate") @db.VarChar(16)
+ reason String @db.VarChar(500)
+ version Int @default(0)
+ created_by String? @db.VarChar(191)
+ updated_by String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([status, updated_at])
+ @@map("reserved_handles")
+}
+model ReservedHandleChange {
+ id String @id @default(uuid())
+ reservation_id String
+ version Int
+ before_handle String? @db.VarChar(24)
+ handle String @db.VarChar(24)
+ before_status String? @db.VarChar(16)
+ status String @db.VarChar(16)
+ reason String @db.VarChar(500)
+ changed_by String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@unique([reservation_id, version])
+ @@map("reserved_handle_changes")
 }

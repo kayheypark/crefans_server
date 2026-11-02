@@ -1,3 +1,4 @@
+import {listReservedHandles,reservedHandleHistory,saveReservedHandle,deleteReservedHandle} from './reserved-handles';
 import {CategoriesService} from './categories.service';
 import {Res,UploadedFile,UseInterceptors} from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express';
@@ -60,6 +61,11 @@ export class PlatformAdminController{
  @Get('dashboard') @Permit(['overview','view']) dashboard(@Query() query:any,@Req() req:any){return adminDashboard(this.service.db,req.admin,query);}
  @Get('overview') @Permit(['overview','view']) overview(){return adminOverview(this.service.db);}
  @Get('revenue') @Permit(['revenue','view']) revenue(@Query() query:any,@Req() req:any){return adminRevenue(this.service.db,req.admin,query);}
+ @Get('reserved-handles') @Permit(['reserved-handles','view']) reservedHandles(@Query() query:any,@Req() req:any){return listReservedHandles(this.service.db,req.admin,query);}
+ @Get('reserved-handles/:id/history') @Permit(['reserved-handles','view']) reservedHistory(@Param('id') id:string,@Query() query:any,@Req() req:any){return reservedHandleHistory(this.service.db,req.admin,id,query);}
+ @Post('reserved-handles') @Permit(['reserved-handles','create']) createReservedHandle(@Body() body:any,@Req() req:any){return saveReservedHandle(this.service.db,req.admin,undefined,body);}
+ @Put('reserved-handles/:id') @Permit(['reserved-handles','update']) updateReservedHandle(@Param('id') id:string,@Body() body:any,@Req() req:any){return saveReservedHandle(this.service.db,req.admin,id,body);}
+ @Delete('reserved-handles/:id') @Permit(['reserved-handles','delete']) removeReservedHandle(@Param('id') id:string,@Body() body:any,@Req() req:any){return deleteReservedHandle(this.service.db,req.admin,id,body);}
  @Get('members') @Permit(['members','view']) members(@Query() query:any){return adminMembers(this.service.db,query);}
  @Get('referrals') @Permit(['referrals','view']) referrals(@Query() query:any){return adminReferrals(this.service.db,query);}
  @Put('referrals/settings') @Permit(['referrals','update']) referralSettings(@Body() body:any,@Req() req:any){return updateReferralSettings(this.service.db,req.admin,body);}

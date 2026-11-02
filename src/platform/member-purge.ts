@@ -26,7 +26,7 @@ export async function purgeMember(tx:any,id:string,email:string,now=new Date()){
   // Unlinking the attachments lets the daily media cleanup delete the originals (MEDIA_DELETE_ENABLED, 7-day grace).
   const posts=await tx.posting.findMany({where:{user_sub:id},select:{id:true}});
   if(posts.length)await tx.postingMedia.updateMany({where:{posting_id:{in:posts.map((p:any)=>p.id)},is_deleted:false},data:{is_deleted:true,deleted_at:now}});
-  await tx.creator.updateMany({where:{user_id:id},data:{display_name:WITHDRAWN_NAME,handle:null,bio:null,about:null,links:Prisma.DbNull,avatar:null,cover:null}});
+  await tx.creator.updateMany({where:{user_id:id},data:{display_name:WITHDRAWN_NAME,handle:null,about:null,links:Prisma.DbNull,avatar:null,cover:null}});
   await tx.userProfile.deleteMany({where:{user_id:id}});
   await tx.settlementAccount.updateMany({where:{creator_id:id},data:{account_encrypted:null,holder_alias:'',verified:false}});
   await tx.withdrawalCredential.deleteMany({where:{creator_id:id}});
