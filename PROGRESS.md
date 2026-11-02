@@ -1885,3 +1885,10 @@
 - 회원/스튜디오 저장과 bootstrap·공개 프로필·검색·스튜디오 조회가 공통 소개를 사용. 생략 시 보존·빈 값 명시 시 삭제. migration은 공개 크리에이터 소개 우선 보존, 없으면 회원 소개 유지, 누락 프로필 추가 후 creators.bio 제거. 커버·생성일·상세 소개 보존.
 - Prisma6.9 generate/Nest build 통과. 로컬 MySQL 전용 E2E DB에서 공유 소개5·신규 크리에이터·프로필 사진·탈퇴 개인정보 회귀 총18건 통과. 최초 migration 검사는 MySQL 임시 테이블 재참조 제한으로 실패했고, 임의 이름의 격리 테스트 테이블로 실제 SQL을 재검증해 통과. 기존 실패 로그는 전용 증거에 기록. 운영 DB·실회원 변경 없음.
 - 배포 전 DB 백업 및 구형 API/worker 중지, migration→새 API/worker 동시 적용 필요. 구형 이미지 단독 롤백 금지. 공식 Prisma v6 migration 근거·절차는 docs/platform-api.md. 검증 로그 .local/shared-short-bio-20261103/. AGENTS 기존 규칙 유지.
+
+## 2026-11-03 승인된 미배포 서버 묶음 통합
+- origin/dev9a76c9c에 소개글 단일화2120baa와 예약핸들1f87215 통합. 프로필 저장 충돌은 user_profiles.bio 단일 기록과 동일 트랜잭션의 핸들 정책 잠금·최신 회원 핸들 조회를 모두 유지하도록 해결. 기존 배지·100콩 공개 수령 API 보존.
+- Prisma 생성·Nest 빌드 통과. 격리DB/HTTP31건 중30통과·OpenAPI 총경로 기존191 기대값1건 실패. 실제 controller 전체196경로와 계약 전체 대조를 유지하고 개별 user83/studio46/console87로 맞춰 재검사한다.
+- 운영 예정 migration2개: reserved_handles103개 초기예약, shared_short_bio. 백업·구형 API/worker 중지 후 이전 및 새API/worker 동시 반영 필요. 운영 미배포, 사용자 승인 범위로 진행 중.
+
+- 최종 로컬 통합 회귀:31개 고유 사례 중 최초 실패한 OpenAPI 경로수 기대값을196으로 수정 후 해당13건 재실행 모두 통과. 전체 경로명/메서드 집합 동등성 검증을 유지. 소개글5·예약핸들8·기존핸들5 통과는 그대로 유효. src/platform/studio.service.ts의 양 기능 병합에 Nest 빌드·Prisma 생성 통과.

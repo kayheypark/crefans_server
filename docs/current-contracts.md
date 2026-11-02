@@ -258,7 +258,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/events/feedback` | 네이버페이 1만원 상품권 이벤트 |
 | `/preview/events/creator-advertising` | 주목할 크리에이터 광고상품 30일 이벤트 |
 | `/preview/events/promotion-beans` | 프로모션 100콩 이벤트 |
-| `/preview/events/founding-badge` | 원년멤버 한정판 뱃지 이벤트 |
+| `/preview/events/founding-badge` | 오픈 기념 한정판 배지 이벤트 |
 | `/preview/guide/fan` | 팬 이용안내 |
 | `/preview/guide/creator` | 크리에이터 이용안내 |
 | `/preview/reset-password` | 비밀번호 재설정 |
@@ -375,9 +375,9 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261102140000_watermark_followups`
 - `20261102160000_withdrawn_handle_reservation`
 - `20261102161000_referral_revoke`
+- `20261103010000_reserved_handles`
 - `20261103083000_shared_short_bio`
 - `20261103120000_founding_badge_claim`
-- `20261103010000_reserved_handles`
 
 ## Prisma 전체 정의 (89 models · 15 enums)
 
