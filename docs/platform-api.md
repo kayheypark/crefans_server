@@ -41,7 +41,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /health | 공개; DB 준비 상태와 version |
 | GET | /bootstrap | 선택 인증; 현재 사용자·팬 화면 데이터·계정 설정 |
 | GET | /session | 회원; 세션 유효 여부 |
-| GET | /common | 선택 인증; 공지·FAQ·정책·내 결제수단 legal에 시행 전 개정본이 있으면 `terms-next`·`policy-next` 키로 함께 준다(2026-11-30 시행본, KST 시행일에 terms·policy로 자동 교체). |
+| GET | /common | 선택 인증; 공지·FAQ·정책·내 결제수단 legal에 시행 전 개정본이 있으면 `terms-next`·`policy-next` 키로 함께 준다(2026-11-02 재공지한 2026-12-02 시행본, KST 시행일에 terms·policy로 자동 교체. 처리방침 개정은 공지일부터 현재본). |
 | POST | /auth/signup/email/request | email; 6자리 코드, 10분 유효·180초 재요청 제한 |
 | POST | /auth/signup/email/verify | email, code; 일회용 email proof |
 | POST | /identity/start | purpose=signup 또는 withdrawal-pin; attemptId/state/redirectUrl |

@@ -177,9 +177,27 @@ test('signing up through a referral link requires the disclosure agreement and r
   const member=await db.member.findUniqueOrThrow({where:{email:ok.email}});
   assert.equal((await signupOf(member.id)).referrer_id,referrer);
   const consent=await db.memberConsent.findFirstOrThrow({where:{member_id:member.id,kind:referrals.REFERRAL_DISCLOSURE_KIND}});
-  assert.equal(consent.document_snapshot.version,referrals.REFERRAL_DISCLOSURE.version);assert.match(consent.document_snapshot.agreement,/이메일 일부/);
+  assert.equal(consent.document_snapshot.version,referrals.REFERRAL_DISCLOSURE.version);
+  // 2026-11-02.2: the five items of a third-party provision consent (개인정보 보호법 제17조제2항).
+  for(const item of['제공받는 자','목적','항목','보유·이용 기간','거부'])assert.ok(consent.document_snapshot.agreement.includes(item),item);assert.equal(consent.document_snapshot.version,'2026-11-02.2');assert.match(consent.document_snapshot.agreement,/이메일 일부/);
  }finally{const made=await db.member.findMany({where:{email:{in:emails}},select:{id:true}}),mids=made.map(m=>m.id);
   await db.referralSignup.deleteMany({where:{member_id:{in:mids}}});await db.memberConsent.deleteMany({where:{member_id:{in:mids}}});await db.accountPreference.deleteMany({where:{member_id:{in:mids}}});
   await db.beanAccount.deleteMany({where:{wallet:{owner_key:{in:mids.map(id=>'member:'+id)}}}}).catch(()=>{});await db.beanWallet.deleteMany({where:{owner_key:{in:mids.map(id=>'member:'+id)}}}).catch(()=>{});
   await db.member.deleteMany({where:{id:{in:mids}}});await db.signupChallenge.deleteMany({where:{email:{in:emails}}});}
+});
+
+test('invite lists and friend-invite records of purged members are deleted 5 years after purge, not before (2026-11-02)',async()=>{
+ const {purgeWithdrawnMembers}=require('../dist/src/platform/member-purge');
+ const [oldOne,recent,inviter]=[randomUUID(),randomUUID(),randomUUID()],all=[oldOne,recent,inviter],day=86400000;
+ try{
+  for(const [id,purged] of[[oldOne,new Date(Date.now()-(5*365+1)*day)],[recent,new Date(Date.now()-4*365*day)],[inviter,null]])
+   await db.member.create({data:{id,email:id+'@retention.invalid',name:'x',nickname:'x',preferred_username:id,email_verified:true,...(purged?{enabled:false,withdrawn_at:new Date(purged.getTime()-31*day),purged_at:purged}:{})}});
+  for(const id of[oldOne,recent])await db.signupInvite.create({data:{email:'invited-'+id+'@retention.invalid',member_id:id,used_at:new Date()}});
+  const ref=await referrals.ensureReferral(db,inviter);await referrals.ensureReferral(db,oldOne);
+  for(const id of[oldOne,recent])await db.referralSignup.create({data:{referral_id:ref.id,referrer_id:inviter,member_id:id}});
+  await purgeWithdrawnMembers(db);
+  assert.equal(await db.signupInvite.count({where:{member_id:oldOne}}),0);assert.equal(await db.referralSignup.count({where:{member_id:oldOne}}),0);assert.equal(await db.referral.count({where:{member_id:oldOne}}),0);
+  assert.equal(await db.signupInvite.count({where:{member_id:recent}}),1,'kept until 5 years');assert.equal(await db.referralSignup.count({where:{member_id:recent}}),1);
+  assert.equal(await db.referral.count({where:{member_id:inviter}}),1,'active members keep their invite code');
+ }finally{await db.signupInvite.deleteMany({where:{member_id:{in:all}}});await db.referralSignup.deleteMany({where:{OR:[{member_id:{in:all}},{referrer_id:{in:all}}]}});await db.referral.deleteMany({where:{member_id:{in:all}}});await db.member.deleteMany({where:{id:{in:all}}});}
 });
