@@ -132,10 +132,9 @@ export async function withdrawalTerms(db:any,memberId:string){
  const minimumWithdrawalKrw=row?.minimum_withdrawal_krw??betaPolicy.minimumWithdrawal;
  return{beanWithdrawalFeeBps:row?.bean_withdrawal_fee_bps??beanPolicy.withdrawalFeeBps,minimumWithdrawalKrw,minimumWithdrawalBeans:Math.ceil(minimumWithdrawalKrw/beanPolicy.krwPerBean)};
 }
-// Studio shows a creator's own terms only when an override exists; otherwise the published default notes apply.
+// Always return effective terms, including current DB defaults for creators without overrides.
 export async function studioTerms(db:any,memberId:string){
  const row=await db.creatorFinancialTerms.findUnique({where:{member_id:memberId}});
- if(!row)return null;
  const d=await defaultTerms(db);
- return{platformFeeBps:row.platform_fee_bps??d.platformFeeBps,settlementHoldDays:row.settlement_hold_days??d.settlementHoldDays,beanWithdrawalFeeBps:row.bean_withdrawal_fee_bps??d.beanWithdrawalFeeBps,minimumWithdrawalKrw:row.minimum_withdrawal_krw??d.minimumWithdrawalKrw};
+ return{platformFeeBps:row?.platform_fee_bps??d.platformFeeBps,settlementHoldDays:row?.settlement_hold_days??d.settlementHoldDays,beanWithdrawalFeeBps:row?.bean_withdrawal_fee_bps??d.beanWithdrawalFeeBps,minimumWithdrawalKrw:row?.minimum_withdrawal_krw??d.minimumWithdrawalKrw};
 }

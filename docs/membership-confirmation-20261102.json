@@ -1,0 +1,71 @@
+{
+  "recordedAt": "2026-11-02T14:53:49.921204+00:00",
+  "environment": "macOS-15.2-arm64-arm-64bit-Mach-O",
+  "research": {
+    "reference": "https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html",
+    "checkedAt": "2026-11-02",
+    "application": "Show target and validate server-side. Typed name is an accident-prevention check, not authentication or independent authorization."
+  },
+  "deployed": false,
+  "limitations": [
+    "Browser tests use local preview models and block API requests; no production data changed.",
+    "Backend deletion/state tests use a database substitute; no live database lock-concurrency claim.",
+    "OpenAPI tests run a local HTTP server without DB/provider connections.",
+    "No real payment, mobile physical device or production verification."
+  ],
+  "requiredIntegration": "Front and server together via dev then prod. Old clients lacking confirmation cannot delete against the new server.",
+  "repository": "/Users/ethan/repository/crefans_server-membership-confirmation",
+  "branch": "feat/membership-confirmation",
+  "baseline": "60175a2baee2a572e7f7f276ca33adf73ab6ce54",
+  "statusAtVerification": [
+    "M PROGRESS.md",
+    " M docs/platform-api.md",
+    " M src/platform/openapi-contract.ts",
+    " M src/platform/signup-invites.ts",
+    " M src/platform/studio.service.ts",
+    "?? tests/platform-membership-confirmation.test.cjs"
+  ],
+  "sourceSha256": {
+    "src/platform/openapi-contract.ts": "5b125325338553eeb9f7a0f74b012d9594964d84a548df0936500cd7a5074e19",
+    "src/platform/signup-invites.ts": "927a4175d0c72cdb07b26d16b615cf40342f94d32b1740be62dd4c1830f1ad62",
+    "src/platform/studio.service.ts": "ae9eb09de2745e7a586ab7c1b1ad3cb532a0dd5ef8f26b804f101d1463ba8f41",
+    "tests/platform-membership-confirmation.test.cjs": "79263772ca9770cb2ff9ba21bbaa4e8b02c8038bb692d17f87ddd64aa9109f04"
+  },
+  "checks": [
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "result": "PASS",
+      "log": ".local/membership-confirmation-20261102/build.log",
+      "logSha256": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2",
+      "startedAt": "2026-11-02T14:47:02.583546+00:00",
+      "finishedAt": "2026-11-02T14:47:02.681347+00:00"
+    },
+    {
+      "command": "CREFANS_E2E=true node --test tests/platform-membership-confirmation.test.cjs tests/platform-openapi.test.cjs",
+      "exitCode": 0,
+      "result": "17/17 PASS: 6 domain/schema +11 OpenAPI HTTP",
+      "log": ".local/membership-confirmation-20261102/tests-final.log",
+      "logSha256": "8076380d13e78737eb3a777b8949a02506539ff5a8bc5ae533ecb8a7ef33618d",
+      "startedAt": "2026-11-02T14:52:42.678990+00:00",
+      "finishedAt": "2026-11-02T14:52:43.582354+00:00"
+    }
+  ],
+  "negativeControl": {
+    "exitCode": 1,
+    "log": ".local/membership-confirmation-20261102/negative.log",
+    "detected": [
+      "wrong/missing confirmation",
+      "stale renamed target",
+      "no override returning null instead of DB fee"
+    ],
+    "restored": true
+  },
+  "initialAttempt": {
+    "log": ".local/membership-confirmation-20261102/tests.log",
+    "result": "Local HTTP listen EPERM. Repeated with local server permission; passed."
+  },
+  "financialSource": "src/platform/financial-policy.ts paymentPolicy resolves actual new-order fee; signup-invites.ts studioTerms now resolves same per-field defaults. Finance ledger uses floor(amount*bps/10000). Existing orders are unchanged.",
+  "consoleReference": "/Users/ethan/repository/crefans_admin/src/components/console/TypedConfirm.tsx",
+  "migrationRequired": false
+}
