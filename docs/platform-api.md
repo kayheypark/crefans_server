@@ -111,7 +111,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /studio/content | id?, title/body/media/commentsEnabled/accessPlanId/status/scheduledAt |
 | POST | /studio/content/:id/delete | 소유권 검증 후 soft delete |
 | POST | /studio/memberships | id?, name/price/benefits/image; immutable version 생성 |
-| PUT | /studio/memberships/:id | active 또는 deleted; 삭제 시 유효 구독 확인 |
+| PUT | /studio/memberships/:id | active 또는 deleted; 삭제는 confirmation에 현재 멤버십 이름 정확히 입력 필수, 잠금 후 이름·소유자·삭제 여부·유효 구독 재확인 |
 | PUT | /studio/comments/:id | hidden, 본인 게시물만 |
 | POST | /studio/comments/:id/reply | body 1~1000자, 본인 게시물·삭제되지 않은 부모, 2뎁스·댓글 수 반영 |
 | PUT | /studio/comments/:id/replies/:replyId | body 1~1000자, 내 게시물의 해당 부모에 내가 쓴 답글만 수정 |
@@ -492,3 +492,5 @@ AdProduct 응답: id/name/description/terms/placement/amount/durationDays/visibl
 업로드는 운영자 수정 권한·기존 Origin 검사·10분 30회 제한을 적용한다. 저장 모드는 icon에 local:/s3: UUID로 기록하고 기존 비공개 S3 저장소를 재사용한다. 공개 조회는 해당 분야에 연결된 현재 아이콘만 허용하며 회원 미디어의 접근 권한을 변경하지 않는다. 외부 URL·SVG·움직이는 이미지 업로드는 받지 않는다. 실패한 업로드와 교체된 파일을 정리하며 정리 실패는 서버 로그에 파일 ID로 남긴다. 프로세스 중단으로 남은 비참조 파일의 자동 스캔 복구는 이번 범위에 포함하지 않았다.
 
 근거: [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), 2026-10-31 확인. 확장자·실제 형식·용량·권한을 함께 검사하고 애플리케이션 생성 파일명과 이미지 재인코딩을 적용한다. PNG/JPG/WebP 2MiB·128px 출력은 작은 칩 아이콘 용도에 맞춘 구현 기준이다. 검증 증거는 각 리포 `.local/category-management-20261031/`에 저장하며 대역 S3 검증과 운영 실업로드를 구분한다.
+
+- 2026-11-02: `/studio/finance`의 `creatorTerms`는 개별 조건이 없어도 현재 DB 기본값을 반영한 적용 조건을 반환한다. 멤버십 예상 수익은 `platformFeeBps` 기준이며 기존 주문·구독의 공제율 스냅샷은 변경하지 않는다.

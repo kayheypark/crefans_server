@@ -1,3 +1,11 @@
+## 2026-11-02 멤버십 삭제 확인·스튜디오 적용 공제율 — 로컬 완료·미배포
+- origin/prod 60175a2에서 feat/membership-confirmation, 별도 작업 폴더 /Users/ethan/repository/crefans_server-membership-confirmation. 기본 dev의 미커밋 PROGRESS는 보존.
+- 멤버십 삭제에 confirmation 필수. 기존 소유자 조회 이후 row lock 안에서 현재 이름·소유권·삭제 여부를 다시 확인하고 정확한 이름 입력일 때만 유효 구독 검사 후 기존 soft delete. 활성화/비활성화는 입력 확인 불필요, 기존 구독 기록/조건 보존. OpenAPI·API문서 갱신.
+- studioTerms는 개별 조건이 없어도 현재 DB 금융 정책을 반환한다. 개별 공제율 우선, 미지정 필드는 기본 정책, 0% 유지. 실제 새 결제 paymentPolicy와 동일한 값으로 프론트 월 구독료 예상 수익을 계산한다. 수익 원장·기존 주문 snapshot·환불/출금 정책·마이그레이션은 변경하지 않았다.
+- 검증: build 통과, DB 대역 도메인6(오입력 무변경, 구독 보호, 잠금 후 이름/삭제 재검사, 소유권, 상태변경, 기본/개별/0% 공제율 및 스키마), 로컬 HTTP OpenAPI11 통과. 원본처럼 확인 검사를 제거하거나 기본 조건을 null 반환시3건 실패 확인 후 복원. 실DB 동시성/운영 검증 아님. 첫 OpenAPI 실행은 로컬 listen EPERM으로 실패하여 로컬 서버 실행 허용 후 재검사 통과.
+- 근거: 운영 콘솔 src/components/console/TypedConfirm.tsx, financial-policy.ts의 서버 확인 방식. OWASP Transaction Authorization Cheat Sheet(2026-11-02 확인)의 대상 정보 명시·서버 측 검사를 참고했으며 이름 입력은 실수 방지이지 추가 인증이 아니다. 반올림은 finance.service.ts의 기존 floor(amount*bps/10000)를 그대로 사용.
+- 증거 docs/membership-confirmation-20261102.json, .local/membership-confirmation-20261102/. 프론트 짝 /Users/ethan/repository/crefans_front-membership-confirmation. 다음 요청 시 dev→prod·프론트와 함께 배포. 현재 미푸시·미통합·미배포, 구형클라이언트 confirmation 누락은 거절한다.
+
 # PROGRESS: crefans_server
 
 ## 2026-11-01 신규 크리에이터 게시물 워터마크 — 운영 배포 완료
