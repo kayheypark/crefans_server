@@ -1,3 +1,11 @@
+## 2026-11-03 계약서 v2.40 — 애플 고딕 PDF 완료
+- 요청: 계약서 폰트 애플 고딕. 기존 명함과 같은 Apple SD Gothic Neo Regular/Bold를 제목·본문·표·쪽번호에 적용. 글자 크기·여백·계약 문구·별지 입력란은 유지한다.
+- 최신origin/prod d4238d9에서 feat/contract-apple-gothic 생성. 이전 계약서2d187de(v2.39)의 승인된 제목/별지/통지 제한 수정4파일을 먼저 보존했다. 원래feat/contract-notice-limits 브랜치와 기본 체크아웃의 미커밋 자료는 유지.
+- 합격 조건: 사용 글꼴의 PDF 포함, v2.39 대비 전체 텍스트 동일,13조·별지A·서명/페이지 경계,전 페이지 렌더에서 잘림/겹침/깨진 한글 없음. 이전PDF는 .local/contract-apple-gothic-20261103/before-v2.39.pdf 보존. 운영 코드/현행 약관/DB/배포 변경 없음.
+- 검증: HTML/PDF 생성 종료0, PDF 구조 검사 종료0(7쪽·13조·별지A·서명·페이지 경계), 원문TXT 바이트와 쪽번호/공백을 제외한 PDF 전문이 v2.39와 동일. 7쪽 렌더 전부 육안 검수 완료. Chromium CDP에서 실제 Apple SD Gothic Neo Regular/Bold 사용 확인, PDF Type3 글리프91개 묶음·312579바이트 및 Unicode mapping 포함 확인. 첫 검사는 TTF 프로그램 추출을 잘못 기대하여 실패했으며 원본 로그를 보존하고 실제 Type3 글리프 포함 검사로 정정했다.
+- 글꼴 누락 대조: 생성 HTML의 Regular 이름만 존재하지 않는 값으로 바꾼 경우 renderer 종료1, 기존 PDF 해시 불변 확인 후 HTML 복원. PDF SHA256 ea07f6dc73fb5311ebd261d170132bfdc8005205eefa235b5d626599be6c71da. 결과 output/pdf/crefans-creator-agreement-draft.pdf, 상세 .local/contract-apple-gothic-20261103/verification.json.
+- 문서 검사: inventory/계약/링크 구조76문서·186라우트·57화면·450로컬링크 통과. 프론트 check:docs 전체는 이번 변경7파일의 기존 스냅샷 만료로 종료1. 다른 프론트 작업의 전역 증거를 덮어쓰지 않았으며 전체 검사를 통과했다고 주장하지 않는다. 서버 기능 테스트/운영 배포는 문서 글꼴 변경 범위에 포함하지 않았다.
+
 ## 2026-11-03 멤버십 삭제 확인·적용 공제율 — 운영 배포 완료
 - 사용자 배포 승인에 따라 feat/membership-confirmation→dev fefc3ee(통합 build·6건 통과)→prod d99e010 순서로 반영. 프론트 prod73fbc85와 `membership-20261103`으로 API·worker·front 함께 배포. 이후 배포 증거 커밋은 문서만 변경한다.
 - 이름 직접 입력 일치 검사·잠금 후 재확인 및 유효 구독 보호, 현재 DB 금융 정책/개별 조건에 맞는 studioTerms 적용. 기존 수익·구독·결제 snapshot은 변경하지 않으며 migration 없음.

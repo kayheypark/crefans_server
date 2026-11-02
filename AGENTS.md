@@ -65,3 +65,5 @@
 - 실행 방법·증거 기준은 `docs/branch-workflow.md`. prod 반영과 운영 배포는 별개다.
 
 - 게시물 워터마크는 업로드 metadata의 watermarkEligible 버전이 있는 신규 크리에이터 미디어만 대상으로 한다. 기존 파일을 재저장 시 추론해 변환하거나 일괄 소급하지 않는다. 원본은 프로필·멤버십 사진을 위해 보존하고, 게시물만 새 UUID의 파생 파일을 참조한다. 완료 전 비공개·기존 구독/GET/HEAD/Range 권한을 유지한다. 상세는 docs/private-media.md.
+
+- 계약서 글꼴은 Apple SD Gothic Neo Regular/Bold를 사용한다. 글꼴 변경 시 계약 문구는 유지하고 PDF 글꼴 포함·전체 텍스트·모든 페이지 렌더를 대조한다. 원본 폰트 파일은 저장소에 넣지 않는다.
