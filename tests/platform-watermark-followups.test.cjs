@@ -30,7 +30,7 @@ before(async()=>{
 after(async()=>{
  await db.memberNotification.deleteMany({where:{OR:[{member_id:{in:ids}},{actor_id:{in:ids}}]}});await db.userFollow.deleteMany({where:{following_id:owner}});
  await db.postingMedia.deleteMany({where:{posting:{user_sub:{in:ids}}}});await db.posting.deleteMany({where:{user_sub:{in:ids}}});await db.mediaWatermarkJob.deleteMany({where:{creator_id:{in:ids}}});await db.media.deleteMany({where:{user_sub:{in:ids}}});
- await db.platformOperationalEvent.deleteMany({where:{dedupe_key:`watermark-skipped:${odd}`}});await db.retiredHandle.deleteMany({where:{member_id:{in:ids}}});
+ await db.platformOperationalEvent.deleteMany({where:{dedupe_key:`watermark-skipped:${odd}`}});await db.retiredHandle.deleteMany({where:{OR:[{member_id:{in:ids}},{handle:{in:[oldHandle,newHandle]}}]}});
  await db.creator.deleteMany({where:{user_id:{in:ids}}});await db.member.deleteMany({where:{id:{in:ids}}});await db.$disconnect();await fs.rm(root,{recursive:true,force:true});await release?.();
 });
 
@@ -95,7 +95,7 @@ test('a failed photo tells the creator and holds the notice until the post is fi
  assert.equal(await watermarkNextMedia(db,{enabled:false},root),1);assert.equal(await notices.releaseHeldNotices(db),0);assert.equal(await fanNotices(draft.id),0);
 });
 
-test('a changed handle stays reserved for its owner and leads to the current profile; taking it back or withdrawing releases it',async()=>{
+test('a changed handle stays reserved for its owner and leads to the current profile; taking it back frees it; withdrawal keeps both as text only',async()=>{
  await service.profile(mover,{name:'Mover',bio:'',handle:newHandle});
  assert.deepEqual(await service.handleAvailability(fan,oldHandle),{handle:oldHandle,available:false});
  assert.deepEqual(await service.handleAvailability(mover,oldHandle),{handle:oldHandle,available:true});
@@ -104,5 +104,9 @@ test('a changed handle stays reserved for its owner and leads to the current pro
  await service.profile(mover,{name:'Mover',bio:'',handle:oldHandle});
  assert.deepEqual((await db.retiredHandle.findMany({where:{member_id:mover}})).map(r=>r.handle),[newHandle]);
  await db.$transaction(tx=>purgeMember(tx,mover,mover+'@wm-followups.invalid'));
- assert.equal(await db.retiredHandle.count({where:{member_id:mover}}),0);assert.equal((await service.handleAvailability(fan,newHandle)).available,true);
+ // Withdrawal keeps both handles reserved as text only (2026-11-02 user decision): nobody can take them, and they lead nowhere.
+ assert.equal(await db.retiredHandle.count({where:{member_id:mover}}),0);
+ assert.deepEqual((await db.retiredHandle.findMany({where:{handle:{in:[oldHandle,newHandle]}},orderBy:{handle:'asc'}})).map(r=>[r.handle,r.member_id]),[[newHandle,null],[oldHandle,null]].sort());
+ for(const h of[oldHandle,newHandle])assert.equal((await service.handleAvailability(fan,h)).available,false);
+ await assert.rejects(service.publicProfile(oldHandle),e=>e.getResponse?.().code==='MEMBER_NOT_FOUND');
 });

@@ -13,7 +13,7 @@ export async function adminReferrals(db:any,query:any){
  const people=await db.member.findMany({where:{id:{in:[...new Set(rows.flatMap((r:any)=>[r.referrer_id,r.member_id]))]}},select:{id:true,email:true,nickname:true}});
  const person=(id:string)=>{const m=people.find((p:any)=>p.id===id);return{id,nickname:m?.nickname||'탈퇴한 회원',email:m?.email||''};};
  return{enabled:await referralOn(db),summary:Object.fromEntries(statuses.map(s=>{const c=counts.find((x:any)=>x.reward_status===s);return[s,{count:c?._count._all||0,beans:c?._sum.reward_quantity||0}];})),
-  items:rows.map((r:any)=>({id:r.id,referrer:person(r.referrer_id),member:person(r.member_id),status:r.reward_status,rewardQuantity:r.reward_quantity,source:r.reward_source,dueAt:r.grant_due_at,rewardedAt:r.rewarded_at,clawedBackAt:r.clawed_back_at,createdAt:r.created_at})),total,page,pageSize:size};
+  items:rows.map((r:any)=>({id:r.id,referrer:person(r.referrer_id),member:person(r.member_id),status:r.reward_status,rewardQuantity:r.reward_quantity,source:r.reward_source,dueAt:r.grant_due_at,rewardedAt:r.rewarded_at,clawedBackAt:r.clawed_back_at,revokeReason:r.revoke_reason,createdAt:r.created_at})),total,page,pageSize:size};
 }
 export async function updateReferralSettings(db:any,admin:any,input:any){
  if(typeof input?.enabled!=='boolean')reject(400,'INVALID_INPUT','사용 여부를 선택해주세요.');

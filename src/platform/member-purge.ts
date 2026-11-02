@@ -25,8 +25,10 @@ export async function purgeMember(tx:any,id:string,email:string,now=new Date()){
   await tx.userProfile.deleteMany({where:{user_id:id}});
   await tx.settlementAccount.updateMany({where:{creator_id:id},data:{account_encrypted:null,holder_alias:'',verified:false}});
   await tx.withdrawalCredential.deleteMany({where:{creator_id:id}});
-  // Handles given up earlier are released with the account, like the current one (2026-11-02).
-  await tx.retiredHandle.deleteMany({where:{member_id:id}});
+  // Watermarks keep printing old addresses, so the handle text stays reserved but no longer points to anyone (2026-11-02).
+  const handle=(await tx.member.findUnique({where:{id},select:{preferred_username:true}}))?.preferred_username;
+  await tx.retiredHandle.updateMany({where:{member_id:id},data:{member_id:null}});
+  if(handle&&/^[a-z0-9_]{3,24}$/.test(handle))await tx.retiredHandle.upsert({where:{handle},create:{handle,member_id:null},update:{member_id:null}});
   // D8 (2026-10-30): the CI-derived duplicate-signup hash goes with the rest. Messages stay for the other person (the sender
   // now reads as 탈퇴한 사용자) and inquiries stay as dispute records for 3 years (/pilot-work 2026-10-30).
   for(const proof of await tx.identityProof.findMany({where:{member_id:id},select:{id:true}}))await tx.identityProof.update({where:{id:proof.id},data:{verified_name:null,identity_hash:randomBytes(32).toString('hex')}});

@@ -1849,6 +1849,9 @@ model ReferralSignup {
  /// 첫 실결제 후 보상 확정 예정 시각(환불 기간 7일). qualified 상태에서만 값이 있다.
  grant_due_at DateTime?
  clawed_back_at DateTime?
+ /// 운영자가 보상에서 제외·회수한 사유와 운영자 ID (2026-11-02)
+ revoke_reason String? @db.VarChar(500)
+ revoked_by String? @db.VarChar(191)
  created_at DateTime @default(now())
  @@index([referral_id])
  @@index([referrer_id,created_at])
@@ -1886,10 +1889,11 @@ model MediaWatermarkJob {
 }
 
 // A handle given up by a profile change stays reserved for that member and links to the current profile, because
-// watermarks keep printing https://crefans.com/{handle} (2026-11-02 user decision). Removed on withdrawal.
+// watermarks keep printing https://crefans.com/{handle} (2026-11-02 user decision). On withdrawal only the handle text stays
+// reserved, unlinked from the member (member_id null), so nobody can take an old watermark address (2026-11-02 user decision).
 model RetiredHandle {
   handle String @id @db.VarChar(64)
-  member_id String @db.VarChar(191)
+  member_id String? @db.VarChar(191)
   retired_at DateTime @default(now())
   @@index([member_id])
   @@map("retired_handles")

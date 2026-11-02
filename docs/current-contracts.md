@@ -75,6 +75,7 @@
 | POST | `/api/v1/admin/posts/:id/moderation` | `src/platform/moderation.ts::post` |
 | POST | `/api/v1/admin/posts/:id/review` | `src/platform/moderation.ts::review` |
 | GET | `/api/v1/admin/referrals` | `src/platform/admin.controller.ts::referrals` |
+| POST | `/api/v1/admin/referrals/:id/revoke` | `src/platform/admin.controller.ts::revokeReferral` |
 | PUT | `/api/v1/admin/referrals/settings` | `src/platform/admin.controller.ts::referralSettings` |
 | GET | `/api/v1/admin/reports` | `src/platform/admin.controller.ts::reports` |
 | POST | `/api/v1/admin/reports/:id/resolve` | `src/platform/admin.controller.ts::resolve` |
@@ -362,6 +363,8 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261101150000_media_watermark`
 - `20261101150000_platform_settings`
 - `20261102140000_watermark_followups`
+- `20261102160000_withdrawn_handle_reservation`
+- `20261102161000_referral_revoke`
 
 ## Prisma 전체 정의 (87 models · 15 enums)
 
@@ -2219,6 +2222,9 @@ model ReferralSignup {
  /// 첫 실결제 후 보상 확정 예정 시각(환불 기간 7일). qualified 상태에서만 값이 있다.
  grant_due_at DateTime?
  clawed_back_at DateTime?
+ /// 운영자가 보상에서 제외·회수한 사유와 운영자 ID (2026-11-02)
+ revoke_reason String? @db.VarChar(500)
+ revoked_by String? @db.VarChar(191)
  created_at DateTime @default(now())
  @@index([referral_id])
  @@index([referrer_id,created_at])
@@ -2256,10 +2262,11 @@ model MediaWatermarkJob {
 }
 
 // A handle given up by a profile change stays reserved for that member and links to the current profile, because
-// watermarks keep printing https://crefans.com/{handle} (2026-11-02 user decision). Removed on withdrawal.
+// watermarks keep printing https://crefans.com/{handle} (2026-11-02 user decision). On withdrawal only the handle text stays
+// reserved, unlinked from the member (member_id null), so nobody can take an old watermark address (2026-11-02 user decision).
 model RetiredHandle {
   handle String @id @db.VarChar(64)
-  member_id String @db.VarChar(191)
+  member_id String? @db.VarChar(191)
   retired_at DateTime @default(now())
   @@index([member_id])
   @@map("retired_handles")
