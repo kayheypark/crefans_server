@@ -1,3 +1,10 @@
+## 2026-11-03 멤버십 삭제 확인·적용 공제율 — 운영 배포 완료
+- 사용자 배포 승인에 따라 feat/membership-confirmation→dev fefc3ee(통합 build·6건 통과)→prod d99e010 순서로 반영. 프론트 prod73fbc85와 `membership-20261103`으로 API·worker·front 함께 배포. 이후 배포 증거 커밋은 문서만 변경한다.
+- 이름 직접 입력 일치 검사·잠금 후 재확인 및 유효 구독 보호, 현재 DB 금융 정책/개별 조건에 맞는 studioTerms 적용. 기존 수익·구독·결제 snapshot은 변경하지 않으며 migration 없음.
+- Linux amd64 이미지 build, 운영 API/worker 소스·컴파일 해시 일치, 6경로200·재시작0/OOM없음 확인. 프론트 운영 목업 공용 UI PC4·모바일WebKit4 통과. 실제 운영 멤버십 삭제/실결제·실DB 동시성 검증은 미실행.
+- 설정·DB 백업, rollback 준비, admin/DB/proxy·결제/출금 스위치 보존. 이미지 정리는 로컬10개 삭제에 대한 자동 승인 검토 거절로 미실행; 원격10개도 계획만 보존. 배포 자체는 완료.
+- 증거: [배포·검증 기록](docs/membership-deployment-20261103.json), 프론트 `.local/membership-deploy-20261102/`의 로그·캡처.
+
 ## 2026-11-02 멤버십 삭제 확인·스튜디오 적용 공제율 — 로컬 완료·미배포
 - origin/prod 60175a2에서 feat/membership-confirmation, 별도 작업 폴더 /Users/ethan/repository/crefans_server-membership-confirmation. 기본 dev의 미커밋 PROGRESS는 보존.
 - 멤버십 삭제에 confirmation 필수. 기존 소유자 조회 이후 row lock 안에서 현재 이름·소유권·삭제 여부를 다시 확인하고 정확한 이름 입력일 때만 유효 구독 검사 후 기존 soft delete. 활성화/비활성화는 입력 확인 불필요, 기존 구독 기록/조건 보존. OpenAPI·API문서 갱신.
