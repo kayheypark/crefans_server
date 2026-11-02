@@ -1,0 +1,307 @@
+{
+  "release": "membership-20261103",
+  "status": "deployed",
+  "recordedAt": "2026-11-02T15:14:17.540583+00:00",
+  "deployedAt": "2026-11-02T15:10:18Z",
+  "scope": [
+    "Membership image form reuses the compact post editor MediaUpload",
+    "Exact membership name is required for deletion in UI and server",
+    "Monthly fee preview uses the creator effective deduction rate; no withholding helper text"
+  ],
+  "branchFlow": {
+    "at": "2026-11-02T15:07:06.713497+00:00",
+    "repositories": [
+      {
+        "repository": "crefans_front",
+        "refs": {
+          "HEAD": "73fbc854596d967310555101a0a96eb482406144",
+          "origin/dev": "73fbc854596d967310555101a0a96eb482406144",
+          "origin/prod": "73fbc854596d967310555101a0a96eb482406144"
+        },
+        "workingTree": ""
+      },
+      {
+        "repository": "crefans_server",
+        "refs": {
+          "HEAD": "d99e010440d5ee4dbf2bc5ad68098b4de9018c35",
+          "origin/dev": "d99e010440d5ee4dbf2bc5ad68098b4de9018c35",
+          "origin/prod": "d99e010440d5ee4dbf2bc5ad68098b4de9018c35"
+        },
+        "workingTree": ""
+      }
+    ]
+  },
+  "images": {
+    "server": {
+      "tag": "crefans-api:membership-20261103",
+      "imageId": "sha256:3b7a2207ef7e7ca38e16e0c10f6c6116699a7a8c6f7470253f043edf89ddec78",
+      "rootFsLayers": [
+        "sha256:9b35de7893378218e365c34c2c735fb0032a859112fb7345ca8ea73f9aa1db70",
+        "sha256:73455f008d2c29b7bd012ed6034808c2eb31011ad5585202f9162c661bcfee9f",
+        "sha256:304cbc337ac002298f36802ea165638e0751e9d71f3065025df466bfac483932",
+        "sha256:0d441fd7f082d3ceb0aa923bbaf1c53fa09b6c5b3e4eeeb60a0980faa13b1a1a",
+        "sha256:a6a14a60a059ce70d9917ac911eb5ee06263ece91632613de6e562cfec9027d1",
+        "sha256:e05e6039771ee0c4da84bd5ba5067e50ebb4fea734b64b141e37252e47b0f1c9",
+        "sha256:6326bdc46fafc2ecbb48a050ded9ea055863f9eab4bfc7f6ec0941f04175be09",
+        "sha256:abddc34044d4c1867b91d5bd8bf4bbc673da80dee340eb3734cd7d3325c36bef",
+        "sha256:9e2426a78ba6ad30bb1e93862de5e480d7eb666878fe83cff3770ee19ed6faf9",
+        "sha256:a39143867e2761d344542225f9e21bb152c4c081ff77b9cd11a6b0dd51cee01c",
+        "sha256:21014fcff5879b7cae97e8d2b3f5e9bb7b867538c91d8ab9b918a147e4d3efc7",
+        "sha256:acaf890ba72a00a48babb140d13f70368584eddfafc464c3b70ae3f0126638e9",
+        "sha256:2427ae9b56a07bb589905438697093f486cd81d3b40e0e090c2e081373d3a0fb",
+        "sha256:8590ede38681f31b6aace4ce9eab5a4766a62de66dd6e9a98d641ae680fe80a5",
+        "sha256:c046fa295bb6f2a8978a823602e16c85ef742c1b137912020e500a22a364ec28"
+      ],
+      "commit": "d99e010440d5ee4dbf2bc5ad68098b4de9018c35",
+      "sourceManifestSha256": "056c5fd6c6cf72fdafc851fe48ffb6ea786253e6dc7e4cbde08d8e1acbe84bdb",
+      "configurationDigest": "sha256:90b845686e577b9215d6a9b6429fbeebbb9e0ef3db0aaa4da16207b72bdf53e9"
+    },
+    "front": {
+      "tag": "crefans-front:membership-20261103",
+      "imageId": "sha256:81a16cb03d444c3ee76e0f23deaf3efd8032254db38fc70e3c47f5b05e742259",
+      "rootFsLayers": [
+        "sha256:9b35de7893378218e365c34c2c735fb0032a859112fb7345ca8ea73f9aa1db70",
+        "sha256:73455f008d2c29b7bd012ed6034808c2eb31011ad5585202f9162c661bcfee9f",
+        "sha256:304cbc337ac002298f36802ea165638e0751e9d71f3065025df466bfac483932",
+        "sha256:0d441fd7f082d3ceb0aa923bbaf1c53fa09b6c5b3e4eeeb60a0980faa13b1a1a",
+        "sha256:a6a14a60a059ce70d9917ac911eb5ee06263ece91632613de6e562cfec9027d1",
+        "sha256:e05e6039771ee0c4da84bd5ba5067e50ebb4fea734b64b141e37252e47b0f1c9",
+        "sha256:2aa992729cf737834ab30e44b61978165f0c54dff58f085065785a73043458e4",
+        "sha256:489b6b2d4eb20109b29a09ccc37b59a27260e41fa8764b4064dadf124e159ab9",
+        "sha256:7bbf391a3909841cf40bd0ca922d56179ef4752abdd15918031bc628d4ca4895",
+        "sha256:5f6dc889428c566507a7173303f35f5a2e81c7be4cc15935473be2863556d807"
+      ],
+      "commit": "73fbc854596d967310555101a0a96eb482406144",
+      "sourceManifestSha256": "2eb45f673a9b60ed97579b5bf57ffdff012e68abc51185c647a85d42c4cae440",
+      "configurationDigest": "sha256:9463ab220461b25ba78a03c0c612f12d5e30edacea364a6da0f5d9936f9a19c2"
+    }
+  },
+  "builds": [
+    {
+      "label": "server",
+      "tag": "crefans-api:membership-20261103",
+      "startedAt": "2026-11-02T15:03:20.440280+00:00",
+      "finishedAt": "2026-11-02T15:05:04.349978+00:00",
+      "exitCode": 0,
+      "sourceManifestSha256": "056c5fd6c6cf72fdafc851fe48ffb6ea786253e6dc7e4cbde08d8e1acbe84bdb"
+    },
+    {
+      "label": "front",
+      "tag": "crefans-front:membership-20261103",
+      "startedAt": "2026-11-02T15:05:04.733204+00:00",
+      "finishedAt": "2026-11-02T15:07:25.119011+00:00",
+      "exitCode": 0,
+      "sourceManifestSha256": "2eb45f673a9b60ed97579b5bf57ffdff012e68abc51185c647a85d42c4cae440"
+    }
+  ],
+  "checks": [
+    {
+      "command": "npm run typecheck",
+      "repo": "front",
+      "exitCode": 0
+    },
+    {
+      "command": "node --test tests/typed-confirm-dialog.test.cjs tests/creator-payout-terms.test.cjs tests/crefans-studio-management.test.cjs tests/studio-membership-upload.test.cjs",
+      "repo": "front",
+      "exitCode": 0,
+      "passed": 30
+    },
+    {
+      "command": "npm run build && CREFANS_E2E=true node --test tests/platform-membership-confirmation.test.cjs",
+      "repo": "server",
+      "exitCode": 0,
+      "passed": 6
+    },
+    {
+      "command": "CREFANS_SERVER_DIR=<paired-release-worktree> npm run check:docs",
+      "repo": "front",
+      "exitCode": 0,
+      "level": "snapshot-only-not-test-proof"
+    },
+    {
+      "command": "npx playwright test --config .local/membership-deploy-20261102/production-preview.config.ts",
+      "repo": "front",
+      "exitCode": 0,
+      "passed": 8,
+      "pcChromium": 4,
+      "mobileIPhone13WebKit": 4,
+      "target": "https://crefans.com/preview/*",
+      "data": "mock model only; API requests blocked"
+    }
+  ],
+  "production": {
+    "at": "2026-11-02T15:11:09.614624+00:00",
+    "deployedAt": "2026-11-02T15:10:18Z",
+    "containers": {
+      "crefans-beta-api-1": {
+        "sourceAndCompiledHashesMatch": true,
+        "tag": "crefans-api:membership-20261103",
+        "image": "sha256:3b7a2207ef7e7ca38e16e0c10f6c6116699a7a8c6f7470253f043edf89ddec78",
+        "restarts": 0,
+        "healthy": "healthy",
+        "hashes": {
+          "src/platform/studio.service.ts": "ae9eb09de2745e7a586ab7c1b1ad3cb532a0dd5ef8f26b804f101d1463ba8f41",
+          "src/platform/signup-invites.ts": "927a4175d0c72cdb07b26d16b615cf40342f94d32b1740be62dd4c1830f1ad62",
+          "src/platform/openapi-contract.ts": "5b125325338553eeb9f7a0f74b012d9594964d84a548df0936500cd7a5074e19",
+          "dist/src/platform/studio.service.js": "64ada93a507de4f61530b2584d3c090012d3f6d2903ff2ce5dee3eda3fcd5caa",
+          "dist/src/platform/signup-invites.js": "ccbd7d342bf4ce379a0c9c151b4c8bf1ada1045f19ef096b1565490681963e48"
+        }
+      },
+      "crefans-beta-worker-1": {
+        "sourceAndCompiledHashesMatch": true,
+        "tag": "crefans-api:membership-20261103",
+        "image": "sha256:3b7a2207ef7e7ca38e16e0c10f6c6116699a7a8c6f7470253f043edf89ddec78",
+        "restarts": 0,
+        "healthy": null,
+        "hashes": {
+          "src/platform/studio.service.ts": "ae9eb09de2745e7a586ab7c1b1ad3cb532a0dd5ef8f26b804f101d1463ba8f41",
+          "src/platform/signup-invites.ts": "927a4175d0c72cdb07b26d16b615cf40342f94d32b1740be62dd4c1830f1ad62",
+          "src/platform/openapi-contract.ts": "5b125325338553eeb9f7a0f74b012d9594964d84a548df0936500cd7a5074e19",
+          "dist/src/platform/studio.service.js": "64ada93a507de4f61530b2584d3c090012d3f6d2903ff2ce5dee3eda3fcd5caa",
+          "dist/src/platform/signup-invites.js": "ccbd7d342bf4ce379a0c9c151b4c8bf1ada1045f19ef096b1565490681963e48"
+        }
+      },
+      "crefans-beta-frontend-1": {
+        "sourceAndCompiledHashesMatch": true,
+        "tag": "crefans-front:membership-20261103",
+        "image": "sha256:81a16cb03d444c3ee76e0f23deaf3efd8032254db38fc70e3c47f5b05e742259",
+        "restarts": 0,
+        "healthy": null,
+        "hashes": {
+          "components/crefans/studio/ManagementPages.tsx": "723354555eb3477e5d91933b9379efed8d566855cd1657e587e4f7b5aa73cf4c",
+          "components/ui/MediaUpload.tsx": "1945597843dd3c01f5f6e8a4c1b73e4873f0fc9ac17ba2c55166092b680724dd",
+          "components/ui/TypedConfirmDialog.tsx": "47ec9fed76bf353bdf29a390ee991479c7308c9351ba9bd7aeb6faa94bc9716b",
+          "features/service/useStudioModel.ts": "5f98fe0f32d0cf848225559ae9f67b7f373a4edb3e5f72f0c92ac20fa3ae5755",
+          "lib/crefans/creator-payout-policy.ts": "4e63776a682369dd5663f7d027c4fdf35f03bdec5c89a78018441b51949c803d"
+        }
+      }
+    },
+    "urls": {
+      "https://crefans.com/api/v1/health": 200,
+      "https://crefans.com/service/feed": 200,
+      "https://crefans.com/service/studio/memberships": 200,
+      "https://crefans.com/preview/studio/memberships": 200,
+      "https://beta.crefans.com/preview/studio/memberships": 200,
+      "https://admin.crefans.com/login": 200
+    },
+    "dbBackupPresent": true,
+    "runtime": {
+      "crefans-beta-frontend-1": {
+        "id": "bb7dbfb39d65cd61a49c92c1c5e0382aea2e28e8b2b83ace71b9745e0a85f5ca",
+        "image": "sha256:81a16cb03d444c3ee76e0f23deaf3efd8032254db38fc70e3c47f5b05e742259",
+        "tag": "crefans-front:membership-20261103",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-api-1": {
+        "id": "837c93a027bf6d9117db4e39ed19ecdc3317bf7e56d09b64e9ffcae761dac0c2",
+        "image": "sha256:3b7a2207ef7e7ca38e16e0c10f6c6116699a7a8c6f7470253f043edf89ddec78",
+        "tag": "crefans-api:membership-20261103",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-worker-1": {
+        "id": "590a8f764672215174bebe3a9052c1126327b22bef1f4fac4f19df16903cc0b0",
+        "image": "sha256:3b7a2207ef7e7ca38e16e0c10f6c6116699a7a8c6f7470253f043edf89ddec78",
+        "tag": "crefans-api:membership-20261103",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-admin-1": {
+        "id": "ae095a5e4e065b39f3efb03b617f28906e937e2d53d2300dfc06ce1e8ed2a39f",
+        "image": "sha256:85c30c8526508d29e3a790b185ac69948060f9d6ec838eec8ec4b7d875bc8fab",
+        "tag": "crefans-admin:referral-20261102",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-proxy-1": {
+        "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+        "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f",
+        "tag": "caddy:2-alpine",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-database-1": {
+        "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+        "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b",
+        "tag": "mysql:8.0",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      }
+    }
+  },
+  "deploy": {
+    "startedAt": "2026-11-02T15:10:04.755168+00:00",
+    "finishedAt": "2026-11-02T15:10:18.436757+00:00",
+    "exitCode": 0
+  },
+  "limits": [
+    "No physical iPhone verification",
+    "No production membership creation/deletion or actual payment was executed",
+    "Server behavior tests use a DB double; deployment checks verify compiled/source identity and runtime health",
+    "Unrelated previously unshipped feature branches were not bundled"
+  ],
+  "imageRetention": {
+    "status": "not_applied",
+    "localPlannedCount": 10,
+    "remotePlannedCount": 10,
+    "reason": "Automatic approval review rejected deletion of 10 old local Docker images as a separate destructive operation without explicit authorization for that scope; no deletion was performed, remote apply was not attempted",
+    "protected": [
+      "current release",
+      "latest three images per repository",
+      "in-use images",
+      "legal-20261102 immediate rollback release"
+    ]
+  },
+  "visualReview": [
+    "PC/mobile membership photo picker",
+    "Mobile deduction rate and estimated revenue",
+    "Mobile exact-name deletion dialog"
+  ],
+  "artifactHashes": {
+    "branch-promotion.json": "c8daa16e2968ccdb0f7f9fa8ca1463f644c516cc20708b52461735b1a205520a",
+    "browser-results/.last-run.json": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903",
+    "browser-results/membership-confirmation-me-27a41-l-and-keep-the-image-picker-mobile/membership-delete-confirm.png": "990cd69093bb1670019638c83c4b044d0362f286682bbd49a2fc3e49b0ce758f",
+    "browser-results/membership-confirmation-me-27a41-l-and-keep-the-image-picker-mobile/membership-revenue.png": "f50ddc2c6812b64df1f0bf36dd4668ed198aa472ae49fde191e913c502cb3b49",
+    "browser-results/membership-confirmation-me-27a41-l-and-keep-the-image-picker-pc/membership-delete-confirm.png": "25bac56c600176e3aba153e05220ec9a5f4ff9b60ad43bf89ad0dcf0080e8d8a",
+    "browser-results/membership-confirmation-me-27a41-l-and-keep-the-image-picker-pc/membership-revenue.png": "5bc526ce3f8cdb9d85cc500d15582901e2af8ce229c4e744ca5819f404d31da4",
+    "browser-results/membership-upload-create-a-cd1ec-eserve-save-remove-behavior-mobile/create-empty.png": "6a184f1b6d33824651d8cc931694b0242a7672e89191dbe5a2ed25a0764711a6",
+    "browser-results/membership-upload-create-a-cd1ec-eserve-save-remove-behavior-mobile/create-selected.png": "8aca47cff2d680994a694f6b3d696ae45aa269b22c257730dc7504685c0ffb85",
+    "browser-results/membership-upload-create-a-cd1ec-eserve-save-remove-behavior-pc/create-empty.png": "f2e9fcfd711ca2d8d74a8b2d4a06aebd52f76fe69982cecc413ae3094add0794",
+    "browser-results/membership-upload-create-a-cd1ec-eserve-save-remove-behavior-pc/create-selected.png": "5e6200eff4805ad344bb3f43281e31b105413a8577d9f3fc49a4e2233392c27a",
+    "browser-results/membership-upload-membersh-d8bdb-and-resets-cancelled-drafts-mobile/invalid-size.png": "4dd519b42b75235ae20324e51c61879e0166145aa822dbfa91995f961c6180a8",
+    "browser-results/membership-upload-membersh-d8bdb-and-resets-cancelled-drafts-pc/invalid-size.png": "5bd9ab7bb4ad8aeba826dfb0eae3914ad5b3a928b5271bc27c2bc6d6b4808346",
+    "browser-results.json": "2d8c5505bae011283862e2d7dfdd17c568e71c36c885553121af6d90f7844232",
+    "browser.log": "06fe6598558319594c2dea4cb7ff49b55c30da15659255235e5820b8911df2bf",
+    "build.py": "d5523ee74e2b880d5f63e5a5cf0df300eaf0a127d1a74ea0764386011c8aa87d",
+    "builds.json": "f1f6d494aced55f284b792993b64b0b5f492a39b5ea752178b66f2a794fd17c5",
+    "deploy-result.json": "7851f3abcb7989b6aff5f1a8d8314e299a43391d1561e81cd0dbc99e53a67b63",
+    "deploy.log": "945dac23be6196e5acd966ac87e9ffee71ef6dbc76ac732481af8fc0462cf9d7",
+    "deploy.sh": "5490f8136f961d94df89eae8e70732fb07df44947aac2273be08b7eb51a16e5d",
+    "docs.log": "d5df2a914c55e6677fff00f9d290da7ac696e0e14b379f6a79446d7d5c063faf",
+    "front-build.log": "f787be61c95848cf57023958085d44d178130dd5318e5771c59f01eb66e24a52",
+    "front-delta.json": "d2b27c7321b3f3661574d843541dc776292b9653e908a493b4b5f0a01ba3b47a",
+    "front-source.json": "2eb45f673a9b60ed97579b5bf57ffdff012e68abc51185c647a85d42c4cae440",
+    "images.json": "3a2b864fc0b0f073fb63f87c547560c8322f93cd647e7f86e9417ac91ca1af1e",
+    "integration.log": "079ff7aacf46595be72757703b05e19ccb073877f3467c91ea1534b4f0b4eb1e",
+    "live-before.log": "3443614cacfa0b3cc3ffbf48aa0e2c02ae33a6c3218ac4f2df301c9d9532d3d1",
+    "live-verification.json": "e3241ab360b4a695b47fb4ab0766723fcce255d3869d1a77ac5b3dd266a7fb3f",
+    "load.log": "4947af8b53442392d5ef8979e1b621c008f75bd1268d3305cbed49883bb10a54",
+    "production-preview.config.ts": "ad72a16c76062193ef04401bb931812cd409b3176fac02c66b0783c359a180a3",
+    "retention-local-plan.json": "37ef439499848bcf0a91323821e29beb8ce641193a30f848beceebb932b526d7",
+    "retention-remote-plan.json": "937084eb63ee99cd6ac35a89d8b26040dc27e68a57c311bebfba97899d5a35f3",
+    "runtime-hashes.json": "95e1de98b0ab09c4cf552501827c606a319eea1c21d845bbcb94765b62230ef7",
+    "save.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "server-build.log": "086e1b317e9c50ba7c8b491b97479c47ef125d59bbfe119920c003f4f268b693",
+    "server-delta.json": "a67d20de53286eb4ab2e7d49a67e5383b082d4389c79942b7d8ef82562cb8490",
+    "server-source.json": "056c5fd6c6cf72fdafc851fe48ffb6ea786253e6dc7e4cbde08d8e1acbe84bdb",
+    "ship.py": "189a982ae7b6f46337cc031a20519f1b1f837adf1535ba18b1ddc326bce194c8",
+    "typecheck.log": "257e4a2cb00fa6fae592277d05df5e7b60f895802456510b5c9bfed9c339fe04"
+  }
+}
