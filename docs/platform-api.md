@@ -188,7 +188,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /admin/withdrawals/:id/manual-result | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 출금 검사(수요일·잔액·확인 계좌)로 처리 중 전환 후, 운영자가 직접 이체한 결과(paid: 참조번호·이체 시각, rejected: 사유)를 한 번만 기록. 감사 `withdrawal.manual_result`. 은행 API 호출 없음 |
 | GET | /admin/settlement-accounts | 매출·정산 조회 권한. 수동 지급 모드에서 예금주 확인 대기 계좌(은행·예금주 표시명·끝 4자리, 최대 100건). 전체 계좌번호는 반환하지 않음 |
 | POST | /admin/settlement-accounts/:id/verify | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 통장 사본 등으로 예금주 확인 후 expectedVersion·확인 내용으로 기록, 이미 확인·버전 불일치는 409. 감사 `account.manual_verified` |
-| POST | /admin/beans/withdrawals/:id/manual-result | 콩 변경 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
+| POST | /admin/beans/withdrawals/:id/manual-result | SUPER_ADMIN(2026-11-02), `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
 | GET | /admin/financial-policy | 운영 설정 조회 권한; 현재 DB 수수료율/정산 보류·version 조회 |
 | PUT | /admin/financial-policy | 운영 설정 수정 권한; expectedVersion/platformFeeBps/settlementHoldDays/reason와 confirmation='정책 변경'(정확히 일치, 아니면 400 CONFIRMATION_REQUIRED), 충돌409·감사 기록 원자 반영 |
 | GET | /admin/financial-policy/history | 운영 설정 조회 권한; 최근 정책 변경100건 |
@@ -364,7 +364,7 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | POST | /studio/bean-withdrawals | quantity/accountId/authorizationId/requestId, 받은 일반콩 가용 lot를 원자 예약, 중복/경합 방지 |
 | GET | /admin/beans/overview | 활성 ADMIN/SUPER_ADMIN만 회사재고/충전·후원·출금/부채·환경별 집계, page |
 | GET | /admin/beans/wallets/:id | SUPER_ADMIN 본인 업무로 회원 지갑·원장·최근100 출처 lot/충전·배분 추적, page |
-| POST | /admin/beans/promotions | SUPER_ADMIN, memberId/quantity/reason/requestId, 회사재고→프로모션, 중복 지급 방지·사유 기록 |
+| POST | /admin/beans/promotions | SUPER_ADMIN, 1회·KST 하루 운영자 합계 10,000콩 이하(친구 초대 자동 보상 제외, 2026-11-02), memberId/quantity/reason/requestId, 회사재고→프로모션, 중복 지급 방지·사유 기록 |
 | POST | /admin/beans/charges/:id/receipt | SUPER_ADMIN, amount/reference/receivedAt/reason, live 승인된 원주문 실제입금 대사·불변 기록/감사 |
 | POST | /admin/beans/charges/:id/refund | beans.update. requestId·reason, waived=true면 회사 귀책으로 7일 이후 10% 공제 면제 |
 | GET | /admin/beans/receivables | beans.view. 열린 미수금(멤버십·콩). 지급 후 환불·차지백으로 생김(D4), 생성 시 크리에이터에게 정산 알림 |
