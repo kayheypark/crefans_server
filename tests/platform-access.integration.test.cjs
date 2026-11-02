@@ -20,8 +20,8 @@ before(async()=>{
  otherPlan=await db.membershipItem.create({data:{...data,creator_id:owner,level:5}});
  foreignPlan=await db.membershipItem.create({data:{...data,creator_id:stranger,level:5}});
  const png=await require('sharp')({create:{width:2,height:2,channels:3,background:'#abcdef'}}).png().toBuffer();
- // The video fixture tests authorization, not decoding or playback quality.
- for(const [bytes,type,name]of[[png,'image/png','access.png'],[Buffer.from([0,0,0,12,102,116,121,112,105,115,111,109]),'video/mp4','access.mp4']]){const body=new FormData();body.append('file',new Blob([bytes],{type}),name);const r=await json('/media',owner,{method:'POST',body});assert.equal(r.success,true);media.push(r.data);}
+ // The video fixture tests authorization, not playback quality; since 2026-11-02 the server probes MP4 length and size, so it must be a real file.
+ for(const [bytes,type,name]of[[png,'image/png','access.png'],[require('node:fs').readFileSync('../crefans_front/public/video_1.mp4'),'video/mp4','access.mp4']]){const body=new FormData();body.append('file',new Blob([bytes],{type}),name);const r=await json('/media',owner,{method:'POST',body});assert.equal(r.success,true);media.push(r.data);}
  post=await db.posting.create({data:{user_sub:owner,title:'구독 전용',content:secret,status:'PUBLISHED',is_membership:true,access_plan_id:plan.id,membership_level:1,medias:{create:media.map((m,i)=>({media_id:m.id,sort_order:i}))}}});
  comment=await db.comment.create({data:{posting_id:post.id,author_id:owner,content:secret}});
  reply=await db.comment.create({data:{posting_id:post.id,author_id:owner,parent_id:comment.id,content:secret}});

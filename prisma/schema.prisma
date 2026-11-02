@@ -428,6 +428,8 @@ model Posting {
   /// 베타 사후 검수: 운영자가 확인한 시각. 작성자가 수정하면 다시 null(미검수)
   reviewed_at               DateTime?
   reviewed_by               String?        @db.VarChar(191)
+  /// 팔로워 알림 보류: 게시했지만 사진·영상 처리(워터마크·변환)가 끝나지 않음. 모두 완료되면 알림 후 false (2026-11-02)
+  notify_pending            Boolean        @default(false)
   allow_individual_purchase Boolean        @default(false)
   /// 개별 구매 가격 (원)
   individual_purchase_price Decimal?       @db.Decimal(10, 0)
@@ -1881,4 +1883,14 @@ model MediaWatermarkJob {
   completed_at DateTime?
   @@index([status, next_attempt_at])
   @@map("media_watermark_jobs")
+}
+
+// A handle given up by a profile change stays reserved for that member and links to the current profile, because
+// watermarks keep printing https://crefans.com/{handle} (2026-11-02 user decision). Removed on withdrawal.
+model RetiredHandle {
+  handle String @id @db.VarChar(64)
+  member_id String @db.VarChar(191)
+  retired_at DateTime @default(now())
+  @@index([member_id])
+  @@map("retired_handles")
 }

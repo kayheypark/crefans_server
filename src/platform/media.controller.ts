@@ -1,7 +1,7 @@
 import {Controller,Get,Logger,Param,Post,Req,Res,UploadedFile,UseGuards,UseInterceptors} from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express';
 import {ConfigService} from '@nestjs/config';
-import {mkdir,writeFile,readFile,open,rename,unlink} from 'fs/promises';
+import {mkdir,writeFile,readFile,open,rename,stat,unlink} from 'fs/promises';
 import {mkdirSync} from 'fs';
 import {diskStorage} from 'multer';
 import {join,resolve} from 'path';
@@ -17,6 +17,7 @@ import {PlatformMediaStorage,managedMediaKey} from './media-storage';
 import {MAX_VIDEO_SECONDS,MAX_VIDEO_SIDE,QUICKTIME_MIME,sourcePath,videoTools} from './video-transcode';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 import {profilePhotoInUse} from './profile-photos';
+import {enqueueOperation} from './operations-events';
 @Controller('media')
 export class PlatformMediaController {
  private readonly logger=new Logger(PlatformMediaController.name);
@@ -38,19 +39,23 @@ export class PlatformMediaController {
     }else{
      const handle=await open(file.path,'r'),buffer=Buffer.alloc(12);try{await handle.read(buffer,0,12,0);}finally{await handle.close();}
      const atom=buffer.subarray(4,8).toString('latin1'),mp4=atom==='ftyp',webm=buffer.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3])),mov=['ftyp','moov','mdat','wide','free','skip','pnot'].includes(atom);
-     if(quicktime?!mov:mime==='video/mp4'?!mp4:!webm)reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');if(quicktime){
-      // Too long or larger than 4K is refused before anything is stored (user decision 2026-11-01).
-      let info:{seconds:number;side:number};try{info=await videoTools.probe(file.path);}catch{reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');}
-      if(info.seconds>MAX_VIDEO_SECONDS)reject(400,'VIDEO_TOO_LONG','동영상은 10분 이하만 올릴 수 있어요.');
-      if(info.side>MAX_VIDEO_SIDE)reject(400,'VIDEO_TOO_LARGE','4K보다 큰 동영상은 올릴 수 없어요.');
-      source=sourcePath(root,id);
-     }
-     await rename(file.path,source||destination);
+     if(quicktime?!mov:mime==='video/mp4'?!mp4:!webm)reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');
+     // Too long or larger than 4K is refused before anything is stored: QuickTime since 2026-11-01, MP4·WebM since 2026-11-02.
+     let info:{seconds:number;side:number};try{info=await videoTools.probe(file.path,mime==='video/webm'?'matroska':'mov');}catch{reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');}
+     if(info.seconds>MAX_VIDEO_SECONDS)reject(400,'VIDEO_TOO_LONG','동영상은 10분 이하만 올릴 수 있어요.');
+     if(info.side>MAX_VIDEO_SIDE)reject(400,'VIDEO_TOO_LARGE','4K보다 큰 동영상은 올릴 수 없어요.');
+     if(quicktime){source=sourcePath(root,id);await rename(file.path,source);}
+     // MP4·WebM are stored without location or other metadata; QuickTime loses it in the worker conversion.
+     else{try{await videoTools.strip(file.path,destination,mime);}catch{reject(400,'INVALID_VIDEO','동영상 파일을 확인해주세요.');}size=(await stat(destination)).size;}
     }
     const remote=this.storage.enabled;
     // Eligibility is recorded at upload, not inferred from a later post edit. Profile/plan references remain untouched.
     const creator=await this.service.db.creator.findUnique({where:{user_id:req.user.sub}});let watermarkMetadata:any=undefined;
-    if(creator?.is_active){const member=await this.service.member(req.user.sub);watermarkText(member.preferred_username);watermarkMetadata={watermarkEligible:WATERMARK_VERSION,watermarkHandle:member.preferred_username};}
+    if(creator?.is_active){const member=await this.service.member(req.user.sub);
+     // A handle outside the watermark format (older or operator-made accounts) skips the watermark instead of failing every upload;
+     // operators hear of it once per member (2026-11-02 user decision: code-only defense, no production query).
+     try{watermarkText(member.preferred_username);watermarkMetadata={watermarkEligible:WATERMARK_VERSION,watermarkHandle:member.preferred_username};}
+     catch{await enqueueOperation(this.service.db as any,'media.watermark_skipped',{memberId:req.user.sub,status:'invalid_handle'},`watermark-skipped:${req.user.sub}`);}}
     const row=await this.service.db.media.create({data:{id,user_sub:req.user.sub,type,...(watermarkMetadata?{metadata:watermarkMetadata}:{}),original_name:file.originalname.slice(0,200),file_name:id,file_size:size,mime_type:mime,original_url:`/api/v1/media/${id}/file`,s3_upload_key:remote?`platform/${id}`:`local/${id}`,processing_status:quicktime?'PROCESSING':remote?'UPLOADING':'COMPLETED',processed_at:remote||quicktime?null:new Date()}});tracked=true;
     if(quicktime)return{id:row.id,type:'video',url:row.original_url,processing:true};
     if(remote){await this.storage.put(id,destination,mime,size);await this.service.db.media.update({where:{id},data:{processing_status:'COMPLETED',processed_at:new Date()}});}saved=true;

@@ -117,7 +117,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | PUT | /studio/comments/:id/replies/:replyId | body 1~1000자, 내 게시물의 해당 부모에 내가 쓴 답글만 수정 |
 | DELETE | /studio/comments/:id/replies/:replyId | 같은 소유권 검사, soft delete·댓글 수 1회 감소 |
 | GET | /studio/reports/:id | revenue/subscribers/followers, startDate/endDate |
-| POST | /media | 소유권 있는 업로드; image 5MB/video 300MB |
+| POST | /media | 소유권 있는 업로드; image 5MB/video 300MB, 영상 10분·4K 이하(2026-11-02 MP4·WebM도). MP4·WebM은 메타데이터(위치) 제거 후 저장 |
 | GET | /media/:id/file | owner/게시물 권한/공개 멤버십 이미지에 따른 파일 응답; CDN 캐시 적중도 현재 권한 검사 |
 | GET | /media/:id/edge-authorize | 엣지 HMAC + 현재 세션/콘텐츠 권한; S3 객체 키 또는 legacy API 경로 선택, 파일 바이트 없음 |
 | GET | /media/:id/origin-file | 동일 권한 검사를 적용한 직접 스트리밍; legacy/롤백 경로 |

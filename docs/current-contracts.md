@@ -361,8 +361,9 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261101120000_referral_hold`
 - `20261101150000_media_watermark`
 - `20261101150000_platform_settings`
+- `20261102140000_watermark_followups`
 
-## Prisma 전체 정의 (86 models · 15 enums)
+## Prisma 전체 정의 (87 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -797,6 +798,8 @@ model Posting {
   /// 베타 사후 검수: 운영자가 확인한 시각. 작성자가 수정하면 다시 null(미검수)
   reviewed_at               DateTime?
   reviewed_by               String?        @db.VarChar(191)
+  /// 팔로워 알림 보류: 게시했지만 사진·영상 처리(워터마크·변환)가 끝나지 않음. 모두 완료되면 알림 후 false (2026-11-02)
+  notify_pending            Boolean        @default(false)
   allow_individual_purchase Boolean        @default(false)
   /// 개별 구매 가격 (원)
   individual_purchase_price Decimal?       @db.Decimal(10, 0)
@@ -2250,5 +2253,15 @@ model MediaWatermarkJob {
   completed_at DateTime?
   @@index([status, next_attempt_at])
   @@map("media_watermark_jobs")
+}
+
+// A handle given up by a profile change stays reserved for that member and links to the current profile, because
+// watermarks keep printing https://crefans.com/{handle} (2026-11-02 user decision). Removed on withdrawal.
+model RetiredHandle {
+  handle String @id @db.VarChar(64)
+  member_id String @db.VarChar(191)
+  retired_at DateTime @default(now())
+  @@index([member_id])
+  @@map("retired_handles")
 }
 ```
