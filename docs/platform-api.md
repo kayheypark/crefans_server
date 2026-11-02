@@ -347,6 +347,9 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 
 | Method | 경로 | 의미·검증 |
 | --- | --- | --- |
+| GET | /events/founding-badge | 세션 본인 배지 상태 available/claimed/ineligible/unavailable, claimedAt, visible. 신규 지급 없이 조회. private/no-store |
+| POST | /events/founding-badge/claim | 빈 객체만 허용. 확정 회원 명단 최대16·누적16·본인1회. 캠페인→회원 행 잠금 후 재검사, 수령 시각·표시 설정·감사를 원자 저장. 재시도는 이전 기록 반환 |
+| PUT | /me/founding-badge | {visible:boolean}만 허용. 세션 본인이 이미 수령한 배지의 표시·숨김만 변경. 미수령409 BADGE_NOT_CLAIMED, 잘못된 값400 |
 | GET | /events/promotion-beans | 회원 본인 이벤트 상태만. available/claimed/ineligible/unavailable, quantity100, claimedAt. 원장 변경 없음, 대상 명단 비공개 |
 | POST | /events/promotion-beans/claim | 회원 본인 고정100콩 즉시 수령. 빈 객체만 허용(400 INVALID_EVENT_CLAIM). 대상 명단/총13회 재검사, 회사/회원 잠금과 BeanPromotion 고유 키로 중복 방지. 잔액·로트·감사 원자적 반영. 재시도는 기존 지급 시각 반환, 신규 지급 없이 ineligible/unavailable 반환 가능 |
 | GET | /beans/wallet | 세션 본인 지갑 멱등 생성·5원장잔액·사용가용 합/일반·프로모션 세부합·일반·프로모션 후원 출처 심사 후 출금가용 합/종류별 합·필터 후 충전/이동 각20건·총수, page/from/to/status/direction (후속 필터는 로컬 반영) |
@@ -501,3 +504,9 @@ AdProduct 응답: id/name/description/terms/placement/amount/durationDays/visibl
 기존 확정 팬13명·1인1회 정책을 구현한다. `PROMOTION_EVENT_MEMBER_IDS`는 운영자가 확인한 팬 회원 ID의 JSON 배열(중복 없이1~13명). 미설정·잘못된 값은 신규 지급 불가이며 명단을 공개 API에 반환하지 않는다. 대상 확대는 별도 결정이며 이메일 패턴/가입 순서/현재 로그인만으로 선정하지 않는다. 이전 수동 지급 여부와 동일인의 중복 계정을 운영자가 확인한 후 지정한다. 현재 명단은 설정하지 않았다.
 `BEAN_LEDGER_ENABLED=true`와 활성·이메일 확인 회원·명단 포함·누적13회 미만을 검사한다. 회사 지갑을 먼저 잠근 뒤 모두 재검사하고 고정100을 재고→promotion으로 이동한다. 같은 트랜잭션에서 BeanPromotion(`event:promotion-beans-v1:`+회원ID SHA256 키), 유효5년 BeanLot, 감사/운영 outbox를 기록한다. Actor는 `system:event:promotion-beans-v1`로 운영자 수동 지급의 일한도와 분리하되 캠페인 누적13회/1300콩 상한을 별도 강제한다. 대상 명단 교체로 총한도가 초기화되지 않으며 이전 수령 상태는 명단 제외·기능 중지 뒤에도 조회된다. 재고 부족/동결/저장 실패 시 전부 취소된다. 출금 조건과 후원 수익 출처 검증은 기존 프로모션과 같다. 신규 DB migration 없음.
 검증은 tests/platform-event-claim.test.cjs의 로컬 MySQL8건과 platform-openapi.test.cjs의 대역 인증 HTTP12건. 실제 PG·은행·메일·운영 명단/지급/배포는 미실행. 근거(2026-11-03): [OWASP 원자적 업무 검증](https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html), [Prisma6 트랜잭션·멱등성](https://www.prisma.io/docs/orm/v6/prisma-client/queries/transactions).
+
+### 원년멤버 배지 받기 (2026-11-03, 미배포)
+`FOUNDING_BADGE_MEMBER_IDS`는 기존 참여 확정 회원(크리에이터3명·팬13명)의 회원ID JSON 배열이다. 중복 없는1~16개만 유효하며 비어 있거나 잘못된 값이면 신규 수령을 중지한다. 실제 계정 명단은 아직 미설정이다. 가입 순서·이메일 패턴으로 대상을 추정하거나 전체 회원에게 확대하지 않는다. 운영자가 동일인의 중복 계정을 확인한 뒤 지정해야 한다.
+회원의 `founding_badge_claimed_at`(nullable)과 `founding_badge_visible`(기본false)에 저장한다. 새 migration은 두 컬럼과 `platform_settings`의 `event.founding-badge` 잠금용 행만 추가하며 기존 회원에게 배지를 자동 부여하지 않는다. 이 행은 운영 on/off 설정이 아니라 동시 수령의 누적16명 제한을 직렬화하기 위한 내부 잠금이다. ReadCommitted 트랜잭션에서 캠페인 행→회원 행 순서로 잠근 후 활성/미탈퇴/미정지/이메일 확인·대상·수령 여부·누적 한도를 재검사한다. 감사 실패까지 전체 롤백한다. 명단 교체로 누적 한도가 초기화되지 않는다. 콩 재고·금융 원장은 변경하지 않는다.
+이미 수령한 활성 회원은 명단 제외 뒤에도 기록을 조회하고 표시 여부를 바꿀 수 있다. 재수령 요청은 숨김 상태를 강제로 켜지 않는다. 공개 프로필·bootstrap viewer/creator·팔로워·댓글·스튜디오 커뮤니티의 `isFoundingMember`는 활성·미탈퇴·실제 수령·표시 선택을 모두 충족할 때만 true다. 개인 수령일이나 비공개 명단을 공개 응답에 넣지 않는다. 인증 배지의 `isVerified`와 독립적이다.
+검증: [배지 검사](../tests/platform-founding-badge.test.cjs)의 실제 로컬 MySQL8건 및 [API 검사](../tests/platform-openapi.test.cjs)의 인증 대역 HTTP13건. 운영 DB/migration/실회원 지급·운영 배포는 미실행. 공식 근거 확인2026-11-03: [OWASP 업무 권한·원자성](https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html), [Prisma6 트랜잭션](https://www.prisma.io/docs/orm/v6/prisma-client/queries/transactions). 회원당1회·16명 대상은 기존 사용자 정책이며, 트랜잭션/잠금은 그 정책을 지키는 구현이다.

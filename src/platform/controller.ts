@@ -11,6 +11,9 @@ export class PlatformController {
  constructor(private service:PlatformService,private emailChange:EmailChangeService,private categories:CategoriesService){}
  @Get('categories/:id/icon/:version') categoryIcon(@Param('id') id:string,@Param('version') version:string,@Res() res:any){return this.categories.image(id,version,res);}
  @Get('health') async health(){await this.service.db.$queryRaw`SELECT 1`;return{status:'ready',version:'v1'};}
+ @Get('events/founding-badge') @Header('Cache-Control','private, no-store') @UseGuards(PlatformAuthGuard) foundingBadge(@Req() r:any){return this.service.foundingBadge(r.user.sub);}
+ @Post('events/founding-badge/claim') @UseGuards(PlatformAuthGuard) claimBadge(@Req() r:any,@Body() b:any){return this.service.claimBadge(r.user.sub,b);}
+ @Put('me/founding-badge') @UseGuards(PlatformAuthGuard) badgeVisibility(@Req() r:any,@Body() b:any){return this.service.badgeVisibility(r.user.sub,b);}
  @Get('session') @UseGuards(PlatformAuthGuard) session(){return{active:true};}
  @Get('bootstrap') @UseGuards(PlatformOptionalAuthGuard) bootstrap(@Req() r:any,@Query('collection') collection:string){return this.service.bootstrap(r.user?.sub,collection);}
  @Get('creators') @UseGuards(PlatformOptionalAuthGuard) creators(@Query('query') query:string,@Query('category') category:string,@Query('cursor') cursor:string,@Req() r:any){return this.service.directory(r.user?.sub,query,category,cursor);}

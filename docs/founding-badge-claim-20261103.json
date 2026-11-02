@@ -1,0 +1,99 @@
+{
+  "recordedAt": "2026-11-02T17:48:12.628291+00:00",
+  "repo": "crefans_server",
+  "branch": "feat/founding-badge-claim",
+  "startingHead": "32109c338bb794e4da38a1cd9dbf63958a7bb0dd",
+  "prodBase": "d4238d922641277f6e5364f27d2484a8641afdb1",
+  "workingTreeAtVerification": "uncommitted feature changes; exact product file hashes below",
+  "environment": {
+    "host": "macOS-15.2-arm64-arm-64bit-Mach-O",
+    "node": "v22.7.0",
+    "database": "local MySQL 127.0.0.1:3307/crefans_platform_e2e only",
+    "providers": "none called"
+  },
+  "acceptance": [
+    "explicit click only",
+    "confirmed3creator+13fan policy",
+    "member/session scoped,one claim",
+    "cumulative16 under concurrency/allowlist rotation",
+    "public shown only owned+visible",
+    "hide persists through retry",
+    "audit failure rolls back"
+  ],
+  "commands": [
+    {
+      "command": "node node_modules/prisma/build/index.js generate",
+      "log": ".local/badge-claim-20261103/generate.log",
+      "logModifiedAt": "2026-11-02T17:37:59.795361+00:00",
+      "exitCode": 0,
+      "result": "Prisma6.9 generated in private dependency clone",
+      "sha256": "43bdc6998e39cb7d654cb8cdffdb88e63dabd741198d1f2489170db311b58eae"
+    },
+    {
+      "command": "npm run build",
+      "log": ".local/badge-claim-20261103/build.log",
+      "logModifiedAt": "2026-11-02T17:37:59.908486+00:00",
+      "exitCode": 0,
+      "result": "Nest build passed",
+      "sha256": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2"
+    },
+    {
+      "command": "CREFANS_E2E=true node --test tests/platform-founding-badge.test.cjs",
+      "log": ".local/badge-claim-20261103/db-tests.log",
+      "logModifiedAt": "2026-11-02T17:40:45.682657+00:00",
+      "exitCode": 0,
+      "result": "8/8 local MySQL E2E; additive migration applied only to e2e DB",
+      "sha256": "f267593e5cfff16ad4275bb0ada523b628baf4fcb288736a2e16745d7a8e77a1"
+    },
+    {
+      "command": "node --test tests/platform-openapi.test.cjs",
+      "log": ".local/badge-claim-20261103/openapi.log",
+      "logModifiedAt": "2026-11-02T17:41:24.944844+00:00",
+      "exitCode": 0,
+      "result": "13/13 HTTP/auth doubles;191operations; new3routes protected",
+      "sha256": "b6d75e73452e6f17d63dd880a013fea06327ce9776bf7a7c42d4f09bc68c79b5"
+    },
+    {
+      "command": "node --test --test-name-pattern=visible preference alone tests/platform-founding-badge.test.cjs (mutated compiled helper)",
+      "log": ".local/badge-claim-20261103/negative.log",
+      "logModifiedAt": "2026-11-02T17:44:09.579013+00:00",
+      "exitCode": 1,
+      "result": "expected failure proves unowned display detected",
+      "sha256": "e99e13a74c4c349353dd21862122955f655cb14e9d1dec5b079bbd9b7f1b6816"
+    },
+    {
+      "command": "CREFANS_E2E=true node --test tests/platform-founding-badge.test.cjs (restored)",
+      "log": ".local/badge-claim-20261103/db-final.log",
+      "logModifiedAt": "2026-11-02T17:44:10.313646+00:00",
+      "exitCode": 0,
+      "result": "8/8; compiled original SHA restored",
+      "sha256": "e20771be042c5f283edf2ce3c528809fd72b3e28448bac4c3f1316543dccb3b4"
+    }
+  ],
+  "files": {
+    "src/platform/founding-badge.ts": "0d2c2c9616d048249da53401c9dfc2b8f4399759b14d7d95fca724bc1799bfda",
+    "src/platform/controller.ts": "a7c6e3763bceb3b5173b2dcaba2af4a9ff6906811dbe599f3c3d5249038d4f75",
+    "src/platform/service.ts": "5a0324fe55841f7b27c64e869347c0382f39a288c2a80d33630296bcde11c65c",
+    "src/platform/studio.service.ts": "9adce9dc69c91203c6a54f55234ad3fc80ff91036dc2318333f264d57e76b365",
+    "src/platform/openapi-contract.ts": "bf447cc0c1c13ecb7cd971e14b22f5f28a774a2adbef6cfdbf9851ba41146e97",
+    "prisma/schema.prisma": "712f60fed6795fb5c3a4e29818d5d54a0f1a82c58e715dd58fa9bed525849f8c",
+    "prisma/migrations/20261103120000_founding_badge_claim/migration.sql": "1d01e00e146dca9555cdeb2a67ec91018cfb0d37ea29df825389766f46fd000f",
+    "infra/platform/runtime.env.example": "5f532f59fa227e8695b8b963b8746a291843ca7f30519b9170e5dff47cc774e7",
+    "tests/platform-founding-badge.test.cjs": "44156dd4f496bf597cba76b95877c3ccf66cb397e04ce6f2f36893005b29492f",
+    "tests/platform-openapi.test.cjs": "619a12f0e9d9c189da65ab00238189b6551afea7ec9bbf947c67bd867c12cbf0"
+  },
+  "research": {
+    "checkedAt": "2026-11-03",
+    "sources": [
+      "https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html",
+      "https://www.prisma.io/docs/orm/v6/prisma-client/queries/transactions"
+    ],
+    "application": "server-derived member/eligibility; member PK, transaction and campaign/member row locks;16-person policy from earlier user approval"
+  },
+  "limitations": [
+    "production eligible member list unset",
+    "not integrated into dev/prod or deployed",
+    "production migration/grants not performed",
+    "same-human multiaccounts require operator-confirmed list; no new identity matching"
+  ]
+}

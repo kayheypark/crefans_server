@@ -120,6 +120,8 @@
 | GET | `/api/v1/common` | `src/platform/controller.ts::common` |
 | GET | `/api/v1/creators` | `src/platform/controller.ts::creators` |
 | POST | `/api/v1/creators/:id/tips` | `src/platform/beans.controller.ts::tip` |
+| GET | `/api/v1/events/founding-badge` | `src/platform/controller.ts::foundingBadge` |
+| POST | `/api/v1/events/founding-badge/claim` | `src/platform/controller.ts::claimBadge` |
 | GET | `/api/v1/events/promotion-beans` | `src/platform/beans.controller.ts::promotionEvent` |
 | POST | `/api/v1/events/promotion-beans/claim` | `src/platform/beans.controller.ts::claimPromotionEvent` |
 | GET | `/api/v1/health` | `src/platform/controller.ts::health` |
@@ -130,6 +132,7 @@
 | POST | `/api/v1/marketing/unsubscribe` | `src/platform/marketing.controller.ts::unsubscribe` |
 | POST | `/api/v1/me/email/confirm` | `src/platform/controller.ts::emailConfirm` |
 | POST | `/api/v1/me/email/request` | `src/platform/controller.ts::emailRequest` |
+| PUT | `/api/v1/me/founding-badge` | `src/platform/controller.ts::badgeVisibility` |
 | GET | `/api/v1/me/handle-availability` | `src/platform/controller.ts::handleAvailability` |
 | POST | `/api/v1/me/inquiries` | `src/platform/controller.ts::inquiry` |
 | PUT | `/api/v1/me/profile` | `src/platform/controller.ts::profile` |
@@ -291,7 +294,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 ### server
 
-환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `PROMOTION_EVENT_MEMBER_IDS`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`
+환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `PROMOTION_EVENT_MEMBER_IDS`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`, `FOUNDING_BADGE_MEMBER_IDS`
 
 | 명령 | package.json 실행문 |
 | --- | --- |
@@ -367,6 +370,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261102140000_watermark_followups`
 - `20261102160000_withdrawn_handle_reservation`
 - `20261102161000_referral_revoke`
+- `20261103120000_founding_badge_claim`
 
 ## Prisma 전체 정의 (87 models · 15 enums)
 
@@ -1458,6 +1462,8 @@ model Member {
   // Withdrawal (decision 2026-10-29): personal data is purged 30 days after withdrawn_at; purged_at marks completion.
   withdrawn_at       DateTime?
   purged_at          DateTime?
+  founding_badge_claimed_at DateTime?
+  founding_badge_visible Boolean @default(false)
   sessions           MemberSession[]
   challenges         MemberChallenge[]
   @@index([nickname])

@@ -1,3 +1,11 @@
+## 2026-11-03 원년멤버 배지 직접 받기 — 로컬 완료·미배포
+- 최신 origin/prod d4238d9에서 feat/founding-badge-claim 생성, 앞선 프로모션100콩32109c3을 fast-forward로 보존. 별도 작업트리/private node_modules의 Prisma6.9 client 사용; 다른 작업트리/공유 client 미변경.
+- 합격 조건: 수령 클릭 전 미지급, 확정 회원 본인1회·누적16, 동시/재시도 중복 방지, 오류 원자 롤백, 수령 후 프로필 표시·숨김/다시 표시. 기존 크리에이터3·팬13명 정책 유지. 활성·미탈퇴·미정지·이메일확인, 서버 비공개 명단. 운영자 실계정 대상 확정은 남아있으며 빈 명단 기본 중지.
+- Member 수령일/표시 컬럼2개와 캠페인 잠금 행 migration1개. GET events/founding-badge, POST events/founding-badge/claim, PUT me/founding-badge. 기존 개인·크리에이터 프로필/공유 이름 데이터의 공개 배지 flag 반영, 인증/콩 원장 불변.
+- Nest build 성공, 격리 MySQL8건(동시16요청, 마지막1자리 동시신청, 명단 회전 후 누적16, 잘못된body/비대상/비활성, 숨김 유지, 감사실패 롤백) 통과. OpenAPI13건/191경로/유저83 통과; 새3경로 무인증·잘못된 쿠키401 및 세션 본인 연결은 실제 로컬 HTTP+인증 대역. 공개 helper의 소유검사를 제거한 대조 검사는 실패(exit1), 원복 SHA동일 및 실제DB8건 재통과.
+- 공식 근거(2026-11-03) OWASP Business Logic Security, Prisma6 transactions를 재확인하여 서버 권한/잠금/트랜잭션 적용. URL과 판단은 docs/platform-api.md. 증거 docs/founding-badge-claim-20261103.json, 원본 .local/badge-claim-20261103/.
+- 다음: 운영자가 실제 대상 명단 확인→배포 요청 시 dev통합 검증→prod승격→운영migration/API/front순서 배포. 현재 운영 데이터/환경/실회원 지급/배포 미실행. 소유 여부는 계정 단위이며 동일인의 다중계정 식별을 자동 보장하지 않는다.
+
 ## 2026-11-03 프로모션100콩 즉시 수령 — 구현·로컬 검증 완료, 미배포
 - origin/prod d4238d9 기준 feat/promotion-beans-claim. 기존 확정 팬13명·1인1회 정책 유지, 대상 확대 질문 답변은 아직 없음. 서버의 비공개 명단(최대13계정)과 이벤트 누적13회 제한. 명단 미설정 시 지급하지 않으며 운영 명단·환경·DB는 변경하지 않았다.
 - GET events/promotion-beans와 POST events/promotion-beans/claim. 인증 세션 본인/활성·이메일 확인/대상 검증, 빈 body, 고정100·서버고정키, 회사 선행 잠금 안 재검사. 회사 재고→promotion·5년 로트·감사/outbox 원자적 반영. 재시도는 이전 지급 시각. 기존 수동 지급 정책/후원 수익 출금 조건 유지, migration 없음.
