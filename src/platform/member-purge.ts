@@ -7,12 +7,17 @@ import {appendAudit} from './audit';
 export const PURGE_GRACE_DAYS=30;
 export const WITHDRAWN_NAME='탈퇴한 사용자';
 export const INQUIRY_RETENTION_DAYS=3*365;
+export const INVITE_RETENTION_DAYS=5*365;
 export async function purgeWithdrawnMembers(db:any,now=new Date()){
  const due=await db.member.findMany({where:{withdrawn_at:{lte:new Date(now.getTime()-PURGE_GRACE_DAYS*86400000)},purged_at:null,enabled:false},select:{id:true,email:true},take:50,orderBy:{withdrawn_at:'asc'}});
  for(const m of due)await db.$transaction((tx:any)=>purgeMember(tx,m.id,m.email,now));
  // Inquiries of purged members are consumer-dispute records: kept 3 years after purge (전자상거래법 시행령 제6조), then deleted.
  const expired=await db.member.findMany({where:{purged_at:{lte:new Date(now.getTime()-INQUIRY_RETENTION_DAYS*86400000)}},select:{id:true},take:200});
  if(expired.length)await db.supportTicket.deleteMany({where:{member_id:{in:expired.map((m:any)=>m.id)}}});
+ // Invite lists and friend-invite records of purged members are kept 5 years as the basis of settlement terms and reward
+ // reclaim disputes, then deleted (2026-11-02 user decision, privacy policy §7).
+ const aged=(await db.member.findMany({where:{purged_at:{lte:new Date(now.getTime()-INVITE_RETENTION_DAYS*86400000)}},select:{id:true}})).map((m:any)=>m.id);
+ if(aged.length){await db.signupInvite.deleteMany({where:{member_id:{in:aged}}});await db.referralSignup.deleteMany({where:{OR:[{member_id:{in:aged}},{referrer_id:{in:aged}}]}});await db.referral.deleteMany({where:{member_id:{in:aged}}});}
  return due.length;
 }
 // Also the console's immediate erase (SUPER_ADMIN, 2026-10-30): the same scope without the 30-day wait, so the email is free at once.

@@ -1,14 +1,16 @@
 require('reflect-metadata');
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {ConfigService}=require('@nestjs/config');
-const {LegalDocumentsService}=require('../dist/src/platform/legal-documents');
+const {LegalDocumentsService,LEGAL_NOTICE_DATE,NEXT_TERMS_EFFECTIVE}=require('../dist/src/platform/legal-documents');
 const {PlatformAuthService}=require('../dist/src/platform/auth.service');
 const {PlatformService}=require('../dist/src/platform/service');
 const {publishedCatalog,blockedCatalog}=require('./legal-fixture.cjs');
 const error=code=>e=>e.getResponse().code===code;
 test('the released documents take effect on 2026-10-30 with no open items (2026-10-30 /pilot-work)',()=>{
  const source=new LegalDocumentsService();assert.deepEqual(source.catalog().blockers,[]);assert.equal(source.signup().signupReady,true);
- for(const d of [...Object.values(source.catalog().documents),source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
+ for(const d of [source.catalog().documents.terms,source.catalog().documents.policy,source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
+ // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,LEGAL_NOTICE_DATE);assert.equal(p.effectiveAt,LEGAL_NOTICE_DATE);assert.equal(p.version,`${LEGAL_NOTICE_DATE}.1`);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -65,11 +67,16 @@ test('privacy policy describes the actual withdrawal purge: 30-day grace, erased
  assert.match(body,/탈퇴 후 30일 동안은/);assert.match(body,/작성한 게시물을 삭제합니다/);assert.match(body,/“탈퇴한 사용자”로 표시/);
  assert.doesNotMatch(body,/회원 정보 전체를 파기하지 않습니다/);
 });
-test('the 2026-11-30 revision is published as upcoming and replaces the terms and policy on that KST date only',()=>{
- const legal=new LegalDocumentsService(),before=legal.catalog(new Date('2026-11-29T23:59:00+09:00')),after=legal.catalog(new Date('2026-11-30T00:00:00+09:00'));
- assert.equal(before.documents.terms.version,'2026-10-30.3');assert.equal(before.upcoming.effectiveAt,'2026-11-30');assert.equal(before.upcoming.documents.terms.version,'2026-11-30.1');
- assert.equal(after.documents.terms.version,'2026-11-30.1');assert.equal(after.documents.policy.version,'2026-11-30.1');assert.equal(after.upcoming,undefined);
- assert.equal(after.documents.privacy.version,before.documents.privacy.version,'privacy policy is not part of this revision');
- const terms=JSON.stringify(after.documents.terms);for(const added of ['11. 콩','10%를 공제','미수금','세금 처리 방식(원천징수 여부 포함)','신고한 회원에게 앱 알림','볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다','오픈베타'])assert.ok(terms.includes(added),added);
- for(const removed of ['17개 계정','법정 원천징수는 별도'])assert.ok(!terms.includes(removed),removed);
+test('the merged revision is published as upcoming and replaces the terms and policy on its KST effective date only (2026-11-02 re-notice)',()=>{
+ const legal=new LegalDocumentsService(),before=legal.catalog(new Date('2026-12-01T23:59:00+09:00')),after=legal.catalog(new Date('2026-12-02T00:00:00+09:00'));
+ assert.equal(NEXT_TERMS_EFFECTIVE,'2026-12-02','30 days after the 2026-11-02 notice');assert.equal(legal.catalog(new Date('2026-11-30T12:00:00+09:00')).documents.terms.version,'2026-10-30.3','the old 11-30 date no longer applies');
+ assert.equal(before.documents.terms.version,'2026-10-30.3');assert.equal(before.upcoming.effectiveAt,'2026-12-02');assert.equal(before.upcoming.documents.terms.version,'2026-12-02.1');
+ assert.equal(after.documents.terms.version,'2026-12-02.1');assert.equal(after.documents.policy.version,'2026-12-02.1');assert.equal(after.upcoming,undefined);
+ assert.equal(after.documents.privacy.version,before.documents.privacy.version,'the privacy revision already applies from the notice day');
+ const terms=JSON.stringify(after.documents.terms);
+ for(const added of ['11. 콩','10%를 공제','미수금','신고한 회원에게 앱 알림','볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다','오픈베타','회사가 부담하여 신고·납부','화요일 23:59','다음 영업일','친구 초대 보상 등으로 무상 지급한 프로모션콩','12. 친구 초대','남은 콩을 회수','https://crefans.com/핸들','끌 수 없습니다'])assert.ok(terms.includes(added),added);
+ for(const removed of ['17개 계정','법정 원천징수는 별도','세금 처리 방식(원천징수 여부 포함)','공휴일·신청 마감 등 세부 일정','운영자가 지급한 프로모션콩'])assert.ok(!terms.includes(removed),removed);
+ const privacy=JSON.stringify(before.documents.privacy);
+ for(const added of ['메타데이터를 제거','운영자가 통장 사본 등으로 확인','처리를 마친 날부터 3년','회원 정보 파기 후 5년','재사용 금지 목록','ab***@n***.com','해시 값(앞 12자리)','edpo.com/telegram-gdpr-data-request'])assert.ok(privacy.includes(added),added);
+ for(const removed of ['본인확인된 예금주명','문의·신고 기록은','요청·기록·회원·거래 식별자'])assert.ok(!privacy.includes(removed),removed);
 });
