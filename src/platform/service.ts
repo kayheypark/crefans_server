@@ -23,9 +23,9 @@ const notificationLabels:Record<string,string>={subscription:'멤버십',comment
 @Injectable()
 export class PlatformService {
  constructor(public db:PrismaService,private legal:LegalDocumentsService=new LegalDocumentsService(),private config:ConfigService=new ConfigService()){}
- foundingBadge(member:string){return foundingBadgeStatus(this.db,this.config,member);}
- claimBadge(member:string,input:any){return claimFoundingBadge(this.db,this.config,member,input);}
- badgeVisibility(member:string,input:any){return setFoundingBadgeVisibility(this.db,this.config,member,input);}
+ foundingBadge(member:string){return foundingBadgeStatus(this.db,member);}
+ claimBadge(member:string,input:any){return claimFoundingBadge(this.db,member,input);}
+ badgeVisibility(member:string,input:any){return setFoundingBadgeVisibility(this.db,member,input);}
  beta(){return isBeta(this.config);}
  paymentSwitches(){return{livePayments:livePayments(this.config),manualPayouts:manualPayouts(this.config)};}
  async creator(id:string){const c=await this.db.creator.findFirst({where:{OR:[{user_id:id},{id},{handle:id}]}});if(!c)reject(404,'CREATOR_NOT_FOUND','크리에이터를 찾을 수 없습니다.');return c;}

@@ -197,9 +197,9 @@ add('post','admin/revenue/{id}/receipt','금융 정책','PG 실제 입금 수동
 // Bean support is independent from membership checkout and income ledgers.
 const beanQuantity={type:'integer' as const,minimum:1,maximum:100000};
 const beanInput=object({quantity:beanQuantity,requestId:maxString(100)},['quantity','requestId']);
-const eventClaimResponse=object({status:enumeration('available','claimed','ineligible','unavailable'),quantity:integer,claimedAt:{type:'string',format:'date-time',nullable:true}});
-add('get','events/promotion-beans','콩','프로모션 100콩 이벤트 수령 상태',{response:eventClaimResponse,description:'본인 상태만 조회. 운영자가 지정한 확정 팬13명, 이벤트 전체13회·계정당1회100콩. 명단 미설정/오류 또는 콩 기능 중지 시 신규 지급 불가. 지급 명단/다른 회원 정보는 반환하지 않습니다.'});
-add('post','events/promotion-beans/claim','콩','프로모션 100콩 즉시 받기',{body:object({}),response:eventClaimResponse,description:'빈 객체만 허용. 수량·회원·멱등키는 서버 고정. 회사 지갑 잠금 안에서 대상/누적13회/이전 수령을 재검사하고 재고·원장·유효5년 프로모션 로트·감사를 함께 커밋. 재시도는 기존 지급 시각 반환. 본인 지급 콩은 출금 불가, 후원 수익 조건은 기존 정책 유지.'});
+const eventClaimResponse=object({status:enumeration('available','claimed','ineligible','unavailable'),quantity:integer,claimedAt:{type:'string',format:'date-time',nullable:true},expiresAt:{type:'string',format:'date-time',nullable:true}});
+add('get','events/promotion-beans','콩','프로모션 100콩 이벤트 수령 상태',{response:eventClaimResponse,description:'본인 상태만 조회. 활성·이메일 확인된 전체 회원에게 계정당1회100콩. 명단/인원 상한 없음. 콩 기능 중지 시 신규 지급 불가. 수령 시각과 원본 로트의 만료 시각을 반환하며 만료 후에도 재수령 불가.'});
+add('post','events/promotion-beans/claim','콩','프로모션 100콩 즉시 받기',{body:object({}),response:eventClaimResponse,description:'빈 객체만 허용. 수량·회원·멱등키는 서버 고정. 회사 지갑 잠금 안에서 계정 상태/이전 수령을 재검사하고 재고·원장·수령 시점부터30일 프로모션 로트·감사를 함께 커밋. 재시도는 기존 지급·만료 시각 반환. 본인 지급 콩은 출금 불가, 후원 수익 조건은 기존 정책 유지.'});
 add('get','beans/wallet','콩','내 콩 지갑·이동 내역',{query:[query('page',integer),query('from',date),query('to',date),query('status',enumeration('pending','processing','paid','failed','cancelled','disputed')),query('direction',enumeration('in','out'))],response:json,description:'본인 지갑만 조회. 기간은 KST 날짜 양끝 포함. 충전 주문 status/이동 delta 부호 direction 필터를 전체 목록에 적용한 뒤 각각20개씩 페이지네이션. chargesTotal/entriesTotal은 필터 적용 총수. charges[].createdAt은 주문 생성 ISO 시각으로 화면 CF-YYYYMMDDHHmmss(KST) 표시용. UUID id는 결제/권한 식별에 계속 사용. BigInt 잔액/증감은10진 문자열이며 지갑 잔액은 필터와 무관. 후원 이동은 movement.tip에 sourceType/postTitle/postTitleSource/postAvailable을 제공합니다. 기존 원장 reason은 수정하지 않습니다.'});
 add('post','beans/charges','콩','일회성 콩 충전 주문·재고 예약',{body:beanInput,response:json});
 add('get','beans/charges/{id}','콩','본인 충전 주문 조회',{response:json});
@@ -265,6 +265,6 @@ add('get','admin/members/{id}/terms','관리자','크리에이터 개별 수수�
 add('put','admin/members/{id}/terms','관리자','크리에이터 개별 수수료·출금 조건 변경',{body:object({...termsConfirm,reason:maxString(500),expectedVersion:integer},['expectedVersion','reason']),response:object({terms:ref('CreatorTerms'),version:integer,message:str()}),description:'members.update + settings.update, 확인 문구 \'정책 변경\'. 이후 신규 구독 결제·출금 신청부터 적용. 기존 결제와 진행 중 정기결제 조건은 유지. 변경 사유 필수, 저장마다 creator_financial_term_changes에 이력 1행.'});
 
 const foundingBadge=object({status:enumeration('available','claimed','ineligible','unavailable'),claimedAt:nullable(time),visible:bool});
-add('get','events/founding-badge','계정','원년멤버 배지 수령 상태',{response:foundingBadge,description:'인증된 본인만 조회. 확정 참여자 명단 최대16명. 수령하지 않으면 표시되지 않습니다.'});
-add('post','events/founding-badge/claim','계정','원년멤버 배지 받기',{body:{type:'object',properties:{},additionalProperties:false},response:foundingBadge,description:'세션 본인에게1회 지급. 동시·재시도는 기존 수령 기록 반환. 신규 지급 누적16명, 빈/오류 명단은 중지.'});
+add('get','events/founding-badge','계정','원년멤버 배지 수령 상태',{response:foundingBadge,description:'인증된 본인만 조회. 활성·이메일 확인된 전체 회원 대상. 수령하지 않으면 표시되지 않습니다.'});
+add('post','events/founding-badge/claim','계정','원년멤버 배지 받기',{body:{type:'object',properties:{},additionalProperties:false},response:foundingBadge,description:'세션 본인에게1회 지급. 동시·재시도는 기존 수령 기록 반환. 명단과 인원 상한 없음. 조회만으로 지급하지 않으며 미탈퇴·미정지·이메일 확인 상태를 검사합니다.'});
 add('put','me/founding-badge','계정','원년멤버 배지 표시·숨김',{body:object({visible:bool},['visible']),response:foundingBadge,description:'이미 수령한 본인의 표시 여부만 변경. 미수령 계정에 배지를 부여하지 않습니다.'});

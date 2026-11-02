@@ -27,8 +27,8 @@ const validUntil=(from:Date)=>{const d=new Date(from);d.setFullYear(d.getFullYea
 // Operator promotion grants (2026-11-02 user decision): SUPER_ADMIN only, at most 10,000 beans per grant and 10,000 per KST day
 // across all operators. Automatic friend-invite rewards (actor system:*) are not operator grants and are not counted.
 export const PROMOTION_DAILY_LIMIT=10000;
-// Existing event policy: operator-confirmed 13 fans, 100 beans each. Never infer eligibility from signup alone.
-const EVENT_ACTOR='system:event:promotion-beans-v1',EVENT_PREFIX='event:promotion-beans-v1:',EVENT_LIMIT=13,EVENT_QUANTITY=100;
+// Open event: one claim per active member; only these grants expire 30 days after receipt.
+const EVENT_ACTOR='system:event:promotion-beans-v1',EVENT_PREFIX='event:promotion-beans-v1:',EVENT_VALID_DAYS=30,EVENT_QUANTITY=100;
 const quantity=(v:any)=>{if(!Number.isSafeInteger(v)||v<1||v>100000)reject(400,'INVALID_BEAN_QUANTITY','1~100,000콩 사이의 정수로 입력해주세요.');return v as number;};
 const view=(v:any):any=>JSON.parse(JSON.stringify(v,(_k,x)=>typeof x==='bigint'?x.toString():x));
 const pageOf=(v:any)=>{const p=Number(v||1);if(!Number.isSafeInteger(p)||p<1||p>10000)reject(400,'INVALID_PAGE','페이지를 확인해주세요.');return p;};
@@ -56,20 +56,12 @@ export class BeansService {
  }
  private transaction<T>(fn:(tx:any)=>Promise<T>):Promise<T>{return this.db.$transaction(fn,{isolationLevel:'ReadCommitted',timeout:20000});}
  private async event(tx:any,type:string,id:string,member:string,amount?:number){await enqueueOperation(tx,type,{memberId:member,targetId:id},`${type}:${id}`,{amount});}
- private promotionEventMembers():string[]|null{
-  try{const ids=JSON.parse(this.config.get('PROMOTION_EVENT_MEMBER_IDS')||'[]');return Array.isArray(ids)&&ids.length>0&&ids.length<=EVENT_LIMIT&&new Set(ids).size===ids.length&&ids.every(id=>typeof id==='string'&&/^[a-zA-Z0-9_-]{1,191}$/.test(id))?ids:null;}catch{return null;}
- }
  private async promotionEventStatus(db:any,member:string){
   const user=await db.member.findUnique({where:{id:member}});
-  if(!user?.enabled||user.withdrawn_at||!user.email_verified)reject(403,'MEMBER_INACTIVE','이용할 수 없는 계정입니다.');
+  if(!user?.enabled||user.withdrawn_at||!user.email_verified||user.suspended_at&&(!user.suspended_until||user.suspended_until>new Date()))reject(403,'MEMBER_INACTIVE','이용할 수 없는 계정입니다.');
   const old=await db.beanPromotion.findUnique({where:{request_key:EVENT_PREFIX+digest(member)}});
-  if(old){if(old.member_id!==member||old.quantity!==EVENT_QUANTITY||old.actor_id!==EVENT_ACTOR)reject(409,'BEAN_REQUEST_CONFLICT','지급 이력 확인이 필요합니다. 고객센터로 문의해주세요.');return{status:'claimed',quantity:EVENT_QUANTITY,claimedAt:old.created_at.toISOString()};}
-  const members=this.promotionEventMembers(),base={quantity:EVENT_QUANTITY,claimedAt:null};
-  if(!this.available()||!members)return{...base,status:'unavailable'};
-  if(!members.includes(member))return{...base,status:'ineligible'};
-  // Lifetime campaign ceiling survives changes to the configured participant list.
-  const used=await db.beanPromotion.count({where:{request_key:{startsWith:EVENT_PREFIX}}});
-  return{...base,status:used>=EVENT_LIMIT?'unavailable':'available'};
+  if(old){if(old.member_id!==member||old.quantity!==EVENT_QUANTITY||old.actor_id!==EVENT_ACTOR)reject(409,'BEAN_REQUEST_CONFLICT','지급 이력 확인이 필요합니다. 고객센터로 문의해주세요.');const lot=await db.beanLot.findFirst({where:{member_id:member,bucket:'promotion',grant_id:old.id}});return{status:'claimed',quantity:EVENT_QUANTITY,claimedAt:old.created_at.toISOString(),expiresAt:lot?.expires_at?.toISOString()||null};}
+  return{quantity:EVENT_QUANTITY,claimedAt:null,expiresAt:null,status:this.available()?'available':'unavailable'};
  }
  async promotionEvent(member:string){return this.promotionEventStatus(this.db,member);}
  async claimPromotionEvent(member:string,input:any={}){
@@ -83,10 +75,10 @@ export class BeansService {
    if(status.status!=='available')return status;
    const now=new Date(),reason='프로모션 100콩 이벤트',grant=await tx.beanPromotion.create({data:{request_key:EVENT_PREFIX+digest(member),member_id:member,quantity:EVENT_QUANTITY,reason,actor_id:EVENT_ACTOR,created_at:now}});
    await this.move(tx,`promotion:${grant.id}`,'promotion',EVENT_ACTOR,reason,grant.id,[{member:'company',bucket:'stock',delta:-EVENT_QUANTITY},{member,bucket:'promotion',delta:EVENT_QUANTITY}]);
-   await tx.beanLot.create({data:{member_id:member,bucket:'promotion',grant_id:grant.id,available:EVENT_QUANTITY,release_at:now,expires_at:validUntil(now)}});
+   const lot=await tx.beanLot.create({data:{member_id:member,bucket:'promotion',grant_id:grant.id,available:EVENT_QUANTITY,release_at:now,expires_at:new Date(now.getTime()+EVENT_VALID_DAYS*86400000)}});
    await appendAudit(tx,{category:'finance',action:'beans.event_claimed',entityId:grant.id,data:{memberId:member}});
    await this.event(tx,'beans.promotion',grant.id,member);
-   return{status:'claimed',quantity:EVENT_QUANTITY,claimedAt:now.toISOString()};
+   return{status:'claimed',quantity:EVENT_QUANTITY,claimedAt:now.toISOString(),expiresAt:lot.expires_at.toISOString()};
   });
  }
  private chargeView(o:any){return{id:o.id,quantity:o.quantity,amount:o.amount,environment:o.environment,status:o.status,createdAt:o.created_at,expiresAt:o.expires_at,paidAt:o.paid_at,failureCode:o.failure_code,refundedQuantity:o.refunded_quantity,refundedAmount:o.refunded_amount};}
@@ -140,7 +132,7 @@ export class BeansService {
   await this.lock(tx,[member,creator]);const old=await tx.beanTip.findUnique({where:{request_key:key}});if(old){if(old.sender_id!==member||old.creator_id!==creator||old.quantity!==q||old.message!==message||old.post_id!==postId)reject(409,'BEAN_REQUEST_CONFLICT','다른 후원에 사용한 요청입니다.');return {...view((await attributeTips(tx,[old]))[0]),supporterCount:postId?await postSupporterCount(tx,postId):undefined};}
   const c=await tx.creator.findUnique({where:{user_id:creator}});if(!c?.is_active)reject(409,'CREATOR_INACTIVE','후원할 수 없는 크리에이터입니다.');let postTitle:string|null=null;if(postId){await tx.$queryRaw`SELECT id FROM postings WHERE id=${postId} FOR UPDATE`;const post=await tx.posting.findFirst({where:{id:postId,user_sub:creator,status:'PUBLISHED',is_deleted:false,hidden_at:null}});if(!post)reject(404,'POST_NOT_FOUND','게시물이 없습니다.');if(!post.allow_tips)reject(409,'POST_TIPS_DISABLED','후원을 받지 않는 게시물입니다.');// A tip never unlocks a post, so members can only tip posts they can already see (guide fans/beans, /pilot-work 2026-10-30).
 if(!await this.service.access(post,member,tx))reject(403,'POST_ACCESS_REQUIRED','볼 수 있는 게시물에만 후원할 수 있습니다. 멤버십 가입 후 후원해주세요.');postTitle=post.title;}
-  const lots=await tx.beanLot.findMany({where:{member_id:member,bucket:{in:['promotion','purchased']},frozen:false,available:{gt:0},OR:[{expires_at:null},{expires_at:{gt:new Date()}}]},orderBy:[{created_at:'asc'},{id:'asc'}]});lots.sort((a:any,b:any)=>a.bucket===b.bucket?0:a.bucket==='promotion'?-1:1);if(lots.reduce((n:any,l:any)=>n+l.available,0)<q)reject(409,'INSUFFICIENT_BEANS','사용할 수 있는 콩이 부족합니다.');// Received beans wait tipHoldDays from the tip itself; a tip always follows its charge, so this also covers the charge's own 7 days.
+  const lots=await tx.beanLot.findMany({where:{member_id:member,bucket:{in:['promotion','purchased']},frozen:false,available:{gt:0},OR:[{expires_at:null},{expires_at:{gt:new Date()}}]},orderBy:[{created_at:'asc'},{id:'asc'}]});lots.sort((a:any,b:any)=>a.bucket!==b.bucket?(a.bucket==='promotion'?-1:1):a.bucket==='promotion'?(a.expires_at?.getTime()??Infinity)-(b.expires_at?.getTime()??Infinity):0);if(lots.reduce((n:any,l:any)=>n+l.available,0)<q)reject(409,'INSUFFICIENT_BEANS','사용할 수 있는 콩이 부족합니다.');// Received beans wait tipHoldDays from the tip itself; a tip always follows its charge, so this also covers the charge's own 7 days.
   const releaseAt=new Date(Date.now()+beanPolicy.tipHoldDays*86400000);let left=q,promo=0;const used=[];for(const lot of lots){const count=Math.min(lot.available,left);if(!count)continue;used.push({lot,count});if(lot.bucket==='promotion')promo+=count;left-=count;}
   const t=await tx.beanTip.create({data:{request_key:key,sender_id:member,creator_id:creator,post_id:postId,post_title_snapshot:postTitle,quantity:q,paid_quantity:q-promo,promotion_quantity:promo,message}}),moves=[];
   await tx.memberConsent.create({data:{member_id:member,kind:'tip-provision',document_id:`code:tip-provision:${TIP_PROVISION.version}`,document_snapshot:{...TIP_PROVISION,creatorId:creator,tipId:t.id}}});
@@ -256,7 +248,7 @@ if(!await this.service.access(post,member,tx))reject(403,'POST_ACCESS_REQUIRED',
  private refundView(r:any){return{id:r.id,chargeId:r.charge_id,quantity:r.quantity,gross:r.gross,deduction:r.deduction,amount:r.amount,waived:r.waived,status:r.status};}
  // D6: 30 days ahead a member hears that beans will expire; at expiry the unspent rest leaves the wallet for the company's expired account.
  async expireLots(now=new Date()){if(!this.available())return 0;let count=0;const soon=await this.db.beanLot.findMany({where:{bucket:{in:['purchased','promotion']},frozen:false,available:{gt:0},expiry_noticed_at:null,expires_at:{gt:now,lte:new Date(now.getTime()+beanPolicy.expiryNoticeDays*86400000)}},take:200});
-  for(const lot of soon)await this.transaction(async tx=>{const changed=await tx.beanLot.updateMany({where:{id:lot.id,expiry_noticed_at:null},data:{expiry_noticed_at:now}});if(!changed.count)return;const day=lot.expires_at.toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul'});await notifyMember(tx,{dedupeKey:`bean-expiry:${lot.id}`,memberId:lot.member_id,kind:'bean-expiry',text:`콩 ${lot.available.toLocaleString('ko-KR')}개가 ${day}에 유효기간이 끝납니다.`,path:'/beans',rows:[['콩',`${lot.available.toLocaleString('ko-KR')}개 (${lot.bucket==='promotion'?'프로모션콩':'충전콩'})`],['만료일',day]],note:'유효기간은 충전·지급일로부터 5년입니다.'});count++;});
+  for(const lot of soon)await this.transaction(async tx=>{const changed=await tx.beanLot.updateMany({where:{id:lot.id,expiry_noticed_at:null},data:{expiry_noticed_at:now}});if(!changed.count)return;const day=lot.expires_at.toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul'});await notifyMember(tx,{dedupeKey:`bean-expiry:${lot.id}`,memberId:lot.member_id,kind:'bean-expiry',text:`콩 ${lot.available.toLocaleString('ko-KR')}개가 ${day}에 유효기간이 끝납니다.`,path:'/beans',rows:[['콩',`${lot.available.toLocaleString('ko-KR')}개 (${lot.bucket==='promotion'?'프로모션콩':'충전콩'})`],['만료일',day]],note:'안내된 만료일이 지나면 해당 콩의 미사용 잔액이 소멸합니다.'});count++;});
   const due=await this.db.beanLot.findMany({where:{bucket:{in:['purchased','promotion']},frozen:false,available:{gt:0},expires_at:{lte:now}},take:200});
   for(const lot of due)await this.transaction(async tx=>{await this.lock(tx,[lot.member_id],true,true);const current=await tx.beanLot.findUniqueOrThrow({where:{id:lot.id}});if(current.frozen||current.available<1)return;await tx.beanLot.update({where:{id:lot.id},data:{available:0}});await this.move(tx,`bean-expire:${lot.id}`,'expire','system','콩 유효기간 만료',lot.id,[{member:lot.member_id,bucket:lot.bucket,delta:-current.available},{member:'company',bucket:'expired',delta:current.available}]);count++;});
   return count;}

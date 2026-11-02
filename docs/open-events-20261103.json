@@ -1,0 +1,69 @@
+{
+  "timestamp": "2026-11-02T22:36:07.881932+00:00",
+  "status": "verified-local-not-deployed",
+  "head": "37ed6c6fd2775a476673ea15910973352134f044",
+  "branch": "feat/open-promotion-event",
+  "decision": {
+    "promotionQuantity": 100,
+    "expiryDays": 30,
+    "members": "all active verified accounts; once per account",
+    "badge": "all active verified accounts; once; no expiry",
+    "capsRemoved": [
+      13,
+      16
+    ]
+  },
+  "sourceHashes": {
+    "AGENTS.md": "55f775cdef768f61a5ee5cf9b68dea050ec1fda05476945b96dcbcedcca3ed06",
+    "docs/platform-api.md": "d9c1079e320ffb849284b1b0cf64033d4eb285fe7a2bafb236a99785778cb408",
+    "docs/platform-implementation.md": "b1172b017d52429403aa1684390a6119b8612531728b816e5a8eb7a13de97b4d",
+    "infra/platform/runtime.env.example": "ee33baa0b33c6bc0d6dce43b499aa12dc7900fee685a230067c7b11744e84dcc",
+    "src/platform/beans.service.ts": "e7be4773a5a6f4e562b27a7cc40cfe4022506f43ce842db92f60c82971bcff01",
+    "src/platform/founding-badge.ts": "f9d91056a086e6979bddaa13d9eea1468a3d807c82582e0da7d82e33f5e28607",
+    "src/platform/legal-documents.ts": "1a93964cafccaa0f8030fbac3f37962906c153878779d5c8e7992b0294fab179",
+    "src/platform/openapi-contract.ts": "0c859831e5f04ec53677c0ca6b30f4ca5e3dfa764db828166cfd9362b108622b",
+    "src/platform/service.ts": "d3ca135c5c9fb407a992ac995d2f186c9db79fc8fe4a1d84cb164da855a048a5",
+    "tests/platform-event-claim.test.cjs": "32d735b22f8075209e9f8e0d4ecba5c08f0d0273473d96f65d037b4315010f58",
+    "tests/platform-founding-badge.test.cjs": "84b2680a364274b486adc058b771ef02836666fe3424773b29c7367ce7b25cca",
+    "tests/platform-legal.test.cjs": "4132377219ef6cb72183ef75582e115aa273d098c92eb1b390bd353ad4f15e85"
+  },
+  "checks": {
+    "front": {
+      "command": "npm run check",
+      "exit": 0,
+      "tests": 525
+    },
+    "serverBuild": {
+      "command": "npm run build",
+      "exit": 0
+    },
+    "serverSuites": {
+      "platform-event-claim": 11,
+      "platform-founding-badge": 8,
+      "platform-openapi": 13,
+      "platform-legal": 12,
+      "platform-beans": 38
+    },
+    "counterexample": {
+      "change": "compiled event duration30→31 days",
+      "expectedExit": 1,
+      "actualExit": 1,
+      "restoredExit": 0
+    },
+    "browser": "PC Chromium/iPhone13 WebKit/320px Chromium; synthetic service API and preview; 3 beans +3 badge flows"
+  },
+  "notRun": [
+    "physical iPhone",
+    "real recipient grant",
+    "external SMTP delivery",
+    "real PG/bank",
+    "production deployment"
+  ],
+  "sources": [
+    {
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html",
+      "checked": "2026-11-03",
+      "applied": "server-fixed reward, transactions, locks, idempotency; duration and audience are user policy"
+    }
+  ]
+}
