@@ -3,6 +3,7 @@ import {reject,text} from './http';
 import {ensureBeanWallet,postBeanMovement} from './bean-ledger';
 import {beanPolicy} from './bean-policy';
 import {enqueueOperation} from './operations-events';
+import {appendAudit} from './audit';
 const validUntil=(from:Date)=>{const d=new Date(from);d.setFullYear(d.getFullYear()+beanPolicy.validityYears);return d;};
 const rewardKey=(id:string)=>`referral-reward:${id}`;
 
@@ -90,29 +91,57 @@ export async function clawBackReferralReward(tx:any,source:'checkout'|'bean_char
  // Refunded inside the hold: nothing was credited, so the invitee's next live payment may qualify instead.
  await tx.referralSignup.updateMany({where:{reward_source:source,reward_source_id:sourceId,reward_status:'qualified'},data:{reward_status:'pending',reward_source:null,reward_source_id:null,grant_due_at:null}});
  const signup=await tx.referralSignup.findFirst({where:{reward_source:source,reward_source_id:sourceId,reward_status:'granted'}});if(!signup)return null;
+ return reclaimReward(tx,signup,'친구 초대 보상 회수(결제 환불)');
+}
+async function reclaimReward(tx:any,signup:any,reason:string){
  await lockWallets(tx,signup.referrer_id);
  const grant=await tx.beanPromotion.findUnique({where:{request_key:rewardKey(signup.id)}});
  const lot=grant&&await tx.beanLot.findFirst({where:{member_id:signup.referrer_id,bucket:'promotion',grant_id:grant.id}});
  const back=lot?.available||0;
- if(back)await move(tx,`referral-clawback:${signup.id}`,'referral.clawback','친구 초대 보상 회수(결제 환불)',signup.id,[{member:signup.referrer_id,bucket:'promotion',delta:-back},{member:'company',bucket:'stock',delta:back}]);
+ if(back)await move(tx,`referral-clawback:${signup.id}`,'referral.clawback',reason,signup.id,[{member:signup.referrer_id,bucket:'promotion',delta:-back},{member:'company',bucket:'stock',delta:back}]);
  if(lot)await tx.beanLot.update({where:{id:lot.id},data:{available:0,frozen:true}});
  const updated=await tx.referralSignup.update({where:{id:signup.id},data:{reward_status:'clawed_back',clawed_back_at:new Date()}});
  await enqueueOperation(tx,'referral.clawed_back',{memberId:signup.referrer_id,targetId:signup.id},`referral.clawed_back:${signup.id}`,{amount:back});
  return updated;
 }
 
+/**
+ * Console action promised by the referral card (2026-11-02 user decision): an operator excludes a suspicious invite before the
+ * reward ('forfeited') or takes back what is left of a credited reward ('clawed_back'), with a reason kept in the audit log.
+ */
+export async function revokeReferralReward(db:any,adminId:string,id:string,input:any){
+ const reason=text(input?.reason,500);
+ return db.$transaction(async(tx:any)=>{
+  await tx.$queryRaw`SELECT id FROM referral_signups WHERE id=${id} FOR UPDATE`;
+  const signup=await tx.referralSignup.findUnique({where:{id}});if(!signup)reject(404,'REFERRAL_NOT_FOUND','초대 기록을 찾을 수 없습니다.');
+  if(['pending','qualified'].includes(signup.reward_status))await tx.referralSignup.update({where:{id},data:{reward_status:'forfeited',reward_source:null,reward_source_id:null,grant_due_at:null}});
+  else if(signup.reward_status==='granted')await reclaimReward(tx,signup,`친구 초대 보상 회수(운영자): ${reason}`);
+  else reject(409,'REFERRAL_NOT_REVOCABLE','이미 보상이 없거나 회수된 초대입니다.');
+  // The audit log keeps no free text, so the reason and operator stay on the invite row (shown in the console list).
+  await tx.referralSignup.update({where:{id},data:{revoke_reason:reason,revoked_by:adminId}});
+  await appendAudit(tx,{category:'admin',action:'admin.referral_revoked',entityId:id,data:{previousStatus:signup.reward_status}});
+  return{message:signup.reward_status==='granted'?'남은 보상 콩을 회수했습니다.':'이 초대를 보상에서 제외했습니다.'};
+ },{isolationLevel:'ReadCommitted',timeout:20000});
+}
 /** The member's own link and results. Invitee identities are not shown: only counts and reward totals. */
 export async function referralSummary(db:any,member:string){
  const referral=await ensureReferral(db,member);
  const [invited,rewarded,rows]=await Promise.all([db.referralSignup.count({where:{referrer_id:member}}),db.referralSignup.count({where:{referrer_id:member,reward_status:'granted'}}),db.referralSignup.aggregate({where:{referrer_id:member,reward_status:'granted'},_sum:{reward_quantity:true}})]);
  return{code:referral.id,invited,rewarded,rewardBeans:rows._sum.reward_quantity||0,rewardPerInvite:REFERRAL_REWARD_BEANS,holdDays:REFERRAL_HOLD_DAYS,monthlyCap:REFERRAL_MONTHLY_CAP,qualified:await db.referralSignup.count({where:{referrer_id:member,reward_status:'qualified'}})};
 }
-/** Invitee names are masked: first three characters, then ten stars (user decision 2026-11-01). */
-export const maskReferralName=(name:string)=>Array.from(name.trim()).slice(0,3).join('')+'*'.repeat(10);
+// 2026-11-02 user decision: the referrer sees the invitee's masked email instead of the nickname, and the invitee agrees to
+// that on the referral signup screen. The agreement is stored in member_consents; signups without it show no identifier.
+export const REFERRAL_DISCLOSURE={version:'2026-11-02.1',agreement:'초대한 회원에게 내 이메일 일부(예: ab***@n***.com)와 가입·보상 진행 상태가 표시되는 것에 동의합니다.'};
+export const REFERRAL_DISCLOSURE_KIND='referral-disclosure';
+/** ab***@n***.com: two characters of the local part, the first of the domain, and the top-level domain. */
+export function maskReferralEmail(email:string){
+ const [local,domain='']=email.trim().toLowerCase().split('@'),labels=domain.split('.'),tld=labels.length>1?labels[labels.length-1]:'';
+ return `${Array.from(local).slice(0,2).join('')}***@${Array.from(labels[0]||'').slice(0,1).join('')}***${tld?'.'+tld:''}`;
+}
 const historyStatus:Record<string,string>={pending:'joined',qualified:'waiting',granted:'rewarded',clawed_back:'clawed',capped:'capped',forfeited:'forfeited'};
 const historyFilter:Record<string,string[]>={joined:['pending'],waiting:['qualified'],rewarded:['granted']};
 /**
- * The member's own invite history (user decision 2026-11-01): masked invitee name, status and dates only.
+ * The member's own invite history (user decisions 2026-11-01, 2026-11-02): masked invitee email (with the invitee's consent), status and dates only.
  * No email, member id or payment detail of the invitee is returned.
  */
 export async function referralHistory(db:any,member:string,status?:string,pageText?:string){
@@ -125,10 +154,11 @@ export async function referralHistory(db:any,member:string,status?:string,pageTe
   db.referralSignup.count({where}),
   db.referralSignup.groupBy({by:['reward_status'],where:{referrer_id:member},_count:{_all:true}}),
   db.referralSignup.aggregate({where:{referrer_id:member,reward_status:'granted'},_sum:{reward_quantity:true}})]);
- const people=await db.member.findMany({where:{id:{in:rows.map((r:any)=>r.member_id)}},select:{id:true,nickname:true}});
+ const people=await db.member.findMany({where:{id:{in:rows.map((r:any)=>r.member_id)}},select:{id:true,email:true,enabled:true}});
+ const agreed=new Set((await db.memberConsent.findMany({where:{member_id:{in:rows.map((r:any)=>r.member_id)},kind:REFERRAL_DISCLOSURE_KIND},select:{member_id:true}})).map((c:any)=>c.member_id));
  const count=(...keys:string[])=>counts.filter((c:any)=>keys.includes(c.reward_status)).reduce((n:number,c:any)=>n+c._count._all,0);
  return{summary:{invited:count('pending','qualified','granted','clawed_back','capped','forfeited'),waiting:count('qualified'),rewardBeans:beans._sum.reward_quantity||0},
-  items:rows.map((r:any)=>{const m=people.find((p:any)=>p.id===r.member_id);return{id:r.id,name:m?.nickname?maskReferralName(m.nickname):'탈퇴한 회원',status:historyStatus[r.reward_status]||'joined',joinedAt:r.created_at.toISOString(),dueAt:r.reward_status==='qualified'&&r.grant_due_at?r.grant_due_at.toISOString():null,rewardedAt:r.rewarded_at?.toISOString()||null,rewardBeans:r.reward_status==='granted'?r.reward_quantity:0};}),
+  items:rows.map((r:any)=>{const m=people.find((p:any)=>p.id===r.member_id);return{id:r.id,name:!m?.enabled?'탈퇴한 회원':agreed.has(r.member_id)?maskReferralEmail(m.email):'가입한 회원',status:historyStatus[r.reward_status]||'joined',joinedAt:r.created_at.toISOString(),dueAt:r.reward_status==='qualified'&&r.grant_due_at?r.grant_due_at.toISOString():null,rewardedAt:r.rewarded_at?.toISOString()||null,rewardBeans:r.reward_status==='granted'?r.reward_quantity:0};}),
   total,page,pageSize:take};
 }
 export function referralCodeInput(value:unknown){if(value===undefined||value===null||value==='')return undefined;return text(value,36);}

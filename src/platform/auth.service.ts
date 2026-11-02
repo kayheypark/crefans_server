@@ -13,7 +13,7 @@ import {LocalMemberService} from '../auth/local/local-member.service';
 import {MemberMailService} from '../auth/local/member-mail.service';
 import {assertNewPassword,digest,hashPassword,normalizeEmail} from '../auth/local/credentials';
 import {reject,text} from './http';
-import {assertReferralCode,linkReferralSignup,referralCodeInput,referralOn} from './referrals';
+import {assertReferralCode,linkReferralSignup,referralCodeInput,referralOn,REFERRAL_DISCLOSURE,REFERRAL_DISCLOSURE_KIND} from './referrals';
 // Sign-in accepts any value a past contract could have stored (reset allowed up to 256 characters).
 const signInPassword=(value:unknown)=>{if(typeof value!=='string'||!value||value.length>256)reject(400,'INVALID_INPUT','입력값을 확인해주세요.');return value as string;};
 @Injectable()
@@ -48,6 +48,8 @@ export class PlatformAuthService {
  async signup(input:any){const email=this.email(input.email),nickname=text(input.nickname,40);
    if(input.terms!==true||input.privacy!==true)reject(400,'INVALID_INPUT','비밀번호와 필수 동의를 확인해주세요.');const password=assertNewPassword(input.password);
    const policy=signupPolicy(this.config),referred=await this.assertInvitedOrReferred(email,input.referralCode);
+   // Signing up through a referral link shows the referrer a masked email; the invitee agrees to it here (2026-11-02).
+   if(referred&&input.referralDisclosure!==true)reject(400,'REFERRAL_DISCLOSURE_REQUIRED','초대한 회원에게 표시되는 정보에 동의해야 초대 링크로 가입할 수 있습니다.');
    if(!policy.identityRequired&&input.ageAcknowledged!==true)reject(400,'AGE_ACKNOWLEDGEMENT_REQUIRED','만 19세 이상 가입 조건을 확인해주세요.');
    const password_hash=await hashPassword(password);
    await this.db.$transaction(async tx=>{
@@ -65,6 +67,7 @@ export class PlatformAuthService {
      // A console invite revoked after the check above must not still let this email in.
      if(!await consumeInvite(tx,email,member.id)&&policy.inviteOnly&&!policy.listed(email)&&!referred)reject(403,'SIGNUP_INVITE_REQUIRED',INVITE_REQUIRED_MESSAGE);
      if(referred&&!await linkReferralSignup(tx,input.referralCode,member.id))reject(400,'INVALID_REFERRAL','초대 링크를 확인해주세요.');
+     if(referred)await tx.memberConsent.create({data:{member_id:member.id,kind:REFERRAL_DISCLOSURE_KIND,document_id:`code:referral-disclosure:${REFERRAL_DISCLOSURE.version}`,document_snapshot:{...REFERRAL_DISCLOSURE}}});
      if(this.config.get('BEAN_LEDGER_ENABLED')==='true')await ensureBeanWallet(tx,member.id);
      await tx.accountPreference.create({data:{member_id:member.id,marketing_alert:false}});
      await tx.memberConsent.createMany({data:consents.filter(c=>c.kind!=='marketing').map(c=>({...c,member_id:member.id}))});if(input.marketing===true)await recordMarketingChoice(tx,member.id,true,'signup',this.legal.signup().documents.marketing);await tx.signupChallenge.delete({where:{email}});await enqueueOperation(tx,'member.signup',{memberId:member.id},`member.signup:${member.id}`);
