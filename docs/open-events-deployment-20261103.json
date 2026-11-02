@@ -1,0 +1,345 @@
+{
+  "recordedAt": "2026-11-02T22:57:39.506772+00:00",
+  "status": "deployed-and-verified",
+  "release": "open-events-20261103",
+  "policy": {
+    "audience": "all active verified non-suspended accounts; no recipient list or person cap",
+    "quantity": 100,
+    "expiryHours": 720,
+    "perAccount": 1,
+    "badge": "once per account; no expiry; visibility selectable",
+    "oldGrants": "unchanged",
+    "unusedEventBalance": "expires only unused remainder",
+    "earnedTipIncome": "not expired by original event expiry"
+  },
+  "integration": {
+    "capturedAt": "2026-11-02T22:44:17.234695+00:00",
+    "repositories": {
+      "front": {
+        "featureCommit": "4f0e4f842c7cccb072dbc0f5586703dce02921fd",
+        "devCommit": "78edddeb7fc70f153ecc156783642317fbea8cfe",
+        "prodCommit": "3ae8385fd62b3552248b75a24ee55914a2d6f48b",
+        "tree": "3ff17b243654cba97f167e48fc8ccee89ca015ae",
+        "dirty": false,
+        "devProdEqual": true,
+        "devVerification": {
+          "command": "npx tsc --noEmit && node --test tests/crefans-events.test.cjs tests/promotion-claim.test.cjs tests/founding-badge.test.cjs tests/bean-refund.test.cjs",
+          "exitCode": 0,
+          "passed": 34,
+          "logSha256": "f15870639abfcf3045df08e9de601c3e0b3af82e3f8c31f232aa00dc68c519b9"
+        }
+      },
+      "server": {
+        "featureCommit": "a9e80dcf0d48a65241755cc4d3f92c249a94ddb1",
+        "devCommit": "2525f46ed9e58f080a49a64fff0d7c28b145bd04",
+        "prodCommit": "2f7b9179e9120fd0c9a0021ec6122accdfcc20b1",
+        "tree": "a4f7228112cfbc2d77616496e04bd915245e36ba",
+        "dirty": false,
+        "devProdEqual": true,
+        "devVerification": {
+          "command": "npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-event-claim.test.cjs tests/platform-founding-badge.test.cjs",
+          "exitCode": 0,
+          "passed": 19,
+          "logSha256": "da0c5d090fee478451371f0f9ad92c7ab3dd94013f1280b91a71fb335ea305b9"
+        }
+      }
+    }
+  },
+  "builds": {
+    "server": {
+      "commit": "2f7b9179e9120fd0c9a0021ec6122accdfcc20b1",
+      "tag": "crefans-api:open-events-20261103",
+      "sourceManifestSha256": "686d83f51dc1e54cc6861b32ca378f9403103ed7696c05fd035762d49531769b",
+      "startedAt": "2026-11-02T22:42:45.957748+00:00",
+      "finishedAt": "2026-11-02T22:47:34.436470+00:00",
+      "exitCode": 0,
+      "buildHost": "production host; isolated build containers; CPU1,memory1536MiB,swap2GiB",
+      "remoteSource": "/home/ubuntu/crefans-open-events-20261103/server-source",
+      "imageId": "sha256:5196a733f336b479c4030cb6361ab352abe3df9a86624584c044515b9c0b1cf3",
+      "rootFsLayers": [
+        "sha256:44a87794b739d471ec360bec56cc0ceac640d06bbf579ee7d9061a0b88d09818",
+        "sha256:09282d8f6dc3f140ce030eb4e3846b30c465220b50fd0962514f40dfc5122fd4",
+        "sha256:985fa6649f64124b2ab93baeb7a549ac3877147f438dd5931a2c5179aa83eef3",
+        "sha256:d8d64e272e1628c506685a6d413e953de1128072f8d9f58e9f781e0ad6fdee9f",
+        "sha256:6b6d01cb4b38660434f1ec5ef231fd25b6585c18893e02231eb10d38f36b29c3",
+        "sha256:65b18d4990547e6a8b2b6ff76bf5b45b35497d1510a2183687a533599f3372f5",
+        "sha256:2d77917e78e09076baae69c2b6401ae80260f5e38123f4e94a6a70d97aa648ec",
+        "sha256:af7c41ff73c8daf55eea7d275a18418475518969d553334815cb8e9ae545ad58",
+        "sha256:0e6a3ce8307224bdb90735d6b26eb72b89c87d0f957b75f0403d282e6e0dcfd4",
+        "sha256:71192e91de79a090be6b705cf52094a9bdd48404345f1a9762a21f924d278f7f",
+        "sha256:5292ffcc094e61a43bdb6868e08a7d7b071e9b36bc39f7c1caa5ce290483bce5",
+        "sha256:f1ef095183ccdbfafb8ca916d35d207c1a5ef65801812e1e64d5c575424f38cf",
+        "sha256:ea4d98063cd9dd4998b9cc197f8f1b95ab9c0184a1c2523554fab0a1d5513a2a",
+        "sha256:73e35d8d80a80f33b05ebca25fe978620fa6e28dd636ac70cc625be0075f73fc",
+        "sha256:cd88963d35151556d0198db244325c7f7faaba58d9938a9402901e0fd1337e5a"
+      ]
+    },
+    "front": {
+      "commit": "3ae8385fd62b3552248b75a24ee55914a2d6f48b",
+      "tag": "crefans-front:open-events-20261103",
+      "sourceManifestSha256": "83d1456a5f5d7e36a765469cc342e0bde397020fc12933294991646ad1d52831",
+      "startedAt": "2026-11-02T22:47:44.672807+00:00",
+      "finishedAt": "2026-11-02T22:54:31.526243+00:00",
+      "exitCode": 0,
+      "buildHost": "production host; isolated build containers; CPU1,memory1536MiB,swap2GiB",
+      "remoteSource": "/home/ubuntu/crefans-open-events-20261103/front-source",
+      "imageId": "sha256:28b1680f96dbb2221b98c222b4744366a64e105bc7a3ecaa0e36bb58b78d1ab5",
+      "rootFsLayers": [
+        "sha256:44a87794b739d471ec360bec56cc0ceac640d06bbf579ee7d9061a0b88d09818",
+        "sha256:09282d8f6dc3f140ce030eb4e3846b30c465220b50fd0962514f40dfc5122fd4",
+        "sha256:985fa6649f64124b2ab93baeb7a549ac3877147f438dd5931a2c5179aa83eef3",
+        "sha256:d8d64e272e1628c506685a6d413e953de1128072f8d9f58e9f781e0ad6fdee9f",
+        "sha256:6b6d01cb4b38660434f1ec5ef231fd25b6585c18893e02231eb10d38f36b29c3",
+        "sha256:65b18d4990547e6a8b2b6ff76bf5b45b35497d1510a2183687a533599f3372f5",
+        "sha256:ae31eae8386439fa9ac09c9e11c57e7ed7411b2fc3e2703f26797d8dfb466d35",
+        "sha256:fbc5080325eacee1adc038ac89e8cbfee4d2f6b1adc8cf5d7c024160095da5ef",
+        "sha256:c434ccd2477d4c1b3521a54ad69be894dd5a30d39b51e6bfca2fe95c6b64abba",
+        "sha256:442423278836425b1b31f4380fb6c23a4098d8951c876ad8d1b141c6df910b66"
+      ]
+    }
+  },
+  "imageIntegrity": {
+    "server": {
+      "tag": "crefans-api:open-events-20261103",
+      "commit": "2f7b9179e9120fd0c9a0021ec6122accdfcc20b1",
+      "checkedFiles": 238,
+      "result": "PASS"
+    },
+    "front": {
+      "tag": "crefans-front:open-events-20261103",
+      "commit": "3ae8385fd62b3552248b75a24ee55914a2d6f48b",
+      "checkedFiles": 730,
+      "result": "PASS"
+    }
+  },
+  "production": {
+    "recordedAt": "2026-11-02T22:56:10.172280+00:00",
+    "deployment": {
+      "runtime-after.json": {
+        "crefans-beta-api-1": {
+          "id": "9d28738885a3d2f71d0300bf09967d2c68935d56e8463ec30c8dcfa17226d5fc",
+          "image": "sha256:5196a733f336b479c4030cb6361ab352abe3df9a86624584c044515b9c0b1cf3",
+          "tag": "crefans-api:open-events-20261103",
+          "running": true,
+          "restarts": 0,
+          "oom": false
+        },
+        "crefans-beta-worker-1": {
+          "id": "80ea218544d4395ea5a626397ad529337360169dabd1ba0e3a6090d593a2985c",
+          "image": "sha256:5196a733f336b479c4030cb6361ab352abe3df9a86624584c044515b9c0b1cf3",
+          "tag": "crefans-api:open-events-20261103",
+          "running": true,
+          "restarts": 0,
+          "oom": false
+        },
+        "crefans-beta-frontend-1": {
+          "id": "844f32e98c3c1f55ae0d63e89aa63d4eb2b072196fe78cabab657ba3c4334ea0",
+          "image": "sha256:28b1680f96dbb2221b98c222b4744366a64e105bc7a3ecaa0e36bb58b78d1ab5",
+          "tag": "crefans-front:open-events-20261103",
+          "running": true,
+          "restarts": 0,
+          "oom": false
+        },
+        "crefans-beta-admin-1": {
+          "id": "ae095a5e4e065b39f3efb03b617f28906e937e2d53d2300dfc06ce1e8ed2a39f",
+          "image": "sha256:85c30c8526508d29e3a790b185ac69948060f9d6ec838eec8ec4b7d875bc8fab",
+          "tag": "crefans-admin:referral-20261102",
+          "running": true,
+          "restarts": 0,
+          "oom": false
+        },
+        "crefans-beta-database-1": {
+          "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+          "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b",
+          "tag": "mysql:8.0",
+          "running": true,
+          "restarts": 0,
+          "oom": false
+        },
+        "crefans-beta-proxy-1": {
+          "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+          "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f",
+          "tag": "caddy:2-alpine",
+          "running": true,
+          "restarts": 0,
+          "oom": false
+        }
+      },
+      "event-state.json": {
+        "migrations": 48,
+        "badgeClaims": 0,
+        "eventGrants": 0
+      },
+      "migration-before.json": {
+        "appliedCount": 48,
+        "pending": []
+      },
+      "deployed": "2026-11-02T22:55:43Z"
+    },
+    "assets": [
+      {
+        "url": "https://crefans.com/brand/events/open-beta-v2/advertising.webp",
+        "sha256": "e17b2720fec4453038430d3e04c8d18987a9dd57cf23d40ce91587e938bce20b",
+        "bytes": 29342,
+        "result": "PASS"
+      },
+      {
+        "url": "https://crefans.com/brand/events/open-beta-v2/beans.webp",
+        "sha256": "138494927cd884a21f584a70bb8144fa8a3f7ce9c716ed0a20ba5c1adaa63e01",
+        "bytes": 36274,
+        "result": "PASS"
+      },
+      {
+        "url": "https://crefans.com/brand/events/open-beta-v2/badge.webp",
+        "sha256": "c2a666e363b14ceeaf6eb2540aeaec0368b77dc83157c0b91df12e88b0c79964",
+        "bytes": 32034,
+        "result": "PASS"
+      }
+    ],
+    "authChecks": [
+      {
+        "method": "GET",
+        "path": "events/promotion-beans",
+        "status": 401,
+        "result": "unauthenticated rejected"
+      },
+      {
+        "method": "POST",
+        "path": "events/promotion-beans/claim",
+        "status": 401,
+        "result": "unauthenticated rejected"
+      },
+      {
+        "method": "GET",
+        "path": "events/founding-badge",
+        "status": 401,
+        "result": "unauthenticated rejected"
+      },
+      {
+        "method": "POST",
+        "path": "events/founding-badge/claim",
+        "status": 401,
+        "result": "unauthenticated rejected"
+      },
+      {
+        "method": "PUT",
+        "path": "me/founding-badge",
+        "status": 401,
+        "result": "unauthenticated rejected"
+      }
+    ],
+    "eligibility": {
+      "realMemberReadOnly": true,
+      "promotionStatus": "available",
+      "badgeStatus": "available",
+      "quantity": 100,
+      "companyStockAtLeast100": true,
+      "grantExecuted": false
+    },
+    "limits": "No real recipient grant executed by verification. Production eligibility checked read-only; actual grant/expiry verified against isolated local DB. No external email,PG,bank calls."
+  },
+  "browser": [
+    {
+      "name": "pc",
+      "result": "PASS",
+      "flow": "real link clicks list→4details→list",
+      "realApi": true,
+      "overflow": false,
+      "pageErrors": []
+    },
+    {
+      "name": "mobile",
+      "result": "PASS",
+      "flow": "real link clicks list→4details→list",
+      "realApi": true,
+      "overflow": false,
+      "pageErrors": []
+    }
+  ],
+  "localEvidence": {
+    "front": "docs/audit/open-events-20261103.json",
+    "server": "docs/open-events-20261103.json",
+    "frontCheck": 525,
+    "serverLatestSuites": {
+      "event": 11,
+      "badge": 8,
+      "openapi": 13,
+      "legal": 12,
+      "beans": 38
+    },
+    "browserScope": "API doubles; PC Chromium, iPhone13 WebKit,320px Chromium; production browser separately uses real anonymous API"
+  },
+  "deploymentControls": [
+    "DB and runtime/config backup before rollout",
+    "48 existing migration checksums verified; no schema change",
+    "30-day frontend notice published before claims opened",
+    "retired allowlist keys removed; all other runtime switches preserved",
+    "admin,database,proxy container IDs preserved",
+    "rollback images retained; no destructive image cleanup"
+  ],
+  "limitations": [
+    "Real production claim not executed by QA; only real member eligibility read without writes",
+    "No physical iPhone test",
+    "No external SMTP delivery,PG or bank execution",
+    "Per-account control does not identify one person owning multiple accounts"
+  ],
+  "preflight": {
+    "ready": false,
+    "reason": "insufficient_disk",
+    "freeBytes": 463790080,
+    "requiredBytes": 8589934592
+  },
+  "alternativeBuild": "Local insufficient disk; remote isolated sequential CPU1/1536MiB builds, remote >8GiB guard, service health200 monitored",
+  "logs": {
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "desktop-claimed.png": "95abdcfee3f8eb516ef2e6893321c5c96b9d039d1552708da8c4fb093962c977",
+    "desktop-ready.png": "ef2687568c11edf1032fbc930273d1f9205c92121d8734d43dd373c4a73a0b51",
+    "browser.log": "c1e4c0fa29a0f6a0e5b59ba4e6919e831147bee1c0d31e16597fa36a1159ba18",
+    "docs-check.log": "7d156a5950b375a7194ea4478d55a62aebd3ba674070bb2b4f9613bc6600b83b",
+    "front-remote-build.log": "6a0d5c29680d03a6122996c805f2e18445a628dda0d43a4ddbe7ccad1438d936",
+    "pc-navigation-claim-promotion-beans.png": "79ea5b689177fc40446c8a314aafd3774b1dd2adf1b78f336f2fd1e7c7b90907",
+    "preview-small-ready.png": "b9e3a548ec04785ac99e7d0c1672a57c323b03da39ea6861604f2a0e0a7da177",
+    "deployment.log": "316729c961fc5a35fc4982514570371cf1292523e56e9cea4a570c49659116fa",
+    "preview-small-claimed.png": "2c959af31a06a084203bdfef2cbcf07e0e6c21351b0a58c56f68cbba36af81eb",
+    "mobile-ready.png": "7b0a2a9d1c61439cb9fd0ff9f01a0f3b34911f05ccc9cf4d8d29911a8cbe7a1d",
+    "mobile-navigation-claim-founding-badge.png": "10c17c3100ba7f17fc964fb1318c3c06bc9d495109927ccbb67cfdb2ab11cb83",
+    "production-navigation.log": "927a630b5d3ac8edf610a9de3aaa057d731995549ce6658eb46f83ccef5eb205",
+    "docs-record.log": "62bf0ca9d2372fe4a10307b8c33f327c6210995a6456bd4ddbb27d1092088ce1",
+    "mobile-claimed.png": "15a2452ea61d91349d88fd692a2d78bf1a20378baa859c736aa520bb423efc56",
+    "image-integrity.log": "67bfa6afa85776d3aee67a93b4f9051e33656cae8782637f623a8b61c8c2e5b8",
+    "docs-contracts.log": "2826ff658fe2afd42e3ee9627c8f1b5582287ddadfdf4b16ac45bb5dd1c3d1b7",
+    "docs-record-final.log": "821d23d885a389ab7a69ce0a3442e0c188708152bdd676d77c005de7af045b65",
+    "badge-browser.log": "fad41b2d6cc97c429e6dabd34f847a0bc9a33e3ffa173e9b647f9e5292c4dbb9",
+    "front-check.log": "e946ea0bf7dd6c7d8565b25e3f332c27eecc3a504429ac5f0638e4082bb511b1",
+    "dev.log": "e8ea610637a4dba544aa67aba7ab5fb03226b7953eb774a77970eb1c3be41d69",
+    "mobile-navigation-claim-promotion-beans.png": "f1a0a2021b20e3609538e527061e3ab19c24356d8ed79ea129fb809ea8edff70",
+    "server-remote-build.log": "7bf8416a449a51783732fc348c302705dc3d6ff4d369a7596976cdb75647ead3",
+    "pc-navigation-claim-founding-badge.png": "4ec443311d352db85297334286ca4b6b921569069dce84c836d402be5deae370",
+    "docs-check-final.log": "a21512c1447083e406266c2df33727941445a679614c226552873c8920ce9d10",
+    "dev-integration.log": "f15870639abfcf3045df08e9de601c3e0b3af82e3f8c31f232aa00dc68c519b9",
+    "production-verification.log": "06690cb46076273adc715c02e335d7a7c2d81f14cb37f301a973d617a7e15a0b",
+    "receipt-hook.log": "ed58af514c1dbbfc4d41a7a1fbaee34b74ddb40e81fd6ace0624b3435d42ee47"
+  },
+  "commands": [
+    {
+      "command": "python3 remote-build.py",
+      "exit": 0
+    },
+    {
+      "command": "python3 verify-images.py",
+      "exit": 0
+    },
+    {
+      "command": "sudo -n bash deploy.sh",
+      "exit": 0
+    },
+    {
+      "command": "python3 verify-production.py",
+      "exit": 0
+    },
+    {
+      "command": "node production-navigation.cjs",
+      "exit": 0
+    }
+  ]
+}
