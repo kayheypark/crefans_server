@@ -439,7 +439,7 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 ## 운영자·메뉴 권한 (2026-10-28)
 
 - 모든 `/admin/*` 경로는 `@Permit`로 메뉴·동작을 선언하고 `PlatformAdminGuard`가 매 요청 확인한다. 선언 없는 경로는 기본 거부(OWASP Authorization Cheat Sheet: deny by default, 모든 요청 검증, 최소 권한; 2026-10-28 확인).
-- 메뉴와 실제 존재하는 동작만 부여할 수 있다: 대시보드(조회), 회원·크리에이터(조회·수정), 콘텐츠·신고(조회·생성·수정), 매출·정산(조회·생성=입금 대사), 콩 후원·출금(조회·생성=프로모션 지급·입금 대사, 수정=출금 승인·반려), 고객지원(조회·생성·수정), 운영 설정(조회·수정), 운영 로그(조회). 현재 삭제 동작이 있는 메뉴는 없다. 다른 동작은 조회 권한이 있어야 줄 수 있다.
+- 메뉴와 실제 존재하는 동작만 부여할 수 있다: 대시보드(조회), 회원·크리에이터(조회·수정), 콘텐츠·신고(조회·생성·수정), 매출·정산(조회·생성=입금 대사), 콩 후원·출금(조회·생성=프로모션 지급·입금 대사, 수정=출금 승인·반려), 고객지원(조회·생성·수정), 운영 설정(조회·수정), 운영 로그(조회). 현재 광고상품·초대 회원·예약 핸들 메뉴에는 삭제 동작도 제공한다(2026-11-03 현행화). 다른 동작은 조회 권한이 있어야 줄 수 있다.
 - SUPER_ADMIN은 전체 권한. 운영자·권한 관리와 광고 메일 등록은 SUPER_ADMIN 전용이며 위임하지 않는다(권한 상승 방지). 사용자 결정(2026-10-28): 금융 실행(출금 승인·지급·정책 변경)도 권한표로 위임 허용.
 - `admins.permissions`가 null인 기존 ADMIN/MODERATOR는 이전 역할 범위를 그대로 쓴다. 신규 부운영자는 role=ADMIN + permissions JSON.
 - 임시 비밀번호(`must_change_password`) 상태에서는 me·me/profile 조회·me/password 외 모든 관리자 경로가 403 PASSWORD_CHANGE_REQUIRED.
@@ -494,3 +494,25 @@ AdProduct 응답: id/name/description/terms/placement/amount/durationDays/visibl
 근거: [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), 2026-10-31 확인. 확장자·실제 형식·용량·권한을 함께 검사하고 애플리케이션 생성 파일명과 이미지 재인코딩을 적용한다. PNG/JPG/WebP 2MiB·128px 출력은 작은 칩 아이콘 용도에 맞춘 구현 기준이다. 검증 증거는 각 리포 `.local/category-management-20261031/`에 저장하며 대역 S3 검증과 운영 실업로드를 구분한다.
 
 - 2026-11-02: `/studio/finance`의 `creatorTerms`는 개별 조건이 없어도 현재 DB 기본값을 반영한 적용 조건을 반환한다. 멤버십 예상 수익은 `platformFeeBps` 기준이며 기존 주문·구독의 공제율 스냅샷은 변경하지 않는다.
+
+
+## 예약 핸들 관리 (2026-11-03, 구현 후 운영 배포 별도)
+
+콘솔 `/console/reserved-handles`에서 정확 일치하는 핸들을 관리한다. 사용자 결정에 따라 기존 제안 62개와 허용되는 밑줄 제거 변형을 중복 제거한 103개를 초기 `reserved` 상태로 등록한다. 마이그레이션 `20261103010000_reserved_handles`가 원본 목록이며 현재 형식에서 불가능한 점·하이픈 변형은 포함하지 않는다. 전체 접두사·부분 일치·정규식 차단은 없다.
+
+| Method | 경로 | 권한·계약 |
+| --- | --- | --- |
+| GET | /admin/reserved-handles | reserved-handles.view. page/search/status(candidate·reserved·deleted), 20개씩. 상태 미지정은 삭제 제외. 사용 중·이전 핸들 보호·사용자 없음만 표시하며 회원 이메일은 반환하지 않는다. |
+| POST | /admin/reserved-handles | reserved-handles.create. handle/status/reason 필수. 소문자 정규화·3~24자 영문 소문자/숫자/밑줄. 삭제 상태 포함 중복409. |
+| PUT | /admin/reserved-handles/:id | reserved-handles.update. handle/status/reason/expectedVersion 필수. 후보 전환으로 예약 해제, 삭제 항목 복구도 가능. 버전 충돌409. |
+| DELETE | /admin/reserved-handles/:id | reserved-handles.delete. expectedVersion/reason/confirmation(현재 핸들 정확히 입력). 소프트 삭제·이력 보존. |
+| GET | /admin/reserved-handles/:id/history | reserved-handles.view. 버전 내림차순, 20개 페이지. 전후 핸들/상태·사유·처리자 ID/이름·시각. |
+
+- 후보(`candidate`)는 신규 취득을 차단하지 않는다. 예약(`reserved`)만 신규 취득 차단, 삭제(`deleted`)는 예약 차단 해제다. 기존 현재 보유자는 그대로 유지하고 본인 핸들 유지·다른 프로필 정보 수정이 가능하다. 이미 사용 중이라는 표시를 공식 계정 인증으로 해석하지 않는다.
+- 이전에 사용한 핸들 `retired_handles`는 별도 보호다. 운영 예약 해제/삭제로 이전 주소를 다른 사람에게 열지 않는다. 현재 보유자가 예약 핸들을 떠난 뒤 다시 취득하는 경우에는 운영 예약이 적용된다.
+- 회원 가입은 사용자가 핸들을 지정하지 않고 난수로 생성한다. 생성 시에도 운영 예약·사용 중·이전 핸들을 피한다. 팬 프로필 중복 확인과 직접 저장, 스튜디오 현재 핸들 동기화는 같은 규칙을 사용한다. 중복 확인은 예약이 아니므로 저장 시 다시 검사한다.
+- 예약 테이블에 행이 없는 이름도 경쟁할 수 있어, `platform_settings`의 고정 `handles.policy` 행을 먼저 잠근 뒤 예약 변경·가입 핸들 생성·프로필 저장·스튜디오 동기화를 직렬 처리한다. 가입의 이메일 proof 등 일반 조회보다 먼저 잠가 오래된 트랜잭션 스냅샷을 사용하지 않는다. 잠금 행이 없으면503으로 실패하고 예약 검사를 건너뛰지 않는다.
+- 새 테이블 `reserved_handles`·`reserved_handle_changes`; 변경과 버전·변경 이력·`admin.reserved_handle_changed` 감사를 같은 트랜잭션에 저장한다. 삭제 후에도 이력을 보존한다. 감사 원장에는 사유/핸들 원문을 추가하지 않고 해시·전후 상태·버전·처리자만 기록한다. 초기103개는 변경 이력에서 초기 예약으로 구분한다.
+- 기존 운영자에게 새 권한을 자동 부여하지 않는다. 최고관리자는 기존 규칙대로 전체 권한, 부운영자는 운영자·권한에서 메뉴별 입장/생성/수정/삭제를 지정한다. 서버의 세션·Origin·OTP·`@Permit` 검사를 유지한다.
+- 2026-11-03 확인: [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)의 기본 거부·매 요청 서버 권한 검증, [Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html)의 서버 허용 형식 검증을 적용했다. 예약할 이름과 기존 보유자 유지 범위는 사용자 결정이다.
+- 검증: `tests/platform-reserved-handles.test.cjs`, 기존 `tests/platform-handle-unify.test.cjs`, `tests/platform-openapi.test.cjs`. 콘솔 `e2e/reserved-handles.spec.ts`는 실제 로컬 격리 API·DB를 사용한다. 운영 배포 시 DB 백업→마이그레이션→API/worker→콘솔 순서가 필요하며 현재 운영 반영 여부는 PROGRESS.md를 따른다.

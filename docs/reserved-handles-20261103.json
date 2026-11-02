@@ -1,0 +1,233 @@
+{
+  "checkedAt": "2026-11-02T16:04:56.332253+00:00",
+  "status": "local-verified-not-deployed",
+  "environment": {
+    "os": "macOS-15.2-arm64-arm-64bit-Mach-O",
+    "node": "v22.7.0",
+    "database": "loopback:3307/crefans_platform_e2e; isolated fixtures, never production",
+    "browsers": [
+      "Chromium 1440x1000",
+      "WebKit iPhone13 emulation"
+    ]
+  },
+  "decision": {
+    "initialStatus": "reserved",
+    "originalNames": 62,
+    "withValidSeparatorFreeVariants": 103,
+    "matching": "exact lowercase [a-z0-9_]{3,24}; no wildcard",
+    "existingOwners": "keep current name; newly acquiring reserved name is blocked",
+    "retiredHandles": "independent protection remains"
+  },
+  "repositories": {
+    "server": {
+      "path": "/Users/ethan/repository/crefans_server-reserved-handles",
+      "baseline": "d4238d922641277f6e5364f27d2484a8641afdb1",
+      "branch": "feat/reserved-handles",
+      "uncommittedAtVerification": true
+    },
+    "admin": {
+      "path": "/Users/ethan/repository/crefans_admin-reserved-handles",
+      "baseline": "602cecfa7daba567756d2a3a1146877f9616a0fe",
+      "branch": "feat/reserved-handles",
+      "uncommittedAtVerification": true
+    },
+    "front": {
+      "path": "/Users/ethan/repository/crefans_front-reserved-handles-docs",
+      "baseline": "88237ffc6c6089c6ec711f0abe63d13953dd0afe",
+      "branch": "feat/reserved-handles-docs",
+      "uncommittedAtVerification": true
+    }
+  },
+  "executions": [
+    {
+      "repository": "server",
+      "command": "npm run build",
+      "exitCode": 0,
+      "summary": "TypeScript/Nest build PASS",
+      "log": ".local/reserved-handles-20261103/build-final.log",
+      "logUpdatedAt": "2026-11-02T15:53:35.717983+00:00",
+      "timestampSource": "log file completion mtime; exact subprocess times recorded separately where available",
+      "logSha256": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2"
+    },
+    {
+      "repository": "server",
+      "command": "CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-reserved-handles.test.cjs tests/platform-handle-unify.test.cjs tests/platform-openapi.test.cjs",
+      "exitCode": 0,
+      "summary": "24 tests: 24 pass, 0 fail",
+      "log": ".local/reserved-handles-20261103/server-tests-restored.log",
+      "logUpdatedAt": "2026-11-02T16:00:25.793333+00:00",
+      "timestampSource": "log file completion mtime; exact subprocess times recorded separately where available",
+      "logSha256": "96631e9f444a9bde9397cec219c19f451c3a208f13e33d8a04a19d4bedc93e31"
+    },
+    {
+      "repository": "admin",
+      "command": "npm run check",
+      "exitCode": 0,
+      "summary": "typecheck + 11 unit tests PASS",
+      "log": ".local/reserved-handles-20261103/check-final.log",
+      "logUpdatedAt": "2026-11-02T15:53:35.031800+00:00",
+      "timestampSource": "log file completion mtime; exact subprocess times recorded separately where available",
+      "logSha256": "dd07db35b0ec12be293a85db2cdb8f6d6b2871b884e0adc9b833ccd0a67f5d19"
+    },
+    {
+      "repository": "admin",
+      "command": "CREFANS_SERVER_DIR=<isolated server worktree> npx playwright test --config=playwright.reserved-handles.config.ts",
+      "exitCode": 0,
+      "summary": "PC Chromium 2 + iPhone13 WebKit 2 = 4 PASS",
+      "log": ".local/reserved-handles-20261103/browser-final.log",
+      "logUpdatedAt": "2026-11-02T15:58:35.845915+00:00",
+      "timestampSource": "log file completion mtime; exact subprocess times recorded separately where available",
+      "logSha256": "aad388edac96cab30b926bb56ebd81c7528c387176c315f3f66f81c5eff97135"
+    },
+    {
+      "repository": "admin",
+      "command": "npm run build:verify",
+      "exitCode": 0,
+      "summary": "12 pages built; 3 pre-existing img lint warnings",
+      "log": ".local/reserved-handles-20261103/build-final.log",
+      "logUpdatedAt": "2026-11-02T15:59:17.487407+00:00",
+      "timestampSource": "log file completion mtime; exact subprocess times recorded separately where available",
+      "logSha256": "5ce4b13cc651a173a9ca3c34c887af354bb3002173d454acad9136da5cc20e66"
+    }
+  ],
+  "restoredVerification": {
+    "command": "CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-reserved-handles.test.cjs tests/platform-handle-unify.test.cjs tests/platform-openapi.test.cjs",
+    "startedAt": "2026-11-02T16:00:22.961771+00:00",
+    "finishedAt": "2026-11-02T16:00:25.797473+00:00",
+    "exitCode": 0,
+    "logSha256": "96631e9f444a9bde9397cec219c19f451c3a208f13e33d8a04a19d4bedc93e31"
+  },
+  "negativeControl": {
+    "startedAt": "2026-11-02T15:59:35.112096+00:00",
+    "scope": "isolated compiled output only; loopback E2E DB",
+    "mutation": "bypass active reservation check",
+    "originalSha256": "42ca3e67464d39ae1f73d19e28b9aa40b05fdc28631feadda3447476d421381d",
+    "command": [
+      "node",
+      "--test",
+      "--test-concurrency=1",
+      "tests/platform-reserved-handles.test.cjs"
+    ],
+    "exitCode": 1,
+    "finishedAt": "2026-11-02T15:59:36.563553+00:00",
+    "restoredSha256": "42ca3e67464d39ae1f73d19e28b9aa40b05fdc28631feadda3447476d421381d",
+    "result": "6 failures out of 8; expected detection; restored byte-identically, final 24 pass"
+  },
+  "initialFailures": [
+    {
+      "server": "3/24 failures: two old route-count expectations and one wrong test Origin; corrected fixture/contracts and reran to 24 pass"
+    },
+    {
+      "browser": "4/4 failures: state select accessible name and Next route announcer ambiguity; added explicit aria-label and narrowed test alert; rerun 4 pass"
+    },
+    {
+      "documentation": "new API table not recognized; changed to existing Method/Path/contract format; expected hash expiry reviewed before snapshot"
+    }
+  ],
+  "criteria": {
+    "permissions": "5 real HTTP routes, member/anonymous/no permission/read-only, Origin; actor audit/history",
+    "integrity": "actual E2E DB candidates/reserved/deleted/restore, duplicate + version conflicts, typed deletion, history/audit atomicity",
+    "assignment": "availability + direct profile save + existing owner keep + retired name keep + signup reserved random skip",
+    "concurrency": "real transaction holds shared mutex before reservation activation; waiting profile save rejects new reservation after release",
+    "ui": "existing console nav/filter/table/portal/snackbar; desktop/mobile persistence, conflicts, deletion, restore, history, read-only/no-permission, empty, no document overflow"
+  },
+  "sourceHashes": {
+    "server/AGENTS.md": "7d79fe564cff7425b3b7b20b14b8e5c98ed94bc64e813572d19c8010f04cfc7b",
+    "server/PROGRESS.md": "0ede39b63b1af2a754e29c32b4109cd8e6b3ba00b0e79e521e0ee9138d7a7867",
+    "server/docs/current-contracts.md": "f4ae221d3a3f27b512074968ac8843bff278e8578adb946df5daa5b9e44b657f",
+    "server/docs/platform-api.md": "214245b63902e1ed12c886226a17dd6394886f108b1a2bbf9bd84bf60d72e62c",
+    "server/prisma/migrations/20261103010000_reserved_handles/migration.sql": "76d8420fe20a54a4835267c37502d033dd30c9b6088df2d5b4561a8fe9dc49e5",
+    "server/prisma/schema.prisma": "72225c10a54d5ce67b73e65455811be375a5b53173128c6184d55496d8ce6a65",
+    "server/src/platform/admin-permissions.ts": "d8722b471db98ed4e7f0d306685f8712eb35b4f88992657523b84481af6efddc",
+    "server/src/platform/admin.controller.ts": "5ed13f5baadf83936d573828b67ca88e9a0aeaad587a228881abb5f9686084d5",
+    "server/src/platform/auth.service.ts": "668a5b0fbd5a65afb209f039fb48b99870c2db7f211adf2795b3e623c2c124be",
+    "server/src/platform/handles.ts": "616e7fbcf12c28bb9e22dd924cd3bf4b448b4fab240e79f7db88f9bc8a63fa5d",
+    "server/src/platform/openapi-contract.ts": "caea4440bb774c7ab26dbbe4b35b5eaa0ea54884cd7faf32f239fc3b258e1f25",
+    "server/src/platform/reserved-handles.ts": "383234a843b9927ca96ad61d7e7ad09db4f99605b902a6dc32a1d62a6aecbafa",
+    "server/src/platform/service.ts": "7fb30dcbd187a8d5ec65764e7fd2e37757c47468d88a88e87c0e67dcee429208",
+    "server/src/platform/studio.service.ts": "eb8a1804158244570d02ac1b81eac8240f20797ede63f851d00dcd9c242cd093",
+    "server/tests/admin-console-server.cjs": "da1e379328b3d8e6efae01b41d660768c30efd158799ccfbb178a267a608b248",
+    "server/tests/platform-openapi.test.cjs": "dc313ff0ead9b941096cfad6058e786f812afd5911d9b944314fce84075e4b64",
+    "server/tests/platform-reserved-handles.test.cjs": "9398d18d5e2e3d11157a1b8cbedbd48491830d51a10280307433f8d625542962",
+    "admin/AGENTS.md": "89a6fc261bd908e12cc7c6b1e4b38b45c523c09b131aa4e6c744ed7639c14cd4",
+    "admin/PROGRESS.md": "b3ee5d3e9f0d96b146d6a296a23ff01cf2e988152bdc56bd058d6c08432a5e50",
+    "admin/README.md": "f9763624bee9b0142c06c6437604f5ea204626600eaa43be887154c0048663b8",
+    "admin/e2e/reserved-handles.spec.ts": "1b8186a3bf64f8147e8e6f4fe213275d758551a9bfdc59860ca7816ebf26b987",
+    "admin/playwright.config.ts": "056fe6110121a4819f7930826859684e6b2ed3cf7411b253a2fe76980de3f49c",
+    "admin/playwright.reserved-handles.config.ts": "73a07e22582f0ec3ee2a7e41518a2a7c49a203884167241a28d2aa257b061ef2",
+    "admin/src/app/console/[[...section]]/page.tsx": "3b1625bece9cd2579966a1872878e0964c3e89f92e1f0d8061b60aed136a4d20",
+    "admin/src/app/globals.css": "75c6391bd022e0dd5519c8f01f66d044fd131d8d708af60d23c0a0409c8279f6",
+    "admin/src/components/console/Console.tsx": "4848d2f2a6919b34ee6c3131c00e7a065c780b34d1cde64e58f51ce9458951d4",
+    "admin/src/components/console/ConsoleIcon.tsx": "b7961ce9d21082a0622743af12d93ec0646f168915784ac62af3f42875d14b2b",
+    "admin/src/components/console/Operators.tsx": "903d1171d209daeadc7aa4958542a0ecb29f41cc5ac3f739cb19ac2557f97f25",
+    "admin/src/components/console/ReservedHandles.tsx": "34c3b670547004a602438b6613551d4e48013b53c9fafd357e15824f4cf1cba6",
+    "admin/src/components/console/TypedConfirm.tsx": "7b79d99b4dcf49d452ed43da49c17660aaf4beb7cfb5f6e97bd7cee43460d5a2",
+    "front/AGENTS.md": "96f756773f3b8b37c6750e84ad19b7fc78e66e3ce5dc8bf519610409086de8a4",
+    "front/PROGRESS.md": "aa44aeb5470449417b806bd9068655df393573a0e9d1b2ccff3f5186a0dbb186"
+  },
+  "screenshots": [
+    {
+      "path": "test-results/reserved-handles/reserved-handles-read-only-4e8ba--leak-the-management-screen-mobile/empty-readonly.png",
+      "sha256": "e66643b3e47fdd5e5d469381358de328494fd1b2c644ee68d1cd9a62a843a020"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-read-only-4e8ba--leak-the-management-screen-pc/empty-readonly.png",
+      "sha256": "303ee4c4c8014fe995b7ab2e7f0971e55baa09e370faad02d3e7ab400034f25b"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-mobile/candidate-list.png",
+      "sha256": "c2231691f80e1b9200f62c7e43de4b8e70e0efc36b070a3e9f9594961c58744e"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-mobile/delete-confirm.png",
+      "sha256": "e9b3f698f82d3a5788d58497a4c46ad20527da508d1f57f5c6bc9a68af0d5092"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-mobile/edit-reservation.png",
+      "sha256": "609b33183cc04a8ce2f4c97cd8b1db64396537a927bec3fab4213ce9060669a8"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-mobile/history.png",
+      "sha256": "0da0e1261a6da0367b68ba6357a50d7e3ef7ff101367fa454c4975eba4fcf195"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-mobile/initial-list.png",
+      "sha256": "fb5d5cecf02446f584b1dac6f3cc5a5d3112f4e6ad06a783717505a2cbfe25d5"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-pc/candidate-list.png",
+      "sha256": "46ae0f0b9d6e34444b3f7d1e69242f3736f2ddfe4449fa35c18aa83691ed8f3a"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-pc/delete-confirm.png",
+      "sha256": "9dfe3e489d6dc37e5cde2a5a6ef6b491fadf965b41035676383bec5fb6212afe"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-pc/edit-reservation.png",
+      "sha256": "3dc1131a0cccd5a9ed984fcab774030f73ebb5f9777e92061f1ebf1bb622ca35"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-pc/history.png",
+      "sha256": "359d6517f13947c72ddd908221aa0448c74b96b9eb8318be66d531a46ea6b43d"
+    },
+    {
+      "path": "test-results/reserved-handles/reserved-handles-reserved--6d3f6--shows-history-on-PC-mobile-pc/initial-list.png",
+      "sha256": "13b8413beccbcf0c028c6fd8a245357fcb211182e6011e69fa3ed1fe65fda6af"
+    }
+  ],
+  "limits": [
+    "No production migration/deployment or live account changes",
+    "No physical iPhone test",
+    "No real SMTP/payment/financial transactions; outside scope",
+    "Read-only and no-permission browser cases use API doubles; lifecycle cases use isolated real API/DB",
+    "No load testing or claim of exhaustive security review"
+  ],
+  "releaseOrder": [
+    "feature -> dev integration checks -> prod",
+    "backup deployed DB",
+    "apply 20261103010000_reserved_handles migration",
+    "deploy matched API/worker and admin",
+    "verify initial103/status/owner retention/denials in production"
+  ],
+  "docsVerification": "See companion front docs/audit/reserved-handles-20261103.json; snapshot-only is not product test proof"
+}

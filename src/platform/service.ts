@@ -1,3 +1,4 @@
+import {profileHandle,handleTaken,lockHandlePolicy} from './handles';
 import {categoryView,categoryOrder} from './category-catalog';
 import {notifyPost} from './post-notices';
 import {postSupporterCount} from './post-supporters';
@@ -16,7 +17,6 @@ import {assertNewPassword,hashPassword,matchesPassword} from '../auth/local/cred
 import {reject,text,dateOnly} from './http';
 import {memberNoticeLabels} from './member-notices';
 const preferences=(p:any)=>({contentAlert:p?.content_alert??true,messageAlert:p?.message_alert??true,marketingAlert:p?.marketing_alert??false,showActivity:p?.show_activity??true,allowSearch:p?.allow_search??true,showFollowers:p?.show_followers??true,showFollowing:p?.show_following??true});
-function profileHandle(value:unknown){if(typeof value!=='string'||!/^[a-z0-9_]{3,24}$/.test(value.trim()))reject(400,'INVALID_HANDLE','핸들은 영문 소문자, 숫자, 밑줄 3~24자입니다.');return value.trim();}
 // Stored notification kinds shown as the Korean filter labels of the notifications page.
 const notificationLabels:Record<string,string>={subscription:'멤버십',comment:'댓글',message:'메시지',content:'새 게시물',settlement:'정산',media:'게시물 처리',...memberNoticeLabels};
 @Injectable()
@@ -132,11 +132,11 @@ export class PlatformService {
  // Reasons offered by the report dialog (front lib/crefans/report-reasons.ts). A request without one is filed as OTHER for older clients.
  async report(member:string,target:string,kind:'USER'|'POSTING'|'COMMENT',reason:unknown='OTHER'){if(!['INAPPROPRIATE','COPYRIGHT','SPAM','HARASSMENT','PRIVACY','OTHER'].includes(reason as string))reject(400,'INVALID_REPORT_REASON','신고 사유를 선택해주세요.');if(kind==='USER')await this.member(target);else if(kind==='COMMENT'?!await this.db.comment.findFirst({where:{id:target,is_deleted:false,hidden:false}}):!await this.db.posting.findUnique({where:{id:target}}))reject(404,'NOT_FOUND','신고 대상을 확인해주세요.');await this.db.userReport.create({data:{reporter_id:member,target_id:target,target_type:kind,reason:reason as any}});return{message:'신고를 접수했습니다.'};}
  async handleAvailability(member:string,value:unknown){const handle=profileHandle(value);return{handle,available:!await this.handleTaken(this.db,member,handle)};}
- private async handleTaken(db:Prisma.TransactionClient,member:string,handle:string){return !!(await db.member.findFirst({where:{preferred_username:handle,id:{not:member}},select:{id:true}})||await db.creator.findFirst({where:{handle,user_id:{not:member}},select:{id:true}})||await db.retiredHandle.findFirst({where:{handle,OR:[{member_id:null},{member_id:{not:member}}]},select:{handle:true}}));}
+ private async handleTaken(db:Prisma.TransactionClient,member:string,handle:string){return handleTaken(db,member,handle);}
  async profile(member:string,input:any){
   // 2026-10-31: one public user name. members.preferred_username is the source; creators.handle (the creator profile address) follows it.
   const handle=input?.handle===undefined?undefined:profileHandle(input.handle);
-  try{await this.db.$transaction(async tx=>{const priorMember=await tx.member.findUnique({where:{id:member}}),priorProfile=await tx.userProfile.findUnique({where:{user_id:member}});
+  try{await this.db.$transaction(async tx=>{await lockHandlePolicy(tx);const priorMember=await tx.member.findUnique({where:{id:member}}),priorProfile=await tx.userProfile.findUnique({where:{user_id:member}});
    if(handle!==undefined&&handle!==priorMember?.preferred_username){if(await this.handleTaken(tx,member,handle))reject(409,'HANDLE_TAKEN','이미 사용 중인 핸들입니다.');await tx.creator.updateMany({where:{user_id:member},data:{handle}});
     // The old handle stays this member's and keeps leading to the profile (watermarks print it, 2026-11-02); taking it back frees the reservation.
     if(priorMember?.preferred_username)await tx.retiredHandle.upsert({where:{handle:priorMember.preferred_username},create:{handle:priorMember.preferred_username,member_id:member},update:{}});await tx.retiredHandle.deleteMany({where:{handle,member_id:member}});}
