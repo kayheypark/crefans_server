@@ -115,23 +115,71 @@ test('console: switch, list, member type filter and a link for any member',async
  }finally{await db.creator.deleteMany({where:{user_id:busy}});}
 });
 
-test('my invite history: masked names (first 3 + 10 stars), status filters, own rows only, no email or ids of invitees',async()=>{
- const owner=randomUUID(),other=randomUUID(),people=[['카이팍크리에이터','pending'],['minjun','qualified'],['jo','granted']].map(([nickname,status])=>({id:randomUUID(),nickname,status}));
+test('my invite history: masked emails only for invitees who agreed (2026-11-02), status filters, own rows only, no full email or ids',async()=>{
+ const owner=randomUUID(),other=randomUUID(),people=[['카이팍크리에이터','pending','KaiPak@Naver.com',true],['minjun','qualified','minjun99@gmail.com',true],['jo','granted','jo@daum.net',false]].map(([nickname,status,email,agreed])=>({id:randomUUID(),nickname,status,email,agreed}));
  const all=[owner,other,...people.map(p=>p.id)];
  try{
-  for(const id of all){const p=people.find(x=>x.id===id);await db.member.create({data:{id,email:id+'@history.invalid',name:'History fixture',nickname:p?.nickname||'History owner',preferred_username:id,email_verified:true}});}
+  for(const id of all){const p=people.find(x=>x.id===id);await db.member.create({data:{id,email:p?id.slice(0,8)+'.'+p.email:id+'@history.invalid',name:'History fixture',nickname:p?.nickname||'History owner',preferred_username:id,email_verified:true}});if(p?.agreed)await db.memberConsent.create({data:{member_id:id,kind:referrals.REFERRAL_DISCLOSURE_KIND,document_snapshot:referrals.REFERRAL_DISCLOSURE}});}
   const ref=await referrals.ensureReferral(db,owner),otherRef=await referrals.ensureReferral(db,other);
   for(const [i,p] of people.entries())await db.referralSignup.create({data:{referral_id:ref.id,referrer_id:owner,member_id:p.id,reward_status:p.status,created_at:new Date(Date.now()-i*60000),...(p.status==='qualified'?{grant_due_at:new Date(Date.now()+86400000)}:{}),...(p.status==='granted'?{reward_quantity:100,rewarded_at:new Date()}:{})}});
   const outsider=randomUUID();all.push(outsider);await db.member.create({data:{id:outsider,email:outsider+'@history.invalid',name:'x',nickname:'outsider',preferred_username:outsider,email_verified:true}});
   await db.referralSignup.create({data:{referral_id:otherRef.id,referrer_id:other,member_id:outsider}});
   const h=await referrals.referralHistory(db,owner);
-  assert.deepEqual(h.items.map(i=>i.name),['카이팍**********','min**********','jo**********']);
+  assert.deepEqual(h.items.map(i=>i.name),[`${people[0].id.slice(0,2)}***@n***.com`,`${people[1].id.slice(0,2)}***@g***.com`,'가입한 회원'],'masked email with consent, nothing identifying without it');
   assert.deepEqual(h.items.map(i=>i.status),['joined','waiting','rewarded']);assert.deepEqual(h.summary,{invited:3,waiting:1,rewardBeans:100});
   assert.ok(h.items[1].dueAt&&!h.items[0].dueAt);assert.equal(h.items[2].rewardBeans,100);
-  const text=JSON.stringify(h);for(const p of people){assert.ok(!text.includes(p.id),'invitee id hidden');assert.ok(!text.includes('@history.invalid'),'email hidden');}
+  const text=JSON.stringify(h);for(const p of people){assert.ok(!text.includes(p.id),'invitee id hidden');assert.ok(!text.toLowerCase().includes(p.email.toLowerCase()),'full email hidden');assert.ok(!h.items.some(i=>i.name.includes(p.nickname)),'nickname no longer shown');}
   assert.ok(!text.includes('outsider'),'other referrers are isolated');
-  assert.deepEqual((await referrals.referralHistory(db,owner,'waiting')).items.map(i=>i.name),['min**********']);
+  assert.deepEqual((await referrals.referralHistory(db,owner,'waiting')).items.map(i=>i.name),[`${people[1].id.slice(0,2)}***@g***.com`]);
   await assert.rejects(referrals.referralHistory(db,owner,'everything'),code('INVALID_REFERRAL_STATUS'));
   await setSwitch(false);try{await assert.rejects(referrals.referralHistory(db,owner),code('REFERRAL_DISABLED'));}finally{await setSwitch(true);}
- }finally{await db.referralSignup.deleteMany({where:{OR:[{member_id:{in:all}},{referrer_id:{in:all}}]}});await db.referral.deleteMany({where:{member_id:{in:all}}});await db.member.deleteMany({where:{id:{in:all}}});}
+ }finally{await db.memberConsent.deleteMany({where:{member_id:{in:all}}});await db.referralSignup.deleteMany({where:{OR:[{member_id:{in:all}},{referrer_id:{in:all}}]}});await db.referral.deleteMany({where:{member_id:{in:all}}});await db.member.deleteMany({where:{id:{in:all}}});}
+});
+
+test('masked email keeps two characters, the first of the domain and the top-level domain',()=>{
+ assert.equal(referrals.maskReferralEmail('AbCdef@Naver.com'),'ab***@n***.com');assert.equal(referrals.maskReferralEmail('a@b.co.kr'),'a***@b***.kr');assert.equal(referrals.maskReferralEmail('x@localhost'),'x***@l***');
+});
+
+test('operators exclude a waiting invite or take back what is left of a granted reward, with a reason; settled ones are refused',async()=>{
+ // 2026-11-02 user decision: the referral card promises operator exclusion/reclaim; it must exist before the switch is turned on.
+ const owner=randomUUID(),a=randomUUID(),b=randomUUID(),admin=randomUUID(),all=[owner,a,b];
+ try{
+  for(const id of all)await db.member.create({data:{id,email:id+'@revoke.invalid',name:'Revoke fixture',nickname:'Revoke fixture',preferred_username:id,email_verified:true}});
+  const ref=await referrals.ensureReferral(db,owner);
+  for(const id of[a,b])await db.referralSignup.create({data:{referral_id:ref.id,referrer_id:owner,member_id:id}});
+  await buy(beans,b,100);const due=await signupOf(b);assert.equal(due.reward_status,'qualified');assert.equal(await grantDue(),1);
+  await assert.rejects(referrals.revokeReferralReward(db,admin,(await signupOf(a)).id,{reason:''}),code('INVALID_INPUT'));
+  assert.equal((await referrals.revokeReferralReward(db,admin,(await signupOf(a)).id,{reason:'같은 기기 다중 가입'})).message,'이 초대를 보상에서 제외했습니다.');
+  assert.equal((await signupOf(a)).reward_status,'forfeited');
+  const before=(await beans.wallet(owner)).accounts.find(x=>x.bucket==='promotion')?.balance;
+  assert.equal((await referrals.revokeReferralReward(db,admin,(await signupOf(b)).id,{reason:'부정 결제 확인'})).message,'남은 보상 콩을 회수했습니다.');
+  assert.equal((await signupOf(b)).reward_status,'clawed_back');assert.equal((await beans.wallet(owner)).accounts.find(x=>x.bucket==='promotion')?.balance,'0',`was ${before}`);
+  for(const id of[a,b])await assert.rejects(referrals.revokeReferralReward(db,admin,(await signupOf(id)).id,{reason:'다시'}),code('REFERRAL_NOT_REVOCABLE'));
+  await assert.rejects(referrals.revokeReferralReward(db,admin,randomUUID(),{reason:'없음'}),code('REFERRAL_NOT_FOUND'));
+  const audits=await db.platformAuditLog.findMany({where:{action:'admin.referral_revoked',entity_id:{in:[(await signupOf(a)).id,(await signupOf(b)).id]}}});
+  assert.equal(audits.length,2);
+  assert.deepEqual([await signupOf(a),await signupOf(b)].map(r=>[r.revoke_reason,r.revoked_by]),[['같은 기기 다중 가입',admin],['부정 결제 확인',admin]],'reason and operator stay on the invite');
+ }finally{await db.referralSignup.deleteMany({where:{OR:[{member_id:{in:all}},{referrer_id:{in:all}}]}});await db.referral.deleteMany({where:{member_id:{in:all}}});}
+});
+
+test('signing up through a referral link requires the disclosure agreement and records it; without it nothing is created',async()=>{
+ // 2026-11-02 user decision: the referrer will see a masked email, so the invitee agrees on the referral signup screen.
+ const {PlatformAuthService}=require('../dist/src/platform/auth.service'),{LegalDocumentsService}=require('../dist/src/platform/legal-documents'),{publishedCatalog}=require('./legal-fixture.cjs');
+ const legal=new LegalDocumentsService();legal.catalog=publishedCatalog;const messages=[],emails=[];
+ const auth=new PlatformAuthService(db,{limit:async()=>{}},{sendCode:async(email,value)=>messages.push({email,code:value})},new ConfigService({LOCAL_AUTH_SECRET:'test-only-'.repeat(8),SIGNUP_IDENTITY_MODE:'email-only',SIGNUP_INVITE_ONLY:'true'}),legal);
+ const ref=await referrals.ensureReferral(db,referrer);
+ const input=async()=>{const email=`ref-${randomUUID()}@example.invalid`;emails.push(email);await auth.requestCode(email,ref.id);const {proof}=await auth.verifyCode({email,code:messages.find(m=>m.email===email).code});return{email,emailProof:proof,password:'Referral-test-123!',nickname:'초대 가입',terms:true,privacy:true,marketing:false,ageAcknowledged:true,policyVersions:legal.signup().versions,referralCode:ref.id};};
+ try{
+  const refused=await input();
+  for(const referralDisclosure of[undefined,false,'true'])await assert.rejects(auth.signup({...refused,referralDisclosure}),code('REFERRAL_DISCLOSURE_REQUIRED'));
+  assert.equal(await db.member.count({where:{email:refused.email}}),0);
+  const ok=await input();await auth.signup({...ok,referralDisclosure:true});
+  const member=await db.member.findUniqueOrThrow({where:{email:ok.email}});
+  assert.equal((await signupOf(member.id)).referrer_id,referrer);
+  const consent=await db.memberConsent.findFirstOrThrow({where:{member_id:member.id,kind:referrals.REFERRAL_DISCLOSURE_KIND}});
+  assert.equal(consent.document_snapshot.version,referrals.REFERRAL_DISCLOSURE.version);assert.match(consent.document_snapshot.agreement,/이메일 일부/);
+ }finally{const made=await db.member.findMany({where:{email:{in:emails}},select:{id:true}}),mids=made.map(m=>m.id);
+  await db.referralSignup.deleteMany({where:{member_id:{in:mids}}});await db.memberConsent.deleteMany({where:{member_id:{in:mids}}});await db.accountPreference.deleteMany({where:{member_id:{in:mids}}});
+  await db.beanAccount.deleteMany({where:{wallet:{owner_key:{in:mids.map(id=>'member:'+id)}}}}).catch(()=>{});await db.beanWallet.deleteMany({where:{owner_key:{in:mids.map(id=>'member:'+id)}}}).catch(()=>{});
+  await db.member.deleteMany({where:{id:{in:mids}}});await db.signupChallenge.deleteMany({where:{email:{in:emails}}});}
 });
