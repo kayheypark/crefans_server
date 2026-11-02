@@ -80,3 +80,12 @@ test('batch errors preserve safe internal code and job name without exception te
  const row=await ops.error('worker.error',error,{job:'billing-registration-and-revocation'});ids.add(row.id);
  assert.equal(row.data.job,'billing-registration-and-revocation');assert.equal(row.data.errorCode,'BILLING_RETRY_FAILED');assert.match(row.data.fingerprint,/^[a-f0-9]{64}$/);assert.ok(row.data.release);assert.doesNotMatch(JSON.stringify(row),/secret/);
 });
+test('Telegram alerts carry member identifiers only as a keyed hash; 기록 ID stays for the console lookup',()=>{
+ // 2026-11-02 user decision: Telegram is an overseas service, so member IDs leave hashed; 기록 ID leads operators to the raw row.
+ const {operationsAlertText}=require('../dist/src/platform/operations.service'),memberId=randomUUID(),creatorId=randomUUID(),targetId=randomUUID();
+ const row={id:randomUUID(),type:'referral.rewarded',ip:null,peer_ip:null,request_id:null,created_at:new Date(),data:{memberId,creatorId,targetId}};
+ const first=operationsAlertText(row,'synthetic','synthetic-secret'),again=operationsAlertText(row,'synthetic','synthetic-secret'),other=operationsAlertText(row,'synthetic','another-secret'),none=operationsAlertText(row,'synthetic');
+ for(const text of[first,other,none]){assert.ok(!text.includes(memberId)&&!text.includes(creatorId),text);assert.ok(text.includes(`기록 ID: ${row.id}`));assert.ok(text.includes(`targetId: ${targetId}`));}
+ assert.match(first,/^memberId: h:[0-9a-f]{12}$/m);assert.match(first,/^creatorId: h:[0-9a-f]{12}$/m);assert.equal(first,again,'same member, same hash');assert.notEqual(first,other,'the hash depends on the server secret');
+ assert.match(none,/^memberId: \(숨김\)$/m);
+});

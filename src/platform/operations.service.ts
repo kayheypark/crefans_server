@@ -3,7 +3,7 @@ import {Injectable,OnModuleInit,OnModuleDestroy} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {PrismaService} from '../prisma/prisma.service';
 import {requestContext} from './request-context';
-import {randomUUID} from 'crypto';
+import {createHmac,randomUUID} from 'crypto';
 
 const labels:Record<string,string>={
  'beans.charge_created':'콩 충전 주문','beans.charge_paid':'콩 충전 완료','beans.tip':'콩 후원','beans.promotion':'프로모션콩 지급','beans.payout_requested':'후원콩 출금 접수','beans.payout_paid':'후원콩 은행 지급 완료','beans.payout_rejected':'후원콩 은행 반려','beans.charge_disputed':'콩 충전 취소·차지백 감지',
@@ -25,6 +25,14 @@ function metadata(data:Record<string,unknown>){
   }
  }
  return result;
+}
+/** Telegram is outside the service (overseas transfer): member identifiers leave only as a keyed hash (2026-11-02 user decision).
+ * Operators find the raw value through 기록 ID in the console log. */
+export function operationsAlertText(row:{type:string;ip:string|null;peer_ip:string|null;created_at:Date;id:string;request_id:string|null;data:unknown},env:string,secret?:string){
+ const hidden=(value:unknown)=>secret?'h:'+createHmac('sha256',secret).update(`operations-alert:${String(value)}`).digest('hex').slice(0,12):'(숨김)';
+ const lines=[`[crefans] ${labels[row.type]||row.type}`,`환경: ${env}`,`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`,`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
+ for(const [key,value] of Object.entries(row.data as Record<string,unknown>))lines.push(`${key}: ${['memberId','creatorId'].includes(key)?hidden(value):typeof value==='object'?JSON.stringify(value):String(value)}`);
+ return lines.join('\n').slice(0,3800);
 }
 @Injectable()
 export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
@@ -93,9 +101,8 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
    if(!target.ok||target.payload.ok!==true){code='TELEGRAM_CHAT_UNAVAILABLE';}
    else if(target.payload.result.type!=='channel'||target.payload.result.title!=='[crefans] operations'){code='TELEGRAM_CHANNEL_MISMATCH';}
    else{
-    const lines=[`[crefans] ${labels[row.type]||row.type}`,`환경: ${this.config.get('APP_ENV')||this.config.get('NODE_ENV')||'local'}`,`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`,`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
-    for(const [key,value] of Object.entries(row.data as Record<string,unknown>))lines.push(`${key}: ${typeof value==='object'?JSON.stringify(value):String(value)}`);
-    const sent=await post('sendMessage',{chat_id:chat,text:lines.join('\n').slice(0,3800)});
+    const text=operationsAlertText(row,this.config.get('APP_ENV')||this.config.get('NODE_ENV')||'local',this.config.get<string>('LOCAL_AUTH_SECRET'));
+    const sent=await post('sendMessage',{chat_id:chat,text});
     if(sent.ok&&sent.payload.ok===true){await this.db.platformOperationalEvent.update({where:{id:row.id},data:{delivered_at:new Date(),locked_until:null,last_error_code:null}});return true;}
     if(sent.status===429){code='TELEGRAM_RATE_LIMITED';const delay=Number(sent.payload.parameters?.retry_after);if(Number.isFinite(delay)&&delay>=0)retryMs=Math.max(1200,Math.min(delay*1000,3600000));}
    }
