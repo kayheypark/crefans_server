@@ -1,0 +1,60 @@
+{
+  "verifiedAt": "2026-11-02T23:37:52.779525+00:00",
+  "repository": "crefans_server",
+  "baseCommit": "9a76c9cfb15d1ff17da2954ec1c884f1425fe6bc",
+  "branch": "feat/shared-short-bio",
+  "workingTree": "changes represented by source SHA-256 below; committed after verification",
+  "sourceSha256": {
+    "prisma/schema.prisma": "7e4436808630be046148b098fd3733a6e5f444a7083cec4cf8cf4cfe99714fc8",
+    "prisma/migrations/20261103083000_shared_short_bio/migration.sql": "c4a96fd5fb01661012e411fdb2be28b2ca6aa30ea295ad0b2bbb1fb9cc78607b",
+    "src/platform/service.ts": "dbcfd8ee93f1da237b81d62c9bcfc2af16d6239c2511d6eb3f22df5ff648988a",
+    "src/platform/studio.service.ts": "53ed15b122293a83855950d0c6222b28df9bbcedf2cf3881bee4ce79c9c0071b",
+    "src/platform/member-purge.ts": "6d2f95f1d9d94902352274193e10189cefeaf87d10a0c5a5cbcd0b486bc831f0",
+    "src/platform/openapi-contract.ts": "c922f7e7c492fa660cfeb5c83ae172c0f3c47ecfdce19dc8705663f8fe79e93e",
+    "tests/platform-shared-bio.test.cjs": "2c22e131e40021f07fee6ef7a0661086bf715f9c3e8d98b6d8757da669ee1b98",
+    "tests/platform-new-creators.test.cjs": "6d29bec06c0f1d1d8664d0cc1e6b7c0e93016080403ead0b5490c6482f2eb75c",
+    "tests/platform-moderation.test.cjs": "33e3143f3af56dd74fdc4e98f37c3c5c7c9578c7bef0e0dc9c77b667bd0faab3"
+  },
+  "environment": "local NestJS / Prisma6.9 / MySQL dedicated crefans_platform_e2e; synthetic accounts",
+  "checks": [
+    {
+      "command": "npm run build",
+      "finishedAt": "2026-11-02T23:35:34.373324+00:00",
+      "exitCode": 0,
+      "result": "passed",
+      "logSha256": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2"
+    },
+    {
+      "command": "CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-shared-bio.test.cjs tests/platform-new-creators.test.cjs tests/platform-profile-photos.test.cjs tests/platform-moderation.test.cjs",
+      "finishedAt": "2026-11-02T23:34:51.696574+00:00",
+      "exitCode": 0,
+      "result": "18 passed",
+      "logSha256": "605f6325f0e3dc18e921a2a53e0fc995fbd61602dd0a8d1bf9036af828ce9367"
+    },
+    {
+      "command": "npm run test:openapi",
+      "finishedAt": "2026-11-02T23:36:00.063892+00:00",
+      "exitCode": 0,
+      "result": "13 passed",
+      "logSha256": "ff77083f6e0a7e20a74713000fac174744da99c2b7445733af5f8bca68e26725"
+    }
+  ],
+  "earlierFailures": [
+    "Initial temporary-table migration test: MySQL 1137 cannot reopen table; test changed to uniquely named isolated ordinary tables, same migration SQL passed.",
+    "OpenAPI loopback bind blocked with EPERM in sandbox; rerun with local server permission passed."
+  ],
+  "scope": [
+    "short bio member/studio/bootstrap/public/search synchronization",
+    "explicit clear and omitted-value preservation",
+    "detailed about, cover and creation date preserved by migration",
+    "unauthenticated writes and 121-character biographies rejected",
+    "related new creator, photos, purge regressions"
+  ],
+  "productionDeployed": false,
+  "productionMigrationApplied": false,
+  "reference": {
+    "url": "https://www.prisma.io/docs/orm/v6/prisma-migrate/workflows/customizing-migrations",
+    "checked": "2026-11-03",
+    "applied": "preserve data with custom SQL before column removal; coordinate old API/worker shutdown and backup before deployment"
+  }
+}

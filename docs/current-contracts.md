@@ -370,6 +370,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261102140000_watermark_followups`
 - `20261102160000_withdrawn_handle_reservation`
 - `20261102161000_referral_revoke`
+- `20261103083000_shared_short_bio`
 - `20261103120000_founding_badge_claim`
 
 ## Prisma 전체 정의 (87 models · 15 enums)
@@ -568,7 +569,6 @@ model Creator {
   category_id String?
   display_name String?
   handle String? @unique
-  bio String? @db.Text
   about String? @db.Text
   links Json?
   avatar String? @db.Text

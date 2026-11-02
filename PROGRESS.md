@@ -1869,3 +1869,10 @@
 ## 2026-11-02 지갑 화면 명칭 계약 운영 소스 반영
 - 사용자 확정 사항 배포 지시로 feat/wallet-navigation-labels 22ffc56→dev7f961b7 통합→prod1f1a82f 승격 후 원격 dev/prod 동기화. docs/current-contracts.md의 화면명·순서와 작업 로그만 변경; 서버 런타임/API/worker/DB 배포·마이그레이션 없음.
 - 프론트 지갑 메뉴·새로고침 아이콘은 wallet-release-20261102로 04:42 KST 배포. 문서 계약75개 검사 통과, 운영6서비스 정상 및 서버·worker·DB ID 유지. 증거 ../crefans_front/.local/wallet-release-20261102/verification.json, deployment-git.json, runtime-after.json. 금융 동작 검증으로 확대하지 않음.
+
+
+## 2026-11-03 짧은 프로필 소개 통합 — feat/shared-short-bio, 미배포
+- 최신 origin/prod9a76c9c에서 분기. 사용자 확정: 상단 120자 소개만 user_profiles.bio로 통합, creators.about 1,000자 상세 소개 유지. 기존 중단 작업트리 보존 후 최신 배지 로직과 병합.
+- 회원/스튜디오 저장과 bootstrap·공개 프로필·검색·스튜디오 조회가 공통 소개를 사용. 생략 시 보존·빈 값 명시 시 삭제. migration은 공개 크리에이터 소개 우선 보존, 없으면 회원 소개 유지, 누락 프로필 추가 후 creators.bio 제거. 커버·생성일·상세 소개 보존.
+- Prisma6.9 generate/Nest build 통과. 로컬 MySQL 전용 E2E DB에서 공유 소개5·신규 크리에이터·프로필 사진·탈퇴 개인정보 회귀 총18건 통과. 최초 migration 검사는 MySQL 임시 테이블 재참조 제한으로 실패했고, 임의 이름의 격리 테스트 테이블로 실제 SQL을 재검증해 통과. 기존 실패 로그는 전용 증거에 기록. 운영 DB·실회원 변경 없음.
+- 배포 전 DB 백업 및 구형 API/worker 중지, migration→새 API/worker 동시 적용 필요. 구형 이미지 단독 롤백 금지. 공식 Prisma v6 migration 근거·절차는 docs/platform-api.md. 검증 로그 .local/shared-short-bio-20261103/. AGENTS 기존 규칙 유지.
