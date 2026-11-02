@@ -241,3 +241,12 @@ test('a refused membership refund is retried under a new idempotency key instead
  await assert.rejects(f.finance.refund(f.fan,f.order.id),code('PAYMENT_FAILED'));assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'paid');
  await f.finance.refund(f.fan,f.order.id);assert.deepEqual(keys,[`refund-${f.order.id}`,`refund-${f.order.id}_r1`]);assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'refunded');
 });
+// 2026-11-02 user decision: paying needs the agreement shown right before the payment button; it is kept in member_consents.
+test('a payment request without the current payment terms is refused; an agreed request records the consent',async()=>{
+ const f=await fixture();const consents=()=>db.memberConsent.findMany({where:{member_id:f.fan,kind:'payment-terms'}});
+ await assert.rejects(f.finance.pay(f.fan,f.order.id,undefined,undefined,null),code('PAYMENT_TERMS_REQUIRED'));await assert.rejects(f.finance.pay(f.fan,f.order.id,undefined,undefined,'2026-01-01.1'),code('PAYMENT_TERMS_REQUIRED'));
+ assert.equal(f.calls.length,0);assert.equal((await consents()).length,0);
+ await f.finance.pay(f.fan,f.order.id,undefined,undefined,'2026-11-02.1');const saved=await consents();assert.equal(saved.length,1);assert.equal(saved[0].document_id,'code:payment-terms:2026-11-02.1');assert.deepEqual([saved[0].document_snapshot.orderId,saved[0].document_snapshot.amount,saved[0].document_snapshot.paymentMode],[f.order.id,f.order.amount,'subscription']);
+ const g=await fixture();await assert.rejects(g.finance.paymentWindow(g.fan,g.order.id,null),code('PAYMENT_TERMS_REQUIRED'));await g.finance.paymentWindow(g.fan,g.order.id,'2026-11-02.1');
+ assert.equal((await db.memberConsent.findFirstOrThrow({where:{member_id:g.fan,kind:'payment-terms'}})).document_snapshot.paymentMode,'one-time');
+});

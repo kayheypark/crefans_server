@@ -10,6 +10,7 @@ import {verifyPassword,digest} from '../auth/local/credentials';
 import {PlatformService} from './service';
 import {PlatformFinanceService} from './finance.service';
 import {PaymentProvider,acceptedPaymentMethod} from './payment-provider';
+import {PAYMENT_TERMS,paymentTermsAccepted} from './payment-terms';
 import {BankProvider} from './bank-provider';
 import {clawBackReferralReward,qualifyReferralReward,requireBeanPayoutMember} from './referrals';
 import {beanPolicy} from './bean-policy';
@@ -73,7 +74,7 @@ export class BeansService {
   await this.move(tx,`charge-reserve:${o.id}`,'charge.reserve',member,'충전 주문 재고 예약',o.id,[{member:'company',bucket:'stock',delta:-q},{member:'company',bucket:'charge-reserved',delta:q}]);await this.event(tx,'beans.charge_created',o.id,member,o.amount);return this.chargeView(o);
  });}
  async charge(member:string,id:string){this.enabled();const o=await this.db.beanCharge.findFirst({where:{id,member_id:member}});if(!o)reject(404,'BEAN_CHARGE_NOT_FOUND','충전 주문이 없습니다.');return this.chargeView(o);}
- async paymentWindow(member:string,id:string){const o=await this.charge(member,id),env=this.environment();if(o.status!=='pending'||o.environment!==env||o.expiresAt<=new Date())reject(409,'INVALID_CHARGE_STATE','진행할 수 없는 충전 주문입니다.');return{...o,...this.provider.configForClient(),customerKey:(await this.finance.billingConfig(member)).customerKey,orderId:id,orderName:`크레팬스 ${o.quantity}콩 충전`};}
+ async paymentWindow(member:string,id:string,terms?:unknown){if(!paymentTermsAccepted(terms))reject(400,'PAYMENT_TERMS_REQUIRED','결제 조건을 확인하고 동의해야 결제할 수 있습니다. 화면을 새로고침한 뒤 다시 확인해주세요.');const o=await this.charge(member,id),env=this.environment();if(o.status!=='pending'||o.environment!==env||o.expiresAt<=new Date())reject(409,'INVALID_CHARGE_STATE','진행할 수 없는 충전 주문입니다.');if(terms!==undefined)await this.db.memberConsent.create({data:{member_id:member,kind:'payment-terms',document_id:`code:payment-terms:${PAYMENT_TERMS.version}`,document_snapshot:{...PAYMENT_TERMS,chargeId:id,amount:o.amount,quantity:o.quantity}}});return{...o,...this.provider.configForClient(),customerKey:(await this.finance.billingConfig(member)).customerKey,orderId:id,orderName:`크레팬스 ${o.quantity}콩 충전`};}
  async confirm(member:string,id:string,input:any){this.enabled();const paymentKey=text(input.paymentKey,200),env=this.environment();const order=await this.transaction(async tx=>{
   await tx.$queryRaw`SELECT id FROM bean_charges WHERE id=${id} FOR UPDATE`;const o=await tx.beanCharge.findFirst({where:{id,member_id:member}});if(!o)reject(404,'BEAN_CHARGE_NOT_FOUND','충전 주문이 없습니다.');if(input.orderId!==id||input.amount!==o.amount||o.environment!==env)reject(400,'PAYMENT_MISMATCH','충전 주문과 결제 정보가 다릅니다.');if(o.payment_key&&o.payment_key!==paymentKey)reject(409,'PAYMENT_MISMATCH','다른 결제 요청입니다.');if(o.status==='paid')return o;if(!['pending','processing'].includes(o.status))reject(409,'INVALID_CHARGE_STATE','결제 상태를 확인해주세요.');if(o.locked_until>new Date())reject(409,'PAYMENT_IN_PROGRESS','충전 결과 확인 중입니다.');if(o.status==='pending'&&o.expires_at<=new Date())reject(409,'CHARGE_EXPIRED','충전 주문이 만료되었습니다.');return tx.beanCharge.update({where:{id},data:{status:'processing',payment_key:paymentKey,locked_until:new Date(Date.now()+90000)}});
  });if(order.status==='paid')return this.chargeView(order);

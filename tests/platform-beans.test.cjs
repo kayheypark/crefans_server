@@ -427,3 +427,8 @@ test('the bean payment window uses the random customer key; a non-card approval 
   const easy=await beans.createCharge(fan,{quantity:10,requestId:randomUUID()});provider.confirm=approve('간편결제');await beans.confirm(fan,easy.id,{paymentKey:'synthetic-'+easy.id,orderId:easy.id,amount:easy.amount});assert.equal((await db.beanCharge.findUniqueOrThrow({where:{id:easy.id}})).status,'paid');
  }finally{provider.confirm=original;}
 });
+test('a bean payment window needs the current payment terms and records the consent',async()=>{
+ const o=await beans.createCharge(fan,{quantity:10,requestId:randomUUID()}),before=await db.memberConsent.count({where:{member_id:fan,kind:'payment-terms'}});
+ await assert.rejects(beans.paymentWindow(fan,o.id,null),code('PAYMENT_TERMS_REQUIRED'));await beans.paymentWindow(fan,o.id,'2026-11-02.1');
+ const saved=await db.memberConsent.findMany({where:{member_id:fan,kind:'payment-terms'},orderBy:{accepted_at:'desc'}});assert.equal(saved.length,before+1);assert.equal(saved[0].document_snapshot.chargeId,o.id);assert.equal(saved[0].document_snapshot.amount,o.amount);
+});
