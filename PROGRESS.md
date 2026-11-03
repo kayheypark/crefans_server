@@ -1,3 +1,10 @@
+## 2026-11-03 카카오 공개 공유 이미지 구현·검증 중
+- 사용자 확정: 공개 게시물만 사진/영상 썸네일 사용. 멤버십·비공개·성인 제한 및 미디어 없음은 승인된 기본 이미지. 서버의 익명 접근 권한을 렌더 전후 확인하며, 원본 서명 URL을 외부에 전달하지 않는다.
+- GET /media/posts/:id/share-image: 첫 미디어의 1200×630 JPEG, 보호/미완료/실패는 기본 이미지302. 메모리 캐시16건·동시 변환2건·ffmpeg15초·외부 프로토콜 제한. 운영 기존 media/openapi 파일 해시가 기능 분기 기준과 같음을 확인했다. DB 변경 없음.
+- 로컬 빌드 성공. 최초 공유 node_modules의 Prisma 타입이 오래되어 실패했으나 작업트리 전용 의존성 복사와 prisma generate 후 해결(다른 작업트리 변경 없음). 단위11/11 통과: 제한별 차단·권한 변경·사진 실JPEG. 로컬 ffmpeg 없음으로 실영상은 운영과 같은 격리 이미지에서 추가 검증 예정.
+- 근거(2026-11-03): https://developers.kakao.com/docs/ko/message-template/default 피드 이미지 템플릿; https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html 매 요청 권한 검사. 카카오가 이미 수신/캐시한 메시지의 회수까지 보장하지 않는다.
+- 아직 미배포. 실제 카카오 메시지 발송·휴대전화 수신은 검증하지 않는다. 증거 .local/share-images-*.log.
+
 ## 2026-11-03 기간 2배 광고 이벤트 상품 — 운영 배포·4종 등록 완료
 - 사용자 확정: 일반1/3/7/30일 유지, 이벤트2/6/14/60일=3,900/11,700/27,300/117,000원(VAT 포함). 같은 기간 기준가7,800/23,400/54,600/234,000원 대비50%. 기간은 이미 혜택을 포함한 총기간이며 재차2배/기존 구매 소급 적용하지 않는다.
 - feat/advertising-event-products→dev 통합·검증→prod. 기능 승격 server01bec50/front532796c/admin803d8fc. 운영은 API·worker·front·admin advertising-event-20261103. DB 백업 후 추가형 migration20261103180000_ad_product_comparison_price 적용(운영 총51개). 프론트 파일해시·API/worker 소스/Prisma·공개4경로200·기존상품 불변·설정 보존·DB/proxy 컨테이너 불변 검증.
