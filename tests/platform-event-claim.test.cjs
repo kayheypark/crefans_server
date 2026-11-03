@@ -30,9 +30,16 @@ test('30-day expiry removes only the unused event portion; ordinary grants and r
  await beans.tip(fan,creator,{quantity:30,requestId:randomUUID(),message:'',creatorProvision:'2026-10-30.1'});
  assert.equal((await db.beanLot.findUniqueOrThrow({where:{id:lot.id}})).available,70,'the new short-lived lot is spent before the older five-year grant');
  assert.equal((await db.beanLot.findUniqueOrThrow({where:{id:ordinary.id}})).available,40);
- await beans.expireLots(new Date(Date.parse(receipt.expiresAt)-1));
+ // 2026-11-03: the 30-day event lot is not noticed at claim time nor 8 days ahead, only from 7 days ahead, once.
+ const expires=Date.parse(receipt.expiresAt),day=86400000;
+ await beans.expireLots(new Date());await beans.expireLots(new Date(expires-8*day));
+ assert.equal(await db.memberNotice.count({where:{member_id:fan,kind:{in:['bean-expiry','event-bean-expiry']},dedupe_key:{contains:lot.id}}}),0,'no notice right after the claim');
+ await beans.expireLots(new Date(expires-7*day+60000));await beans.expireLots(new Date(Date.parse(receipt.expiresAt)-1));
  assert.equal((await db.beanLot.findUniqueOrThrow({where:{id:lot.id}})).available,70);
- const notice=await db.memberNotice.findUniqueOrThrow({where:{dedupe_key:'bean-expiry:'+lot.id}});assert.doesNotMatch(notice.note,/5년/);
+ const notice=await db.memberNotice.findUniqueOrThrow({where:{dedupe_key:'event-bean-expiry:'+lot.id}});assert.equal(notice.kind,'event-bean-expiry');assert.doesNotMatch(notice.note,/5년/);assert.match(notice.note,/출금·환불되지 않습니다/);
+ assert.equal(await db.memberNotice.count({where:{dedupe_key:'bean-expiry:'+lot.id}}),0,'no generic notice for the event lot');
+ assert.equal(await db.memberNotification.count({where:{member_id:fan,type:'event-bean-expiry'}}),1);
+ assert.equal(await db.memberNotice.count({where:{dedupe_key:'bean-expiry:'+ordinary.id}}),0,'the five-year grant is not noticed');
  await beans.expireLots(new Date(receipt.expiresAt));await beans.expireLots(new Date(receipt.expiresAt));
  assert.equal((await db.beanLot.findUniqueOrThrow({where:{id:lot.id}})).available,0);
  assert.equal((await db.beanLot.findUniqueOrThrow({where:{id:ordinary.id}})).expires_at.toISOString(),originalExpiry);
@@ -42,3 +49,18 @@ test('30-day expiry removes only the unused event portion; ordinary grants and r
  assert.deepEqual(await beans.claimPromotionEvent(fan,{}),receipt);
 });
 test('suspended members cannot claim the public event',async()=>{await db.member.update({where:{id:ids[0]},data:{suspended_at:new Date()}});await assert.rejects(beans.claimPromotionEvent(ids[0],{}),errorCode('MEMBER_INACTIVE'));});
+test('re-notice migration clears only early event notices, once',async()=>{
+ const sql=require('fs').readFileSync(require('path').join(__dirname,'../prisma/migrations/20261103140000_event_bean_expiry_renotice/migration.sql'),'utf8').split('\n').filter(l=>!l.startsWith('--')).join('\n');
+ const [early,late]=[ids[0],ids[1]];for(const id of [early,late])await beans.claimPromotionEvent(id,{});
+ const lotOf=async id=>db.beanLot.findFirstOrThrow({where:{member_id:id,bucket:'promotion',grant_id:(await db.beanPromotion.findFirstOrThrow({where:{member_id:id,actor_id:actor}})).id}});
+ const a=await lotOf(early),b=await lotOf(late);
+ await db.beanLot.update({where:{id:a.id},data:{expiry_noticed_at:a.created_at}});
+ await db.beanLot.update({where:{id:b.id},data:{expiry_noticed_at:new Date(b.expires_at.getTime()-6*86400000)}});
+ const grant=await db.beanPromotion.create({data:{request_key:randomUUID(),member_id:early,quantity:5,reason:'ordinary',actor_id:ids[2]}});
+ const ordinary=await db.beanLot.create({data:{member_id:early,bucket:'promotion',grant_id:grant.id,available:5,release_at:new Date(),expires_at:new Date(Date.now()+20*86400000),expiry_noticed_at:new Date()}});
+ await db.$executeRawUnsafe(sql);await db.$executeRawUnsafe(sql);
+ assert.equal((await db.beanLot.findUniqueOrThrow({where:{id:a.id}})).expiry_noticed_at,null,'the claim-time notice is cleared');
+ assert.notEqual((await db.beanLot.findUniqueOrThrow({where:{id:b.id}})).expiry_noticed_at,null,'a notice already inside 7 days stays');
+ assert.notEqual((await db.beanLot.findUniqueOrThrow({where:{id:ordinary.id}})).expiry_noticed_at,null,'non-event lots are untouched');
+ await db.beanLot.delete({where:{id:ordinary.id}});await db.beanPromotion.delete({where:{id:grant.id}});
+});
