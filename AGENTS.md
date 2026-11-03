@@ -3,6 +3,7 @@
 - 공통 조사 규약: 애매한 요구사항·구현·검증이나 결정이 필요한 부분은 공식 공급사 문서·현행 법령·OWASP를 웹검색하여 업계 기준을 면밀히 조사한다. 출처·확인일·적용 판단과 미결정 사업 정책을 기록한다. 역할별 출시 검수 기준은 프론트 `docs/release-test-scenarios.md`이며, 공급자 대역 통과를 실제 PG/PASS/은행·운영 검증으로 간주하지 않는다.
 
 - 크레팬스(팬·크리에이터 멤버십 플랫폼) 백엔드. NestJS + Prisma + MySQL. AWS Cognito 제거·자체 회원 인증·단일 원서버(docker compose, host Postfix SMTP) 배포를 준비 중. 
+- 조회수는 `post-views.ts`에서 별도 집계한다. 환불 판단용 consumeContent와 혼용하지 않는다. 익명 식별자는30분·IP/지문 미사용, 공유는 상세 유입 차원이며 원본/미리보기 GET은 조회수를 올리지 않는다.
 - 작업 전에 `PROGRESS.md`를 먼저 읽고, 작업 후 갱신한다. 신규 서비스 기준은 `docs/platform-api.md`, `docs/platform-implementation.md`, `infra/platform/`이다. `docs/local-member-migration.md`와 `infra/single-instance/`는 구형 인증 전환 참고 자료다. `docs/prd.md`·`docs/deployment-setup.md`의 Cognito 전제 내용은 구식.
 - 현재 이메일은 `src/auth/local/mail/templates.ts` 공통 템플릿의 흰 배경·박스 없는 왼쪽 정렬·16px 좌우 여백·진한 블루 `#1746C7`를 사용한다. text/HTML·CID 로고·인증 검증·수신거부 헤더를 보존한다. 콩 만료 안내는 로트별 실제 만료일을 사용하며 일괄 5년으로 안내하지 않는다. 시안/로컬 SMTP 검증을 실제 수신함 검증으로 보고하지 않는다.
 - 운영 DB에 `migrate dev`/`db push`/`seed`를 실행하지 않는다. 비밀번호·인증 코드·AWS 키를 로그에 남기지 않는다.
