@@ -378,6 +378,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261103010000_reserved_handles`
 - `20261103083000_shared_short_bio`
 - `20261103120000_founding_badge_claim`
+- `20261103140000_event_bean_expiry_renotice`
 
 ## Prisma 전체 정의 (89 models · 15 enums)
 

@@ -1,3 +1,11 @@
+## 2026-11-03 이벤트100콩 만료 예정 안내 시점 — 구현·검증 완료, 미커밋·미배포
+- 문제(사용자 신고): 공개100콩 이벤트 콩(수령 후30일)이 받자마자 '콩 유효기간이 곧 끝납니다' 메일을 받음. 원인: `expireLots`가 모든 콩을 만료30일 전에 안내(beanPolicy.expiryNoticeDays=30)해 30일짜리 lot이 다음 작업 주기에 바로 대상이 됨. 5년이 아닌 것은 2026-11-03 이벤트 정책(a9e80dc, 이벤트 화면·12-02 약관 예정본 안내)대로임.
+- 사용자 결정(2026-11-03): 이벤트 콩은 만료7일 전 1회 / 이미 받자마자 안내받은 회원은 새 기준으로 다시 안내 / 이벤트 콩 전용 문구.
+- 구현: feat/event-bean-expiry-notice. `beans.service.ts` EVENT_NOTICE_DAYS=7, 이벤트 grant(actor system:event:promotion-beans-v1) lot과 그 외 lot을 각각 7일/30일 창으로 조회(서로 200건 한도를 막지 않음). 이벤트 lot은 kind/type `event-bean-expiry`, dedupe `event-bean-expiry:{lot}`, 받은 시각·사용기한(KST 시각) 표시, 환불 안내 없음. 메일 템플릿 `event-bean-expiry` 추가. 일반 콩(5년, 30일 전) 동작 변화 없음.
+- 마이그레이션 `20261103140000_event_bean_expiry_renotice`(데이터만): 이벤트 lot 중 안내가 만료7일보다 이르게 나간 것만 expiry_noticed_at=NULL. 재실행 무변화.
+- 검증: Nest 빌드 0. event-claim(12)·mail-templates·platform-beans 합계74/74 통과. 대조: 창을30일로 되돌리면 이벤트 만료 테스트 실패, 마이그레이션의 7일 조건을 빼면 마이그레이션 테스트 실패, 복원 후 통과. docs/platform-api.md 갱신, current-contracts 마이그레이션 목록 추가. 전체 서버 테스트531건: 통과444·실패86이며 같은 환경의 origin/prod(528건, 통과441·실패86)와 실패 목록이 완전히 같음(로컬 dev DB에 founding_badge_visible 등 최신 마이그레이션 미적용 등 기존 환경 원인). 추가3건은 모두 통과.
+- 미확인: 운영에서 이미 나간 이벤트 안내 건수(읽기 전용 DB 조회가 권한 분류기에 거부됨, 우회 안 함). 지갑 화면의 '곧 만료' 표시(expiringSoon, 30일 창)는 이벤트 콩을 받자마자 곧 만료로 보여 줄 수 있음 — 이번 범위 밖, 결정 필요.
+
 ## 2026-11-03 이메일 심플 딥블루 — 운영 배포 완료
 - feat/email-simple-blue11ceae8→dev4c6020c(Nest빌드·메일22건 재통과)→prod55786da. 2026-11-03 11:59 KST API/worker email-simple-blue-20261103 배포 완료. 승인한 흰 배경·박스 없는 좌측정렬·16px여백·#1746C7 공통 디자인. 신규 발송 이벤트 연결이나 수신자 발송 테스트는 하지 않음.
 - 기준 운영 이미지 고정·템플릿 TS/JS/source map/선언4파일만 추가한29.5KB 컨텍스트로 amd64 릴리스 생성. 첫 이미지의 선언파일 누락을 배포 전 해시 검사로 거절 후 수정. 최종 이미지와 실제 API/worker 각각452파일·20종 합성 템플릿 해시 일치. 운영DB/환경 비공개 백업, 기존50migration checksum 일치·신규migration0.

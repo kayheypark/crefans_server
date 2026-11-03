@@ -4,9 +4,9 @@ import {PrismaService} from '../prisma/prisma.service';
 import {MemberMailService} from '../auth/local/member-mail.service';
 
 // In-app notice plus a queued mail for things a member must hear about outside billing:
-// operator actions (D11, with the public reason) and bean expiry (D6, 30 days ahead).
-export type MemberNoticeKind='moderation'|'bean-expiry';
-const labels:Record<MemberNoticeKind,string>={moderation:'운영 안내','bean-expiry':'콩'};
+// operator actions (D11, with the public reason) and bean expiry (D6, 30 days ahead; 30-day event beans 7 days ahead).
+export type MemberNoticeKind='moderation'|'bean-expiry'|'event-bean-expiry';
+const labels:Record<MemberNoticeKind,string>={moderation:'운영 안내','bean-expiry':'콩','event-bean-expiry':'콩'};
 export async function notifyMember(tx:any,input:{dedupeKey:string;memberId:string;kind:MemberNoticeKind;text:string;path:string;rows:Array<[string,string]>;note:string;actorId?:string}){
  if(await tx.memberNotice.findUnique({where:{dedupe_key:input.dedupeKey}}))return;
  await tx.memberNotification.create({data:{member_id:input.memberId,actor_id:input.actorId||null,type:input.kind,text:input.text,path:input.path}});
