@@ -1,3 +1,9 @@
+## 2026-11-04 미배포 광고상품·미니멀 워터마크 운영 배포 완료
+- dev→prod front615ee06/serveraf99bc3/admin0011cca. 운영 front/api/worker/admin minimal-bundle-20261104. 기본상품 특가제외·제목18px, 콘솔/프론트 상품명 동일 형식, 미니멀 워터마크40%/2%/3%/외곽선없음 반영. DB migration 없음·DB/proxy 유지·기존미디어 재변환 없음.
+- front운영빌드·admin운영빌드 통과, 소스해시/운영키·배포6서비스 running/restarts0/OOMfalse. 배포공용preview PC Chromium/iPhone WebKit 기본4+특가4·중복없음·제목18px·상품명·안내열기닫기·팬이동 통과. API운영이미지 격리컨테이너 실사진 렌더링565변경픽셀(119~183), 영상미니멀인자 확인. 이전로컬 영상/사진4·프론트9·콘솔14 통과. 실계정콘솔/실업로드/실PG 미검증.
+- 최초배포스크립트 로컬문법검사 줄바꿈오류로 SSH전중단, 수정후 배포성공. 복구이미지3개1.14GB·설정6파일 로컬전용보관 및 OCI/tag/blob·파일SHA검증. 완료후 이전3이미지·이번임시3폴더만 제거. 운영 여유12816658432bytes. 복구 /Users/ethan/crefans-recovery/20261104/minimal-bundle.
+- 증거 front docs/audit/minimal-bundle-20261104.json 및 .local/minimal-bundle-release/. 운영 runtime은 위 소스커밋이며 이후 문서커밋은 런타임 변경 아님. 아래 미배포 기록은 해결된 이력.
+
 ## 2026-11-04 미니멀 워터마크 선택 적용 (운영 미배포)
 - 사용자01선택: 흰색 불투명도40%, 짧은변 글자2%, 가장자리여백3%, 그림자/외곽선/박스 없음. 사진400weight, 영상DejaVuSans 기본. URL과 오른쪽하단·길이제한·보안검사 유지. 기존완료 파일 재처리 없음. 미디어타일은 변환영상 firstFrame을 사용하므로 같은 표시 반영.
 - origin/prod 기준 feat/minimal-watermark, npm run build 종료0. Docker 로컬 기존 Linux API이미지+현재 dist 주입, network none/768MiB/1CPU/--init: 실제MP4(오디오)/WebM(무음)/EXIF사진/40MP사진4통과(2.98초). MP4추출프레임·사진 육안확인. 최초 init 없는 Rosetta컨테이너는 두번째 변환 뒤 대기해 해당 테스트컨테이너만 종료, --init 재실행 통과. 운영·DB 변경 없음.
