@@ -464,7 +464,7 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 | --- | --- | --- |
 | GET | /studio/advertising/products | 회원 세션 및 크리에이터 등록 필수. visible=true/deleted_at=null, 정렬 순서·ID순 최대100개. 판매중지 상품도 안내 조회 가능 |
 | GET | /admin/advertising/products | advertising.view. page(1부터)/deleted(true·false),20개 페이지와 total/page. 삭제 상품 별도 조회 |
-| POST | /admin/advertising/products | advertising.create. name/description/terms/placement/amount/durationDays/visible/onSale/sortOrder, 판매 허용 시 terms 필수 |
+| POST | /admin/advertising/products | advertising.create. name/description/terms/placement/amount/durationDays/visible/onSale/sortOrder, 선택 comparisonAmount/comparisonBasis, 판매 허용 시 terms 필수 |
 | PUT | /admin/advertising/products/:id | advertising.update. 동일 필드와 expectedVersion 필수, 충돌409·없는/삭제상품404 |
 | DELETE | /admin/advertising/products/:id | advertising.delete. expectedVersion 확인, deleted_at 및 숨김/판매중지, 반복 삭제 멱등. 물리 삭제 없음 |
 | GET | /admin/invites | invites.view. page/status(active·used·revoked)/search(이메일·메모), 20개 페이지. 초대별 개별 조건(terms)·가입 회원 ID |
@@ -535,3 +535,8 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - 기존 운영자에게 새 권한을 자동 부여하지 않는다. 최고관리자는 기존 규칙대로 전체 권한, 부운영자는 운영자·권한에서 메뉴별 입장/생성/수정/삭제를 지정한다. 서버의 세션·Origin·OTP·`@Permit` 검사를 유지한다.
 - 2026-11-03 확인: [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)의 기본 거부·매 요청 서버 권한 검증, [Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html)의 서버 허용 형식 검증을 적용했다. 예약할 이름과 기존 보유자 유지 범위는 사용자 결정이다.
 - 검증: `tests/platform-reserved-handles.test.cjs`, 기존 `tests/platform-handle-unify.test.cjs`, `tests/platform-openapi.test.cjs`. 콘솔 `e2e/reserved-handles.spec.ts`는 실제 로컬 격리 API·DB를 사용한다. 운영 배포 시 DB 백업→마이그레이션→API/worker→콘솔 순서가 필요하며 현재 운영 반영 여부는 PROGRESS.md를 따른다.
+
+### 광고상품 비교가격 (2026-11-03)
+- `AdProduct`는 `comparisonAmount`(null 또는 VAT 포함 정수), `comparisonBasis`(빈 문자열 또는200자 이내 비교 근거), `discountPercent`(null 또는 내림 계산값)를 반환한다. 기준가는 결제금액 초과·1천만원 이하여야 하고 비교 설명이 필수다. 입력 두 필드 생략은 이전 클라이언트 호환을 위해 기존 값을 보존하며, null/빈 문자열 쌍으로 명시하면 제거한다. 금액 변경 후에도 보존된 기준가가 더 커야 한다. 버전 잠금·권한·감사 이력은 유지한다.
+- 기간2배 상품은 별도 상품ID와 최종 노출기간2/6/14/60일을 사용한다. 승인 금액3,900/11,700/27,300/117,000원, 기준가는 일반1/3/7/30일 상품을2회 이용한 값이며50% 할인. 일반 상품과 기존 이력의 기간은 변경하지 않는다. 실제 광고 주문·결제·노출 개시 기능은 아직 없고 UI도 준비 상태다.
+- 추가형 migration `20261103180000_ad_product_comparison_price`는 기존 상품 비교값을 null/빈문자열로 유지한다. 상품 데이터는 승인된 운영 콘솔 등록으로 별도 추가하며 migration/seed로 임의 생성하지 않는다. 검증: `tests/advertising-price.test.cjs`, `tests/platform-advertising.test.cjs`.

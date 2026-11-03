@@ -1,12 +1,20 @@
 import {auditChange,appendAudit,contentDigest} from './audit';
 import {reject,text} from './http';
 export const adPlacement='featured_creator';
-export const adProductView=(p:any)=>({id:p.id,name:p.name,description:p.description,terms:p.terms,placement:p.placement,amount:p.amount,durationDays:p.duration_days,visible:p.visible,onSale:p.on_sale,sortOrder:p.sort_order,version:p.version,deletedAt:p.deleted_at,createdAt:p.created_at,updatedAt:p.updated_at});
+export const adProductView=(p:any)=>({id:p.id,name:p.name,description:p.description,terms:p.terms,placement:p.placement,amount:p.amount,durationDays:p.duration_days,comparisonAmount:p.comparison_amount??null,comparisonBasis:p.comparison_basis??'',discountPercent:p.comparison_amount>p.amount?Math.floor((p.comparison_amount-p.amount)*100/p.comparison_amount):null,visible:p.visible,onSale:p.on_sale,sortOrder:p.sort_order,version:p.version,deletedAt:p.deleted_at,createdAt:p.created_at,updatedAt:p.updated_at});
 export function adProductInput(input:any){
  if(!input||typeof input!=='object'||!Number.isSafeInteger(input.amount)||input.amount<100||input.amount>10000000||!Number.isSafeInteger(input.durationDays)||input.durationDays<1||input.durationDays>365||!Number.isSafeInteger(input.sortOrder)||Math.abs(input.sortOrder)>100000||typeof input.visible!=='boolean'||typeof input.onSale!=='boolean'||input.placement!==adPlacement)reject(400,'INVALID_AD_PRODUCT','광고상품의 금액·기간·노출·판매 설정을 확인해주세요.');
- return{name:text(input.name,100),description:text(input.description,3000),terms:text(input.terms,5000,input.onSale),placement:adPlacement,amount:input.amount,duration_days:input.durationDays,visible:input.visible,on_sale:input.onSale,sort_order:input.sortOrder};
+ const comparison: {comparison_amount?:number|null;comparison_basis?:string}={};
+ if(input.comparisonAmount!==undefined||input.comparisonBasis!==undefined){
+  if(input.comparisonAmount===null&&input.comparisonBasis===''){comparison.comparison_amount=null;comparison.comparison_basis='';}
+  else{
+   if(!Number.isSafeInteger(input.comparisonAmount)||input.comparisonAmount<=input.amount||input.comparisonAmount>10000000)reject(400,'INVALID_AD_COMPARISON','기준가는 결제금액보다 큰 원 단위 금액이어야 합니다.');
+   comparison.comparison_amount=input.comparisonAmount;comparison.comparison_basis=text(input.comparisonBasis,200);
+  }
+ }
+ return{name:text(input.name,100),description:text(input.description,3000),terms:text(input.terms,5000,input.onSale),placement:adPlacement,amount:input.amount,duration_days:input.durationDays,visible:input.visible,on_sale:input.onSale,sort_order:input.sortOrder,...comparison};
 }
-function auditState(p:any){return p?{amount:p.amount,duration_days:p.duration_days,visible:p.visible,on_sale:p.on_sale,sort_order:p.sort_order,version:p.version,status:p.deleted_at?'deleted':'active',titleHash:contentDigest(p.name),contentHash:contentDigest([p.description,p.terms])}:null;}
+function auditState(p:any){return p?{amount:p.amount,comparison_amount:p.comparison_amount??null,duration_days:p.duration_days,visible:p.visible,on_sale:p.on_sale,sort_order:p.sort_order,version:p.version,status:p.deleted_at?'deleted':'active',titleHash:contentDigest(p.name),contentHash:contentDigest([p.description,p.terms,p.comparison_basis??''])}:null;}
 export async function saveAdProduct(db:any,id:string|undefined,input:any){
  const data=adProductInput(input);
  return db.$transaction(async(tx:any)=>{
@@ -14,6 +22,8 @@ export async function saveAdProduct(db:any,id:string|undefined,input:any){
   const before=id?await tx.adProduct.findUnique({where:{id}}):null;
   if(id&&(!before||before.deleted_at))reject(404,'AD_PRODUCT_NOT_FOUND','광고상품을 찾을 수 없습니다.');
   if(before&&input.expectedVersion!==before.version)reject(409,'AD_PRODUCT_CHANGED','다른 운영자가 상품을 변경했습니다. 다시 불러와주세요.');
+  const comparisonAmount=data.comparison_amount===undefined?before?.comparison_amount:data.comparison_amount;
+  if(comparisonAmount!=null&&comparisonAmount<=data.amount)reject(400,'INVALID_AD_COMPARISON','기준가는 결제금액보다 커야 합니다. 할인 표시를 해제하거나 기준가를 함께 수정해주세요.');
   const saved=before?await tx.adProduct.update({where:{id},data:{...data,version:{increment:1}}}):await tx.adProduct.create({data});
   await appendAudit(tx,{category:'admin',action:before?'admin.ad_product_updated':'admin.ad_product_created',entityId:saved.id,data:auditChange(auditState(before),auditState(saved)!)});
   return{product:adProductView(saved),message:'광고상품을 저장했습니다.'};
