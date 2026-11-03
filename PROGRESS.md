@@ -1892,3 +1892,9 @@
 - 운영 예정 migration2개: reserved_handles103개 초기예약, shared_short_bio. 백업·구형 API/worker 중지 후 이전 및 새API/worker 동시 반영 필요. 운영 미배포, 사용자 승인 범위로 진행 중.
 
 - 최종 로컬 통합 회귀:31개 고유 사례 중 최초 실패한 OpenAPI 경로수 기대값을196으로 수정 후 해당13건 재실행 모두 통과. 전체 경로명/메서드 집합 동등성 검증을 유지. 소개글5·예약핸들8·기존핸들5 통과는 그대로 유효. src/platform/studio.service.ts의 양 기능 병합에 Nest 빌드·Prisma 생성 통과.
+
+## 2026-11-03 공유 소개·예약핸들 운영 배포
+- 검증 통합07baf36→prod3ad66c3(동일 제품 트리), API/worker all-pending-20261103 동시 운영 적용. 구형API/worker 중지 후 비공개 전체DB 일관 백업, 기존48migration checksum 검증→reserved_handles 및 shared_short_bio 적용→50개 완료 확인 후 새 writer 시작.
+- 103개 초기 예약/감사행과 기존회원 핸들 보존 확인. user_profiles.bio 이관 예상/실제 해시 일치, creators.bio 제거, 기타creator컬럼 전체(긴소개·커버·생성일 포함) 동일 해시. 데이터 원문은 증거에 넣지 않음.
+- 소스와 실제 Docker 이미지 파일SHA 대조, APIhealth·workerrelease·서비스restarts0/OOMfalse 및 금융설정 불변 확인. 프론트/관리자도 동시 묶음 배포. 공개 운영 증거는 프론트 docs/audit/open-event-spacing-20261103.json, 상세 비공개 백업은 운영 배포 폴더에 보존.
+- Nest빌드·Prisma생성·격리DB31고유사례 통과. OpenAPI 합산196 기대값 수정 후13사례 재통과. 실결제·송금·인증운영 사용자 변경 테스트는 미실행. 이미지 단독 롤백 금지(구형bio 컬럼 삭제); 새 writer 이후 DB 전체 복구는 데이터 손실 위험으로 자동 시행하지 않도록 구성.
