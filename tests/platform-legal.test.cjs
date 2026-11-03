@@ -10,7 +10,7 @@ test('the released documents take effect on 2026-10-30 with no open items (2026-
  const source=new LegalDocumentsService();assert.deepEqual(source.catalog().blockers,[]);assert.equal(source.signup().signupReady,true);
  for(const d of [source.catalog().documents.terms,source.catalog().documents.policy,source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,LEGAL_NOTICE_DATE);assert.equal(p.effectiveAt,LEGAL_NOTICE_DATE);assert.equal(p.version,`${LEGAL_NOTICE_DATE}.1`);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-03');assert.equal(p.effectiveAt,'2026-11-03');assert.equal(p.version,'2026-11-03.views.1');assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });

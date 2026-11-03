@@ -1,3 +1,4 @@
+import {recordPostView} from './post-views';
 import {CategoriesService} from './categories.service';
 import {Res} from '@nestjs/common';
 import {Body,Controller,Delete,Get,Header,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
@@ -18,6 +19,7 @@ export class PlatformController {
  @Get('bootstrap') @UseGuards(PlatformOptionalAuthGuard) bootstrap(@Req() r:any,@Query('collection') collection:string){return this.service.bootstrap(r.user?.sub,collection);}
  @Get('creators') @UseGuards(PlatformOptionalAuthGuard) creators(@Query('query') query:string,@Query('category') category:string,@Query('cursor') cursor:string,@Req() r:any){return this.service.directory(r.user?.sub,query,category,cursor);}
  @Get('posts') @UseGuards(PlatformOptionalAuthGuard) posts(@Query('creatorId') creator:string,@Query('cursor') cursor:string,@Query('category') category:string,@Req() r:any){return this.service.postPage(r.user?.sub,creator,cursor,category);}
+ @Post('posts/:id/views') @UseGuards(PlatformOptionalAuthGuard) view(@Param('id') id:string,@Body() b:any,@Req() r:any){return recordPostView(this.service,id,b,r);}
  @Get('posts/:id') @UseGuards(PlatformOptionalAuthGuard) post(@Param('id') id:string,@Req() r:any){return this.service.postDetail(id,r.user?.sub);}
  @Get('profiles/:id') @UseGuards(PlatformOptionalAuthGuard) profileData(@Param('id') id:string,@Req() r:any){return this.service.publicProfile(id,r.user?.sub);}
  @Get('profiles/:id/connections') @UseGuards(PlatformOptionalAuthGuard) profileConnections(@Param('id') id:string,@Query('kind') kind:string,@Query('offset') offset='0',@Req() r:any){return this.service.profileConnections(id,kind,offset,r.user?.sub);}

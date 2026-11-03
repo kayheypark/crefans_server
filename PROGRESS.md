@@ -1,3 +1,17 @@
+## 2026-11-03 조회수 집계 구현 — 검증·배포 준비
+- 사용자 승인: 피드50%·1초 유효 열람, 상세·공유 경로·영상 별도 통계, 동일 방문자30분 공개 조회수1회, 본인/알려진 봇/프리패치 제외. 익명은30분 자사 무작위 쿠키(IP·지문 미사용) 승인. 방문수는30분 단위 추정이며 실제 사람 수/장기 순방문자가 아니다.
+- 최신 prod 기반 feat/post-view-metrics. PostMetric 합산표·PostViewWindow 단기 해시창 추가형 migration. 게시물 행 잠금으로 동시 중복 방지, 익명/회원 접근 재검사. 창 만료 후 매분 워커 삭제. 잠긴 미리보기는 feed/visits만, 조회수/detail/video 제외. 원본·공유이미지GET·consumeContent는 변경하지 않는다.
+- 프론트250ms visibility 검사:50%/1초, 백그라운드·모달에 가려진 화면 제외, 긴 콘텐츠는 뷰포트 크기의 읽기 영역 기준. 동영상 실제 재생1초 후 이벤트. 실패 재시도30초. 쿠키 차단 시 집계 생략. 크리에이터 스튜디오 콘텐츠 성과에 피드/상세/공유·외부/재생/방문수 추가. copy/kakao/native 링크에 share 파라미터, 외부 referrer는도메인 분류만 전송.
+- privacy2026-11-03.views.1에 자사30분쿠키·단기 해시·합계만제공 안내. 회원 동의 당시 사본 보존. 소스 변경이 없어도 이전 법무 설명을 현재 정책으로 오인하지 않는다.
+- 로컬 build·법무12·DB7 통과(동시8요청 포함), 프론트538·PC Chromium/iPhone13WebKit 유효시간·hidden 제외·쿠키·공유 경로 대역 검증. 신규DB이름 권한 부족으로 기존허용 E2E스키마 활용, 운영 미변경. OpenAPI 기존 개수/이미지binary 검사가 새2경로를 반영하지 못해 보정 중. 기준 운영 파일·Prisma SHA 모두 일치 확인.
+- 다음: OpenAPI/문서 최종검사→dev→prod→DB백업/추가형migration/API·worker·front배포→운영조회 검증. 운영 조회수 부풀리기 방지를 위해 본인 계정 외 임의 반복 열람 테스트는 하지 않는다. 증거 .local/view-metrics/.
+
+## 2026-11-03 조회수 정책 조사 — 구현 변경 없음
+- 사용자 질문: 현재 집계 방식 및 피드/상세/공유 상세 구분의 업계 기준. 기준 bcd1ca4 소스 읽기 조사. src/platform/main.ts·module.ts는 신규 Platform 런타임, service.ts post/postDetail은 total_view_count 조회만 하고 증가 없음. consumeContent는 유료 콘텐츠 접근 기록이며 조회수가 아니다. 구형 src/posting/posting.service.ts의 incrementViewCount는 신규 모듈 미등록. 운영 DB 증분 재현은 하지 않았다.
+- 공식 확인(2026-11-03): X https://help.x.com/en/using-x/view-counts 는 로그인 사용자 홈/검색/프로필 열람·본인·반복 열람 포함. YouTube https://support.google.com/youtube/answer/9314486?hl=en 는 썸네일50% 이상·1초 초과 노출을 impression으로 집계하며 재생/고유 시청자와 구분. SNS 전체 단일 표준은 아님.
+- 제안(미확정): 피드 노출/상세 조회를 별도 이벤트로 수집, 공유는 상세의 source=kakao 등 유입 차원. 공개 숫자는 유효 열람으로 합산하되 동일 방문자의 피드→상세 중복 억제, 스튜디오에서 세부 지표 제공. 자체 열람·봇/미리보기·자동 프리패치 제외. 50%/1초·30분 중복창은 자체 권장 초안이지 업계 의무 기준이 아님. 익명 식별·동의·보존기간은 구현 전에 결정 필요.
+- 다음: 사용자 정책 확정 후 별도 prod 기반 기능 브랜치에서 구현. 이번은 조사만, 제품 코드·배포·운영 데이터 변경 없음. 근거 .local/view-policy-research.json.
+
 ## 2026-11-03 카카오 공유 이미지 — 운영 배포 완료
 - 공개 게시물은 첫 사진/영상 썸네일 JPEG, 멤버십·비공개·성인 제한·미디어 없음은 승인 기본 이미지. 서버는 렌더 전후 익명 권한을 재검사하며 원본 보호 URL은 공유하지 않는다.
 - dev→prod 승격 후 kakao-share-images-20261103 운영 배포. front76d7da5/server3ed112e. 서버는 기존 event-expiry 이미지에 이번 4개 모듈만 반영, 관리자·DB·proxy 유지·migration 없음. 배포 이미지의 파일 SHA 대조 및 health/기본 이미지200 확인.

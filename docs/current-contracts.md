@@ -167,6 +167,7 @@
 | PUT | `/api/v1/posts/:id/like` | `src/platform/controller.ts::like` |
 | GET | `/api/v1/posts/:id/mention-candidates` | `src/platform/controller.ts::mentionCandidates` |
 | PUT | `/api/v1/posts/:id/save` | `src/platform/controller.ts::save` |
+| POST | `/api/v1/posts/:id/views` | `src/platform/controller.ts::view` |
 | GET | `/api/v1/profiles/:id` | `src/platform/controller.ts::profileData` |
 | GET | `/api/v1/profiles/:id/connections` | `src/platform/controller.ts::profileConnections` |
 | GET | `/api/v1/profiles/:id/following` | `src/platform/controller.ts::profileFollowing` |
@@ -381,8 +382,9 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261103120000_founding_badge_claim`
 - `20261103140000_event_bean_expiry_renotice`
 - `20261103180000_ad_product_comparison_price`
+- `20261103190000_post_view_metrics`
 
-## Prisma 전체 정의 (89 models · 15 enums)
+## Prisma 전체 정의 (91 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -835,6 +837,8 @@ model Posting {
   comments                  Comment[]
   likes                     PostingLike[]
   medias                    PostingMedia[]
+  metrics                   PostMetric?
+  view_windows              PostViewWindow[]
   views                     PostingView[]
 
   @@index([status, is_deleted, reviewed_at, created_at], map: "postings_review_queue_idx")
@@ -2318,5 +2322,33 @@ model ReservedHandleChange {
  created_at DateTime @default(now())
  @@unique([reservation_id, version])
  @@map("reserved_handle_changes")
+}
+
+// Aggregate counters only; no visitor identifiers are retained here.
+model PostMetric {
+  posting_id String @id
+  feed Int @default(0)
+  detail Int @default(0)
+  shared Int @default(0)
+  kakao Int @default(0)
+  copy Int @default(0)
+  native Int @default(0)
+  external Int @default(0)
+  video Int @default(0)
+  visits Int @default(0)
+  posting Posting @relation(fields: [posting_id], references: [id], onDelete: Cascade)
+  @@map("post_metrics")
+}
+
+// Per-post pseudonym, removed after its fixed 30-minute deduplication window.
+model PostViewWindow {
+  posting_id String
+  visitor_hash String @db.Char(64)
+  flags Int @default(0)
+  expires_at DateTime
+  posting Posting @relation(fields: [posting_id], references: [id], onDelete: Cascade)
+  @@id([posting_id, visitor_hash])
+  @@index([expires_at])
+  @@map("post_view_windows")
 }
 ```

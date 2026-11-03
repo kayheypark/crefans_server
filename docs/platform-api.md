@@ -1,3 +1,4 @@
+<!-- 2026-11-03 최신 실행 검사: 전체198 / 유저85 / 스튜디오46 / 콘솔87. 아래 날짜가 명시된 과거 집계와 구분. -->
 # CREFANS v1 API 계약
 
 새 서비스의 HTTP 진입점은 `/api/v1`. 실행은 `src/platform/main.ts`, 별도 자동 작업은 `src/platform/worker.ts`. 기존 앱의 비버전 API와 Cognito 컨트롤러는 이 런타임에 등록하지 않는다. 파괴적인 응답·의미 변경은 `/api/v2`로 분리한다.
@@ -124,6 +125,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /media | 소유권 있는 업로드; image 5MB/video 300MB, 영상 10분·4K 이하(2026-11-02 MP4·WebM도). MP4·WebM은 메타데이터(위치) 제거 후 저장 |
 | GET | /media/:id/file | owner/게시물 권한/공개 멤버십 이미지에 따른 파일 응답; CDN 캐시 적중도 현재 권한 검사 |
 | GET | /media/:id/edge-authorize | 엣지 HMAC + 현재 세션/콘텐츠 권한; S3 객체 키 또는 legacy API 경로 선택, 파일 바이트 없음 |
+| POST | /posts/:id/views | 유효 열람 집계. kind=feed/detail/video, source=kakao/copy/native/external/direct/internal, visitor=무작위 UUID. 30분 중복 제거·서버 권한 검사·본인/알려진 봇 제외. 공유는 상세의 경로이며 유료 콘텐츠 이용 기록과 독립. |
 | GET | /media/posts/:id/share-image | 익명 공개 권한 재검사 후 첫 사진/영상 프레임 JPEG; 제한/없음은 기본 이미지302 |
 | GET | /media/:id/origin-file | 동일 권한 검사를 적용한 직접 스트리밍; legacy/롤백 경로 |
 | GET | /media/:id/status | 업로더 본인만; 아이폰 QuickTime 변환 상태 processing/completed/failed. 다른 회원에게는 404 MEDIA_NOT_FOUND |
