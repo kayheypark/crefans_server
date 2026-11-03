@@ -2,7 +2,7 @@
   "at": "2026-11-03T02:53:38.933491+00:00",
   "baseCommit": "8935b97b18a76b5a0527396cdd851a1512c821e0",
   "branch": "feat/email-simple-blue",
-  "status": "verified locally; deployment pending",
+  "status": "deployed",
   "successCriteria": [
     "20 cases share approved unboxed deep-blue design",
     "HTML/text/CID and unsubscribe behavior preserved",
@@ -65,6 +65,125 @@
     "smtp.json": "90045c2c5ca7fb34f90e358f33478e483c0774c476396fdc9a8b4d37e69cb00a",
     "baseline-source-check.json": "a30740cfa07e7d2719947a62ca2a2918b097d9bce008bf4ffddac4216f56c4ce",
     "build.log": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2",
-    "templates.log": "1324061bb2e32fbbe5d5c9e0b69ccd9687bd250e644a34d1fffa97d1fbfe9f3e"
-  }
+    "templates.log": "1324061bb2e32fbbe5d5c9e0b69ccd9687bd250e644a34d1fffa97d1fbfe9f3e",
+    "dev-build.log": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2",
+    "dev-tests.log": "be0e763f3ae2e797cd5689e65c867ce17e137e64bfd9631067d9be2b85c76ab2",
+    "builds.json": "f2474a3a434580e04a69cbcd20e4b4bf1d6b694dd98da62055bb82390dc62552",
+    "verification.json": "beeb663b2c777350b820c2efe98fc3f837e38678154d484e6ab42d5749c66eda",
+    "deployment.log": "a0ef836b4c324cfe8d4c91866cfbf02dbc949e03e0d478386ad882f1588c4a83",
+    "verify-runtime.js": "edff0f03183f7e6dbb5424ba1a0bd491f79469afc8063160fe84cd82e73ea17d",
+    "run-deploy.py": "0d95e0438e92adac796de6f8afd4176ac0800eafae358368913e47789547ca54",
+    "deploy.sh": "3115a4d6adf3ce17895c7e8fdc4d90dd9fea33c9bbd6f8e0ddabb1ccb8465068"
+  },
+  "deployment": {
+    "at": "2026-11-03T02:59:33Z",
+    "release": "email-simple-blue-20261103",
+    "commit": "55786da63d707b69644e69f296ca9ae668462646",
+    "runtimeTemplateChecks": {
+      "api": 20,
+      "worker": 20
+    },
+    "runtimeFileChecksPerService": 452,
+    "environmentUnchangedExceptRelease": true,
+    "unchangedServices": [
+      "frontend",
+      "admin",
+      "database",
+      "proxy"
+    ],
+    "http200": [
+      "https://crefans.com/api/v1/health",
+      "https://beta.crefans.com/api/v1/health",
+      "https://crefans.com/service/feed",
+      "https://admin.crefans.com/login"
+    ],
+    "externalTestEmailsSent": 0
+  },
+  "image": {
+    "release": "email-simple-blue-20261103",
+    "commit": "55786da63d707b69644e69f296ca9ae668462646",
+    "tag": "crefans-api:email-simple-blue-20261103",
+    "imageId": "sha256:26296d60575372190c77f0b6dc1597eb40b75755c9f6e8ecf29b71370366237e",
+    "architecture": "amd64",
+    "sourceManifestSha256": "1926536bb766a1e239756e57e4cee6d1a39f596d2a1ee6adf577b42a5fcc7cf7",
+    "baseImageId": "sha256:8ad4dbe50180be82395778b8c58a9f392440123c0122ae0f45e977b103a53b5f",
+    "startedAt": "2026-11-03T02:58:03.109140+00:00",
+    "finishedAt": "2026-11-03T02:58:29.438547+00:00",
+    "strategy": "Pinned deployed image, only template TS/JS/source map overlaid; dependencies/schema unchanged; no network in build or verification",
+    "contextBytes": 29538,
+    "verified": {
+      "files": 452,
+      "templateCases": 20,
+      "release": "email-simple-blue-20261103",
+      "ok": true
+    },
+    "sourceDockerfile": "FROM crefans-api:all-pending-20261103\nLABEL crefans.release=\"email-simple-blue-20261103\" crefans.commit=\"55786da63d707b69644e69f296ca9ae668462646\" crefans.source-sha256=\"1926536bb766a1e239756e57e4cee6d1a39f596d2a1ee6adf577b42a5fcc7cf7\" crefans.base-image=\"sha256:8ad4dbe50180be82395778b8c58a9f392440123c0122ae0f45e977b103a53b5f\"\nENV APP_RELEASE=email-simple-blue-20261103\nCOPY templates.ts /app/src/auth/local/mail/templates.ts\nCOPY templates.js /app/dist/src/auth/local/mail/templates.js\nCOPY templates.js.map /app/dist/src/auth/local/mail/templates.js.map\nCOPY templates.d.ts /app/dist/src/auth/local/mail/templates.d.ts\n",
+    "exitCode": 0
+  },
+  "migrations": {
+    "count": 50,
+    "pending": 0,
+    "allChecksumsMatch": true
+  },
+  "runtime": {
+    "crefans-beta-api-1": {
+      "id": "06c5da9b6f6249a4da8bc49f2836bae8a200ba21f4d9337a74d442feb8e29a30",
+      "image": "sha256:26296d60575372190c77f0b6dc1597eb40b75755c9f6e8ecf29b71370366237e",
+      "tag": "crefans-api:email-simple-blue-20261103",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-worker-1": {
+      "id": "d32e735989bd1b1eb4c4f7325c7375afcd32a6d488e0a48992e398684c88928b",
+      "image": "sha256:26296d60575372190c77f0b6dc1597eb40b75755c9f6e8ecf29b71370366237e",
+      "tag": "crefans-api:email-simple-blue-20261103",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-frontend-1": {
+      "id": "4d6c04f3899e5d00482401aab61ed445b18e690a403c8dc5ebefae3639b96365",
+      "image": "sha256:ae9077ec1b6817361ed75e706df1746515f3488c75663d9cb1e02c439bc78c1e",
+      "tag": "crefans-front:all-pending-20261103",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-admin-1": {
+      "id": "1ba24965bbdf8a8657bc2af3141a9673156e0aa753afae35d20a35b10794859d",
+      "image": "sha256:b22d949a6ace0d4c28c0ab3c2b8f3246c2ec7618e5e513828c3d3a9eca77c86b",
+      "tag": "crefans-admin:all-pending-20261103",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-database-1": {
+      "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+      "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b",
+      "tag": "mysql:8.0",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    },
+    "crefans-beta-proxy-1": {
+      "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+      "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f",
+      "tag": "caddy:2-alpine",
+      "running": true,
+      "restarts": 0,
+      "oom": false
+    }
+  },
+  "workflow": {
+    "feature": "11ceae8",
+    "devValidated": "4c6020c98a51d22ef8d481e44615ae21fe116054",
+    "prodDeployed": "55786da63d707b69644e69f296ca9ae668462646",
+    "devBuildExit": 0,
+    "devTestsExit": 0,
+    "devTestsPassed": 22
+  },
+  "buildGuardFinding": "Pre-deployment verification rejected the first patch image because the generated templates.d.ts was stale after a const string change. Included TS, JS, source map, declarations; all452 runtime hashes and20 template results then passed. No service was updated with the rejected image.",
+  "documentationChecks": "Initial docs check targeted the old sibling server; explicit CREFANS_SERVER_DIR resolved that. Current sources correctly expired five prior hashes; front email-design-evidence worktree records the reviewed new snapshot separately.",
+  "recordedAt": "2026-11-03T03:00:46.732385+00:00"
 }
