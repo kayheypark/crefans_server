@@ -17,3 +17,18 @@ test('visibility and sale are independent; stale edits fail without overwriting 
 test('soft delete removes listings and writes actor/IP/before-after audit without losing the row',async()=>{const path='/admin/advertising/products/'+products[0];assert.equal((await api(path,'reader',{expectedVersion:2},'DELETE')).status,403);assert.equal((await api(path,'admin',{expectedVersion:1},'DELETE')).status,409);assert.equal((await api(path,'admin',{expectedVersion:2},'DELETE')).status,200);const row=await db.adProduct.findUnique({where:{id:products[0]}});assert.ok(row.deleted_at);assert.equal(row.visible,false);assert.equal(row.on_sale,false);assert.equal((await api(path,'admin',{...input,expectedVersion:3},'PUT')).status,404);assert.equal((await api('/studio/advertising/products','creator')).data.some(p=>p.id===row.id),false);assert.equal((await api('/admin/advertising/products?deleted=true','admin')).data.items.some(p=>p.id===row.id),true);const logs=await db.platformAuditLog.findMany({where:{entity_id:row.id},orderBy:{occurred_at:'asc'}});assert.equal(logs.length,3);assert.equal(logs.at(-1).metadata.after.status,'deleted');assert.ok(logs.every(l=>l.ip==='127.0.0.1'&&l.actor_id));});
 
 test('concurrent edits serialize and repeated soft deletion creates one deletion audit',async()=>{const made=await api('/admin/advertising/products','admin',input);const id=made.data.product.id;products.push(id);const path='/admin/advertising/products/'+id;const edits=await Promise.all(['A','B'].map(name=>api(path,'admin',{...input,name,expectedVersion:1},'PUT')));assert.deepEqual(edits.map(r=>r.status).sort(),[200,409]);const deletes=await Promise.all([1,2].map(()=>api(path,'admin',{expectedVersion:2},'DELETE')));assert.deepEqual(deletes.map(r=>r.status),[200,200]);assert.equal((await db.adProduct.findUnique({where:{id}})).version,3);assert.equal(await db.platformAuditLog.count({where:{entity_id:id,action:'admin.ad_product_deleted'}}),1);});
+
+test('event and ordinary products coexist; comparison fields persist, audit, validate and can be cleared',async()=>{
+ const normal={...input,visible:true,amount:3900,durationDays:1};
+ const made=await api('/admin/advertising/products','admin',normal);products.push(made.data.product.id);
+ const event={...normal,name:'기간 2배 이벤트',durationDays:2,comparisonAmount:7800,comparisonBasis:'일반 1일 상품 3,900원 × 2회(2일) 기준'};
+ const added=await api('/admin/advertising/products','admin',event);assert.equal(added.status,201,added.errorMessage);const id=added.data.product.id;products.push(id);const path='/admin/advertising/products/'+id;
+ const catalog=(await api('/studio/advertising/products','creator')).data;
+ assert.equal(catalog.find(p=>p.id===made.data.product.id).durationDays,1);
+ assert.equal(catalog.find(p=>p.id===id).durationDays,2);assert.equal(catalog.find(p=>p.id===id).discountPercent,50);
+ const oldClient=await api(path,'admin',{...normal,durationDays:2,expectedVersion:1},'PUT');assert.equal(oldClient.status,200);assert.equal(oldClient.data.product.comparisonAmount,7800);
+ assert.equal((await api(path,'admin',{...normal,amount:8000,expectedVersion:2},'PUT')).status,400);
+ assert.equal((await api(path,'admin',{...event,comparisonBasis:'',expectedVersion:2},'PUT')).status,400);
+ const clear=await api(path,'admin',{...normal,comparisonAmount:null,comparisonBasis:'',expectedVersion:2},'PUT');assert.equal(clear.status,200);assert.equal(clear.data.product.discountPercent,null);
+ const audit=await db.platformAuditLog.findFirst({where:{entity_id:id,action:'admin.ad_product_created'}});assert.equal(audit.metadata.after.comparison_amount,7800);
+});

@@ -1,0 +1,134 @@
+{
+  "checkedAt": "2026-11-03T04:46:38.263244+00:00",
+  "repositories": {
+    "front": {
+      "baseCommit": "19df303118f056020e467be515dcfd8dd59438d5",
+      "branch": "feat/advertising-event-products",
+      "uncommitted": true
+    },
+    "server": {
+      "baseCommit": "50a0bafe6df44a41c77bcc0cacce145cf20242a9",
+      "branch": "feat/advertising-event-products",
+      "uncommitted": true
+    },
+    "admin": {
+      "baseCommit": "11857d9f52bc0fa07129af3e8bafa1b911368090",
+      "branch": "feat/advertising-event-products",
+      "uncommitted": true
+    }
+  },
+  "acceptedProducts": [
+    {
+      "name": "주목할 크리에이터 2일 · 기간 2배",
+      "description": "오픈 기념 기간 2배 상품입니다. 일반 1일 상품 가격으로 총 2일 동안 주목할 크리에이터 영역에서 프로필을 소개합니다.",
+      "terms": "현재 상품 안내 단계이며 실제 결제와 광고 노출은 시작되지 않습니다. 구매 개시 전 노출 시작 방식과 구매·취소 조건을 안내합니다. 표시된 노출기간은 추가 기간이 이미 포함된 총기간이며 다시 2배로 늘어나지 않습니다. 기존 일반 상품이나 기존 구매 건에 소급 적용되지 않습니다.",
+      "placement": "featured_creator",
+      "amount": 3900,
+      "durationDays": 2,
+      "comparisonAmount": 7800,
+      "comparisonBasis": "일반 1일 상품 3,900원 × 2회(2일) 기준입니다. 모든 금액은 VAT 포함입니다.",
+      "visible": true,
+      "onSale": true,
+      "sortOrder": -40
+    },
+    {
+      "name": "주목할 크리에이터 6일 · 기간 2배",
+      "description": "오픈 기념 기간 2배 상품입니다. 일반 3일 상품 가격으로 총 6일 동안 주목할 크리에이터 영역에서 프로필을 소개합니다.",
+      "terms": "현재 상품 안내 단계이며 실제 결제와 광고 노출은 시작되지 않습니다. 구매 개시 전 노출 시작 방식과 구매·취소 조건을 안내합니다. 표시된 노출기간은 추가 기간이 이미 포함된 총기간이며 다시 2배로 늘어나지 않습니다. 기존 일반 상품이나 기존 구매 건에 소급 적용되지 않습니다.",
+      "placement": "featured_creator",
+      "amount": 11700,
+      "durationDays": 6,
+      "comparisonAmount": 23400,
+      "comparisonBasis": "일반 3일 상품 11,700원 × 2회(6일) 기준입니다. 모든 금액은 VAT 포함입니다.",
+      "visible": true,
+      "onSale": true,
+      "sortOrder": -30
+    },
+    {
+      "name": "주목할 크리에이터 14일 · 기간 2배",
+      "description": "오픈 기념 기간 2배 상품입니다. 일반 7일 상품 가격으로 총 14일 동안 주목할 크리에이터 영역에서 프로필을 소개합니다.",
+      "terms": "현재 상품 안내 단계이며 실제 결제와 광고 노출은 시작되지 않습니다. 구매 개시 전 노출 시작 방식과 구매·취소 조건을 안내합니다. 표시된 노출기간은 추가 기간이 이미 포함된 총기간이며 다시 2배로 늘어나지 않습니다. 기존 일반 상품이나 기존 구매 건에 소급 적용되지 않습니다.",
+      "placement": "featured_creator",
+      "amount": 27300,
+      "durationDays": 14,
+      "comparisonAmount": 54600,
+      "comparisonBasis": "일반 7일 상품 27,300원 × 2회(14일) 기준입니다. 모든 금액은 VAT 포함입니다.",
+      "visible": true,
+      "onSale": true,
+      "sortOrder": -20
+    },
+    {
+      "name": "주목할 크리에이터 60일 · 기간 2배",
+      "description": "오픈 기념 기간 2배 상품입니다. 일반 30일 상품 가격으로 총 60일 동안 주목할 크리에이터 영역에서 프로필을 소개합니다.",
+      "terms": "현재 상품 안내 단계이며 실제 결제와 광고 노출은 시작되지 않습니다. 구매 개시 전 노출 시작 방식과 구매·취소 조건을 안내합니다. 표시된 노출기간은 추가 기간이 이미 포함된 총기간이며 다시 2배로 늘어나지 않습니다. 기존 일반 상품이나 기존 구매 건에 소급 적용되지 않습니다.",
+      "placement": "featured_creator",
+      "amount": 117000,
+      "durationDays": 60,
+      "comparisonAmount": 234000,
+      "comparisonBasis": "일반 30일 상품 117,000원 × 2회(60일) 기준입니다. 모든 금액은 VAT 포함입니다.",
+      "visible": true,
+      "onSale": true,
+      "sortOrder": -10
+    }
+  ],
+  "checks": [
+    {
+      "scope": "server",
+      "command": "npm run build; node --test tests/advertising-price.test.cjs",
+      "exitCode": 0,
+      "tests": 3
+    },
+    {
+      "scope": "server",
+      "command": "CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-advertising.test.cjs tests/platform-openapi.test.cjs",
+      "exitCode": 0,
+      "tests": 19,
+      "database": "loopback3307/crefans_platform_e2e"
+    },
+    {
+      "scope": "front",
+      "command": "npm run check",
+      "exitCode": 0,
+      "tests": 533
+    },
+    {
+      "scope": "admin",
+      "command": "npm run check",
+      "exitCode": 0,
+      "tests": 13
+    },
+    {
+      "scope": "front",
+      "command": "npx playwright test --config playwright.advertising.config.ts",
+      "exitCode": 0,
+      "tests": 9,
+      "environment": "PC Chromium, iPhone13 WebKit,320px WebKit; API fixtures/preview"
+    },
+    {
+      "scope": "admin",
+      "command": "npx playwright test --config playwright.advertising.config.ts",
+      "exitCode": 0,
+      "tests": 6,
+      "environment": "PC Chromium,iPhone13 WebKit; API fixtures; also 6 on deployed-base release source"
+    }
+  ],
+  "negativeControl": {
+    "mutation": "allow comparison price equal to purchase amount in compiled validation",
+    "exitCode": 1,
+    "restoredExitCode": 0
+  },
+  "research": [
+    {
+      "url": "https://www.kca.go.kr/smartconsumer/sub.do?menukey=7714&mode=view&no=1004472590&page=3",
+      "publishedAt": "2026-05-28",
+      "checkedAt": "2026-11-03T04:46:38.263244+00:00",
+      "finding": "가격할인 표시의 기준가격 유형과 산정 근거 명시 권고",
+      "application": "일반 상품2회 동일기간 기준가 설명. 신규 이벤트 상품의 과거가격으로 표현하지 않음. 법률 적합성 보증 아님."
+    }
+  ],
+  "limits": [
+    "Actual advertising payment and exposure feature remains unavailable",
+    "No real PG transaction, outbound email, or physical iPhone testing",
+    "Production deployment and catalog creation not yet complete"
+  ]
+}

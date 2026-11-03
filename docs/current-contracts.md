@@ -379,6 +379,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261103083000_shared_short_bio`
 - `20261103120000_founding_badge_claim`
 - `20261103140000_event_bean_expiry_renotice`
+- `20261103180000_ad_product_comparison_price`
 
 ## Prisma 전체 정의 (89 models · 15 enums)
 
@@ -2086,6 +2087,8 @@ model AdProduct {
   placement String @default("featured_creator") @db.VarChar(40)
   amount Int
   duration_days Int
+  comparison_amount Int?
+  comparison_basis String @default("") @db.VarChar(200)
   visible Boolean @default(false)
   on_sale Boolean @default(false)
   sort_order Int @default(0)
