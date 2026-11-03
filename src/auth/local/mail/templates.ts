@@ -9,6 +9,7 @@ const codeCopy = {
 export const noticeCopy = {
   'moderation': ['크레팬스 운영 조치 안내', '운영 조치를 안내드립니다', '운영 정책에 따라 아래 조치를 했습니다. 이의가 있으면 고객센터로 설명과 자료를 보내 주세요.', '자세히 보기'],
   'bean-expiry': ['콩 유효기간이 곧 끝납니다', '콩 유효기간 만료 예정', '아래 안내된 만료일이 지나면 해당 콩의 미사용 잔액이 소멸합니다. 기간 안에 후원에 사용하거나, 충전한 콩은 지갑에서 환불을 신청할 수 있습니다.', '콩 지갑 보기'],
+  'event-bean-expiry': ['이벤트 콩 사용기한이 곧 끝납니다', '이벤트 콩 사용기한 안내', '이벤트로 받은 프로모션 콩의 사용기한이 곧 끝납니다. 기한 안에 크리에이터 후원에 사용해 주세요.', '콩 지갑 보기'],
   'renewal-stopped': ['멤버십 자동 갱신이 종료되었습니다', '자동 갱신이 종료되었습니다', '결제가 완료되지 않아 멤버십 자동 갱신이 종료되었습니다. 결제수단을 확인한 후 다시 가입할 수 있습니다.', '구독 내역 보기'],
   'account-changed': ['계정 정보가 변경되었습니다', '계정 정보가 변경되었습니다', '계정 정보 변경 내역을 확인해주세요.', '계정 설정 확인'],
   'payment-completed': ['멤버십 결제가 완료되었습니다', '멤버십 결제가 완료되었습니다', '멤버십 결제 내역을 확인해주세요.', '결제 내역 보기'],
@@ -45,7 +46,7 @@ export function marketingMail(subject:string,body:string,unsubscribeUrl:string,a
  result.text=result.text.replace('이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.',advertisement?'이 메일은 광고성 정보입니다.':'이 메일은 수신 설정 처리에 관한 안내입니다.');
  return{...result,replyTo:'khpark@crefans.com',headers:{'List-Unsubscribe':`<${url.href}>`,'List-Unsubscribe-Post':'List-Unsubscribe=One-Click'}};
 }
-// Billing notices deliver payment-failed/renewal-stopped; member notices deliver moderation/bean-expiry.
+// Billing notices deliver payment-failed/renewal-stopped; member notices deliver moderation/bean-expiry/event-bean-expiry.
 // Other notice templates remain prepared only, without event delivery.
 export function noticeMail(kind: keyof typeof noticeCopy, rows: Array<[string,string]>, actionUrl: string, note: string) {
   if (!Object.prototype.hasOwnProperty.call(noticeCopy,kind)) throw new Error('Unknown notice');
