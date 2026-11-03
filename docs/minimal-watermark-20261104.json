@@ -1,0 +1,21 @@
+{
+  "time": "2026-11-04T06:57:53.499307+09:00",
+  "baseCommit": "07266426a50fd5d97f7b0f42c2bd7e04a44b356e",
+  "state": "uncommitted feat/minimal-watermark; not deployed",
+  "checks": [
+    {
+      "command": "npm run build",
+      "exitCode": 0
+    },
+    {
+      "command": "docker run --rm --init --network none --memory 768m --cpus 1 [readonly dist/test mounts, evidence mount] crefans-api:membership-20261103 node --test tests/platform-watermark-render.integration.cjs",
+      "exitCode": 0,
+      "result": "4 passed, actual ffmpeg/sharp, 2980.9ms"
+    }
+  ],
+  "limitation": "Local Linux image via Rosetta; initial run without init stalled and was stopped. No production upload or backfill.",
+  "sha256": {
+    "src/platform/media-watermark-render.ts": "50a9fca4885bad5ff05fdf5b1cd5928e4d7f63a8168736ac3fa6cbb2c4b9135f",
+    "tests/platform-watermark-render.integration.cjs": "1ee02cd1b36ffff5fa5b3aeba3fd018657a8c443da10793a1fb88409c71acc19"
+  }
+}
