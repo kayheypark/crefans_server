@@ -1,0 +1,70 @@
+{
+  "at": "2026-11-03T02:53:38.933491+00:00",
+  "baseCommit": "8935b97b18a76b5a0527396cdd851a1512c821e0",
+  "branch": "feat/email-simple-blue",
+  "status": "verified locally; deployment pending",
+  "successCriteria": [
+    "20 cases share approved unboxed deep-blue design",
+    "HTML/text/CID and unsubscribe behavior preserved",
+    "dev then prod promotion",
+    "API and worker deployed; unrelated services/config preserved"
+  ],
+  "files": {
+    "src/auth/local/mail/templates.ts": "ffc76759897f9eeb87ca21ef7706494464b8849689ccd30b0cb5956b64243c1c",
+    "tests/mail-templates.test.cjs": "bdc9a275eb0db2a62e87ec0dcb98534007e38c80f90f66e901a1cbb629b7c2c3"
+  },
+  "checks": [
+    {
+      "command": "npm run build",
+      "exitCode": 0
+    },
+    {
+      "command": "node --test tests/mail-templates.test.cjs",
+      "exitCode": 0,
+      "passed": 22
+    },
+    {
+      "command": "node .local/email-release/verify-visual.cjs",
+      "exitCode": 0,
+      "cases": 20,
+      "viewportChecks": 80,
+      "engines": [
+        "Chromium 390/1440",
+        "WebKit 320/600"
+      ],
+      "approvedExactPixels": 19,
+      "exception": "bean-expiry: deliberately corrected fixed five-year copy; visually inspected"
+    },
+    {
+      "command": "node .local/email-release/verify-smtp.cjs",
+      "exitCode": 0,
+      "accepted": 20,
+      "unsubscribe": 4,
+      "negative451Rejected": true,
+      "environment": "loopback-only SMTP; no real recipients or DB"
+    },
+    {
+      "command": "python3 .local/email-release/probe-runtime.py",
+      "exitCode": 0,
+      "sourceCount": 257,
+      "compiledCount": 192,
+      "sourceMismatch": [],
+      "compiledMismatch": []
+    }
+  ],
+  "priorFailedCheck": "Initial baseline comparison included six obsolete dist/lambda files absent from production Dockerfile; restricted to actual src/scripts runtime, then passed. No runtime file mismatch.",
+  "exclusions": [
+    "real Gmail/Outlook inbox display",
+    "physical iPhone",
+    "live SMTP delivery",
+    "new automatic notification event wiring"
+  ],
+  "artifacts": ".local/email-release/",
+  "artifactHashes": {
+    "visual.json": "a53d8649a6a83b8bac1d55557884cef059d0787d19fb5c57ea3be4b75d09463b",
+    "smtp.json": "90045c2c5ca7fb34f90e358f33478e483c0774c476396fdc9a8b4d37e69cb00a",
+    "baseline-source-check.json": "a30740cfa07e7d2719947a62ca2a2918b097d9bce008bf4ffddac4216f56c4ce",
+    "build.log": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2",
+    "templates.log": "1324061bb2e32fbbe5d5c9e0b69ccd9687bd250e644a34d1fffa97d1fbfe9f3e"
+  }
+}

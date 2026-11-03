@@ -8,7 +8,7 @@ const codeCopy = {
 } as const;
 export const noticeCopy = {
   'moderation': ['크레팬스 운영 조치 안내', '운영 조치를 안내드립니다', '운영 정책에 따라 아래 조치를 했습니다. 이의가 있으면 고객센터로 설명과 자료를 보내 주세요.', '자세히 보기'],
-  'bean-expiry': ['콩 유효기간이 곧 끝납니다', '콩 유효기간 만료 예정', '아래 콩은 유효기간(5년)이 끝나면 사라집니다. 기간 안에 후원에 사용하거나, 충전한 콩은 지갑에서 환불을 신청할 수 있습니다.', '콩 지갑 보기'],
+  'bean-expiry': ['콩 유효기간이 곧 끝납니다', '콩 유효기간 만료 예정', '아래 안내된 만료일이 지나면 해당 콩의 미사용 잔액이 소멸합니다. 기간 안에 후원에 사용하거나, 충전한 콩은 지갑에서 환불을 신청할 수 있습니다.', '콩 지갑 보기'],
   'renewal-stopped': ['멤버십 자동 갱신이 종료되었습니다', '자동 갱신이 종료되었습니다', '결제가 완료되지 않아 멤버십 자동 갱신이 종료되었습니다. 결제수단을 확인한 후 다시 가입할 수 있습니다.', '구독 내역 보기'],
   'account-changed': ['계정 정보가 변경되었습니다', '계정 정보가 변경되었습니다', '계정 정보 변경 내역을 확인해주세요.', '계정 설정 확인'],
   'payment-completed': ['멤버십 결제가 완료되었습니다', '멤버십 결제가 완료되었습니다', '멤버십 결제 내역을 확인해주세요.', '결제 내역 보기'],
@@ -24,33 +24,34 @@ export const noticeCopy = {
 const clean = (value: string) => String(value).replace(/\u2014/g, ', ');
 const escape = (value: string) => clean(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const security = '본인이 요청하지 않았다면 이 메일을 무시하셔도 됩니다. 인증 코드는 다른 사람에게 알려주지 마세요.';
+const linkStyle = 'display:inline-block;background:transparent;border:0;border-radius:0;padding:0;color:#1746C7;font-size:14px;line-height:1.8;font-weight:bold;text-decoration:underline;text-underline-offset:5px';
 function render(subject: string, title: string, intro: string, body: string, plain: string, note: string) {
   const text = clean(`${title}\n\n${intro}\n\n${plain}\n\n${note}\n\n© CREFANS\n이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.`);
-  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f5f7fb;color:#242638;font-family:Arial,'Apple SD Gothic Neo',sans-serif"><div style="display:none;max-height:0;overflow:hidden">${escape(intro)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:540px;background:#fff;border:1px solid #e8ecf3;border-radius:12px"><tr><td style="padding:32px 24px"><img src="cid:crefans-logo@crefans.com" width="128" alt="crefans" style="display:block;border:0;max-width:100%;height:auto"><h1 style="font-size:24px;line-height:1.4;margin:30px 0 12px">${escape(title)}</h1><p style="font-size:14px;line-height:1.8;color:#626b7c;margin:0">${escape(intro)}</p>${body}<p style="font-size:12px;line-height:1.8;color:#626b7c;border-top:1px solid #e8ecf3;padding-top:20px;margin:28px 0 0">${escape(note)}</p></td></tr><tr><td style="padding:20px 24px;background:#fafbfc;font-size:11px;line-height:1.8;color:#626b7c">© CREFANS<br>이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.</td></tr></table></td></tr></table></body></html>`;
+  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#fff;color:#262832;font-family:Arial,'Apple SD Gothic Neo',sans-serif"><div style="display:none;max-height:0;overflow:hidden">${escape(intro)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:540px;background:white;border:0;border-radius:0;border-spacing:0"><tr><td style="padding:24px 16px 0"><img src="cid:crefans-logo@crefans.com" width="112" alt="crefans" style="display:block;border:0;max-width:100%;height:auto"><h1 style="font-size:22px;line-height:1.45;letter-spacing:-.6px;margin:30px 0 12px;color:#262832">${escape(title)}</h1><p style="font-size:14px;line-height:1.8;color:#616875;margin:0;word-break:keep-all;overflow-wrap:anywhere">${escape(intro)}</p>${body}<p style="font-size:12px;line-height:1.8;color:#7a818d;border:0;padding:0;margin:30px 0 0;word-break:keep-all;overflow-wrap:anywhere">${escape(note)}</p></td></tr><tr><td style="padding:22px 16px 24px;background:white;border:0;font-size:11px;line-height:1.8;color:#8b929c">© CREFANS<br>이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.</td></tr></table></td></tr></table></body></html>`;
   return {subject: `[크레팬스] ${clean(subject)}`, text, html, attachments: [{filename:'crefans-logo.png',content:mailLogo,cid:'crefans-logo@crefans.com',contentType:'image/png',contentDisposition:'inline' as const}]};
 }
 export function codeMail(code: string, purpose: CodePurpose) {
   if (!/^\d{6}$/.test(code) || !Object.prototype.hasOwnProperty.call(codeCopy, purpose)) throw new Error('Invalid verification mail');
   const [subject,title,intro] = codeCopy[purpose];
-  return render(subject,title,intro,`<p style="background:#f0f5ff;color:#245bdc;border-radius:8px;text-align:center;padding:24px 8px;margin:24px 0 12px;font-size:32px;font-weight:bold;letter-spacing:6px">${code}</p><p style="text-align:center;font-size:12px;color:#626b7c">발송 시점부터 10분간 유효합니다.</p>`,`인증 코드: ${code}\n발송 시점부터 10분간 유효합니다.`,security);
+  return render(subject,title,intro,`<p style="background:transparent;color:#1746C7;border:0;border-radius:0;text-align:left;padding:0;margin:28px 0 8px;font-size:36px;font-weight:bold;letter-spacing:7px">${code}</p><p style="font-size:12px;line-height:1.8;margin:0;color:#7a818d;text-align:left">발송 시점부터 10분간 유효합니다.</p>`,`인증 코드: ${code}\n발송 시점부터 10분간 유효합니다.`,security);
 }
 export function marketingMail(subject:string,body:string,unsubscribeUrl:string,advertisement:boolean){
  const url=new URL(unsubscribeUrl);
  if(url.protocol!=='https:'||!['crefans.com','beta.crefans.com'].includes(url.hostname)||url.username||url.password||url.port||url.pathname!=='/api/v1/marketing/unsubscribe')throw Error('Invalid unsubscribe URL');
  const contact='좋아하는일해야지(크레팬스) · 고객지원 khpark@crefans.com · 010-3211-3164';
- const result=render(subject,subject,advertisement?'수신에 동의한 크레팬스 이벤트·프로모션 안내입니다.':'광고 메일 수신 설정에 관한 안내입니다.',`<p style="white-space:pre-line;font-size:14px;line-height:1.8">${escape(body)}</p><p><a href="${escape(url.href)}">광고 메일 무료 수신거부</a></p>`,`${body}\n광고 메일 무료 수신거부: ${url.href}`,contact);
+ const result=render(subject,subject,advertisement?'수신에 동의한 크레팬스 이벤트·프로모션 안내입니다.':'광고 메일 수신 설정에 관한 안내입니다.',`<p style="white-space:pre-line;font-size:14px;line-height:1.8">${escape(body)}</p><p><a href="${escape(url.href)}" style="${linkStyle}">광고 메일 무료 수신거부</a></p>`,`${body}\n광고 메일 무료 수신거부: ${url.href}`,contact);
  result.subject=(advertisement?'(광고) ':'')+result.subject;
  result.html=result.html.replace('이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.',advertisement?'이 메일은 광고성 정보입니다.':'이 메일은 수신 설정 처리에 관한 안내입니다.');
  result.text=result.text.replace('이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.',advertisement?'이 메일은 광고성 정보입니다.':'이 메일은 수신 설정 처리에 관한 안내입니다.');
  return{...result,replyTo:'khpark@crefans.com',headers:{'List-Unsubscribe':`<${url.href}>`,'List-Unsubscribe-Post':'List-Unsubscribe=One-Click'}};
 }
-// Payment failure/recovery notices are delivered by the durable billing notice worker.
+// Billing notices deliver payment-failed/renewal-stopped; member notices deliver moderation/bean-expiry.
 // Other notice templates remain prepared only, without event delivery.
 export function noticeMail(kind: keyof typeof noticeCopy, rows: Array<[string,string]>, actionUrl: string, note: string) {
   if (!Object.prototype.hasOwnProperty.call(noticeCopy,kind)) throw new Error('Unknown notice');
   const url = new URL(actionUrl);
   if (url.protocol !== 'https:' || !['crefans.com','beta.crefans.com'].includes(url.hostname) || url.username || url.password || url.port) throw new Error('Invalid mail action URL');
   const [subject,title,intro,action] = noticeCopy[kind];
-  const table = rows.map(([label,value])=>`<tr><td style="padding:8px 0;color:#626b7c">${escape(label)}</td><td align="right" style="padding:8px 0">${escape(value)}</td></tr>`).join('');
-  return render(subject,title,intro,`<table role="presentation" width="100%" style="font-size:13px;margin:24px 0">${table}</table><a href="${escape(url.href)}" style="display:block;text-align:center;background:#2962ff;color:#fff;padding:14px;border-radius:8px;text-decoration:none;font-size:14px">${escape(action)}</a>`,rows.map(([k,v])=>`${k}: ${v}`).join('\n')+`\n${action}: ${url.href}`,note);
+  const table = rows.map(([label,value])=>`<tr><td style="padding:8px 0;color:#626b7c;vertical-align:top;font-size:13px">${escape(label)}</td><td align="right" style="padding:8px 0;vertical-align:top;font-size:13px">${escape(value)}</td></tr>`).join('');
+  return render(subject,title,intro,`<table role="presentation" width="100%" style="font-size:13px;margin:24px 0">${table}</table><a href="${escape(url.href)}" style="${linkStyle}">${escape(action)}</a>`,rows.map(([k,v])=>`${k}: ${v}`).join('\n')+`\n${action}: ${url.href}`,note);
 }
