@@ -4,6 +4,7 @@
 
 - 크레팬스(팬·크리에이터 멤버십 플랫폼) 백엔드. NestJS + Prisma + MySQL. AWS Cognito 제거·자체 회원 인증·단일 원서버(docker compose, host Postfix SMTP) 배포를 준비 중. 
 - 작업 전에 `PROGRESS.md`를 먼저 읽고, 작업 후 갱신한다. 신규 서비스 기준은 `docs/platform-api.md`, `docs/platform-implementation.md`, `infra/platform/`이다. `docs/local-member-migration.md`와 `infra/single-instance/`는 구형 인증 전환 참고 자료다. `docs/prd.md`·`docs/deployment-setup.md`의 Cognito 전제 내용은 구식.
+- 현재 이메일은 `src/auth/local/mail/templates.ts` 공통 템플릿의 흰 배경·박스 없는 왼쪽 정렬·16px 좌우 여백·진한 블루 `#1746C7`를 사용한다. text/HTML·CID 로고·인증 검증·수신거부 헤더를 보존한다. 콩 만료 안내는 로트별 실제 만료일을 사용하며 일괄 5년으로 안내하지 않는다. 시안/로컬 SMTP 검증을 실제 수신함 검증으로 보고하지 않는다.
 - 운영 DB에 `migrate dev`/`db push`/`seed`를 실행하지 않는다. 비밀번호·인증 코드·AWS 키를 로그에 남기지 않는다.
 - 활동 분야 정렬·아이콘은 `categories.service.ts`와 `category-catalog.ts`를 사용한다. 기존 sort_order/icon 컬럼·권한·Origin·감사 이력을 유지하고, 업로드는 제한된 이미지 재인코딩 후 저장한다. 공개 분야 아이콘 경로를 유료 미디어 공개 경로로 재사용하지 않는다.
 - 예약 핸들은 `handles.ts`·`reserved-handles.ts`의 정확 일치 규칙을 사용한다. 후보는 차단하지 않고 예약 중만 신규 취득을 막는다. 기존 현재 보유자와 별도 이전 핸들 보호를 유지하며, 핸들 쓰기·예약 변경은 `handles.policy` 행 잠금 후 재검사한다. 콘솔 권한은 `reserved-handles`이며 변경·이력·감사는 같은 트랜잭션이다.
