@@ -1,3 +1,8 @@
+## 2026-11-04 미니멀 워터마크 선택 적용 (운영 미배포)
+- 사용자01선택: 흰색 불투명도40%, 짧은변 글자2%, 가장자리여백3%, 그림자/외곽선/박스 없음. 사진400weight, 영상DejaVuSans 기본. URL과 오른쪽하단·길이제한·보안검사 유지. 기존완료 파일 재처리 없음. 미디어타일은 변환영상 firstFrame을 사용하므로 같은 표시 반영.
+- origin/prod 기준 feat/minimal-watermark, npm run build 종료0. Docker 로컬 기존 Linux API이미지+현재 dist 주입, network none/768MiB/1CPU/--init: 실제MP4(오디오)/WebM(무음)/EXIF사진/40MP사진4통과(2.98초). MP4추출프레임·사진 육안확인. 최초 init 없는 Rosetta컨테이너는 두번째 변환 뒤 대기해 해당 테스트컨테이너만 종료, --init 재실행 통과. 운영·DB 변경 없음.
+- 증거 docs/minimal-watermark-20261104.json, .local/minimal-watermark/사진·영상·추출프레임. 다음 배포 요청시 dev→prod 통합 후 API/worker 배포 필요(외부복구보관 규칙 준수).
+
 ## 2026-11-03 광고상품 수동 사용 운영 배포 완료
 - dev→prod front bb8bdff / server7dd4bc5. API·worker·front ad-manual-use-20261103 적용, 비공개DB백업 후 추가형 migration20261103230000_ad_manual_use 완료. 관리자·DB·프록시 컨테이너 불변, 이전 복구이미지 보존.
 - 타입·운영빌드·문서검사 통과. 격리DB 광고8/OpenAPI13=21통과, 공개프로필 시작·만료 HTTP 포함 광고8 재통과. 초기명세개수2건/퇴장애니메이션선택3건 실패는 갱신·수정후 재통과. PC/iPhoneWebKit/320px 로컬6 및 배포공용preview3환경에서 구매후ready/취소/시작/두번째상품사용차단/가로넘침없음 통과. 모바일 좌측안내/우측버튼 정렬 캡처 확인.
