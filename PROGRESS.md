@@ -1,3 +1,10 @@
+## 2026-11-03 광고상품 수동 사용 운영 배포 완료
+- dev→prod front bb8bdff / server7dd4bc5. API·worker·front ad-manual-use-20261103 적용, 비공개DB백업 후 추가형 migration20261103230000_ad_manual_use 완료. 관리자·DB·프록시 컨테이너 불변, 이전 복구이미지 보존.
+- 타입·운영빌드·문서검사 통과. 격리DB 광고8/OpenAPI13=21통과, 공개프로필 시작·만료 HTTP 포함 광고8 재통과. 초기명세개수2건/퇴장애니메이션선택3건 실패는 갱신·수정후 재통과. PC/iPhoneWebKit/320px 로컬6 및 배포공용preview3환경에서 구매후ready/취소/시작/두번째상품사용차단/가로넘침없음 통과. 모바일 좌측안내/우측버튼 정렬 캡처 확인.
+- 운영 해시front1329/api10파일·기준API소스4개 일치, health/페이지200, 구매내역·상품 비인증401. API/worker/front running·재시작0·OOM없음. 신규구매0/유료광고종료일설정0으로 임의구매·노출 없음 확인.
+- 사용자 확정대로 실제 결제/주문생성은 준비중이며 운영 수령할 구매내역은 아직 없음. 목업 및 격리테스트만 주문생성. 실PG/실물기기/운영유료광고 사용 미검증. 향후 결제 연결시 paid 주문snapshot 저장과 취소시 광고상태 동기화 필요.
+- 증거 front docs/audit/advertising-manual-use-20261103.json 및 양쪽 .local/ad-use/, front .local/ad-use-release/. 아래 대기/미배포 기록은 당시 이력.
+
 ## 2026-11-03 광고상품 수동 사용 구현·검증
 - 사용자 확정: 실제 결제는 준비중 유지; 구매내역/사용 기능 먼저, 같은 광고 사용중 다른 주문 사용불가. 신규 AdPurchase 구매snapshot/시작·종료 저장, Creator.ad_promoted_until은 기존 수동 promoted와 분리. 추가형 migration20261103230000_ad_manual_use. 결제완료 주문을 만드는 공개 API는 없으며 무료 주문 발급 우회 없음.
 - GET studio/advertising/orders, POST orders/:id/use: 본인/paid/활성creator 검사, creator행잠금으로 서로다른 주문 동시사용 차단, 동일주문 재시도 기존기간 반환. 사용시점부터 duration_days*24시간 계산, 요청시각에 만료 판정(배치 지연 없음). 운영자 수동홍보 유지. 디렉터리는 수동홍보→유료만료일내림차순, 프로필/부트스트랩은 유효기간으로 promoted 계산.
