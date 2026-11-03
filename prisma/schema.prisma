@@ -1699,6 +1699,8 @@ model AdProduct {
   placement String @default("featured_creator") @db.VarChar(40)
   amount Int
   duration_days Int
+  comparison_amount Int?
+  comparison_basis String @default("") @db.VarChar(200)
   visible Boolean @default(false)
   on_sale Boolean @default(false)
   sort_order Int @default(0)
