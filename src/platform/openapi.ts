@@ -51,6 +51,7 @@ export function buildPlatformOpenApi(app:INestApplication):OpenAPIObject{
    for(const status of ['200','206'])op.responses[status]={description:status==='200'?'전체 파일. HEAD는 본문 없음.':'부분 파일',headers:{'Accept-Ranges':{schema:str()},'Content-Length':{schema:{type:'integer'}},'Content-Range':{schema:str()}},content:{'application/octet-stream':{schema:{type:'string',format:'binary'}}}};
    op.responses['416']={description:'지원하지 않는 범위. 스트리밍 경로에서는 Content-Range와 빈 본문을 반환할 수 있습니다.'};
   }
+  if(path==='/api/v1/media/posts/{id}/share-image'){op.responses['200']={description:'공개 게시물 JPEG 미리보기',content:{'image/jpeg':{schema:{type:'string',format:'binary'}}}};op.responses['302']={description:'기본 이미지로 이동'};}
   if(['/api/v1/categories/{id}/icon/{version}','/api/v1/admin/categories/{id}/icon/{version}'].includes(path))op.responses['200']={description:'공개 분야 아이콘',content:{'image/webp':{schema:{type:'string',format:'binary'}}}};
   if(edge)for(const name of ['purpose','ip','at','id','method'])op.parameters.push({name:'x-crefans-edge-'+name,in:'header',required:true,schema:str()});
  }

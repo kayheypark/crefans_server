@@ -18,8 +18,10 @@ import {MAX_VIDEO_SECONDS,MAX_VIDEO_SIDE,QUICKTIME_MIME,sourcePath,videoTools} f
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 import {profilePhotoInUse} from './profile-photos';
 import {enqueueOperation} from './operations-events';
+import {ShareImageRenderer,SHARE_FALLBACK} from './share-image';
 @Controller('media')
 export class PlatformMediaController {
+ private readonly shareImages=new ShareImageRenderer();
  private readonly logger=new Logger(PlatformMediaController.name);
  constructor(private service:PlatformService,private config:ConfigService,private storage:PlatformMediaStorage){}
  @Post() @UseGuards(PlatformAuthGuard) @UseInterceptors(FileInterceptor('file',{storage:diskStorage({destination:(_req,_file,done)=>{const directory=join(resolve(process.env.MEDIA_ROOT||'.local/media'),'.uploads');mkdirSync(directory,{recursive:true});done(null,directory);},filename:(_req,_file,done)=>done(null,randomUUID())}),limits:{fileSize:300*1024*1024}}))
@@ -76,6 +78,23 @@ export class PlatformMediaController {
    if(!allowed)reject(403,'MEDIA_ACCESS_DENIED','파일 이용 권한이 없습니다.');
    for(const link of restricted){if(!await this.service.consumeContent(link.posting,req.user?.sub))reject(403,'MEDIA_ACCESS_DENIED','파일 이용 권한이 없습니다.');}
    return m;
+ }
+ /** Public sharing deliberately ignores all sender cookies and checks permissions again after rendering. */
+ @Get('posts/:id/share-image')
+ async shareImage(@Param('id') id:string,@Res() res:any){
+  res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
+  const fallback=()=>res.redirect(302,SHARE_FALLBACK);
+  if(!/^[0-9a-f-]{36}$/i.test(id))return fallback();
+  const select=async()=>{
+   const post=await this.service.db.posting.findFirst({where:{id,is_deleted:false,hidden_at:null,status:'PUBLISHED'},include:{medias:{where:{is_deleted:false},include:{media:true},orderBy:{sort_order:'asc'}}}});
+   if(!post||post.is_membership||post.is_sensitive||!post.is_public||!await this.service.access(post))return null;
+   const first=post.medias[0]?.media;if(!first||first.is_deleted||first.processing_status!=='COMPLETED')return null;
+   try{return await this.authorize(first.id,{});}catch(error:any){if([403,404].includes(error.getStatus?.()))return null;throw error;}
+  };
+  const media=await select();if(!media)return fallback();
+  let bytes:Buffer;try{bytes=await this.shareImages.render(media,this.config.get('MEDIA_ROOT')||'.local/media',this.storage);}catch{res.setHeader('Retry-After','30');return fallback();}
+  const current=await select();if(!current||current.id!==media.id||current.updated_at.getTime()!==media.updated_at.getTime())return fallback();
+  res.setHeader('Content-Type','image/jpeg');return res.send(bytes);
  }
  /** The uploader polls this while an iPhone video is being converted (2026-11-01); other members get 404. */
  @Get(':id/status') @UseGuards(PlatformAuthGuard)

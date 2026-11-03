@@ -151,6 +151,7 @@
 | GET | `/api/v1/media/:id/file` | `src/platform/media.controller.ts::download` |
 | GET | `/api/v1/media/:id/origin-file` | `src/platform/media.controller.ts::originDownload` |
 | GET | `/api/v1/media/:id/status` | `src/platform/media.controller.ts::status` |
+| GET | `/api/v1/media/posts/:id/share-image` | `src/platform/media.controller.ts::shareImage` |
 | PUT | `/api/v1/members/:id/block` | `src/platform/controller.ts::block` |
 | PUT | `/api/v1/members/:id/follow` | `src/platform/controller.ts::follow` |
 | POST | `/api/v1/members/:id/messages` | `src/platform/controller.ts::message` |
