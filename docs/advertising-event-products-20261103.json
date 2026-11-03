@@ -1,20 +1,41 @@
 {
-  "checkedAt": "2026-11-03T04:46:38.263244+00:00",
+  "checkedAt": "2026-11-03T05:22:33.788922+00:00",
   "repositories": {
     "front": {
       "baseCommit": "19df303118f056020e467be515dcfd8dd59438d5",
-      "branch": "feat/advertising-event-products",
-      "uncommitted": true
+      "branch": "release/advertising-event-prod",
+      "feature": "0822357f2897ac0e770d2294f8f44674151b08fa",
+      "devValidated": "cf27546ce9098e2cf959a0510471684b297188a7",
+      "prod": "532796ce4dbe3ae781f4fd59432ae0d976e75998",
+      "status": "",
+      "at": "2026-11-03T04:52:23.035689+00:00",
+      "currentSourceCommit": "532796ce4dbe3ae781f4fd59432ae0d976e75998",
+      "uncommittedAtFeatureValidation": true,
+      "cleanSourceTreeBeforeEvidenceUpdate": true
     },
     "server": {
       "baseCommit": "50a0bafe6df44a41c77bcc0cacce145cf20242a9",
-      "branch": "feat/advertising-event-products",
-      "uncommitted": true
+      "branch": "release/advertising-event-prod",
+      "feature": "49aa4defaf8dab37a1827dfc98776c70b54dfc3c",
+      "devValidated": "4c66c122a1378e3389f7917814ef3660bc1a1004",
+      "prod": "01bec504f3ae04a3711329ab8e386dc1361c95a7",
+      "status": "",
+      "at": "2026-11-03T04:52:17.812521+00:00",
+      "currentSourceCommit": "01bec504f3ae04a3711329ab8e386dc1361c95a7",
+      "uncommittedAtFeatureValidation": true,
+      "cleanSourceTreeBeforeEvidenceUpdate": true
     },
     "admin": {
       "baseCommit": "11857d9f52bc0fa07129af3e8bafa1b911368090",
-      "branch": "feat/advertising-event-products",
-      "uncommitted": true
+      "branch": "release/advertising-price-lines-prod",
+      "feature": "4c0e8915b1ee3f0d76713e710327afea1d5ff704",
+      "devValidated": "965bdeefc855c34598203f225306ebf64c38ebdf",
+      "prod": "803d8fc629b38e2447afe64e6a18b722e1efa3ff",
+      "status": "",
+      "at": "2026-11-03T04:52:27.786615+00:00",
+      "currentSourceCommit": "8408d0e336e1749f4d88110e33f7cc942919fa6c",
+      "uncommittedAtFeatureValidation": true,
+      "cleanSourceTreeBeforeEvidenceUpdate": true
     }
   },
   "acceptedProducts": [
@@ -127,8 +148,276 @@
     }
   ],
   "limits": [
-    "Actual advertising payment and exposure feature remains unavailable",
-    "No real PG transaction, outbound email, or physical iPhone testing",
-    "Production deployment and catalog creation not yet complete"
+    "Actual advertising payment and exposure feature remains unavailable; product listing and guidance are live",
+    "No real PG transaction, outbound email, physical iPhone or authenticated production Studio browsing test",
+    "Source prod includes unrelated pending changes; runtime scope is explicitly limited above"
+  ],
+  "initialImplementationCheckAt": "2026-11-03T04:46:38.263244+00:00",
+  "productionRelease": {
+    "at": "2026-11-03T05:12:31.171222+00:00",
+    "containers": {
+      "crefans-beta-api-1": {
+        "id": "36d098f98cefbd56a3aec000d515e60a2d3f00531036a86001ccd5d545d06821",
+        "image": "sha256:03b75007fa903216671537daebbf7e382480fa19c1b5fac705dbcd35e01cc7bb",
+        "tag": "crefans-api:advertising-event-20261103",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-worker-1": {
+        "id": "d8e15921283c85a9dd805d0f6cd09a39ce802e225f7f3eba5ac6565c5cbf6981",
+        "image": "sha256:03b75007fa903216671537daebbf7e382480fa19c1b5fac705dbcd35e01cc7bb",
+        "tag": "crefans-api:advertising-event-20261103",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-frontend-1": {
+        "id": "ff7983e71fa3d802f580b53e968cec773e52ed1c4eee62a9cbca3d4570d8b37d",
+        "image": "sha256:0233b50e3426b6df75eb27bf0b3b168834e2499f6d5d7dec110195727727bf18",
+        "tag": "crefans-front:advertising-event-20261103",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-admin-1": {
+        "id": "d95a371de111f3fbe3c9b743a9e9019d0452294d2622bd4290032fed12386009",
+        "image": "sha256:2a40879cf17e7b1cc8493d158c9c8db85dbb10a02c22c7fecd6ac4735bb58318",
+        "tag": "crefans-admin:advertising-event-20261103",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-database-1": {
+        "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+        "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b",
+        "tag": "mysql:8.0",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      },
+      "crefans-beta-proxy-1": {
+        "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+        "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f",
+        "tag": "caddy:2-alpine",
+        "running": true,
+        "restarts": 0,
+        "oom": false
+      }
+    },
+    "publicRoutes": [
+      {
+        "url": "https://crefans.com/service/events",
+        "status": 200
+      },
+      {
+        "url": "https://crefans.com/service/events/creator-advertising",
+        "status": 200
+      },
+      {
+        "url": "https://crefans.com/service/studio/advertising",
+        "status": 200
+      },
+      {
+        "url": "https://admin.crefans.com/login",
+        "status": 200
+      }
+    ],
+    "migrationCount": 51,
+    "existingProductsUnchanged": true,
+    "settingsUnchangedExceptReleaseAndImages": true,
+    "schemaValidation": "API and worker source hashes, generated Prisma fields and price50%/duration2 verified",
+    "actualPaymentTested": false
+  },
+  "images": {
+    "server": {
+      "tag": "crefans-api:advertising-event-20261103",
+      "imageId": "sha256:03b75007fa903216671537daebbf7e382480fa19c1b5fac705dbcd35e01cc7bb",
+      "featureCommit": "49aa4defaf8dab37a1827dfc98776c70b54dfc3c",
+      "sourceManifestSha256": "9ba1b743b69003682c01ec19c1dd317b1a6fdac2601a49f618161d0665f327e9",
+      "startedAt": "2026-11-03T04:52:01.612415+00:00",
+      "finishedAt": "2026-11-03T04:52:02.038259+00:00",
+      "exitCode": 0,
+      "archiveBytes": 79368,
+      "sourceBase": "sha256:26296d60575372190c77f0b6dc1597eb40b75755c9f6e8ecf29b71370366237e"
+    },
+    "front": {
+      "tag": "crefans-front:advertising-event-20261103",
+      "imageId": "sha256:0233b50e3426b6df75eb27bf0b3b168834e2499f6d5d7dec110195727727bf18",
+      "featureCommit": "0822357f2897ac0e770d2294f8f44674151b08fa",
+      "sourceManifestSha256": "e31829db9b348250d43a195f637c3b4f38ba008003da8d296f2d706315d1ebaa",
+      "startedAt": "2026-11-03T04:52:16.385876+00:00",
+      "finishedAt": "2026-11-03T05:00:36.098884+00:00",
+      "exitCode": 0,
+      "archiveBytes": 231418953,
+      "sourceBase": "0822357f2897ac0e770d2294f8f44674151b08fa"
+    },
+    "admin": {
+      "tag": "crefans-admin:advertising-event-20261103",
+      "imageId": "sha256:2a40879cf17e7b1cc8493d158c9c8db85dbb10a02c22c7fecd6ac4735bb58318",
+      "featureCommit": "4c0e8915b1ee3f0d76713e710327afea1d5ff704",
+      "sourceManifestSha256": "4ed037fc597451f544ad2f36bc8be2ffbbb3fdc5d793a29bd8d46c4c3dbb3a68",
+      "startedAt": "2026-11-03T05:00:37.643898+00:00",
+      "finishedAt": "2026-11-03T05:09:08.138250+00:00",
+      "exitCode": 0,
+      "archiveBytes": 8232852,
+      "sourceBase": "5a290a454048b9b454514c8938c9de2c571f4b34"
+    }
+  },
+  "catalog": {
+    "at": "2026-11-03T05:14:39.118255+00:00",
+    "total": 8,
+    "normalProductsUnchanged": true,
+    "eventProducts": [
+      {
+        "id": "eab5c9b8-7a1d-470f-a8a6-7aa68557d771",
+        "name": "주목할 크리에이터 2일 · 기간 2배",
+        "amount": 3900,
+        "comparisonAmount": 7800,
+        "comparisonBasis": "일반 1일 상품 3,900원 × 2회(2일) 기준입니다. 모든 금액은 VAT 포함입니다.",
+        "discountPercent": 50,
+        "durationDays": 2,
+        "visible": true,
+        "onSale": true,
+        "version": 1,
+        "sortOrder": -40
+      },
+      {
+        "id": "015f1d84-7f4a-4b45-8424-602ce3b67c04",
+        "name": "주목할 크리에이터 6일 · 기간 2배",
+        "amount": 11700,
+        "comparisonAmount": 23400,
+        "comparisonBasis": "일반 3일 상품 11,700원 × 2회(6일) 기준입니다. 모든 금액은 VAT 포함입니다.",
+        "discountPercent": 50,
+        "durationDays": 6,
+        "visible": true,
+        "onSale": true,
+        "version": 1,
+        "sortOrder": -30
+      },
+      {
+        "id": "67250708-f3a3-4e29-a21c-f753d9711943",
+        "name": "주목할 크리에이터 14일 · 기간 2배",
+        "amount": 27300,
+        "comparisonAmount": 54600,
+        "comparisonBasis": "일반 7일 상품 27,300원 × 2회(14일) 기준입니다. 모든 금액은 VAT 포함입니다.",
+        "discountPercent": 50,
+        "durationDays": 14,
+        "visible": true,
+        "onSale": true,
+        "version": 1,
+        "sortOrder": -20
+      },
+      {
+        "id": "df6ab6e3-a69a-407f-84c8-eff10b5351cf",
+        "name": "주목할 크리에이터 60일 · 기간 2배",
+        "amount": 117000,
+        "comparisonAmount": 234000,
+        "comparisonBasis": "일반 30일 상품 117,000원 × 2회(60일) 기준입니다. 모든 금액은 VAT 포함입니다.",
+        "discountPercent": 50,
+        "durationDays": 60,
+        "visible": true,
+        "onSale": true,
+        "version": 1,
+        "sortOrder": -10
+      }
+    ],
+    "purchaseImplemented": false,
+    "registrationMethod": "Authenticated production console UI, 4 form submissions",
+    "actualPaymentsPerformed": false
+  },
+  "sourceScope": {
+    "server": "deployed email-simple-blue image + advertising/audit/openapi/schema/additive migration patch; pending bean-expiry-notice change excluded",
+    "front": "prod-derived feature source",
+    "admin": "deployed5a290a4 source + advertising-only patch; other pending console changes excluded"
+  },
+  "deploymentAttempts": [
+    {
+      "attempt": 1,
+      "outcome": "automatic application rollback",
+      "cause": "HTTP checker expected exact phrase 동일 기간 기준가 in event detail, but actual content uses 가격 비교 기준; product implementation was not rolled forward until corrected checks passed",
+      "schema": "additive migration51 retained; old API compatible; no catalog creation yet"
+    },
+    {
+      "attempt": 2,
+      "outcome": "success",
+      "checks": "source hashes + migration checksum + metadata title + 4 public routes200, followed by rendered event DOM actual prices and comparison explanation"
+    }
+  ],
+  "productionUi": {
+    "console": "Chrome authenticated normal forms:4 creates, total8, correct prices/days50%; screenshot .local/advertising-event/production-catalog.jpg",
+    "event": "Chrome public rendered event detail: approved prices, final durations, generalproducts coexist, reference explanation, purchase-preparing notice verified",
+    "studio": "Production creator session unavailable; PC/iPhone13WebKit/320px service+preview UI used explicit fixtures; production DB/view serialization verified, not claimed as authenticated Studio browser test"
+  },
+  "buildValidationNote": "Prisma generated schema is autoformatted; initial byte hash and then line-space checks failed on formatting. Normalized whitespace equality + DMMF fields + exact source hashes passed. No schema values were weakened.",
+  "consolePriceLineRelease": {
+    "build": {
+      "tag": "crefans-admin:advertising-event-lines-20261103",
+      "imageId": "sha256:5d26a609de916e135c5f8f8bc6c111d1ce20c99b9838e0ab3d70d2672929a07a",
+      "featureCommit": "f7fccd53aeacbc58bb83aec2cf88b5db1e04e753",
+      "sourceManifestSha256": "440118e2e8cbb7334e0cea565ac0623ad5cd6f6100f28cd63059a98b3c7f67b4",
+      "startedAt": "2026-11-03T05:16:05.900089+00:00",
+      "finishedAt": "2026-11-03T05:20:19.361146+00:00",
+      "sourceBase": "5a290a454048b9b454514c8938c9de2c571f4b34 + advertising-only patch",
+      "exitCode": 0
+    },
+    "production": {
+      "at": "2026-11-03T05:21:07.500808+00:00",
+      "services": {
+        "api": {
+          "id": "36d098f98cefbd56a3aec000d515e60a2d3f00531036a86001ccd5d545d06821",
+          "image": "sha256:03b75007fa903216671537daebbf7e382480fa19c1b5fac705dbcd35e01cc7bb",
+          "tag": "crefans-api:advertising-event-20261103"
+        },
+        "worker": {
+          "id": "d8e15921283c85a9dd805d0f6cd09a39ce802e225f7f3eba5ac6565c5cbf6981",
+          "image": "sha256:03b75007fa903216671537daebbf7e382480fa19c1b5fac705dbcd35e01cc7bb",
+          "tag": "crefans-api:advertising-event-20261103"
+        },
+        "frontend": {
+          "id": "ff7983e71fa3d802f580b53e968cec773e52ed1c4eee62a9cbca3d4570d8b37d",
+          "image": "sha256:0233b50e3426b6df75eb27bf0b3b168834e2499f6d5d7dec110195727727bf18",
+          "tag": "crefans-front:advertising-event-20261103"
+        },
+        "admin": {
+          "id": "6751f35e58129323a9726c3b12be3506650313d8bfdd97cf673758c7ceb8fa41",
+          "image": "sha256:5d26a609de916e135c5f8f8bc6c111d1ce20c99b9838e0ab3d70d2672929a07a",
+          "tag": "crefans-admin:advertising-event-lines-20261103"
+        },
+        "database": {
+          "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+          "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b",
+          "tag": "mysql:8.0"
+        },
+        "proxy": {
+          "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+          "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f",
+          "tag": "caddy:2-alpine"
+        }
+      },
+      "adminOnly": true,
+      "httpStatus": 200
+    },
+    "validation": [
+      "npm run check: typecheck and13tests passed",
+      "dev typecheck passed",
+      "Chrome live table: 8 products and line-separated comparison/actual price/basis verified"
+    ]
+  },
+  "imageRetention": {
+    "status": "kept",
+    "reason": "automatic approval review rejected deletion of unapproved additional old images; no deletion ran; optional user decision requested",
+    "protected": [
+      "current images",
+      "previous operational images"
+    ],
+    "local": "Docker Desktop unavailable; local deletion not attempted"
+  },
+  "screenshots": [
+    {
+      "path": ".local/advertising-event/production-catalog.jpg",
+      "sha256": "88dd97b72ac396e1a03df61b75e2f814ad2034545f4b5ed564681158a7ea2df2",
+      "source": "authenticated production Chrome table, after console price line patch"
+    }
   ]
 }
