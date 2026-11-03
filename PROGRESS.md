@@ -1,3 +1,9 @@
+## 2026-11-03 조회수 집계 — 운영 배포 완료
+- 사용자 확정 30분 익명 식별자·50%/1초 유효 열람·동일 방문자30분 중복 방지 적용. 피드/상세/공유경로/영상재생/30분방문 통계를 스튜디오에 표시. 과거 통계 소급 생성 없음.
+- dev→prod 승격: front baa3a05, server a9ba05c. 운영 API·worker·front post-views-20261103 적용. 1321개 프론트·14개 서버 파일 SHA 검증, 비공개 DB 백업 후 추가형 migration20261103190000_post_view_metrics 적용(53개 완료). 관리자·DB·proxy 컨테이너 유지.
+- 검증: front check538, backend 격리MySQL7/법무12/OpenAPI13 및 build 통과. 운영 health/페이지/공유이미지200, 봇POST recorded=false·조회수/통계행 증가 없음, 6서비스 running·재시작0·OOM없음. 운영 PC Chromium/iPhone13WebKit 화면에서 hidden/1초미만 제외·공유상세·30분쿠키 확인(POST 집계는 대역으로 인위적 조회수 증가 방지).
+- 실제 휴대전화·운영 유료회원 영상 재생은 미검증. 임시방문은 실제 사람 수가 아니며 봇완전차단을 보장하지 않는다. 공개 증거 front docs/audit/post-view-metrics-20261103.json, 상세 .local/view-release/·.local/view-metrics/. 아래 미배포 표현은 당시 이력이다.
+
 ## 2026-11-03 조회수 집계 구현 — 검증·배포 준비
 - 사용자 승인: 피드50%·1초 유효 열람, 상세·공유 경로·영상 별도 통계, 동일 방문자30분 공개 조회수1회, 본인/알려진 봇/프리패치 제외. 익명은30분 자사 무작위 쿠키(IP·지문 미사용) 승인. 방문수는30분 단위 추정이며 실제 사람 수/장기 순방문자가 아니다.
 - 최신 prod 기반 feat/post-view-metrics. PostMetric 합산표·PostViewWindow 단기 해시창 추가형 migration. 게시물 행 잠금으로 동시 중복 방지, 익명/회원 접근 재검사. 창 만료 후 매분 워커 삭제. 잠긴 미리보기는 feed/visits만, 조회수/detail/video 제외. 원본·공유이미지GET·consumeContent는 변경하지 않는다.
