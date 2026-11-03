@@ -461,7 +461,7 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 
 ## 광고상품 관리 (2026-10-29, 로컬 구현·운영 미배포)
 
-모든 경로는 `/api/v1` 접두어와 기존 공통 응답을 사용한다. 광고 주문·결제·광고기간·매출 API는 아직 없다.
+모든 경로는 `/api/v1` 접두어와 기존 공통 응답을 사용한다. 실제 주문 생성·결제·매출 API는 준비중이다. 구매내역 조회·수동 사용 API는 2026-11-03 절을 따른다.
 
 | Method | Path | 계약 |
 | --- | --- | --- |
@@ -543,3 +543,15 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - `AdProduct`는 `comparisonAmount`(null 또는 VAT 포함 정수), `comparisonBasis`(빈 문자열 또는200자 이내 비교 근거), `discountPercent`(null 또는 내림 계산값)를 반환한다. 기준가는 결제금액 초과·1천만원 이하여야 하고 비교 설명이 필수다. 입력 두 필드 생략은 이전 클라이언트 호환을 위해 기존 값을 보존하며, null/빈 문자열 쌍으로 명시하면 제거한다. 금액 변경 후에도 보존된 기준가가 더 커야 한다. 버전 잠금·권한·감사 이력은 유지한다.
 - 기간2배 상품은 별도 상품ID와 최종 노출기간2/6/14/60일을 사용한다. 승인 금액3,900/11,700/27,300/117,000원, 기준가는 일반1/3/7/30일 상품을2회 이용한 값이며50% 할인. 일반 상품과 기존 이력의 기간은 변경하지 않는다. 실제 광고 주문·결제·노출 개시 기능은 아직 없고 UI도 준비 상태다.
 - 추가형 migration `20261103180000_ad_product_comparison_price`는 기존 상품 비교값을 null/빈문자열로 유지한다. 상품 데이터는 승인된 운영 콘솔 등록으로 별도 추가하며 migration/seed로 임의 생성하지 않는다. 검증: `tests/advertising-price.test.cjs`, `tests/platform-advertising.test.cjs`.
+
+## 광고 구매내역·수동 사용 (2026-11-03)
+이 절은 과거의 광고기간 미구현 설명을 대체한다. 실제 결제/주문 생성은 미구현·준비중으로 유지한다. 사용자 승인으로 `AdPurchase`는 구매 당시 이름/조건/가격/기간을 보존하고 구매만으로 시작하지 않는다. 결제 연결 전 운영용 주문을 임의 생성하지 않는다.
+- `GET /api/v1/studio/advertising/orders`: 본인 구매내역, 결제상태와 ready/active/completed 사용상태, startsAt/endsAt/blockedUntil.
+- `POST /api/v1/studio/advertising/orders/:id/use`: 활성 크리에이터 본인의 paid 주문만 사용. 동일주문 재시도는 최초기간 반환, 다른 주문 사용중이면409. creator행잠금으로 동시성 보장. 서버 사용시각부터 구매기간×24시간, 만료는 조회시 판정하며 다른 상품은 그 이후 사용 가능.
+- 기존 Creator.promoted 수동설정은 유지하고 ad_promoted_until 별도 저장. 개인정보/가격/결제/환불 정책 변경 없음. 이미 노출중인 수동홍보는 유료 주문으로 취급하지 않는다.
+- https://cheatsheetseries.owasp.org/Authorization_Cheat_Sheet.html 및 https://www.prisma.io/docs/orm/v6/prisma-client/queries/transactions (2026-11-03 확인): 요청마다 소유권/권한 검사와 트랜잭션/멱등 설계 근거. 실제 구현은 구매기간 정책을 사용자 확정대로 적용.
+
+| Method | Path | 계약 |
+| --- | --- | --- |
+| GET | /studio/advertising/orders | 본인 크리에이터 구매내역·사용상태·다른 광고 종료일. 실제 결제 준비중 |
+| POST | /studio/advertising/orders/:id/use | 본인 paid/활성creator만, creator잠금·동일주문멱등·다른 광고 사용중409, 사용시점부터 구매기간 적용 |

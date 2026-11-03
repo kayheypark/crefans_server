@@ -237,6 +237,9 @@ const adProductFields={id:str(),name:maxString(100),description:maxString(3000),
 schemas.AdProduct=object(adProductFields);
 const adInput=object(Object.fromEntries(['name','description','terms','placement','amount','durationDays','visible','onSale','sortOrder','comparisonAmount','comparisonBasis'].map(key=>[key,adProductFields[key]])),['name','description','terms','placement','amount','durationDays','visible','onSale','sortOrder']);
 const adUpdateInput=object({...adInput.properties,expectedVersion:integer},[...adInput.required,'expectedVersion']);
+schemas.AdPurchase=object({id:str(),name:str(),amount:integer,durationDays:integer,createdAt:str(),status:enumeration('paid','processing','failed'),useStatus:enumeration('ready','active','completed'),startsAt:{type:'string',nullable:true},endsAt:{type:'string',nullable:true},blockedUntil:{type:'string',nullable:true}});
+add('get','studio/advertising/orders','스튜디오','광고상품 구매 내역',{response:list(ref('AdPurchase')),description:'본인 구매 당시 정보와 사용 상태. 실제 결제는 아직 미구현. 다른 광고 사용중이면 blockedUntil 제공.'});
+add('post','studio/advertising/orders/{id}/use','스튜디오','광고 사용 시작',{response:ref('AdPurchase'),description:'본인 결제완료 주문만. 크리에이터 잠금으로 동시사용 차단(409), 같은 주문 재시도는 기존 기간 반환. 사용시점부터 기간 계산, 구매시 자동시작하지 않음.'});
 add('get','studio/advertising/products','스튜디오','광고상품 목록',{response:list(ref('AdProduct')),description:'등록 크리에이터 전용. 숨김·소프트 삭제 상품 제외. 판매 중지 상품은 조회 가능.'});
 add('get','admin/advertising/products','관리자','광고상품 관리 목록',{query:[query('page',integer),query('deleted',enumeration('true','false'))],response:page(ref('AdProduct')),description:'advertising.view 권한 필요. 삭제된 상품은 별도 필터로 조회.'});
 add('post','admin/advertising/products','관리자','광고상품 등록',{body:adInput,response:object({product:ref('AdProduct'),message:str()}),description:'advertising.create. 판매 중이면 구매·취소 안내 필수. 금액은 VAT 포함 원 단위. 비교 표시 시 comparisonAmount(결제금액 초과)와 comparisonBasis(비교 기준 설명)를 함께 입력. null/빈 문자열은 비교 해제, 둘 다 생략하면 기존 값 유지. 할인율은 서버에서 내림 계산.'});

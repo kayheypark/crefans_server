@@ -2,7 +2,7 @@ require('reflect-metadata');require('dotenv').config({path:'.local/platform.env'
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),{randomUUID,randomBytes}=require('node:crypto'),{PrismaClient}=require('@prisma/client');
 const source=process.env.DATABASE_URL;assert.match(source||'',/@127\.0\.0\.1:3307\/crefans_platform_dev$/);const url=new URL(source);url.pathname='/crefans_platform_e2e';process.env.DATABASE_URL=url.toString();
 const {NestFactory}=require('@nestjs/core'),{PlatformModule}=require('../dist/src/platform/module'),{cookieParser}=require('../dist/src/platform/middleware'),{EnvelopeInterceptor,PlatformExceptionFilter}=require('../dist/src/platform/http'),{digest}=require('../dist/src/auth/local/credentials'),{requestContext}=require('../dist/src/platform/request-context');
-const db=new PrismaClient(),ids=[randomUUID(),randomUUID()],admins=[],products=[],cookies={};let app,origin,release;
+const db=new PrismaClient(),ids=[randomUUID(),randomUUID()],admins=[],products=[],purchaseIds=[],cookies={};let app,origin,release;
 const input={name:'광고 검증 상품',description:'주목할 크리에이터 노출',terms:'검증용 안내',placement:'featured_creator',amount:11000,durationDays:7,visible:false,onSale:false,sortOrder:0};
 async function api(path,actor,body,method=body?'POST':'GET'){const res=await fetch(origin+'/api/v1'+path,{method,headers:{'Content-Type':'application/json',...(actor?{cookie:cookies[actor]}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});return{status:res.status,...await res.json()};}
 before(async()=>{release=await require('./e2e-db-lock.cjs').lockE2EDatabase(source);const fs=require('node:fs/promises'),path=require('node:path'),temp=await fs.mkdtemp(path.join(require('node:os').tmpdir(),'crefans-ads-schema-'));try{await fs.copyFile('prisma/schema.prisma',path.join(temp,'schema.prisma'));await fs.cp('prisma/migrations',path.join(temp,'migrations'),{recursive:true});const r=require('node:child_process').spawnSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy','--schema',path.join(temp,'schema.prisma')],{cwd:temp,env:process.env,encoding:'utf8'});assert.equal(r.status,0,'isolated migrations must pass');}finally{await fs.rm(temp,{recursive:true,force:true});}
@@ -10,7 +10,7 @@ before(async()=>{release=await require('./e2e-db-lock.cjs').lockE2EDatabase(sour
  await db.creator.create({data:{user_id:ids[0],display_name:'광고 검증 크리에이터'}});
  for(const [name,permissions]of[['admin',{advertising:{view:true,create:true,update:true,delete:true}}],['reader',{advertising:{view:true}}],['none',{}]]){const a=await db.admin.create({data:{user_sub:randomUUID(),name,email:randomUUID()+'@ads.test.invalid',role:'ADMIN',permissions}});admins.push(a.id);cookies[name]=await require('./admin-session.cjs')(db,a.id);}
  app=await NestFactory.create(PlatformModule,{logger:false});app.setGlobalPrefix('api/v1');app.use(cookieParser());app.use((req,res,next)=>requestContext.run({ip:'127.0.0.1',peerIp:'127.0.0.1',requestId:randomUUID()},next));app.useGlobalInterceptors(new EnvelopeInterceptor());app.useGlobalFilters(new PlatformExceptionFilter());await app.listen(0,'127.0.0.1');origin=await app.getUrl();});
-after(async()=>{await app?.close();await db.adProduct.deleteMany({where:{id:{in:products}}});await db.platformAuditLog.deleteMany({where:{entity_id:{in:products}}});await db.admin.deleteMany({where:{id:{in:admins}}});await db.creator.deleteMany({where:{user_id:{in:ids}}});await db.member.deleteMany({where:{id:{in:ids}}});await db.$disconnect();await release?.();});
+after(async()=>{await app?.close();await db.adPurchase.deleteMany({where:{creator_id:{in:ids}}});await db.platformAuditLog.deleteMany({where:{entity_id:{in:purchaseIds}}});await db.adProduct.deleteMany({where:{id:{in:products}}});await db.platformAuditLog.deleteMany({where:{entity_id:{in:products}}});await db.admin.deleteMany({where:{id:{in:admins}}});await db.creator.deleteMany({where:{user_id:{in:ids}}});await db.member.deleteMany({where:{id:{in:ids}}});await db.$disconnect();await release?.();});
 test('advertising endpoints enforce separate admin permissions and creator membership',async()=>{assert.equal((await api('/studio/advertising/products')).status,401);assert.equal((await api('/studio/advertising/products','fan')).status,403);assert.equal((await api('/admin/advertising/products','creator')).status,401);assert.equal((await api('/admin/advertising/products','none')).status,403);assert.equal((await api('/admin/advertising/products','reader',input)).status,403);});
 test('product input is validated; hidden products do not appear in studio',async()=>{for(const patch of [{amount:0},{durationDays:0},{onSale:'yes'},{onSale:true,terms:''},{placement:'unknown'},{name:''}])assert.equal((await api('/admin/advertising/products','admin',{...input,...patch})).status,400);const r=await api('/admin/advertising/products','admin',input);assert.equal(r.status,201,r.errorMessage);products.push(r.data.product.id);const catalog=await api('/studio/advertising/products','creator');assert.equal(catalog.data.some(p=>p.id===products[0]),false);});
 test('visibility and sale are independent; stale edits fail without overwriting current data',async()=>{const path='/admin/advertising/products/'+products[0];const r=await api(path,'admin',{...input,visible:true,expectedVersion:1},'PUT');assert.equal(r.status,200,r.errorMessage);assert.equal(r.data.product.version,2);let catalog=await api('/studio/advertising/products','creator');assert.equal(catalog.data.find(p=>p.id===products[0]).onSale,false);assert.equal((await api(path,'admin',{...input,onSale:true,expectedVersion:1},'PUT')).status,409);assert.equal((await api(path,'reader',{...input,expectedVersion:2},'PUT')).status,403);});
@@ -31,4 +31,31 @@ test('event and ordinary products coexist; comparison fields persist, audit, val
  assert.equal((await api(path,'admin',{...event,comparisonBasis:'',expectedVersion:2},'PUT')).status,400);
  const clear=await api(path,'admin',{...normal,comparisonAmount:null,comparisonBasis:'',expectedVersion:2},'PUT');assert.equal(clear.status,200);assert.equal(clear.data.product.discountPercent,null);
  const audit=await db.platformAuditLog.findFirst({where:{entity_id:id,action:'admin.ad_product_created'}});assert.equal(audit.metadata.after.comparison_amount,7800);
+});
+
+const purchaseData=(status='paid')=>({creator_id:ids[0],product_id:products[0],name:'구매 당시 2일',terms:'검증용 조건',amount:3900,duration_days:2,status});
+async function makePurchase(status){const row=await db.adPurchase.create({data:purchaseData(status)});purchaseIds.push(row.id);return row;}
+test('paid purchase is unused; only owner and paid active creator can start',async()=>{
+ const order=await makePurchase('processing');assert.equal((await api('/studio/advertising/orders')).status,401);assert.equal((await api('/studio/advertising/orders','fan')).status,403);
+ assert.equal((await db.creator.findUnique({where:{user_id:ids[0]}})).ad_promoted_until,null);
+ await db.creator.create({data:{user_id:ids[1],display_name:'다른 크리에이터'}});
+ assert.equal((await api(`/studio/advertising/orders/${order.id}/use`,'fan',{})).status,404);
+ assert.equal((await api(`/studio/advertising/orders/${order.id}/use`,'creator',{})).status,409);
+ await db.adPurchase.update({where:{id:order.id},data:{status:'paid'}});
+ const list=await api('/studio/advertising/orders','creator');assert.equal(list.data.find(x=>x.id===order.id).useStatus,'ready');assert.equal(list.data.find(x=>x.id===order.id).startsAt,null);
+ const results=await Promise.all(Array.from({length:6},()=>api(`/studio/advertising/orders/${order.id}/use`,'creator',{})));
+ assert.ok(results.every(r=>r.status===201),JSON.stringify(results));assert.equal(new Set(results.map(r=>r.data.startsAt)).size,1);assert.equal((await api('/profiles/'+ids[0])).data.promoted,true);assert.equal(Date.parse(results[0].data.endsAt)-Date.parse(results[0].data.startsAt),2*86400000);
+ assert.equal(await db.platformAuditLog.count({where:{entity_id:order.id,action:'advertising.started'}}),1);
+});
+test('another order is blocked while active; expiry allows one of concurrent orders and preserves manual promotion',async()=>{
+ const a=await makePurchase('paid'),b=await makePurchase('paid');
+ assert.equal((await api(`/studio/advertising/orders/${a.id}/use`,'creator',{})).status,409);
+ let rows=(await api('/studio/advertising/orders','creator')).data;assert.ok(rows.find(x=>x.id===a.id).blockedUntil);
+ const past=new Date(Date.now()-1000);await db.adPurchase.updateMany({where:{creator_id:ids[0],starts_at:{not:null}},data:{ends_at:past}});await db.creator.update({where:{user_id:ids[0]},data:{ad_promoted_until:past,promoted:false}});
+ const {promotionActive}=require('../dist/src/platform/advertising-use');assert.equal(promotionActive(await db.creator.findUnique({where:{user_id:ids[0]}})),false);assert.equal((await api('/profiles/'+ids[0])).data.promoted,false);
+ rows=(await api('/studio/advertising/orders','creator')).data;assert.equal(rows.find(x=>x.startsAt).useStatus,'completed');assert.equal(rows.find(x=>x.id===a.id).blockedUntil,null);
+ const outcomes=await Promise.all([a,b].map(row=>api(`/studio/advertising/orders/${row.id}/use`,'creator',{})));assert.deepEqual(outcomes.map(x=>x.status).sort(),[201,409]);
+ assert.equal(promotionActive(await db.creator.findUnique({where:{user_id:ids[0]}})),true);
+ await db.creator.update({where:{user_id:ids[0]},data:{promoted:true,ad_promoted_until:past}});assert.equal(promotionActive(await db.creator.findUnique({where:{user_id:ids[0]}})),true);
+ const waiting=outcomes[0].status===409?a:b;await db.creator.update({where:{user_id:ids[0]},data:{is_active:false}});assert.equal((await api(`/studio/advertising/orders/${waiting.id}/use`,'creator',{})).status,403);
 });

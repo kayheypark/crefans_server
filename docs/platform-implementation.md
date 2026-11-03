@@ -344,3 +344,10 @@ BeansService.promotionEvent/claimPromotionEvent는 전체 활성·이메일 확�
 
 ### 원년멤버 배지 수령 (2026-11-03, 미배포)
 `founding-badge.ts`는 회원 기반1회 수령과 표시·숨김을 처리한다. `20261103120000_founding_badge_claim`을 먼저 적용하고 새 API를 배포한 뒤 프론트를 반영한다. 2026-11-03 정책 개정으로 명단·16명 제한을 제거했다. 전체 활성·이메일 확인 회원이 계정당1회 받으며, 기존 기록/표시 설정을 보존한다. 되돌릴 때 수령 데이터나 추가 컬럼을 삭제하지 않고 이전 앱으로 롤백할 수 있다. 운영 DB에 migrate dev/db push/seed를 실행하지 않는다. 상세 계약·검증 범위는 platform-api.md의 원년멤버 절과 docs/founding-badge-claim-20261103.json.
+
+## 광고 구매내역·수동 사용 (2026-11-03)
+이 절은 과거의 광고기간 미구현 설명을 대체한다. 실제 결제/주문 생성은 미구현·준비중으로 유지한다. 사용자 승인으로 `AdPurchase`는 구매 당시 이름/조건/가격/기간을 보존하고 구매만으로 시작하지 않는다. 결제 연결 전 운영용 주문을 임의 생성하지 않는다.
+- `GET /api/v1/studio/advertising/orders`: 본인 구매내역, 결제상태와 ready/active/completed 사용상태, startsAt/endsAt/blockedUntil.
+- `POST /api/v1/studio/advertising/orders/:id/use`: 활성 크리에이터 본인의 paid 주문만 사용. 동일주문 재시도는 최초기간 반환, 다른 주문 사용중이면409. creator행잠금으로 동시성 보장. 서버 사용시각부터 구매기간×24시간, 만료는 조회시 판정하며 다른 상품은 그 이후 사용 가능.
+- 기존 Creator.promoted 수동설정은 유지하고 ad_promoted_until 별도 저장. 개인정보/가격/결제/환불 정책 변경 없음. 이미 노출중인 수동홍보는 유료 주문으로 취급하지 않는다.
+- https://cheatsheetseries.owasp.org/Authorization_Cheat_Sheet.html 및 https://www.prisma.io/docs/orm/v6/prisma-client/queries/transactions (2026-11-03 확인): 요청마다 소유권/권한 검사와 트랜잭션/멱등 설계 근거. 실제 구현은 구매기간 정책을 사용자 확정대로 적용.

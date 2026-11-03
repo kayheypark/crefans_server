@@ -195,6 +195,7 @@ model Creator {
   cover String? @db.Text
   comments_enabled Boolean @default(true)
   promoted Boolean @default(false)
+  ad_promoted_until DateTime?
   /// Administrator-issued creator badge; independent of identity verification.
   is_verified Boolean @default(false)
   category    CreatorCategory? @relation(fields: [category_id], references: [id])
@@ -1959,4 +1960,24 @@ model PostViewWindow {
   @@id([posting_id, visitor_hash])
   @@index([expires_at])
   @@map("post_view_windows")
+}
+
+// Payment creation is intentionally not exposed until the advertising checkout is implemented.
+model AdPurchase {
+ id String @id @default(uuid())
+ creator_id String @db.VarChar(191)
+ product_id String @db.VarChar(191)
+ name String @db.VarChar(100)
+ terms String @db.Text
+ amount Int
+ duration_days Int
+ placement String @default("featured_creator") @db.VarChar(40)
+ status String @default("processing") @db.VarChar(20)
+ starts_at DateTime?
+ ends_at DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([creator_id, created_at, id])
+ @@index([creator_id, status, ends_at])
+ @@map("ad_purchases")
 }

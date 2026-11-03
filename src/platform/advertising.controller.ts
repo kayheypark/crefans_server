@@ -5,9 +5,12 @@ import {PlatformAdminGuard} from './admin.controller';
 import {Permit} from './admin-permissions';
 import {adProductView,saveAdProduct,deleteAdProduct} from './advertising-catalog';
 import {reject} from './http';
+import {listAdPurchases,activateAdPurchase} from './advertising-use';
 @Controller('studio/advertising') @UseGuards(PlatformAuthGuard)
 export class AdvertisingController {
  constructor(private service:PlatformService){}
+ @Get('orders') async orders(@Req() req:any){await this.service.requireCreator(req.user.sub);return listAdPurchases(this.service.db,req.user.sub);}
+ @Post('orders/:id/use') async use(@Req() req:any,@Param('id') id:string){return activateAdPurchase(this.service.db,req.user.sub,id);}
  @Get('products') async products(@Req() req:any){await this.service.requireCreator(req.user.sub);return(await this.service.db.adProduct.findMany({where:{deleted_at:null,visible:true},orderBy:[{sort_order:'asc'},{id:'asc'}],take:100})).map(adProductView);}
 }
 @Controller('admin/advertising') @UseGuards(PlatformAdminGuard)

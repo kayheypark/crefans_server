@@ -177,6 +177,8 @@
 | PUT | `/api/v1/studio/accounts/:id/default` | `src/platform/finance.controller.ts::defaultAccount` |
 | POST | `/api/v1/studio/accounts/:id/verify` | `src/platform/finance.controller.ts::verifyAccount` |
 | PUT | `/api/v1/studio/activity` | `src/platform/studio.controller.ts::activity` |
+| GET | `/api/v1/studio/advertising/orders` | `src/platform/advertising.controller.ts::orders` |
+| POST | `/api/v1/studio/advertising/orders/:id/use` | `src/platform/advertising.controller.ts::use` |
 | GET | `/api/v1/studio/advertising/products` | `src/platform/advertising.controller.ts::products` |
 | GET | `/api/v1/studio/bean-finance` | `src/platform/beans.controller.ts::studio` |
 | POST | `/api/v1/studio/bean-withdrawal-quotes` | `src/platform/beans.controller.ts::review` |
@@ -383,8 +385,9 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261103140000_event_bean_expiry_renotice`
 - `20261103180000_ad_product_comparison_price`
 - `20261103190000_post_view_metrics`
+- `20261103230000_ad_manual_use`
 
-## Prisma 전체 정의 (91 models · 15 enums)
+## Prisma 전체 정의 (92 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -586,6 +589,7 @@ model Creator {
   cover String? @db.Text
   comments_enabled Boolean @default(true)
   promoted Boolean @default(false)
+  ad_promoted_until DateTime?
   /// Administrator-issued creator badge; independent of identity verification.
   is_verified Boolean @default(false)
   category    CreatorCategory? @relation(fields: [category_id], references: [id])
@@ -2350,5 +2354,25 @@ model PostViewWindow {
   @@id([posting_id, visitor_hash])
   @@index([expires_at])
   @@map("post_view_windows")
+}
+
+// Payment creation is intentionally not exposed until the advertising checkout is implemented.
+model AdPurchase {
+ id String @id @default(uuid())
+ creator_id String @db.VarChar(191)
+ product_id String @db.VarChar(191)
+ name String @db.VarChar(100)
+ terms String @db.Text
+ amount Int
+ duration_days Int
+ placement String @default("featured_creator") @db.VarChar(40)
+ status String @default("processing") @db.VarChar(20)
+ starts_at DateTime?
+ ends_at DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([creator_id, created_at, id])
+ @@index([creator_id, status, ends_at])
+ @@map("ad_purchases")
 }
 ```
