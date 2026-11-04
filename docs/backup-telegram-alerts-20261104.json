@@ -1,0 +1,49 @@
+{
+  "at": "2026-11-04T00:50:19.744673+00:00",
+  "eventMatches": {
+    "FAILED": true,
+    "ABORTED": true,
+    "EXPIRED": true,
+    "COMPLETED": false
+  },
+  "leastPrivilegeVerified": true,
+  "eventSourceVerified": true,
+  "lambdaTest": {
+    "delivered": true,
+    "messageId": 1509
+  },
+  "host": {
+    "test": {
+      "delivered": true,
+      "messageId": 1510
+    },
+    "onFailure": "crefans-backup-alert.service",
+    "timer": "active/enabled",
+    "secretMode": "0600 root",
+    "sourceHashes": {
+      "notify.py": "ed31f21719b7298fd4ed7d211978eef336f80cff9bd04b45b8c82519a066ac90",
+      "server_notify.py": "1109b8179c0a02e36897eb0df061ae387f769091645be340379a93f26dc8ae99"
+    }
+  },
+  "repository": "crefans_server",
+  "baseline": "d01ffc6",
+  "unitTests": {
+    "command": "python3 -B -m unittest discover -s infra/platform/backup-alerts -p test_alerts.py -v",
+    "passed": 8,
+    "exitCode": 0
+  },
+  "sourceSha256": {
+    "handler.py": "10ae2ccd4459e5bceea8270b8ce762a7d8f203850ab4a962ea6fea8729b61715",
+    "server_notify.py": "1109b8179c0a02e36897eb0df061ae387f769091645be340379a93f26dc8ae99",
+    "notify.py": "ed31f21719b7298fd4ed7d211978eef336f80cff9bd04b45b8c82519a066ac90",
+    "test_alerts.py": "f4202e68e7ee6c6748da4d919db821234c60e63c484204fad2fa8c2272bb8a19",
+    "README.md": "a88e21ed3aacd29edf20efb81ac7141c5e5b967cdab66cd7b375f138cac6e17a",
+    "crefans-backup-alert.service": "224373a104372cf4a54568678de7b68c60fcec79e36bcc570e67a75198f12a79",
+    "10-alert.conf": "91526945c07a01747e3b28da95758a01d05075b095d4ab77c6d39ca3c6755c76"
+  },
+  "limits": [
+    "No deliberately failed backup",
+    "Telegram API delivery confirmed; human read receipt not checked",
+    "API/worker containers and DB not redeployed"
+  ]
+}

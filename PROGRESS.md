@@ -1,3 +1,20 @@
+## 2026-11-04 텔레그램 백업 실패 알림 운영 설치 완료
+- 사용자 “승인”으로 기존 봇 토큰 AWS Secrets Manager 저장·최소권한 IAM/Lambda/EventBridge·서버 OnFailure 설치·테스트 2건 발송 범위 승인. AWS crefans-backup-alerts 및 서버 알림 unit 설치 완료. API/worker/DB 재배포·백업 삭제 없음.
+- Python8건 통과. AWS test-event-pattern FAILED/ABORTED/EXPIRED 매칭, COMPLETED 제외. 특정 비밀 GetSecretValue/자체 로그 쓰기만 IAM 허용 및 EventBridge SourceArn 제한 확인. 서버 타이머 active/enabled, OnFailure 연결, 설정 root0600, 설치 모듈 SHA 동일 확인.
+- 2026-11-04 09:50 KST Telegram API 실제 테스트 발송 승인: Lambda 메시지1509, 서버1510. 둘 다 “실제 장애 아님”. 실제 장애 고의 발생·사람 읽음 미검증. 증거 docs/backup-telegram-alerts-20261104.json, .local/backup-alerts/deployment.json·live-verification.json.
+- 운영 설치와 소스 dev→prod 통합. 향후 토큰 교체 시 앱 설정 외 Secrets Manager와 /etc/crefans-backup-alert.json도 함께 갱신. 백업 삭제/보관정리 및 기존 S3 알림 복구는 별도 범위로 미변경.
+
+## 2026-11-04 텔레그램 배포 재개 사전 확인
+- 사용자 미배포 텔레그램 배포 요청. 기존 백업 실패 알림 코드를 재검사: Python unittest 8/8 PASS(종료0, 공급사 대역).
+- AWS Lambda/EventBridge/Secrets Manager/IAM 대상 리소스가 각각 NotFound/NoSuchEntity이고 서버 알림 unit/drop-in/설정파일도 없는 것을 읽기 전용 확인. 부분 설치 없음. 증거 .local/backup-alerts/preflight.json.
+- 이전 자동 승인 거절 사유인 봇 토큰 AWS 보관·최소권한 알림 인프라·서버 OnFailure 영구 설정과 시험 알림 2건의 범위를 명시해 사용자 확인 요청. 답변 대기 중, 비밀값 전송·설치·발송 미실행. 승인 후 기존 deploy.py 설치, 실제 수신/필터/권한/서버 설정 검증 및 dev→prod 반영 필요.
+
+## 2026-11-04 기존 운영 텔레그램에 백업 실패 알림 연결 준비 — 설치 승인 검토 차단
+- 최신 origin/prod d01ffc6에서 feat/backup-telegram-alerts 생성. infra/platform/backup-alerts에 AWS Backup FAILED/ABORTED/EXPIRED 필터·전용채널 검증·비밀값/원문오류 제외·systemd OnFailure 알림 작성. 기존 [crefans] operations의 TELEGRAM_OPERATIONS_* 재사용 계획.
+- Python 단위8개 통과(정상/실패 필터, 잘못된 계정·리전·볼트·채널 거절, 전송 실패·예외 비밀값 제거, 연결시험 표시). 공급사 대역 검사이며 실제 Telegram 발송·운영 설치 미실행.
+- 설치 명령은 실행 전 자동 승인 검토가 거부. 사유: 운영 봇 토큰을 AWS Secrets Manager에 전송·보관하고 IAM/Lambda/EventBridge 및 서버 systemd를 영구 변경하는 구체적 범위의 추가 승인 필요. 우회·재시도하지 않음. 운영/클라우드/DB/백업 변경 없음.
+- 설계·근거·재개 체크는 infra/platform/backup-alerts/README.md. 비공개 실행 준비 .local/backup-alerts/deploy.py. 별도 기존 보관정리 Lambda/끊어진 S3 알림 수정은 미진행. 승인 후 설치, AWS 규칙 매칭·Lambda/API 실제 연결시험·systemd 검증, dev→prod 승격 필요.
+
 ## 2026-11-04 미배포 광고상품·미니멀 워터마크 운영 배포 완료
 - dev→prod front615ee06/serveraf99bc3/admin0011cca. 운영 front/api/worker/admin minimal-bundle-20261104. 기본상품 특가제외·제목18px, 콘솔/프론트 상품명 동일 형식, 미니멀 워터마크40%/2%/3%/외곽선없음 반영. DB migration 없음·DB/proxy 유지·기존미디어 재변환 없음.
 - front운영빌드·admin운영빌드 통과, 소스해시/운영키·배포6서비스 running/restarts0/OOMfalse. 배포공용preview PC Chromium/iPhone WebKit 기본4+특가4·중복없음·제목18px·상품명·안내열기닫기·팬이동 통과. API운영이미지 격리컨테이너 실사진 렌더링565변경픽셀(119~183), 영상미니멀인자 확인. 이전로컬 영상/사진4·프론트9·콘솔14 통과. 실계정콘솔/실업로드/실PG 미검증.
