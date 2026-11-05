@@ -184,6 +184,8 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /admin/dashboard | ADMIN/SUPER_ADMIN; date=KST 기준일·days=7/30/90; 신규구독/갱신포함결제/총액/환불차감액, 전일비교, 빈날짜0추이, 현재잔여구독 |
 | GET | /admin/revenue | 매출·정산 조회 권한; from/to 한국 날짜 최대366일, 승인일 원장 합계·일별·크리에이터20명 page |
 | GET | /admin/payments | 매출·정산 조회 권한; from/to 주문 생성일 기준 결제20개 page, PG키/snapshot 제외 |
+| GET | /admin/memberships | 매출·정산 조회 권한, 조회 전용(2026-11-06). 전체 크리에이터의 멤버십 상품 20개 page(생성일 최신순). state=active·inactive·deleted(생략 시 삭제 제외), search=상품명·ID·크리에이터 이름·핸들. 상품별 구독 수: current(이용기간이 남은 ONGOING·CANCELLED)와 저장 상태별 누적 |
+| GET | /admin/subscriptions | 매출·정산 조회 권한, 조회 전용(2026-11-06). 구독 20개 page(생성일 최신순). status=ONGOING(자동 갱신)·CANCELLED(해지 예약, endedAt까지 이용)·EXPIRED, membershipId, search=구독자 ID·활동명·크리에이터 이름·핸들. 구독자는 ID·활동명·탈퇴 여부만, 이메일·빌링키·카드 ID·상품 snapshot 제외. summary는 같은 조건의 전체 집계 |
 | GET | /admin/withdrawals | 매출·정산 조회 권한; 전체 출금신청20개 page, 계좌/지급 자격정보 제외 |
 | GET | /admin/inquiries | 문의 조회 |
 | POST | /admin/inquiries/:id/reply | 문의 답변 |

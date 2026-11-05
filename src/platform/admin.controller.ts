@@ -24,6 +24,7 @@ import {adminDashboard} from './admin-dashboard';
 import {adminReferralLink,adminReferrals,updateReferralSettings} from './admin-referrals';
 import {revokeReferralReward} from './referrals';
 import {adminRevenue,adminOverview,adminMembers,adminPosts,adminPayments,adminWithdrawals} from './admin-console';
+import {adminMemberships,adminSubscriptions} from './admin-memberships';
 @Injectable()
 export class PlatformAdminGuard implements CanActivate{
  constructor(private service:PlatformService,private reflector:Reflector){}
@@ -73,6 +74,8 @@ export class PlatformAdminController{
  @Post('referrals/:id/revoke') @Permit(['referrals','update']) revokeReferral(@Param('id') id:string,@Body() body:any,@Req() req:any){return revokeReferralReward(this.service.db,req.admin.id,id,body);}
  @Get('posts') @Permit(['content','view']) posts(@Query() query:any){return adminPosts(this.service.db,query);}
  @Get('payments') @Permit(['revenue','view']) payments(@Query() query:any,@Req() req:any){return adminPayments(this.service.db,req.admin,query);}
+ @Get('memberships') @Permit(['revenue','view']) memberships(@Query() query:any,@Req() req:any){return adminMemberships(this.service.db,req.admin,query);}
+ @Get('subscriptions') @Permit(['revenue','view']) subscriptions(@Query() query:any,@Req() req:any){return adminSubscriptions(this.service.db,req.admin,query);}
  @Get('withdrawals') @Permit(['revenue','view']) withdrawals(@Query() query:any,@Req() req:any){return adminWithdrawals(this.service.db,req.admin,query);}
  // Manual payout mode: the operator records a bank transfer made outside the app, and confirms settlement accounts by hand.
  @Post('withdrawals/:id/manual-result') @Permit(['revenue','create']) manualResult(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.manualResult(req.admin,id,body);}
