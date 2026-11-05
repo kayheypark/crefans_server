@@ -1,0 +1,56 @@
+{
+  "recordedAt": "2026-11-05T14:50:54.825545+00:00",
+  "release": "billing-results-20261105",
+  "sourceCommits": {
+    "front": "ef297e854d13413f410f1d08217b0007dab8d789",
+    "api": "e4486862d8b6a9d26fad8b74e0ccea26eb262ebe"
+  },
+  "branches": "feat → dev → prod; identical integration/release trees verified",
+  "productionBrowserStats": {
+    "startTime": "2026-11-05T14:49:30.556Z",
+    "duration": 21710.628,
+    "expected": 21,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "limitations": [
+    "Real Toss card registration and live charging were not executed",
+    "Production member subscriptions were not changed for testing",
+    "Mobile tests use iPhone WebKit emulation, not physical iPhone",
+    "No database migrations or payment enablement changes"
+  ],
+  "initialFailures": [
+    "Local network sandbox could not resolve GitHub; authorized network retry succeeded",
+    "Build script placeholder substitution corrected before any runtime change",
+    "API build context ignored dist; replaced with a minimal overlay context, then source hashes verified"
+  ],
+  "tests": {
+    "frontUnit": 39,
+    "localBrowsers": 21,
+    "productionBrowsers": 21,
+    "serverLifecycle": 62,
+    "serverOpenApi": 14,
+    "layersFiles": 430,
+    "nextBuild": "PASS",
+    "nestBuild": "PASS"
+  },
+  "production": {
+    "apiHealth": 200,
+    "anonymousResume": 401,
+    "allSixContainersRunning": true,
+    "restarts": 0,
+    "oom": false,
+    "workerFailures": {},
+    "databaseAdminProxyUnchanged": true,
+    "schemaChanges": false
+  },
+  "recovery": {
+    "offhostVerified": true,
+    "oldTagsRemoved": [
+      "crefans-front:checkout-five-20261105",
+      "crefans-api:telegram-no-run-alerts-20261105"
+    ],
+    "temporarySourcesRemoved": true
+  }
+}
