@@ -1,3 +1,12 @@
+## 2026-11-06 운영 콘솔 멤버십 상품·구독 현황 조회 API (미커밋·미배포)
+- 사용자 요청("추가진행"): 콘솔에서 전체 멤버십 상품과 구독 현황을 볼 수 있게. 브랜치 feat/admin-memberships(origin/prod b477997 기준, 작업트리 crefans_server-admin-memberships).
+- GET /admin/memberships, GET /admin/subscriptions 추가(src/platform/admin-memberships.ts, admin.controller.ts). 조회 전용, 기존 매출 조회 권한(revenue.view)과 financialAdmin 재사용. 새 권한 행은 만들지 않음(기존 부운영자 권한표 변경 없음).
+- 상품: 생성일 최신순 20개, state=active·inactive·deleted(생략 시 삭제 제외), 크리에이터 이름·핸들, 상품별 이용 중(이용기간 남은 ONGOING·CANCELLED)과 저장 상태별 누적 수. 구독: status·membershipId·search 필터, 같은 조건 전체 집계. 구독자는 ID·활동명·탈퇴 여부만. 이메일·빌링키·카드 ID·상품 snapshot 미반환.
+- OpenAPI 계약·docs/platform-api.md 표 갱신. tests/platform-openapi.test.cjs 경로 수 201→203, 콘솔 문서 87→89.
+- 검증(2026-11-06 로컬, 격리 E2E DB 127.0.0.1:3307): nest build exit0, tests/platform-admin-console.test.cjs 15/15(신규 1: 비로그인·회원·비활성 401, MODERATOR 403, ADMIN 200, POST/PUT/DELETE 404, 기본 삭제 제외·상태 필터·집계·검색·비밀값 미노출·잘못된 조회 400), npm run test:openapi 14/14.
+- 대조 검사: 응답에 빌링키를 넣으면 신규 테스트 실패, 이용 중 집계에서 종료일 조건을 빼면 실패, 원복 후 통과(파일 SHA 원복 확인). 운영 DB·운영 API 호출 없음.
+- 남은 일: 커밋·dev 통합·prod 승격·운영 배포는 사용자 승인 대기. 운영 데이터로 화면 확인은 배포 후.
+
 ## 2026-11-05 카드 등록 완료 1안·구독 재개 운영 배포 완료
 - 사용자 “다되면 운영배포”, “다시시도” 승인에 따라 카드 등록 완료 1안과 앞선 ‘다시 이용할래요’를 함께 배포. front ef297e8, server e448686를 dev 통합 검증 → prod 승격 후 billing-results-20261105 이미지로 API·worker·frontend에 적용했다. DB migration/결제 활성화 설정 변경 없음; database/admin/proxy 컨테이너 유지.
 - 완료 화면은 큰 파란 체크와 명시적 원래 화면 복귀 버튼. 서버 등록 성공 확인 후에만 표시. 구독 재개는 새 자동결제 동의를 받고 기존 다음 결제일/금액을 유지하며 즉시 결제하지 않는다.
