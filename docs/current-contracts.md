@@ -260,6 +260,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/studio/accounts` | 정산 계좌 |
 | `/preview/studio/security` | 출금 PIN 설정 |
 | `/preview/studio/settings` | 크리에이터 설정 |
+| `/preview/billing/success` | 카드 등록 완료 |
 | `/preview/events` | 이벤트 안내 |
 | `/preview/events/feedback` | 네이버페이 1만원 상품권 이벤트 |
 | `/preview/events/creator-advertising` | 주목할 크리에이터 광고상품 30일 이벤트 |
