@@ -250,3 +250,49 @@ test('a payment request without the current payment terms is refused; an agreed 
  const g=await fixture();await assert.rejects(g.finance.paymentWindow(g.fan,g.order.id,null),code('PAYMENT_TERMS_REQUIRED'));await g.finance.paymentWindow(g.fan,g.order.id,'2026-11-02.1');
  assert.equal((await db.memberConsent.findFirstOrThrow({where:{member_id:g.fan,kind:'payment-terms'}})).document_snapshot.paymentMode,'one-time');
 });
+
+const resumeInput=sub=>({renewAt:require('../dist/src/platform/http').dateOnly(sub.ended_at),price:Number(sub.amount),paymentTerms:'2026-11-02.1'});
+async function cancelledFixture(){const f=await fixture();await f.finance.pay(f.fan,f.order.id);await f.finance.cancelSubscription(f.fan,f.creator);f.sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});return f;}
+test('resume: concurrent requests restore the original end date once without charging or extending access',async()=>{
+ const f=await cancelledFixture(),before=f.sub,input=resumeInput(before);
+ await Promise.all([f.finance.resumeSubscription(f.fan,before.id,input),f.finance.resumeSubscription(f.fan,before.id,input)]);
+ const sub=await db.subscription.findUniqueOrThrow({where:{id:before.id}});
+ assert.equal(sub.auto_renew,true);assert.equal(sub.status,'ONGOING');assert.equal(sub.next_billing_date.getTime(),before.ended_at.getTime());assert.equal(sub.ended_at.getTime(),before.ended_at.getTime());assert.equal(sub.started_at.getTime(),before.started_at.getTime());assert.equal(Number(sub.amount),Number(before.amount));assert.deepEqual(sub.plan_snapshot,before.plan_snapshot);
+ assert.equal(f.calls.length,1,'only original purchase charged');assert.equal(await db.checkoutOrder.count({where:{member_id:f.fan}}),1);assert.equal(await db.revenueEntry.count({where:{creator_id:f.creator}}),1);
+ const consents=await db.memberConsent.findMany({where:{member_id:f.fan,kind:'payment-terms'}});assert.equal(consents.length,1);assert.equal(consents[0].document_snapshot.purpose,'subscription-resume');assert.equal(consents[0].document_snapshot.nextBillingAt,before.ended_at.toISOString());
+ assert.equal(await db.platformOperationalEvent.count({where:{type:'subscription.resumed',data:{path:'$.subscriptionId',equals:sub.id}}}),1);
+ await f.finance.renew(sub.id);assert.equal(f.calls.length,1,'worker does not charge before the original end date');
+ await due(f);await f.finance.renew(sub.id);await f.finance.renew(sub.id);assert.equal(f.calls.length,2,'one renewal at the scheduled boundary');
+});
+test('resume: missing or stale consent, wrong owner, and stale displayed terms leave the subscription cancelled',async()=>{
+ const f=await cancelledFixture(),input=resumeInput(f.sub);
+ for(const paymentTerms of [undefined,null,'old-version'])await assert.rejects(f.finance.resumeSubscription(f.fan,f.sub.id,{...input,paymentTerms}),code('PAYMENT_TERMS_REQUIRED'));
+ await assert.rejects(f.finance.resumeSubscription(f.creator,f.sub.id,input),code('SUBSCRIPTION_NOT_FOUND'));
+ for(const patch of [{price:1},{renewAt:'2000-01-01'}])await assert.rejects(f.finance.resumeSubscription(f.fan,f.sub.id,{...input,...patch}),code('SUBSCRIPTION_CHANGED'));
+ assert.equal((await db.subscription.findUniqueOrThrow({where:{id:f.sub.id}})).auto_renew,false);assert.equal(f.calls.length,1);
+});
+for(const state of ['expired','refunded','processing','refunding','plan-deleted','creator-disabled','member-disabled','no-snapshot'])test('resume: rejects '+state+' without changing billing',async()=>{
+ const f=await cancelledFixture();let error='SUBSCRIPTION_ENDED';
+ if(state==='expired')await db.subscription.update({where:{id:f.sub.id},data:{ended_at:new Date(0)}});
+ if(state==='refunded')await db.subscription.update({where:{id:f.sub.id},data:{status:'EXPIRED'}});
+ if(['processing','refunding'].includes(state)){await db.checkoutOrder.update({where:{id:f.order.id},data:{status:state}});error='PAYMENT_IN_PROGRESS';}
+ if(state==='plan-deleted'){await db.membershipItem.update({where:{id:f.plan.id},data:{is_deleted:true}});error='PLAN_UNAVAILABLE';}
+ if(state==='creator-disabled'){await db.creator.update({where:{user_id:f.creator},data:{is_active:false}});error='PLAN_UNAVAILABLE';}
+ if(state==='member-disabled'){await db.member.update({where:{id:f.fan},data:{enabled:false}});error='MEMBER_UNAVAILABLE';}
+ if(state==='no-snapshot'){await db.subscription.update({where:{id:f.sub.id},data:{plan_snapshot:require('@prisma/client').Prisma.DbNull}});error='MISSING_SNAPSHOT';}
+ await assert.rejects(f.finance.resumeSubscription(f.fan,f.sub.id,resumeInput(f.sub)),code(error));assert.equal(f.calls.length,1);assert.equal((await db.subscription.findUniqueOrThrow({where:{id:f.sub.id}})).auto_renew,false);
+});
+for(const state of ['deleted','unavailable','revoked','empty-key'])test('resume: rejects '+state+' default card',async()=>{
+ const f=await cancelledFixture(),patch=state==='deleted'?{deleted_at:new Date()}:state==='unavailable'?{unavailable_at:new Date()}:state==='revoked'?{revoked_at:new Date()}:{billing_key_encrypted:''};await db.billingMethod.update({where:{id:f.card.id},data:patch});
+ await assert.rejects(f.finance.resumeSubscription(f.fan,f.sub.id,resumeInput(f.sub)),code(state==='deleted'?'PAYMENT_METHOD_REQUIRED':'PAYMENT_METHOD_UNAVAILABLE'));assert.equal(f.calls.length,1);
+});
+test('resume: the current default card is used, original contracted amount survives a catalogue price change',async()=>{
+ const f=await cancelledFixture();await db.membershipItem.update({where:{id:f.plan.id},data:{price:20000}});const card=await db.billingMethod.create({data:{member_id:f.fan,customer_key:randomUUID(),billing_key_encrypted:'new-card',label:'새 카드',last_four:'4321'}});await f.finance.method(f.fan,card.id,'default');
+ await f.finance.resumeSubscription(f.fan,f.sub.id,resumeInput(f.sub));const sub=await db.subscription.findUniqueOrThrow({where:{id:f.sub.id}});assert.equal(sub.billing_method_id,card.id);assert.equal(Number(sub.amount),10000);assert.equal(f.calls.length,1);
+ await f.finance.cancelSubscription(f.fan,f.creator);await f.finance.renew(sub.id);assert.equal(f.calls.length,1);assert.equal((await db.subscription.findUniqueOrThrow({where:{id:sub.id}})).auto_renew,false);
+});
+test('resume: a one-month purchase requires fresh recurring consent and does not duplicate the paid period',async()=>{
+ const f=await cancelledFixture();await db.subscription.update({where:{id:f.sub.id},data:{billing_method_id:null,plan_snapshot:{...f.sub.plan_snapshot,paymentMode:'one-time'}}});
+ await f.finance.resumeSubscription(f.fan,f.sub.id,resumeInput(f.sub));assert.equal(f.calls.length,1);assert.equal((await db.subscription.findUniqueOrThrow({where:{id:f.sub.id}})).next_billing_date.getTime(),f.sub.ended_at.getTime());
+ await due(f);await f.finance.renew(f.sub.id);await f.finance.renew(f.sub.id);assert.equal(f.calls.length,2);assert.equal((await db.subscription.findUniqueOrThrow({where:{id:f.sub.id}})).auto_renew,true);
+});
