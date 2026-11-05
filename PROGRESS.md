@@ -1,4 +1,7 @@
-## 2026-11-06 운영 콘솔 멤버십 상품·구독 현황 조회 API (미커밋·미배포)
+## 2026-11-06 운영 콘솔 멤버십 상품·구독 현황 조회 API (운영 배포 완료)
+- 사용자 "다되면 배포" 지시로 배포. feat 631f4f5 → dev 0a629d8 → prod 5ff7c73(tree 동일). 운영 api/worker crefans-api:admin-memberships-20261106 = billing-results-20261105 위에 3개 파일(admin-memberships·admin.controller·openapi-contract src/dist)만 overlay, 서버에서 --network none 빌드. 이미지 내 파일 SHA가 컨텍스트와 같음, 컴파일 차이는 두 경로 추가뿐 확인. migration 없음.
+- 배포 확인(2026-11-06): health ready, api/worker running·restart0·OOM false, APP_RELEASE 일치, LIVE_PAYMENTS/MANUAL_PAYOUTS 미설정 유지, front/admin/DB/proxy 컨테이너 ID 불변, .env·runtime.env는 이미지/릴리스 줄 외 동일, 비로그인 /admin/memberships·/admin/subscriptions 401. 운영 컨테이너에서 새 함수 읽기 전용 실행: 상품 1·구독 1(ONGOING)·삭제 상품 0, 비밀 필드 없음, 구독 행 수 불변.
+- 직전 이미지·설정은 /Users/ethan/crefans-recovery/20261106/admin-memberships(SHA256SUMS·index 다이제스트=이미지 ID 확인). 서버의 직전 태그와 임시 폴더는 정리. 배포 스크립트·로그 .local/admin-memberships-deploy/.
 - 사용자 요청("추가진행"): 콘솔에서 전체 멤버십 상품과 구독 현황을 볼 수 있게. 브랜치 feat/admin-memberships(origin/prod b477997 기준, 작업트리 crefans_server-admin-memberships).
 - GET /admin/memberships, GET /admin/subscriptions 추가(src/platform/admin-memberships.ts, admin.controller.ts). 조회 전용, 기존 매출 조회 권한(revenue.view)과 financialAdmin 재사용. 새 권한 행은 만들지 않음(기존 부운영자 권한표 변경 없음).
 - 상품: 생성일 최신순 20개, state=active·inactive·deleted(생략 시 삭제 제외), 크리에이터 이름·핸들, 상품별 이용 중(이용기간 남은 ONGOING·CANCELLED)과 저장 상태별 누적 수. 구독: status·membershipId·search 필터, 같은 조건 전체 집계. 구독자는 ID·활동명·탈퇴 여부만. 이메일·빌링키·카드 ID·상품 snapshot 미반환.
