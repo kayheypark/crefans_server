@@ -205,6 +205,7 @@
 | POST | `/api/v1/studio/withdraw/review` | `src/platform/finance.controller.ts::review` |
 | POST | `/api/v1/studio/withdraw/verify` | `src/platform/finance.controller.ts::verifyPin` |
 | POST | `/api/v1/subscriptions/:creator/cancel` | `src/platform/finance.controller.ts::cancel` |
+| POST | `/api/v1/subscriptions/:id/resume` | `src/platform/finance.controller.ts::resume` |
 | POST | `/api/v1/telemetry/browser-errors` | `src/platform/telemetry.controller.ts::report` |
 
 GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator 목록에 추가하지 않는다. 바이너리 미디어 예외와 권한 의미는 [API 계약](./platform-api.md)을 따른다.
@@ -224,6 +225,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/explore` | 탐색하기 |
 | `/preview/creator/haneul` | 크리에이터 프로필 |
 | `/preview/membership/haneul` | 멤버십 구독 |
+| `/preview/checkout` | 멤버십 결제 |
 | `/preview/signup` | 회원가입 |
 | `/preview/login` | 로그인 |
 | `/preview/feed` | 홈 |
@@ -258,6 +260,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/studio/accounts` | 정산 계좌 |
 | `/preview/studio/security` | 출금 PIN 설정 |
 | `/preview/studio/settings` | 크리에이터 설정 |
+| `/preview/billing/success` | 카드 등록 완료 |
 | `/preview/events` | 이벤트 안내 |
 | `/preview/events/feedback` | 네이버페이 1만원 상품권 이벤트 |
 | `/preview/events/creator-advertising` | 주목할 크리에이터 광고상품 30일 이벤트 |

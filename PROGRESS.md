@@ -1,3 +1,16 @@
+## 2026-11-05 구독 ‘다시 이용할래요’ 구현·검증 (운영 미배포)
+- 사용자 확정: 해지 취소 후 기존 다음 결제일부터 자동 갱신 재개, 즉시 결제 없음. 기존 기간·금액·가입 조건 유지. 이용기간이 남은 단건 구독도 새 자동결제 동의와 기본카드가 필요함.
+- POST /subscriptions/:id/resume 추가. 회원/구독 잠금·소유권·남은 기간·유효 기본카드·상품·기존 snapshot·표시 금액/날짜 재검증. 동의 snapshot·subscription.resumed 운영 이벤트 기록. 새 주문/PG 호출/원장 생성 없음. DB migration 없음.
+- 합격 조건: 해지 구독에 정확한 버튼 문구, 다음 날짜/금액 확인과 새 동의, 재개 시 청구 0건·예정일 1회 청구, 중복·권한·만료·처리 중 결제/환불·카드 오류 차단. 로컬 E2E DB와 PG/API 대역만 사용, 운영 회원/실결제/실물 iPhone 검증 제외.
+- 검증: 서버 build exit0, payment-lifecycle 62/62, openapi 14/14, 기존 billing-recovery 전용 E2E DB 어댑터 26/26. 프론트 단위 24/24·typecheck·Next E2E 빌드·레이어429파일 통과, PC Chromium/iPhone WebKit/320px Chromium 9/9 통과. 최종 PC/모바일 캡처 육안 확인.
+- 최초 실패: 공통 타입 검사 중 오래된 공유 Prisma client는 전용 의존성/생성으로 해결; OpenAPI 개수 기대값, React 텍스트 추출, 모달 종료 애니메이션 대기 누락은 테스트를 보정하고 재검증 통과. 제품 동작 실패를 숨기지 않음. 공식 근거와 적용 판단은 서버 docs/platform-api.md의 재개 절.
+- 브랜치 양쪽 feat/subscription-resume. 기준 front origin/prod 1acfdfe, server cd4ccab. dev/prod 통합·운영배포 미실행. 프론트 .local/subscription-resume/verification.json에 명령·로그 SHA·소스 해시, 각 저장소 .local/subscription-resume에 실행 로그 보존. 문서 해시 갱신은 테스트 증명과 구분하며 기존 전체 출시 인수 검증을 주장하지 않음.
+
+## 2026-11-05 카드 등록 완료 1안 화면 계약 문서 동기화 (미배포)
+- front feat/billing-complete-concepts의 선택된 카드 등록 완료 1안과 목업 `/preview/billing/success`를 current-contracts 화면 목록에 반영한다. 기존 운영 멤버십 결제 `/preview/checkout` 누락도 함께 재생성한다. API/DB/결제 로직 변경 없음.
+- 기준 origin/prod cd4ccab → feat/billing-complete-docs. 앞선 구독 재개는 별도 feat/subscription-resume 7f9cfdd에 보존. 프론트에서 CREFANS_SERVER_DIR을 이 작업트리로 지정해 docs:contracts/check:docs 검증. AGENTS.md 기존 불변 규약 유지.
+- 다음: 프론트 카드 완료 변경과 함께 dev → prod로 문서 통합. 운영배포 미실행. 실행 증거는 front .local/billing-complete-one/verification.json. 문서 스냅샷은 제품 테스트 증명과 구분한다.
+
 ## 2026-11-04 텔레그램 백업 실패 알림 운영 설치 완료
 - 사용자 “승인”으로 기존 봇 토큰 AWS Secrets Manager 저장·최소권한 IAM/Lambda/EventBridge·서버 OnFailure 설치·테스트 2건 발송 범위 승인. AWS crefans-backup-alerts 및 서버 알림 unit 설치 완료. API/worker/DB 재배포·백업 삭제 없음.
 - Python8건 통과. AWS test-event-pattern FAILED/ABORTED/EXPIRED 매칭, COMPLETED 제외. 특정 비밀 GetSecretValue/자체 로그 쓰기만 IAM 허용 및 EventBridge SourceArn 제한 확인. 서버 타이머 active/enabled, OnFailure 연결, 설정 root0600, 설치 모듈 SHA 동일 확인.

@@ -155,6 +155,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /checkout/:id/refund-eligibility | 본인 주문; 서버 이용 기록 기준 전액 환불 가능 여부/사유/금액 |
 | POST | /checkout/:id/refund | 소유권·추적 이력·미이용 확인; 실제 전액 취소 후 수수료/원장/권한 반영 |
 | POST | /subscriptions/:creator/cancel | 자동 갱신 해지, 남은 권한 유지 |
+| POST | /subscriptions/:id/resume | 본인 구독의 자동 갱신 재개; renewAt/price/paymentTerms 필수, 즉시 과금 없음 |
 | GET | /studio/finance | 원장/정산 보류/출금 가능/신청/지급 내역 |
 | POST | /studio/accounts | id?, bank/holderAlias/accountNumber; AES-GCM 보관 |
 | POST | /studio/accounts/:id/verify | PASS 실명과 은행 예금주 검증 |
@@ -555,3 +556,13 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | --- | --- | --- |
 | GET | /studio/advertising/orders | 본인 크리에이터 구매내역·사용상태·다른 광고 종료일. 실제 결제 준비중 |
 | POST | /studio/advertising/orders/:id/use | 본인 paid/활성creator만, creator잠금·동일주문멱등·다른 광고 사용중409, 사용시점부터 구매기간 적용 |
+
+## 구독 자동 갱신 재개 (2026-11-05)
+
+`POST /api/v1/subscriptions/:id/resume`는 `renewAt`(화면의 YYYY-MM-DD), `price`, `paymentTerms`(현재 2026-11-02.1)를 받는다. 회원·구독 잠금 안에서 소유권, 활성 회원, 남은 이용기간, 기존 금액/날짜, 활성 상품/크리에이터, 기존 가입 snapshot, 사용 가능한 기본 카드를 검사한다. 결제/환불 처리 중에는 거절한다. 성공하면 `auto_renew=true`, `status=ONGOING`, `next_billing_date=ended_at`과 기본 카드만 연결하고 실패 횟수를 초기화한다. 기존 시작/종료 시각·금액·가입 snapshot은 유지하고 주문 생성·PG 승인·원장 생성은 하지 않는다. 이미 재개된 동일 요청은 동의/운영 이벤트를 중복 생성하지 않는다. 다음 결제일의 기존 갱신 worker가 청구한다.
+
+동의는 `member_consents`에 금액·다음 결제 시각·purpose=subscription-resume와 함께 기록하고 `subscription.resumed` 운영 이벤트를 남긴다. 한 달 단건 결제도 아직 이용기간이 남았다면 이 명시적 동의와 기본 카드 검사 후 정기결제로 전환할 수 있다. 만료/환불로 종료된 구독은 새 가입이 필요하다. 카드 교체 자체가 해지를 취소하는 것은 아니다.
+
+사용자 확정 정책: “해지 취소 후 다음 결제일부터 자동 갱신 재개, 즉시 결제 없음”. 2026-11-05 공식 문서 확인: [Stripe 기간 종료 전 해지 취소](https://docs.stripe.com/billing/subscriptions/cancel)는 남은 유료 기간의 취소 예약 복원을 설명한다. [Toss 자동결제 연동](https://docs.tosspayments.com/guides/v2/billing/integration-api)은 가맹점이 청구 시점을 관리하므로 이번 재개 API에서는 승인 API를 호출하지 않는다. Stripe는 동작 설계 참고이며 실제 결제 공급사는 Toss다.
+
+검증: `tests/platform-payment-lifecycle.test.cjs`의 재개·동의·소유권·만료·중복·카드 오류·기존 조건 유지·예정일 1회 청구, `tests/platform-openapi.test.cjs`의 인증/라우트 계약. 로컬 E2E DB·PG 대역이며 실제 회원이나 실결제 변경은 하지 않았다.

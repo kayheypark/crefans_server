@@ -154,6 +154,31 @@ export class PlatformFinanceService {
    for(const sub of rows){if(sub.auto_renew)await enqueueOperation(tx,'subscription.cancelled',{memberId:member,creatorId:creator,subscriptionId:sub.id,status:'CANCELLED',previousStatus:sub.status});await tx.subscription.update({where:{id:sub.id},data:{auto_renew:false,status:'CANCELLED',next_billing_date:null}});await tx.checkoutOrder.updateMany({where:{subscription_id:sub.id,status:{in:['pending','failed']}},data:{status:'cancelled',retry_at:null}});}
   });return{message:'갱신을 해지했습니다. 이용 종료일까지 권한이 유지됩니다.'};
  }
+ async resumeSubscription(member:string,id:string,input:any){
+  if(input?.paymentTerms!==PAYMENT_TERMS.version)reject(400,'PAYMENT_TERMS_REQUIRED','자동 갱신 조건을 확인하고 동의해주세요.');
+  return this.db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
+   await tx.$queryRaw`SELECT id FROM subscriptions WHERE id=${id} FOR UPDATE`;
+   const sub=await tx.subscription.findFirst({where:{id,subscriber_id:member}});
+   if(!sub)reject(404,'SUBSCRIPTION_NOT_FOUND','구독을 찾을 수 없습니다.');
+   if(!await tx.member.findFirst({where:{id:member,enabled:true}}))reject(403,'MEMBER_UNAVAILABLE','계정을 확인해주세요.');
+   if(!sub.ended_at||sub.ended_at<=new Date()||!['ONGOING','CANCELLED'].includes(sub.status))reject(409,'SUBSCRIPTION_ENDED','이용 기간이 끝났습니다. 멤버십을 다시 선택해주세요.');
+   if(input.renewAt!==dateOnly(sub.ended_at)||input.price!==Number(sub.amount))reject(409,'SUBSCRIPTION_CHANGED','구독 정보가 변경됐습니다. 화면을 새로고침하고 다시 확인해주세요.');
+   const message='자동 갱신을 다시 시작했습니다. 다음 결제일부터 결제됩니다.';
+   if(sub.auto_renew&&sub.status==='ONGOING')return{message};
+   if(await tx.checkoutOrder.count({where:{subscription_id:id,status:{in:['processing','refunding']}}}))reject(409,'PAYMENT_IN_PROGRESS','결제 또는 환불 결과 확인 후 다시 이용해주세요.');
+   const plan=await tx.membershipItem.findUnique({where:{id:sub.membership_item_id}});
+   if(!plan?.is_active||plan.is_deleted||!await tx.creator.findFirst({where:{user_id:plan.creator_id,is_active:true}}))reject(409,'PLAN_UNAVAILABLE','현재 다시 이용할 수 없는 멤버십입니다.');
+   if(!sub.plan_snapshot)reject(409,'MISSING_SNAPSHOT','기존 구독 조건 확인이 필요합니다.');
+   const method=await tx.billingMethod.findFirst({where:{member_id:member,is_default:true,deleted_at:null}});
+   if(!method)reject(409,'PAYMENT_METHOD_REQUIRED','결제수단 관리에서 기본 카드를 등록해주세요.');
+   if(method.unavailable_at||method.revoked_at||!method.billing_key_encrypted)reject(409,'PAYMENT_METHOD_UNAVAILABLE','결제수단 관리에서 사용 가능한 카드를 기본으로 설정해주세요.');
+   await tx.subscription.update({where:{id},data:{auto_renew:true,status:'ONGOING',next_billing_date:sub.ended_at,billing_method_id:method.id,payment_failure_count:0}});
+   await tx.memberConsent.create({data:{member_id:member,kind:'payment-terms',document_id:`code:payment-terms:${PAYMENT_TERMS.version}`,document_snapshot:{...PAYMENT_TERMS,purpose:'subscription-resume',subscriptionId:id,amount:Number(sub.amount),nextBillingAt:sub.ended_at.toISOString(),paymentMode:'subscription'}}});
+   await enqueueOperation(tx,'subscription.resumed',{memberId:member,creatorId:plan.creator_id,subscriptionId:id,planId:plan.id,status:'ONGOING',previousStatus:sub.status},undefined,{amount:Number(sub.amount)});
+   return{message};
+  });
+ }
  async finance(member:string,tx:any=this.db){const [entries,withdrawals,accounts]=await Promise.all([tx.revenueEntry.findMany({where:{creator_id:member},orderBy:{created_at:'desc'}}),tx.withdrawalRequest.findMany({where:{creator_id:member},orderBy:{created_at:'desc'}}),tx.settlementAccount.findMany({where:{creator_id:member}})]);const refunding=await tx.checkoutOrder.findMany({where:{id:{in:entries.map((e:any)=>e.order_id)},status:'refunding'},select:{id:true,amount:true}}),refundReserved=refunding.reduce((a:any,o:any)=>{const entry=entries.find((e:any)=>e.order_id===o.id);return a+o.amount-(entry&&settlementPending(entry)?Math.max(0,entry.net):0);},0);const sum=(key:string)=>entries.reduce((a:any,e:any)=>a+e[key],0),pending=entries.filter((e:any)=>settlementPending(e)).reduce((a:any,e:any)=>a+Math.max(0,e.net),0),requested=withdrawals.filter((w:any)=>['requested','processing'].includes(w.status)).reduce((a:any,w:any)=>a+w.amount,0),paid=withdrawals.filter((w:any)=>w.status==='paid').reduce((a:any,w:any)=>a+w.amount,0);
    return{summary:{gross:sum('gross'),reversals:sum('reversals'),fees:sum('fees'),net:sum('net'),pending,available:sum('net')-pending-requested-paid-refundReserved,requested,paid,refundReserved},earnings:entries.map((e:any)=>({id:e.id,settlementId:e.id,date:dateOnly(e.created_at),title:e.title,gross:e.gross,reversals:e.reversals,fees:e.fees,net:e.net})),settlements:entries.map((e:any)=>({id:e.id,period:dateOnly(e.created_at),status:settlementPending(e)?'pending':'available',availableAt:dateOnly(e.available_at),holdReasons:settlementHoldReasons(e)})),withdrawals:withdrawals.map((w:any)=>this.withdrawalView(w)),accounts:accounts.map((a:any)=>this.accountView(a)),pinConfigured:!!await tx.withdrawalCredential.findUnique({where:{creator_id:member}}),creatorTerms:await studioTerms(tx,member),receivables:(await tx.creatorReceivable.findMany({where:{creator_id:member,status:'open'},orderBy:{created_at:'asc'}})).map((r:any)=>({id:r.id,kind:r.kind,amount:r.amount,createdAt:dateOnly(r.created_at)})),closingBlockers:await this.service.closingBlockers(tx,member)};
  }
