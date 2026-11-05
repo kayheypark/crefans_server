@@ -44,7 +44,7 @@ test('missing configuration never marks queued records delivered',async()=>{
  const noConfig=new PlatformOperationsService(scoped,new ConfigService({}));let called=false;await noConfig.flush(new Date(),async()=>{called=true;throw Error('unexpected');});assert.equal(called,false);
 });
 
-test('every run is logged, no-work emits hourly, work/failure emits immediately',async()=>{
+test('every run is logged, failures emit immediately, work is summarized hourly',async()=>{
  const jobs=new Map(),events=[],start=new Date('2026-10-21T16:00:00Z');
  const fake={platformAuditLog:{create:async({data})=>data,upsert:async({create})=>create},platformSecurityIp:{deleteMany:async()=>({count:0})},platformJob:{
   create:async({data})=>{jobs.set(data.id,data);return data;},
@@ -58,13 +58,13 @@ test('every run is logged, no-work emits hourly, work/failure emits immediately'
  await isolated.reportRun(new Date(+start+60000),{},{},new Date(+start+60000));
  assert.equal(jobs.size,3);assert.equal(events.length,0);
  await isolated.reportRun(new Date(+start+120000),{},{renewal:1},new Date(+start+120000));
- assert.equal(events[0].type,'worker.completed');assert.equal(events[0].data.processed,1);
+ assert.equal(events.length,0);
  await isolated.reportRun(new Date(+start+180000),{renewal:1},{},new Date(+start+180000));
- assert.equal(events[1].type,'worker.error');
+ assert.equal(events[0].type,'worker.error');
  await isolated.reportRun(new Date(+start+3600000),{},{},new Date(+start+3600000));
- assert.equal(events[2].type,'worker.hourly');assert.equal(events[2].data.runs,4);assert.equal(events[2].data.failedRuns,1);
+ assert.equal(events[1].type,'worker.hourly');assert.equal(events[1].data.runs,4);assert.equal(events[1].data.failedRuns,1);assert.equal(events[1].data.processed,1);
  await isolated.reportRun(new Date(+start+3660000),{},{},new Date(+start+3660000));
- assert.equal(events.length,3);assert.equal([...jobs.keys()].filter(k=>k.startsWith('worker-run-')).length,6);
+ assert.equal(events.length,2);assert.ok(!events.some(e=>e.type==='worker.completed'));assert.equal([...jobs.keys()].filter(k=>k.startsWith('worker-run-')).length,6);
 });
 
 test('uncaught exceptions are reported without continuing or exposing original error text',()=>{
