@@ -37,10 +37,10 @@ before(async()=>{
 });
 after(async()=>{await app?.close();});
 const request=(path,cookie)=>fetch(base+path,{headers:cookie?{cookie}:{},redirect:'manual'});
-test('OpenAPI 3 validates, has all 200 runtime operations and no legacy controllers',async()=>{
+test('OpenAPI 3 validates, has all 201 runtime operations and no legacy controllers',async()=>{
  await Parser.validate(structuredClone(document));
  const operations=Object.entries(document.paths).flatMap(([path,item])=>Object.keys(item).filter(method=>['get','post','put','patch','delete','head','options'].includes(method)).map(method=>method+' '+path));
- assert.equal(operations.length,200);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 171: +4 manual payout routes, +1 GET categories (2026-10-31), +1 PUT me/profile/photos, +1 GET me/referral, +3 admin referrals, +1 GET media/:id/status, +1 POST admin/referrals/:id/revoke (2026-11-02) (2026-11-01)
+ assert.equal(operations.length,201);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 171: +4 manual payout routes, +1 GET categories (2026-10-31), +1 PUT me/profile/photos, +1 GET me/referral, +3 admin referrals, +1 GET media/:id/status, +1 POST admin/referrals/:id/revoke (2026-11-02) (2026-11-01)
  assert.ok(operations.every(key=>key.includes(' /api/v1/')));assert.equal(document.info.version,'v1');
  assert.equal(document.components.securitySchemes.memberSession.name,'access_token');
  assert.equal(document.paths['/api/v1/admin/me'].get.security[0].adminSession.length,0);assert.equal(document.paths['/api/v1/admin/me'].get.security[0].memberSession,undefined,'console uses the operator session only');assert.equal(document.components.securitySchemes.adminSession.name,'admin_access_token');
@@ -120,7 +120,7 @@ test('media is documented as binary, JSON APIs have common envelope, key materia
 test('three valid documents isolate business APIs, retain required shared calls and cover all operations',async()=>{
  const operations=doc=>Object.entries(doc.paths).flatMap(([path,item])=>Object.keys(item).map(method=>method+' '+path));
  const user=operations(documents.user),studio=operations(documents.studio),console=operations(documents.console);
- assert.equal(user.length,85);assert.equal(studio.length,48);assert.equal(console.length,87);
+ assert.equal(user.length,86);assert.equal(studio.length,48);assert.equal(console.length,87);
  assert.deepEqual([...new Set([...user,...studio,...console])].sort(),operations(document).sort());
  const auth=['post /api/v1/auth/login','post /api/v1/auth/logout','post /api/v1/auth/refresh'];
  assert.deepEqual(user.filter(key=>console.includes(key)).sort(),auth);
@@ -170,4 +170,14 @@ test('founding badge routes are authenticated and only forward the current sessi
  }
  assert.deepEqual(calls,[['foundingBadge','member'],['claimBadge','member',{}],['badgeVisibility','member',{visible:false}]]);
  }finally{names.forEach((n,i)=>service[n]=originals[i]);}
+});
+
+test('resume route requires member authentication and forwards the consent and session owner',async()=>{
+ const finance=app.get(PlatformFinanceService),original=finance.resumeSubscription,calls=[];
+ finance.resumeSubscription=async(...args)=>{calls.push(args);return{message:'재개 완료'};};
+ try{
+  const path=base+'/api/v1/subscriptions/test-subscription/resume',body={renewAt:'2030-02-01',price:10000,paymentTerms:'2026-11-02.1'};
+  const missing=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});assert.equal(missing.status,401);assert.equal(calls.length,0);
+  const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',Cookie:'access_token=member'},body:JSON.stringify(body)});assert.equal(response.status,201);assert.deepEqual(calls,[['member','test-subscription',body]]);assert.equal((await response.json()).success,true);
+ }finally{finance.resumeSubscription=original;}
 });

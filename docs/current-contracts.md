@@ -205,6 +205,7 @@
 | POST | `/api/v1/studio/withdraw/review` | `src/platform/finance.controller.ts::review` |
 | POST | `/api/v1/studio/withdraw/verify` | `src/platform/finance.controller.ts::verifyPin` |
 | POST | `/api/v1/subscriptions/:creator/cancel` | `src/platform/finance.controller.ts::cancel` |
+| POST | `/api/v1/subscriptions/:id/resume` | `src/platform/finance.controller.ts::resume` |
 | POST | `/api/v1/telemetry/browser-errors` | `src/platform/telemetry.controller.ts::report` |
 
 GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator 목록에 추가하지 않는다. 바이너리 미디어 예외와 권한 의미는 [API 계약](./platform-api.md)을 따른다.
@@ -224,6 +225,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/explore` | 탐색하기 |
 | `/preview/creator/haneul` | 크리에이터 프로필 |
 | `/preview/membership/haneul` | 멤버십 구독 |
+| `/preview/checkout` | 멤버십 결제 |
 | `/preview/signup` | 회원가입 |
 | `/preview/login` | 로그인 |
 | `/preview/feed` | 홈 |
