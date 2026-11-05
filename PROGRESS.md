@@ -1,3 +1,10 @@
+## 2026-11-05 카드 등록 완료 1안·구독 재개 운영 배포 완료
+- 사용자 “다되면 운영배포”, “다시시도” 승인에 따라 카드 등록 완료 1안과 앞선 ‘다시 이용할래요’를 함께 배포. front ef297e8, server e448686를 dev 통합 검증 → prod 승격 후 billing-results-20261105 이미지로 API·worker·frontend에 적용했다. DB migration/결제 활성화 설정 변경 없음; database/admin/proxy 컨테이너 유지.
+- 완료 화면은 큰 파란 체크와 명시적 원래 화면 복귀 버튼. 서버 등록 성공 확인 후에만 표시. 구독 재개는 새 자동결제 동의를 받고 기존 다음 결제일/금액을 유지하며 즉시 결제하지 않는다.
+- 검증: front 단위39/레이어430파일/Next 빌드·로컬 PC+iPhone WebKit+320px 브라우저21, server Nest 빌드/격리DB payment-lifecycle62/OpenAPI14 통과. 운영 번들 브라우저21/21(API 대역), 공개 완료 목업·구독 목업·랜딩200, API health200, 비로그인 재개401. 6컨테이너 running/restart0/OOM없음, 최신 worker 실패0. 실PG 카드등록/청구·실회원 재개·실물 iPhone 미실행.
+- 배포 전 운영 API 전체 src/Prisma/package 소스를 이전 prod와 대조. 새 이미지의 변경 소스/컴파일 파일 SHA 확인. 복구 이미지2개·설정은 /Users/ethan/crefans-recovery/20261105/billing-results에 저장하고 OCI digest·blob/파일 SHA 검증. 검증 뒤 미사용 직전 이미지 태그와 이번 임시 소스만 운영에서 정리. 활성 이미지·DB·업로드 보존.
+- 최초 빌드 스크립트 치환 오류와 dist 제외는 운영 컨테이너 변경 전에 해결했다. 후자는 최소 overlay 컨텍스트로 수정 후 성공. 증거 docs/billing-results-deployment-20261105.json, front .local/billing-results-release/verification.json 및 실행 로그·캡처. AGENTS.md 기존 규약 유지. 아래 미배포 기록은 당시 이력이며 두 작업의 추가 배포는 필요 없다.
+
 ## 2026-11-05 구독 ‘다시 이용할래요’ 구현·검증 (운영 미배포)
 - 사용자 확정: 해지 취소 후 기존 다음 결제일부터 자동 갱신 재개, 즉시 결제 없음. 기존 기간·금액·가입 조건 유지. 이용기간이 남은 단건 구독도 새 자동결제 동의와 기본카드가 필요함.
 - POST /subscriptions/:id/resume 추가. 회원/구독 잠금·소유권·남은 기간·유효 기본카드·상품·기존 snapshot·표시 금액/날짜 재검증. 동의 snapshot·subscription.resumed 운영 이벤트 기록. 새 주문/PG 호출/원장 생성 없음. DB migration 없음.
