@@ -172,3 +172,22 @@ test('a category added by console API reaches creator onboarding and inactive fi
   await db.creatorCategory.deleteMany({where:{name}});
  }
 });
+
+test('membership and subscription lists are read-only revenue views without billing secrets',async()=>{
+ const tag='구독현황검증'+randomBytes(4).toString('hex'),owner=randomUUID(),plans=[],subs=[];creatorIds.push(owner);await db.creator.create({data:{user_id:owner,display_name:tag,handle:'h'+randomBytes(6).toString('hex')}});
+ try{
+  const plan=async(name,extra={})=>{const p=await db.membershipItem.create({data:{name,creator_id:owner,price:10000,billing_unit:'MONTH',billing_period:1,benefits:'a',...extra}});plans.push(p.id);return p;};
+  const live=await plan(tag+' 판매'),off=await plan(tag+' 중지',{is_active:false}),gone=await plan(tag+' 삭제',{is_deleted:true,is_active:false});
+  let n=0;const day=86400000,sub=async(status,end,extra={})=>{const s=await db.subscription.create({data:{subscriber_id:fan,started_at:new Date(Date.now()-90*day+(n++)*1000),membership_item_id:live.id,status,amount:10000,auto_renew:status==='ONGOING',ended_at:end===null?null:new Date(Date.now()+end),plan_snapshot:{secret:'must-not-leak'},billing_key:'private-billing-key',billing_method_id:'private-method-id',...extra}});subs.push(s.id);return s;};
+  await sub('ONGOING',30*day,{next_billing_date:new Date(Date.now()+30*day)});await sub('CANCELLED',5*day);await sub('CANCELLED',-day);await sub('EXPIRED',-40*day);
+  for(const path of['memberships','subscriptions']){for(const user of['none','fan','disabled'])assert.equal((await api(path,user)).status,401,path+' '+user);assert.equal((await api(path,'moderator')).status,403,path);assert.equal((await api(path,'admin')).status,200,path);}
+  for(const method of['POST','PUT','DELETE'])for(const path of['memberships','subscriptions'])assert.equal((await api(path,'super',{},method)).status,404,method+' '+path);
+  const all=(await api('memberships?search='+encodeURIComponent(tag))).data;assert.deepEqual(all.items.map(p=>p.id).sort(),[live.id,off.id].sort(),'deleted plans are hidden by default');
+  const row=all.items.find(p=>p.id===live.id);assert.equal(row.price,10000);assert.equal(row.billingUnit,'MONTH');assert.equal(row.creator.name,tag);assert.deepEqual(row.subscriptions,{current:2,autoRenew:1,cancelled:2,expired:1});
+  assert.deepEqual((await api('memberships?state=deleted&search='+encodeURIComponent(tag))).data.items.map(p=>p.id),[gone.id]);assert.deepEqual((await api('memberships?state=inactive&search='+encodeURIComponent(tag))).data.items.map(p=>p.id),[off.id]);
+  const list=(await api('subscriptions?membershipId='+live.id)).data;assert.equal(list.total,4);assert.deepEqual(list.summary,{current:2,ONGOING:1,CANCELLED:2,EXPIRED:1});assert.equal(list.items[0].subscriber.id,fan);assert.equal(list.items[0].subscriber.nickname,'Admin fixture');assert.equal(list.items[0].membership.name,tag+' 판매');
+  assert.equal((await api('subscriptions?status=CANCELLED&search='+encodeURIComponent(tag))).data.total,2);assert.equal((await api('subscriptions?search='+fan+'&membershipId='+live.id)).data.total,4);
+  const text=JSON.stringify([all,list]);for(const secret of['must-not-leak','private-billing-key','private-method-id','billing_key','plan_snapshot','email','password'])assert.equal(text.includes(secret),false,secret);
+  for(const q of['memberships?state=all','memberships?page=0','subscriptions?status=ongoing','subscriptions?status=ONGOING&status=EXPIRED','subscriptions?search='+'x'.repeat(101)])assert.equal((await api(q)).status,400,q);
+ }finally{await db.subscription.deleteMany({where:{id:{in:subs}}});await db.membershipItem.deleteMany({where:{id:{in:plans}}});}
+});
