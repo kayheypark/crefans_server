@@ -119,7 +119,8 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
   await this.db.platformJob.create({data:{id,locked_until:now,completed_at:now,note:JSON.stringify(data)}});
   await observeAudit(this.db,{category:'worker',action:'worker.run',level:Object.keys(failures).length?'error':'info',data});
   console.log(JSON.stringify({event:'worker.run',...data}));
-  if(Object.keys(failures).length||processed)await this.record(Object.keys(failures).length?'worker.error':'worker.completed',data);
+  // 2026-11-05 user decision: routine successful runs are not sent to Telegram; failures go out at once, work totals in the hourly summary.
+  if(Object.keys(failures).length)await this.record('worker.error',data);
   const clockId='worker-operations-hourly';
   await this.db.platformJob.upsert({where:{id:clockId},create:{id:clockId,locked_until:now,completed_at:now},update:{}});
   await this.db.$transaction(async tx=>{
@@ -127,7 +128,8 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
    const clock=await tx.platformJob.findUniqueOrThrow({where:{id:clockId}});
    const since=clock.completed_at||now;if(now.getTime()-since.getTime()<3600000)return;
    const runs=await tx.platformJob.findMany({where:{id:{startsWith:'worker-run-'},completed_at:{gt:since,lte:now}},select:{note:true}});
-   const data={runs:runs.length,failedRuns:runs.filter(r=>Object.keys(JSON.parse(r.note||'{}').failures||{}).length).length};
+   const notes=runs.map(r=>JSON.parse(r.note||'{}'));
+   const data={runs:runs.length,failedRuns:notes.filter(n=>Object.keys(n.failures||{}).length).length,processed:notes.reduce((sum,n)=>sum+(Number(n.processed)||0),0)};
    const event=await tx.platformOperationalEvent.create({data:{type:'worker.hourly',data,dedupe_key:`worker-hour-${since.getTime()}`}});await auditOperation(tx,event);
    await tx.platformJob.update({where:{id:clockId},data:{completed_at:now}});
   });
