@@ -1,3 +1,8 @@
+## 2026-11-05 카드 등록 완료 1안 화면 계약 문서 동기화 (미배포)
+- front feat/billing-complete-concepts의 선택된 카드 등록 완료 1안과 목업 `/preview/billing/success`를 current-contracts 화면 목록에 반영한다. 기존 운영 멤버십 결제 `/preview/checkout` 누락도 함께 재생성한다. API/DB/결제 로직 변경 없음.
+- 기준 origin/prod cd4ccab → feat/billing-complete-docs. 앞선 구독 재개는 별도 feat/subscription-resume 7f9cfdd에 보존. 프론트에서 CREFANS_SERVER_DIR을 이 작업트리로 지정해 docs:contracts/check:docs 검증. AGENTS.md 기존 불변 규약 유지.
+- 다음: 프론트 카드 완료 변경과 함께 dev → prod로 문서 통합. 운영배포 미실행. 실행 증거는 front .local/billing-complete-one/verification.json. 문서 스냅샷은 제품 테스트 증명과 구분한다.
+
 ## 2026-11-04 텔레그램 백업 실패 알림 운영 설치 완료
 - 사용자 “승인”으로 기존 봇 토큰 AWS Secrets Manager 저장·최소권한 IAM/Lambda/EventBridge·서버 OnFailure 설치·테스트 2건 발송 범위 승인. AWS crefans-backup-alerts 및 서버 알림 unit 설치 완료. API/worker/DB 재배포·백업 삭제 없음.
 - Python8건 통과. AWS test-event-pattern FAILED/ABORTED/EXPIRED 매칭, COMPLETED 제외. 특정 비밀 GetSecretValue/자체 로그 쓰기만 IAM 허용 및 EventBridge SourceArn 제한 확인. 서버 타이머 active/enabled, OnFailure 연결, 설정 root0600, 설치 모듈 SHA 동일 확인.
