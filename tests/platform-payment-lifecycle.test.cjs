@@ -24,6 +24,7 @@ async function fixture(overrides={}){
 }
 async function due(f){const sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});const past=new Date(Date.now()-60000);return db.subscription.update({where:{id:sub.id},data:{ended_at:past,next_billing_date:past}});}
 after(async()=>{
+ await db.memberNotice.deleteMany({where:{member_id:{in:members}}});await db.platformAuditLog.deleteMany({where:{action:'admin.subscription.refunded'}});
  await db.billingNotice.deleteMany({where:{member_id:{in:members}}});await db.savedPost.deleteMany({where:{member_id:{in:members}}});await db.posting.deleteMany({where:{user_sub:{in:creators}}});
  await db.revenueEntry.deleteMany({where:{creator_id:{in:creators}}});await db.checkoutOrder.deleteMany({where:{member_id:{in:members}}});await db.subscription.deleteMany({where:{subscriber_id:{in:members}}});await db.membershipItem.deleteMany({where:{creator_id:{in:creators}}});await db.billingMethod.deleteMany({where:{member_id:{in:members}}});await db.memberNotification.deleteMany({where:{member_id:{in:members}}});await db.creator.deleteMany({where:{user_id:{in:creators}}});await db.member.deleteMany({where:{id:{in:members}}});if(originalPolicy)await db.financialPolicy.update({where:{id:'platform'},data:originalPolicy});await db.$disconnect();await release?.();
 });
@@ -295,4 +296,66 @@ test('resume: a one-month purchase requires fresh recurring consent and does not
  const f=await cancelledFixture();await db.subscription.update({where:{id:f.sub.id},data:{billing_method_id:null,plan_snapshot:{...f.sub.plan_snapshot,paymentMode:'one-time'}}});
  await f.finance.resumeSubscription(f.fan,f.sub.id,resumeInput(f.sub));assert.equal(f.calls.length,1);assert.equal((await db.subscription.findUniqueOrThrow({where:{id:f.sub.id}})).next_billing_date.getTime(),f.sub.ended_at.getTime());
  await due(f);await f.finance.renew(f.sub.id);await f.finance.renew(f.sub.id);assert.equal(f.calls.length,2);assert.equal((await db.subscription.findUniqueOrThrow({where:{id:f.sub.id}})).auto_renew,true);
+});
+
+// 2026-11-06 user decisions: console full refund (SUPER_ADMIN, ends the subscription now) and membership cancel/end/refund notices.
+const superAdmin={is_active:true,role:'SUPER_ADMIN',user_sub:'admin-refund-test'};
+const notices=(member,kind)=>db.memberNotice.findMany({where:{member_id:member,kind}});
+const inbox=(member,type)=>db.memberNotification.findMany({where:{member_id:member,type},orderBy:{created_at:'asc'}});
+test('console refund: SUPER_ADMIN only, reason required, ignores the 7-day/unused rule, refunds once and ends access now',async()=>{
+ const f=await fixture();await f.finance.pay(f.fan,f.order.id);const sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});
+ const reasons=[];const cancel=f.provider.cancel;f.provider.cancel=async(key,reason,...rest)=>{reasons.push(reason);return cancel(key,reason,...rest);};
+ await assert.rejects(f.finance.adminRefund({is_active:true,role:'ADMIN',user_sub:'x'},sub.id,{reason:'검증'}),code('SUPER_ADMIN_REQUIRED'));
+ await assert.rejects(f.finance.adminRefund({...superAdmin,is_active:false},sub.id,{reason:'검증'}),code('SUPER_ADMIN_REQUIRED'));
+ await assert.rejects(f.finance.adminRefund(superAdmin,sub.id,{}),e=>e.getStatus?.()===400);
+ await assert.rejects(f.finance.adminRefund(superAdmin,randomUUID(),{reason:'검증'}),code('SUBSCRIPTION_NOT_FOUND'));
+ // content already used: the member self-refund is refused, the operator refund is not.
+ await db.checkoutOrder.update({where:{id:f.order.id},data:{usage_tracking_started_at:new Date(),content_accessed_at:new Date()}});
+ await assert.rejects(f.finance.refund(f.fan,f.order.id),code('CONTENT_ALREADY_ACCESSED'));
+ assert.equal(reasons.length,0,'refused calls never reach the provider');
+ await assert.rejects(f.finance.adminRefund(superAdmin,sub.id,{reason:'검증',confirmation:'1,000원'}),code('CONFIRMATION_REQUIRED'));await assert.rejects(f.finance.adminRefund(superAdmin,sub.id,{reason:'검증'}),code('CONFIRMATION_REQUIRED'));
+ assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'paid','a wrong amount leaves the order untouched');
+ const r=await f.finance.adminRefund(superAdmin,sub.id,{reason:'고객센터 청약철회 요청',confirmation:'10,000원'});
+ assert.equal(r.refunded,true);assert.equal(r.amount,10000);assert.equal(r.orderId,f.order.id);assert.equal(r.status,'EXPIRED');
+ assert.deepEqual(reasons,['운영자 환불'],'one provider cancel, with a fixed reason instead of operator free text');
+ const order=await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}}),entry=await db.revenueEntry.findUniqueOrThrow({where:{order_id:f.order.id}}),after=await db.subscription.findUniqueOrThrow({where:{id:sub.id}});
+ assert.equal(order.status,'refunded');assert.equal(entry.reversals,10000);assert.equal(entry.net,0);
+ assert.equal(after.status,'EXPIRED');assert.equal(after.auto_renew,false);assert.ok(after.ended_at<=new Date());
+ assert.equal(after.cancel_reason,'고객센터 청약철회 요청');assert.equal(after.cancelled_by,'admin-refund-test');
+ assert.equal(await db.subscription.count({where:{id:sub.id,status:{in:['ONGOING','CANCELLED']},ended_at:{gt:new Date()}}}),0,'access is cut now');
+ const log=await db.platformAuditLog.findFirst({where:{action:'admin.subscription.refunded',entity_id:sub.id}});assert.ok(log);assert.equal(JSON.stringify(log.metadata).includes('청약철회'),false,'free text stays out of audit');
+ await assert.rejects(f.finance.adminRefund(superAdmin,sub.id,{reason:'재시도',confirmation:'10,000원'}),code('NO_REFUNDABLE_PAYMENT'));assert.equal(reasons.length,1,'no second cancel');
+ // notices: member in-app + queued mail once, creator settlement notice once
+ const told=await inbox(f.fan,'subscription');assert.ok(told.some(n=>n.text.includes('10,000원 환불이 완료')),JSON.stringify(told.map(n=>n.text)));
+ const mail=await notices(f.fan,'refund-completed');assert.equal(mail.length,1);assert.ok(mail[0].rows.some(([k,v])=>k==='구독'&&v==='즉시 종료'));assert.equal(mail[0].path,'/subscriptions');
+ const creator=await inbox(f.creator,'settlement');assert.equal(creator.length,1);assert.match(creator[0].text,/10,000원.*정산에서 제외/);assert.equal(creator[0].path,'/studio/settlements');
+});
+test('console refund refuses while a payment is processing and refunds the latest paid order only',async()=>{
+ const f=await fixture();await f.finance.pay(f.fan,f.order.id);const sub=await db.subscription.findFirstOrThrow({where:{subscriber_id:f.fan}});
+ const busy=await db.checkoutOrder.create({data:{member_id:f.fan,membership_id:f.plan.id,subscription_id:sub.id,amount:10000,status:'processing',snapshot:{},idempotency_key:randomUUID(),expires_at:new Date(Date.now()+60000)}});
+ await assert.rejects(f.finance.adminRefund(superAdmin,sub.id,{reason:'검증',confirmation:'10,000원'}),code('PAYMENT_IN_PROGRESS'));
+ await db.checkoutOrder.delete({where:{id:busy.id}});
+ const empty=await fixture();const none=await db.subscription.create({data:{subscriber_id:empty.fan,membership_item_id:empty.plan.id,status:'ONGOING',amount:10000,auto_renew:true,ended_at:new Date(Date.now()+86400000)}});
+ await assert.rejects(empty.finance.adminRefund(superAdmin,none.id,{reason:'검증'}),code('NO_REFUNDABLE_PAYMENT'));
+});
+test('member cancel tells the member once in the app and by mail; repeating it does not',async()=>{
+ const f=await fixture();await f.finance.pay(f.fan,f.order.id);await f.finance.cancelSubscription(f.fan,f.creator);await f.finance.cancelSubscription(f.fan,f.creator);
+ const mail=await notices(f.fan,'subscription-cancelled');assert.equal(mail.length,1);assert.equal(mail[0].path,'/subscriptions');
+ const told=(await inbox(f.fan,'subscription')).filter(n=>n.text.includes('해지가 예약'));assert.equal(told.length,1);assert.match(told[0].text,/까지 이용할 수 있습니다/);
+});
+test('member 7-day refund and a provider-side cancel each send one refund notice to the member and the creator',async()=>{
+ const f=await fixture();await f.finance.pay(f.fan,f.order.id);await db.checkoutOrder.update({where:{id:f.order.id},data:{usage_tracking_started_at:new Date()}});
+ await f.finance.refund(f.fan,f.order.id);await f.finance.refund(f.fan,f.order.id);
+ assert.equal((await notices(f.fan,'refund-completed')).length,1);assert.equal((await inbox(f.creator,'settlement')).length,1);
+ const g=await fixture();await g.finance.pay(g.fan,g.order.id);const a=g.approved.get(g.order.id);g.approved.set(g.order.id,{...a,status:'CANCELED',balanceAmount:0});
+ assert.equal(await g.finance.reconcilePaid(g.order.id),1);
+ const told=await inbox(g.fan,'subscription');assert.ok(told.some(n=>n.text.includes('결제사에서 취소')));assert.equal((await notices(g.fan,'refund-completed')).length,1);assert.equal((await inbox(g.creator,'settlement')).length,1);
+ await db.platformOperationalEvent.deleteMany({where:{dedupe_key:'external-cancel:'+g.order.id}});
+});
+test('renewal stopped because the plan stopped selling tells an active member; a disabled member is not told',async()=>{
+ const f=await fixture();await f.finance.pay(f.fan,f.order.id);const sub=await due(f);await db.membershipItem.update({where:{id:f.plan.id},data:{is_active:false}});await f.finance.renew(sub.id);
+ const mail=await notices(f.fan,'subscription-cancelled');assert.equal(mail.length,1);assert.ok(mail[0].rows.some(([k,v])=>k==='사유'&&v.includes('판매 중지')));
+ const told=(await inbox(f.fan,'subscription')).filter(n=>n.text.includes('판매가 중지'));assert.equal(told.length,1);assert.doesNotMatch(told[0].text,/까지 이용할 수 있습니다/,'the period already ended at renewal time');
+ const g=await fixture();await g.finance.pay(g.fan,g.order.id);const s2=await due(g);await db.member.update({where:{id:g.fan},data:{enabled:false}});await g.finance.renew(s2.id);
+ assert.equal((await notices(g.fan,'subscription-cancelled')).length,0);
 });

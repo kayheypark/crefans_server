@@ -138,6 +138,8 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 
 최초 발행과 예약 발행은 팔로워/유효 구독자에게 중복 없는 발행 알림을 생성하고 알림 설정을 확인한다. 예약 발행·일일 정리는 worker가 담당한다.
 
+멤버십 해지·종료·환불 알림(2026-11-06 사용자 결정, `src/platform/membership-notices.ts`): 회원에게는 해지 예약(본인·판매 중지로 갱신 중단), 운영자 즉시 해지, 환불 완료(회원 7일·운영자·결제사 측 취소) 때 알림센터(type subscription, 멤버십 탭)와 메일(member_notices 대기열 → worker `member-notices`, kind subscription-cancelled/subscription-ended/refund-completed)을 dedupe 키로 한 번만 보낸다. 판매 중지 갱신 중단은 비활성 회원에게 보내지 않는다. 운영자 내부 사유는 회원에게 보이지 않는다. 크리에이터는 환불·결제사 측 취소 때만 정산 알림(type settlement, /studio/settlements)을 받는다. 가입·갱신·결제 실패 알림은 기존 그대로다.
+
 ## 결제·구독·정산·출금
 
 | Method | 경로 | 동작 |
@@ -187,6 +189,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /admin/memberships | 매출·정산 조회 권한, 조회 전용(2026-11-06). 전체 크리에이터의 멤버십 상품 20개 page(생성일 최신순). state=active·inactive·deleted(생략 시 삭제 제외), search=상품명·ID·크리에이터 이름·핸들. 상품별 구독 수: current(이용기간이 남은 ONGOING·CANCELLED)와 저장 상태별 누적 |
 | GET | /admin/subscriptions | 매출·정산 조회 권한, 조회 전용(2026-11-06). 구독 20개 page(생성일 최신순). status=ONGOING(자동 갱신)·CANCELLED(해지 예약, endedAt까지 이용)·EXPIRED, membershipId, search=구독자 ID·활동명·크리에이터 이름·핸들. 구독자는 ID·활동명·탈퇴 여부만, 이메일·빌링키·카드 ID·상품 snapshot 제외. summary는 같은 조건의 전체 집계 |
 | POST | /admin/subscriptions/:id/cancel-now | 활성 SUPER_ADMIN 전용(2026-11-06). 이용 종료 시각을 지금으로 당기고 상태를 EXPIRED로 바꿔 접근을 즉시 차단한다. 환불·결제 취소는 하지 않으며 결제사 API를 호출하지 않는다. 사유(500자) 필수이며 구독 행과 감사 로그에 남는다. 이미 종료된 구독은 409 |
+| POST | /admin/subscriptions/:id/refund | 활성 SUPER_ADMIN 전용(2026-11-06 사용자 결정). 구독의 가장 최근 paid 결제를 결제사 취소 API로 **전액** 환불(부분 환불 없음)하고 구독을 즉시 종료(EXPIRED)한다. 회원 셀프 환불의 7일·미이용 조건은 적용하지 않는다. 콘솔에서 입력한 금액 표기 `confirmation`(예: "12,000원")이 대상 결제 금액과 다르면 400 CONFIRMATION_REQUIRED. 결제사에 보내는 취소 사유는 고정 문구 '운영자 환불'이며 운영자 사유(500자, 필수)는 구독 행에만 저장되고 감사 로그(`admin.subscription.refunded`)에는 자유 문구 없이 남는다. 환불할 결제가 없으면 409 NO_REFUNDABLE_PAYMENT, 처리 중 결제가 있으면 409 PAYMENT_IN_PROGRESS. 수익 차감·미수금·추천 보상 회수는 회원 환불과 같은 `completeRefund` 경로를 쓴다 |
 | GET | /admin/withdrawals | 매출·정산 조회 권한; 전체 출금신청20개 page, 계좌/지급 자격정보 제외 |
 | GET | /admin/inquiries | 문의 조회 |
 | POST | /admin/inquiries/:id/reply | 문의 답변 |

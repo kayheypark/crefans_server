@@ -77,6 +77,7 @@ export class PlatformAdminController{
  @Get('memberships') @Permit(['revenue','view']) memberships(@Query() query:any,@Req() req:any){return adminMemberships(this.service.db,req.admin,query);}
  @Get('subscriptions') @Permit(['revenue','view']) subscriptions(@Query() query:any,@Req() req:any){return adminSubscriptions(this.service.db,req.admin,query);}
  @Post('subscriptions/:id/cancel-now') @Permit(['revenue','view']) cancelSubscriptionNow(@Param('id') id:string,@Body() body:any,@Req() req:any){return cancelSubscriptionNow(this.service.db,req.admin,id,body);}
+ @Post('subscriptions/:id/refund') @Permit(['revenue','view']) refundSubscription(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.adminRefund(req.admin,id,body);}
  @Get('withdrawals') @Permit(['revenue','view']) withdrawals(@Query() query:any,@Req() req:any){return adminWithdrawals(this.service.db,req.admin,query);}
  // Manual payout mode: the operator records a bank transfer made outside the app, and confirms settlement accounts by hand.
  @Post('withdrawals/:id/manual-result') @Permit(['revenue','create']) manualResult(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.manualResult(req.admin,id,body);}

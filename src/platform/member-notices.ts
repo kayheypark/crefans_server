@@ -5,11 +5,14 @@ import {MemberMailService} from '../auth/local/member-mail.service';
 
 // In-app notice plus a queued mail for things a member must hear about outside billing:
 // operator actions (D11, with the public reason) and bean expiry (D6, 30 days ahead; 30-day event beans 7 days ahead).
-export type MemberNoticeKind='moderation'|'bean-expiry'|'event-bean-expiry';
-const labels:Record<MemberNoticeKind,string>={moderation:'운영 안내','bean-expiry':'콩','event-bean-expiry':'콩'};
+// 2026-11-06 user decision: membership cancel/end/refund also reach the member in the app and by mail (kinds below).
+export type MemberNoticeKind='moderation'|'bean-expiry'|'event-bean-expiry'|'subscription-cancelled'|'subscription-ended'|'refund-completed';
+const labels:Record<MemberNoticeKind,string>={moderation:'운영 안내','bean-expiry':'콩','event-bean-expiry':'콩','subscription-cancelled':'멤버십','subscription-ended':'멤버십','refund-completed':'멤버십'};
+// Membership notices are stored as the existing 'subscription' notification type so they sit in the 멤버십 tab.
+const notificationType=(kind:MemberNoticeKind)=>labels[kind]==='멤버십'?'subscription':kind;
 export async function notifyMember(tx:any,input:{dedupeKey:string;memberId:string;kind:MemberNoticeKind;text:string;path:string;rows:Array<[string,string]>;note:string;actorId?:string}){
  if(await tx.memberNotice.findUnique({where:{dedupe_key:input.dedupeKey}}))return;
- await tx.memberNotification.create({data:{member_id:input.memberId,actor_id:input.actorId||null,type:input.kind,text:input.text,path:input.path}});
+ await tx.memberNotification.create({data:{member_id:input.memberId,actor_id:input.actorId||null,type:notificationType(input.kind),text:input.text,path:input.path}});
  await tx.memberNotice.create({data:{dedupe_key:input.dedupeKey,member_id:input.memberId,kind:input.kind,rows:input.rows,path:input.path,note:input.note}});
 }
 export const memberNoticeLabels=labels;

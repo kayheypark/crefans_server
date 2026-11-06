@@ -46,7 +46,8 @@ export function marketingMail(subject:string,body:string,unsubscribeUrl:string,a
  result.text=result.text.replace('이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.',advertisement?'이 메일은 광고성 정보입니다.':'이 메일은 수신 설정 처리에 관한 안내입니다.');
  return{...result,replyTo:'khpark@crefans.com',headers:{'List-Unsubscribe':`<${url.href}>`,'List-Unsubscribe-Post':'List-Unsubscribe=One-Click'}};
 }
-// Billing notices deliver payment-failed/renewal-stopped; member notices deliver moderation/bean-expiry/event-bean-expiry.
+// Billing notices deliver payment-failed/renewal-stopped; member notices deliver moderation/bean-expiry/event-bean-expiry
+// and, since 2026-11-06, subscription-cancelled/subscription-ended/refund-completed (membership-notices.ts).
 // Other notice templates remain prepared only, without event delivery.
 export function noticeMail(kind: keyof typeof noticeCopy, rows: Array<[string,string]>, actionUrl: string, note: string) {
   if (!Object.prototype.hasOwnProperty.call(noticeCopy,kind)) throw new Error('Unknown notice');
