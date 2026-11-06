@@ -296,6 +296,10 @@ model Subscription {
   next_billing_date     DateTime?
   /// 결제 실패 횟수
   payment_failure_count Int                  @default(0)
+  /// 운영 콘솔 즉시 해지 사유 (2026-11-06)
+  cancel_reason         String?              @db.VarChar(500)
+  /// 즉시 해지를 수행한 관리자 (admin.user_sub)
+  cancelled_by          String?              @db.VarChar(191)
   payment_transactions  PaymentTransaction[]
   membership_item       MembershipItem       @relation(fields: [membership_item_id], references: [id])
   transfers             Transfer[]
