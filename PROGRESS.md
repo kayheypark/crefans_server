@@ -1,3 +1,12 @@
+## 2026-11-06 운영 콘솔 구독 즉시 해지 (커밋·미배포)
+- 사용자 요청: toss@crefans.com 건을 계기로 콘솔에 멤버십 "즉시 해지". /ask-me 결정 4건 — ①이용권 즉시 종료(ended_at=now, status=EXPIRED) ②환불 없음·결제사 API 미호출 ③모든 구독에 쓰는 상시 기능 ④SUPER_ADMIN 전용. 추가 결정: 해지 사유는 전용 컬럼에 보관(마이그레이션 포함).
+- 브랜치 feat/admin-cancel-now(origin/prod 08345cb 기준, 작업트리 crefans_server-admin-memberships).
+- POST /admin/subscriptions/{id}/cancel-now (admin-memberships.ts). requireSuperAdmin + 사유 필수(500자). 한 트랜잭션에서 행 잠금 → status=EXPIRED·ended_at=now·auto_renew=false·next_billing_date=null·cancel_reason·cancelled_by 저장, 열린 주문(pending/failed) cancelled, subscription.cancelled 운영 이벤트, 감사 로그 admin.subscription.cancelled_now. 이미 끝난 구독은 409.
+- 근거: 서비스 전 구간의 접근 판정이 `status in (ONGOING,CANCELLED) AND ended_at > now`라 두 값을 함께 바꿔야 즉시 차단된다. 감사 로그 metadata는 허용목록이라 자유 텍스트를 담지 못해 사유를 전용 컬럼으로 뺐다(기존 financialPolicyChange.reason과 같은 관례).
+- 마이그레이션 20261106120000_subscription_admin_cancel: subscriptions에 cancel_reason VARCHAR(500) NULL, cancelled_by VARCHAR(191) NULL 추가. 조회 API 응답에 cancelReason·cancelledBy 노출(revenue.view).
+- 검증: tsc 0, platform-admin-console 16/16, platform-openapi 14/14(오퍼레이션 203→204, console 문서 89→90). 대조 3건 — 권한 약화·즉시종료 제거·사유 저장 제거 각각 1 fail 후 원복 재통과. 증거 .local/cancel-now-20261106/verification.json.
+- 미수행: 운영 배포, 운영 DB 마이그레이션, 실제 구독 대상 실행. 회원에게 가는 알림 없음(subscription-cancelled 메일 템플릿은 현재 어느 경로에서도 발송되지 않으며 문구도 '기간까지 이용 가능'이라 즉시 해지와 맞지 않음 — 필요하면 별도 작업).
+
 ## 2026-11-06 운영 콘솔 멤버십 상품·구독 현황 조회 API (운영 배포 완료)
 - 사용자 "다되면 배포" 지시로 배포. feat 631f4f5 → dev 0a629d8 → prod 5ff7c73(tree 동일). 운영 api/worker crefans-api:admin-memberships-20261106 = billing-results-20261105 위에 3개 파일(admin-memberships·admin.controller·openapi-contract src/dist)만 overlay, 서버에서 --network none 빌드. 이미지 내 파일 SHA가 컨텍스트와 같음, 컴파일 차이는 두 경로 추가뿐 확인. migration 없음.
 - 배포 확인(2026-11-06): health ready, api/worker running·restart0·OOM false, APP_RELEASE 일치, LIVE_PAYMENTS/MANUAL_PAYOUTS 미설정 유지, front/admin/DB/proxy 컨테이너 ID 불변, .env·runtime.env는 이미지/릴리스 줄 외 동일, 비로그인 /admin/memberships·/admin/subscriptions 401. 운영 컨테이너에서 새 함수 읽기 전용 실행: 상품 1·구독 1(ONGOING)·삭제 상품 0, 비밀 필드 없음, 구독 행 수 불변.
