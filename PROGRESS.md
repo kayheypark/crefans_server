@@ -2108,3 +2108,13 @@
 - 복구본 `/Users/ethan/crefans-recovery/20261106/mail-order/`(이전 api·front·admin 이미지, 설정, DB 덤프) SHA-256 9건 일치 후 서버 사본·이전 태그 정리(디스크 92%→71%). 증거 `.local/mail-order-deploy-20261106/`.
 - 토스 회신 초안에 신고번호 기재·발송 가능 상태로 갱신: `.local/toss-review-audit-20261106/reply-draft.md`. 남은 발송 전 확인은 테스트계정 로그인뿐.
 - 본인확인 공급사: 사용자가 "NICE 우편 서류"를 물었으나 기록상 2026-11-03 KG이니시스 통합인증으로 결정됨. 우편 제출 자료는 `docs/inicis-application-prep-20261029.md` 와 `.local/inicis-reply-20261029/draft/submit/`. 받은 메일이 NICE 인지 이니시스인지 사용자 확인 대기.
+
+## 2026-11-06 ftc-link-20261106 배포 + 복구본 삭제 사고
+- front prod 7c7c691 배포(frontend 만). 하단 사업자 정보의 통신판매업 신고번호 옆에 공정위 "사업자정보 확인" 링크(`https://www.ftc.go.kr/bizCommPop.do?wrkr_no=3770202940`, 새 탭). 공정위 화면은 보안문자 입력 뒤 정보를 보여준다(방문자가 입력). 운영 DOM 2곳에서 링크 확인, 외부 4개 URL 200.
+- **사고**: 배포 후 이전 프론트 이미지(`crefans-front:mail-order-20261106`) 복구본을 옮기는 단계에서 zsh 가 `$K` 옵션 문자열을 나누지 않아 scp 가 실패했는데, 스크립트가 멈추지 않고 정리 단계까지 실행돼 **이전 이미지와 `.env` 백업이 운영 밖 사본 없이 삭제됐다**(AGENTS.md "검증 실패 시 원본 유지" 위반). 운영 서비스·DB·현재 설정에는 영향 없음.
+- 복구: 같은 소스(front e484c37, tree b3a7ac5)·같은 빌드 인자로 서버에서 재빌드해 내용(신고번호 4파일, 공정위 링크 0파일)을 확인하고, `.env` 는 배포 diff 로 확인된 FRONTEND_IMAGE 한 줄만 되돌려 재구성했다. `/Users/ethan/crefans-recovery/20261106/ftc-link/` 에 SHA-256 검증 후 서버 사본 정리. 바이트 동일 원본이 아님을 README 에 기록.
+- 재발 방지: 원격 작업 스크립트는 bash 로 실행하고 ssh/scp 옵션은 배열로 넘긴다. 서버 사본 삭제는 로컬 `shasum -c` 성공 뒤 별도 명령으로만 한다.
+- 남은 서버 잔여물: `/opt/crefans-backup-cancel-now-20261106`(오전 cancel-now 배포 백업). 복구본은 `/Users/ethan/crefans-recovery/20261106/cancel-now/` 에 있으나 내용 대조 전이라 지우지 않았다.
+
+## 2026-11-06 랜딩 모바일 푸터 — prod 승격 완료, 운영 미배포
+- front prod 2832384(feat/landing-footer). 운영 배포는 자동 권한 정책에 막혀 사용자 승인 대기.
