@@ -2118,3 +2118,8 @@
 
 ## 2026-11-06 랜딩 모바일 푸터 — prod 승격 완료, 운영 미배포
 - front prod 2832384(feat/landing-footer). 운영 배포는 자동 권한 정책에 막혀 사용자 승인 대기.
+
+## 2026-11-06 랜딩 모바일 푸터·가이드 콩 1년 운영 배포
+- landing-footer-20261106: front prod 2832384, frontend 만 교체. 랜딩 모바일 하단에 ServiceFooter(서비스 링크·사업자 정보·신고번호·공정위 링크). 외부 4URL 200, 운영 랜딩 HTML 에 신고번호 확인. 이전 front(ftc-link) 이미지·.env 는 `/Users/ethan/crefans-recovery/20261106/landing-footer/` 로 옮겨 **로컬 shasum -c 통과 후에만** 서버 사본 삭제(오전 사고 재발 방지 절차 적용).
+- 가이드: `fans/beans/` 콩 유효기간 5년→1년 운영 반영(가이드 저장소 기록 참고). 토스 회신에 guide.crefans.com 링크를 넣기 위한 선행 조건.
+- 토스 회신 최종 문안: 사용자 간단 버전 + 3번 끝 "더 자세한 가이드는 다음 링크에서 확인 가능합니다. https://guide.crefans.com". 발송은 사용자가 직접.
