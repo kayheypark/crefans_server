@@ -2098,3 +2098,13 @@
 - 제1조의 "유료 서비스 개시 전에 통신판매업을 신고하고 신고번호를 이 조와 서비스 하단 사업자 정보에 표시합니다" 약속 문구를 실제 번호 기재로 바꿨다. 사실 기재이고 이용자에게 불리하지 않아 **시행일(2026-11-06)은 그대로, 버전만 2026-11-06.2 → 2026-11-06.3**. 기존 회원 재동의 흐름은 없다(동의 버전 대조는 가입 시점만).
 - 하단 표시는 프론트 `feat/mail-order-number`(lib/content/business.ts)에서 함께 처리.
 - 검증: build 통과, legal+openapi 26/26. 대조: 번호를 틀리게 바꾸면 legal 1건 실패, 복구 후 0건.
+
+## 2026-11-06 mail-order-20261106 운영 배포 완료
+- server prod f2a3de1 / front prod e484c37 / admin prod ab01003 배포. api·worker·frontend·admin 모두 `*:mail-order-20261106`, database·proxy 불변, 마이그레이션 없음(`migrate status` up to date).
+- 내용: ①통신판매업 신고번호 2026-서울관악-2144 를 사업자 정보(PC 사이드바·모바일 하단)에 표시 ②약관 제1조에 같은 번호 기재(v2026-11-06.3, 시행일 그대로) ③운영 콘솔 네이티브 confirm 6곳·prompt 3곳을 자체 다이얼로그(`useConfirm`/`usePrompt`)로 교체.
+- 배포 전 이미지 내부 대조: api 약관에 번호·v06.3·APP_RELEASE, front 청크 4개에 번호, admin `.next/static` 네이티브 confirm/prompt 0건·새 입력창 문구 존재.
+- 배포 후: 컨테이너 restart 0·api healthy, 외부 health/feed/약관/콘솔 로그인 200, 공개 약관 API v2026-11-06.3·제1조에 번호·시행 예정본 없음. 운영 DOM 사업자 정보 2곳 모두 `통신판매업 신고번호 2026-서울관악-2144`.
+- **배포 1차 실패 → 자동 롤백 → 2차 성공.** 1차는 새 이미지 기동 뒤 검증에서 실패해 트랩이 이전 이미지로 되돌렸다(운영은 이전 상태로 healthy 유지 확인). 단계 표시가 없어 실패 줄을 특정하지 못했으나 `set -o pipefail` 아래 `compose run … | grep -q` 가 유력(조기 종료한 grep 이 앞 명령을 SIGPIPE 로 실패시키는 패턴). 출력을 변수에 받아 검사하도록 고치고 단계 표시·ERR 트랩을 넣은 2차는 전 단계 통과. 이후 배포 스크립트에서 `| grep -q` 를 쓰지 않는다.
+- 복구본 `/Users/ethan/crefans-recovery/20261106/mail-order/`(이전 api·front·admin 이미지, 설정, DB 덤프) SHA-256 9건 일치 후 서버 사본·이전 태그 정리(디스크 92%→71%). 증거 `.local/mail-order-deploy-20261106/`.
+- 토스 회신 초안에 신고번호 기재·발송 가능 상태로 갱신: `.local/toss-review-audit-20261106/reply-draft.md`. 남은 발송 전 확인은 테스트계정 로그인뿐.
+- 본인확인 공급사: 사용자가 "NICE 우편 서류"를 물었으나 기록상 2026-11-03 KG이니시스 통합인증으로 결정됨. 우편 제출 자료는 `docs/inicis-application-prep-20261029.md` 와 `.local/inicis-reply-20261029/draft/submit/`. 받은 메일이 NICE 인지 이니시스인지 사용자 확인 대기.
