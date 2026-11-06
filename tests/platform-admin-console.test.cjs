@@ -191,3 +191,53 @@ test('membership and subscription lists are read-only revenue views without bill
   for(const q of['memberships?state=all','memberships?page=0','subscriptions?status=ongoing','subscriptions?status=ONGOING&status=EXPIRED','subscriptions?search='+'x'.repeat(101)])assert.equal((await api(q)).status,400,q);
  }finally{await db.subscription.deleteMany({where:{id:{in:subs}}});await db.membershipItem.deleteMany({where:{id:{in:plans}}});}
 });
+
+test('immediate cancel ends access now, is SUPER_ADMIN only, needs a reason and never refunds',async()=>{
+ const owner=randomUUID(),tag='즉시해지 '+randomUUID().slice(0,8),plans=[],subs=[],extra=[];
+ creatorIds.push(owner);await db.creator.create({data:{user_id:owner,display_name:tag}});
+ try{
+  const plan=await db.membershipItem.create({data:{name:tag,creator_id:owner,price:10000,billing_unit:'MONTH',billing_period:1,benefits:'a'}});plans.push(plan.id);
+  const day=86400000;let n=0;
+  const sub=async(status,endOffset)=>{const s=await db.subscription.create({data:{subscriber_id:fan,membership_item_id:plan.id,status,amount:10000,auto_renew:status==='ONGOING',started_at:new Date(Date.now()-day+(n++)*1000),ended_at:new Date(Date.now()+endOffset),next_billing_date:status==='ONGOING'?new Date(Date.now()+endOffset):null,plan_snapshot:{secret:'must-not-leak'},billing_key:'private-billing-key'}});subs.push(s.id);return s;};
+  const live=await sub('ONGOING',20*day),done=await sub('EXPIRED',-day);
+  const pending=await order(owner,null,10000,0,'pending',false);await db.checkoutOrder.update({where:{id:pending},data:{subscription_id:live.id}});
+
+  // permission: the write is SUPER_ADMIN only even though the list it sits on is revenue.view
+  for(const user of['none','fan','disabled'])assert.equal((await api('subscriptions/'+live.id+'/cancel-now',user,{reason:'검증'})).status,401,user);
+  for(const user of['moderator','admin'])assert.equal((await api('subscriptions/'+live.id+'/cancel-now',user,{reason:'검증'})).status,403,user);
+  assert.equal((await db.subscription.findUnique({where:{id:live.id}})).status,'ONGOING','refused calls must not change the row');
+
+  assert.equal((await api('subscriptions/'+live.id+'/cancel-now','super',{})).status,400,'reason is required');
+  assert.equal((await api('subscriptions/'+live.id+'/cancel-now','super',{reason:'x'.repeat(501)})).status,400,'reason is bounded');
+  assert.equal((await api('subscriptions/'+randomUUID()+'/cancel-now','super',{reason:'검증'})).status,404);
+  assert.equal((await api('subscriptions/'+done.id+'/cancel-now','super',{reason:'검증'})).status,409,'already ended');
+
+  const before=new Date(),r=await api('subscriptions/'+live.id+'/cancel-now','super',{reason:'토스 심사 종료'}),after=new Date();
+  assert.equal(r.status,201);assert.equal(r.data.status,'EXPIRED');assert.equal(r.data.refunded,false);
+  const row=await db.subscription.findUnique({where:{id:live.id}});
+  assert.equal(row.status,'EXPIRED');assert.equal(row.auto_renew,false);assert.equal(row.next_billing_date,null);
+  assert.ok(row.ended_at>=before&&row.ended_at<=after,'ended_at is moved to now, not left in the future');
+
+  // the access predicate used across the service (live status AND remaining period) no longer matches
+  assert.equal(await db.subscription.count({where:{id:live.id,status:{in:['ONGOING','CANCELLED']},ended_at:{gt:new Date()}}}),0,'access must be cut immediately');
+  assert.equal((await db.checkoutOrder.findUnique({where:{id:pending}})).status,'cancelled','open orders are closed');
+  assert.equal((await api('subscriptions?membershipId='+plan.id)).data.summary.current,0);
+
+  assert.equal(row.cancel_reason,'토스 심사 종료','the reason is stored on the row');
+  assert.ok(row.cancelled_by,'the acting administrator is stored');
+  const shown=(await api('subscriptions?membershipId='+plan.id)).data.items.find(i=>i.id===live.id);
+  assert.equal(shown.cancelReason,'토스 심사 종료','operators can read the reason back');assert.equal(shown.status,'EXPIRED');
+  const log=await db.platformAuditLog.findFirst({where:{action:'admin.subscription.cancelled_now',entity_id:live.id},orderBy:{occurred_at:'desc'}});
+  assert.ok(log,'the action is audited');assert.deepEqual(log.metadata.changedFields.sort(),['auto_renew','status']);
+  assert.equal(JSON.stringify(log.metadata).includes('private-billing-key'),false,'no billing secret in the audit entry');
+  assert.equal(JSON.stringify(log.metadata).includes('토스 심사 종료'),false,'free text stays out of the audit metadata');
+  const event=await db.platformOperationalEvent.findFirst({where:{type:'subscription.cancelled',data:{path:'$.subscriptionId',equals:live.id}}});
+  assert.ok(event,'operators are notified');extra.push(event.id);
+
+  assert.equal((await api('subscriptions/'+live.id+'/cancel-now','super',{reason:'재시도'})).status,409,'repeating is rejected, not applied twice');
+ }finally{
+  await db.platformAuditLog.deleteMany({where:{action:'admin.subscription.cancelled_now',entity_id:{in:subs}}});
+  await db.platformOperationalEvent.deleteMany({where:{id:{in:extra}}});
+  await db.subscription.deleteMany({where:{id:{in:subs}}});await db.membershipItem.deleteMany({where:{id:{in:plans}}});
+ }
+});
