@@ -2077,3 +2077,11 @@
 - 문서: `docs/platform-api.md`에 유효기간 1년·충전 상한·멤버십 가격 상한 반영, 누락돼 있던 `POST /admin/subscriptions/:id/cancel-now` 행 추가(2026-11-06 즉시해지 배포 때 빠뜨린 것).
 - 검증: server 빌드 통과, beans 39/39, legal+openapi 26/26, studio-replies 신규 1건 통과. 대조 검사 4건 모두 검사기가 잡음. 기준선(`origin/prod` 무변경 워크트리)과 대조해 나머지 실패 13건이 기존 실패임을 확인. front `check:docs` PASS·빌드 통과. 증거 `.local/toss-limits-20261106/verification.md`.
 - 미결: 운영 배포 승인 미취득. 가이드 `check:guides` 락은 메인 체크아웃을 해시해 워크트리에서 갱신 불가(통합 시점에 처리). 운영 공지사항 글은 DB 문서라 콘솔에서 별도 수정 필요. 테스트계정 toss@crefans.com 로그인 가능 여부는 사용자 확인 대기.
+
+## 2026-11-06 toss-limits-20261106 운영 배포 완료
+- server prod 162feef / front prod bea9f25 배포. api·worker=`crefans-api:toss-limits-20261106`, frontend=`crefans-front:toss-limits-20261106`. admin·database·proxy 불변. 마이그레이션 없음(스키마 무변경, `migrate status` up to date).
+- 사용자 결정 변경(2026-11-06): 실이용자·실결제가 없었으므로 30일 재공지를 접고 **개정본을 배포일 시행 단일본으로 공개**. 운영 `/api/v1/common` 에서 terms 2026-11-06.2 / effectiveAt 2026-11-06, 시행 예정본(`terms-next`) 사라짐 확인. 실결제 개시가 시행일까지 밀리던 제약 해소.
+- 검증: 컨테이너 restart 0·OOM false·api healthy, 외부 health/feed/admin로그인/약관 전부 200, 결제 스위치 LIVE 미설정·BEAN_LIVE false. 배포 전 이미지 내부 대조(상한·유효기간·약관 버전·가격 상한) 통과. 증거 `.local/toss-limits-deploy-20261106/deployment.md`.
+- 복구본 `/Users/ethan/crefans-recovery/20261106/toss-limits/` 로 이전·SHA-256 7건 일치 후 서버 사본·이전 태그 정리(디스크 94%→71%).
+- 남은 일: **운영 콘솔 공지사항 정리** — `notice-terms-20261202`·`notice-terms-20261130` 두 글이 더 이상 없는 12-02 개정 일정을 안내하고 있어 배포된 약관과 모순된다. DB 문서라 코드 배포로 바뀌지 않는다. 콘솔 로그인은 사용자가 해야 한다(운영 호스트 비밀번호 입력 불가).
+- 남은 일: 토스 회신 발송(통신판매업 신고 후), 테스트계정 toss@crefans.com 로그인 확인, `crefans_guide` prod 승격(메인 체크아웃 점유로 보류).
