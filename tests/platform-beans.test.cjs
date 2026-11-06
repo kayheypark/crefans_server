@@ -4,7 +4,7 @@ require('reflect-metadata');require('dotenv').config({path:'.local/platform.env'
 const WED=(()=>{const d=new Date();d.setUTCHours(0,0,0,0);do{d.setUTCDate(d.getUTCDate()+1);}while(new Date(d.getTime()+9*3600000).getUTCDay()!==3);return d.toISOString();})(),TUE=new Date(Date.parse(WED)-86400000).toISOString(),THU=new Date(Date.parse(WED)+86400000).toISOString();
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),{randomUUID}=require('crypto'),{PrismaClient}=require('@prisma/client'),{ConfigService}=require('@nestjs/config');
 assert.equal(process.env.CREFANS_E2E,'true');const source=process.env.DATABASE_URL;assert.match(source,/@127\.0\.0\.1:3307\/crefans_platform_dev$/);const url=new URL(source);url.pathname='/crefans_platform_e2e';process.env.DATABASE_URL=url.toString();
-const {BeansService}=require('../dist/src/platform/beans.service'),{PlatformService}=require('../dist/src/platform/service'),{PlatformFinanceService}=require('../dist/src/platform/finance.service'),{hashPassword}=require('../dist/src/auth/local/credentials');
+const {beanPolicy}=require('../dist/src/platform/bean-policy'),{BeansService}=require('../dist/src/platform/beans.service'),{PlatformService}=require('../dist/src/platform/service'),{PlatformFinanceService}=require('../dist/src/platform/finance.service'),{hashPassword}=require('../dist/src/auth/local/credentials');
 const db=new PrismaClient(),ids=Array.from({length:5},()=>randomUUID()),[fan,creator,stranger,adminId]=ids,pg=new Map();let release,charges=0,transfers=0,lost=false,bankStatus='paid',account,firstCharge;
 const config=new ConfigService({BEAN_LEDGER_ENABLED:'true',BEAN_LIVE_PAYMENTS_APPROVED:'true',BANK_PAYOUTS_ENABLED:'true',BETA_MODE:'false'}),provider={configForClient:()=>({clientKey:'live_ck_synthetic'}),decrypt:x=>x,encrypt:x=>x,lookup:async id=>pg.get(id)||null,confirm:async(key,o)=>{charges++;const r={status:'DONE',currency:'KRW',totalAmount:o.amount,balanceAmount:o.amount,paymentKey:key,orderId:o.id,approvedAt:new Date(Date.now()-8*86400000).toISOString()};pg.set(o.id,r);if(lost){lost=false;throw Error('Synthetic lost response');}return r;}},bank={transfer:async(...args)=>{transfers++;return{status:bankStatus};}},service=new PlatformService(db,undefined,config),finance=new PlatformFinanceService(service,provider,config,bank),beans=new BeansService(service,finance,provider,bank,config),tipNow=beans.tip.bind(beans),admin={is_active:true,role:'SUPER_ADMIN',user_sub:adminId},code=c=>e=>e.getResponse?.().code===c;
 // Received beans now wait 7 days from the tip (beanPolicy.tipHoldDays). Payout tests below run as if that week passed: each tip's lots move back 7 days, keeping any later source maturity they test.
@@ -249,10 +249,10 @@ test('unused purchased beans refund through a partial PG cancel: full within 7 d
  await assert.rejects(beans.refundCharge(member,refused.id,{requestId:randomUUID()}),code('BEAN_REFUND_IN_PROGRESS'));cancelError=null;
  await db.beanRefund.deleteMany({where:{member_id:member}});
 });
-test('purchased and promotion beans expire 5 years after payment or grant, with one notice 30 days ahead',async()=>{
+test('purchased and promotion beans expire 1 year after payment or grant, with one notice 30 days ahead',async()=>{
  const member=randomUUID();ids.push(member);await db.member.create({data:{id:member,email:member+'@example.invalid',name:'Expiry fixture',nickname:'Expiry fixture',preferred_username:member,email_verified:true}});
  await beans.grant(admin,{memberId:member,quantity:40,requestId:randomUUID(),reason:'만료 검증'});const lot=await db.beanLot.findFirstOrThrow({where:{member_id:member,bucket:'promotion'}});
- const years=(lot.expires_at-lot.created_at)/86400000/365.25;assert.ok(years>4.99&&years<5.01,'promotion beans get 5 years');
+ const years=(lot.expires_at-lot.created_at)/86400000/365.25;assert.ok(years>0.99&&years<1.01,'promotion beans get 1 year (2026-11-06)');
  await db.beanLot.update({where:{id:lot.id},data:{expires_at:new Date(Date.now()+10*86400000)}});
  await beans.expireLots();await beans.expireLots();
  const notes=await db.memberNotification.findMany({where:{member_id:member,type:'bean-expiry'}});assert.equal(notes.length,1);assert.match(notes[0].text,/콩 40개가 .+에 유효기간이 끝납니다/);
@@ -450,4 +450,24 @@ test('operator promotion grants and payout processing are SUPER_ADMIN only; 10,0
   const last=input(3);await beans.grant(admin,last);await beans.grant(admin,last);
   await assert.rejects(beans.grant(admin,input(1)),code('PROMOTION_DAILY_LIMIT'));
  }finally{await db.beanPromotion.deleteMany({where:{id:{in:synthetic}}});}
+});
+
+// 2026-11-06 user decision: the Toss review declares a 1,100,000 KRW single-payment ceiling, so one charge is capped at
+// 10,000 beans (x110 KRW). Tips move ledger beans without a PG payment, so they keep the wider limit. Validity is now 1 year.
+test('단건 충전은 10,000콩(1,100,000원)까지, 후원은 이 상한을 공유하지 않으며 유효기간은 1년이다',async()=>{
+ assert.equal(beanPolicy.maxChargeQuantity,10000);assert.equal(beanPolicy.validityYears,1);
+ assert.equal(beanPolicy.maxChargeQuantity*beanPolicy.chargeKrwPerBean,1100000);
+ await assert.rejects(beans.createCharge(fan,{quantity:10001,requestId:randomUUID()}),code('INVALID_BEAN_QUANTITY'));
+ const before=await db.beanCharge.count({where:{member_id:fan}});
+ await assert.rejects(beans.createCharge(fan,{quantity:100000,requestId:randomUUID()}),code('INVALID_BEAN_QUANTITY'));
+ assert.equal(await db.beanCharge.count({where:{member_id:fan}}),before,'거부된 충전은 주문을 만들지 않는다');
+ const ok=await beans.createCharge(fan,{quantity:10000,requestId:randomUUID()});
+ assert.equal(ok.amount,1100000);
+ // 충전 완료분의 유효기간은 결제일+1년
+ const lot=await db.beanLot.findFirstOrThrow({where:{charge_id:firstCharge.id,bucket:'purchased'}});
+ const paid=(await db.beanCharge.findUniqueOrThrow({where:{id:firstCharge.id}})).paid_at;
+ const expected=new Date(paid);expected.setFullYear(expected.getFullYear()+1);
+ assert.equal(lot.expires_at.toISOString(),expected.toISOString());
+ // 후원은 PG 결제가 아니므로 10,000콩 상한을 적용하지 않는다(잔액 부족으로 걸릴 뿐)
+ await assert.rejects(beans.tip(fan,creator,{quantity:20000,requestId:randomUUID()}),code('INSUFFICIENT_BEANS'));
 });

@@ -2069,3 +2069,11 @@
 - 103개 초기 예약/감사행과 기존회원 핸들 보존 확인. user_profiles.bio 이관 예상/실제 해시 일치, creators.bio 제거, 기타creator컬럼 전체(긴소개·커버·생성일 포함) 동일 해시. 데이터 원문은 증거에 넣지 않음.
 - 소스와 실제 Docker 이미지 파일SHA 대조, APIhealth·workerrelease·서비스restarts0/OOMfalse 및 금융설정 불변 확인. 프론트/관리자도 동시 묶음 배포. 공개 운영 증거는 프론트 docs/audit/open-event-spacing-20261103.json, 상세 비공개 백업은 운영 배포 폴더에 보존.
 - Nest빌드·Prisma생성·격리DB31고유사례 통과. OpenAPI 합산196 기대값 수정 후13사례 재통과. 실결제·송금·인증운영 사용자 변경 테스트는 미실행. 이미지 단독 롤백 금지(구형bio 컬럼 삭제); 새 writer 이후 DB 전체 복구는 데이터 손실 위험으로 자동 시행하지 않도록 구성.
+
+## 2026-11-06 토스 심사 신고값에 코드·약관 정합 (feat/toss-review-limits, 운영 미배포)
+- 사용자 결정(/ask-me): ①단건 최고가 1,100,000원으로 신고하고 코드 상한을 그 값으로 축소 ②콩 유효기간 5년→12개월로 줄이고 제공기간 12개월 신고 ③환불정책 URL은 유지하고 회신 본문에 시행일 상황 명시 ④회신은 통신판매업 신고 완료 후 발송.
+- 코드: `bean-policy.ts`에 `maxChargeQuantity:10000` 신설·`validityYears:1`, `beans.service.ts` 충전 전용 상한(후원은 PG 결제가 아니라 제외), `studio.service.ts`·`finance.service.ts` 멤버십 가격 1,100,000원, `openapi-contract.ts` 동일 반영.
+- 약관: 제11조 유효기간 1년. 불리한 변경이라 재공지 — 공지 2026-11-02→2026-11-06, 시행 2026-12-02→**2026-12-06**, 버전 2026-12-06.2. **실결제 개시 가능일도 12-06으로 밀린다.**
+- 문서: `docs/platform-api.md`에 유효기간 1년·충전 상한·멤버십 가격 상한 반영, 누락돼 있던 `POST /admin/subscriptions/:id/cancel-now` 행 추가(2026-11-06 즉시해지 배포 때 빠뜨린 것).
+- 검증: server 빌드 통과, beans 39/39, legal+openapi 26/26, studio-replies 신규 1건 통과. 대조 검사 4건 모두 검사기가 잡음. 기준선(`origin/prod` 무변경 워크트리)과 대조해 나머지 실패 13건이 기존 실패임을 확인. front `check:docs` PASS·빌드 통과. 증거 `.local/toss-limits-20261106/verification.md`.
+- 미결: 운영 배포 승인 미취득. 가이드 `check:guides` 락은 메인 체크아웃을 해시해 워크트리에서 갱신 불가(통합 시점에 처리). 운영 공지사항 글은 DB 문서라 콘솔에서 별도 수정 필요. 테스트계정 toss@crefans.com 로그인 가능 여부는 사용자 확인 대기.

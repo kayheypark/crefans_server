@@ -67,15 +67,15 @@ test('privacy policy describes the actual withdrawal purge: 30-day grace, erased
  assert.match(body,/탈퇴 후 30일 동안은/);assert.match(body,/작성한 게시물을 삭제합니다/);assert.match(body,/“탈퇴한 사용자”로 표시/);
  assert.doesNotMatch(body,/회원 정보 전체를 파기하지 않습니다/);
 });
-test('the merged revision is published as upcoming and replaces the terms and policy on its KST effective date only (2026-11-02 re-notice)',()=>{
- const legal=new LegalDocumentsService(),before=legal.catalog(new Date('2026-12-01T23:59:00+09:00')),after=legal.catalog(new Date('2026-12-02T00:00:00+09:00'));
- assert.equal(NEXT_TERMS_EFFECTIVE,'2026-12-02','30 days after the 2026-11-02 notice');assert.equal(legal.catalog(new Date('2026-11-30T12:00:00+09:00')).documents.terms.version,'2026-10-30.3','the old 11-30 date no longer applies');
- assert.equal(before.documents.terms.version,'2026-10-30.3');assert.equal(before.upcoming.effectiveAt,'2026-12-02');assert.equal(before.upcoming.documents.terms.version,'2026-12-02.2');
- assert.equal(after.documents.terms.version,'2026-12-02.2');assert.equal(after.documents.policy.version,'2026-12-02.1');assert.equal(after.upcoming,undefined);
+test('the merged revision is published as upcoming and replaces the terms and policy on its KST effective date only (2026-11-06 re-notice: bean validity cut to 1 year)',()=>{
+ const legal=new LegalDocumentsService(),before=legal.catalog(new Date('2026-12-05T23:59:00+09:00')),after=legal.catalog(new Date('2026-12-06T00:00:00+09:00'));
+ assert.equal(LEGAL_NOTICE_DATE,'2026-11-06');assert.equal(NEXT_TERMS_EFFECTIVE,'2026-12-06','30 days after the 2026-11-06 re-notice');assert.equal(legal.catalog(new Date('2026-12-02T12:00:00+09:00')).documents.terms.version,'2026-10-30.3','the old 12-02 date no longer applies');
+ assert.equal(before.documents.terms.version,'2026-10-30.3');assert.equal(before.upcoming.effectiveAt,'2026-12-06');assert.equal(before.upcoming.documents.terms.version,'2026-12-06.2');
+ assert.equal(after.documents.terms.version,'2026-12-06.2');assert.equal(after.documents.policy.version,'2026-12-06.1');assert.equal(after.upcoming,undefined);
  assert.equal(after.documents.privacy.version,before.documents.privacy.version,'the privacy revision already applies from the notice day');
  const terms=JSON.stringify(after.documents.terms);
- for(const added of ['11. 콩','10%를 공제','미수금','신고한 회원에게 앱 알림','볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다','오픈베타','회사가 부담하여 신고·납부','화요일 23:59','다음 영업일','친구 초대 보상 등으로 무상 지급한 프로모션콩','12. 친구 초대','남은 콩을 회수','https://crefans.com/핸들','끌 수 없습니다'])assert.ok(terms.includes(added),added);
- for(const removed of ['17개 계정','법정 원천징수는 별도','세금 처리 방식(원천징수 여부 포함)','공휴일·신청 마감 등 세부 일정','운영자가 지급한 프로모션콩'])assert.ok(!terms.includes(removed),removed);
+ for(const added of ['11. 콩','10%를 공제','미수금','신고한 회원에게 앱 알림','볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다','오픈베타','회사가 부담하여 신고·납부','화요일 23:59','다음 영업일','친구 초대 보상 등으로 무상 지급한 프로모션콩','12. 친구 초대','남은 콩을 회수','https://crefans.com/핸들','끌 수 없습니다','지급일로부터 1년간 쓸 수 있으며','콩 유효기간을 5년에서 1년으로 줄여'])assert.ok(terms.includes(added),added);
+ for(const removed of ['17개 계정','법정 원천징수는 별도','세금 처리 방식(원천징수 여부 포함)','공휴일·신청 마감 등 세부 일정','운영자가 지급한 프로모션콩','지급일로부터 5년간 쓸 수 있으며'])assert.ok(!terms.includes(removed),removed);
  const privacy=JSON.stringify(before.documents.privacy);
  for(const added of ['메타데이터를 제거','운영자가 통장 사본 등으로 확인','처리를 마친 날부터 3년','회원 정보 파기 후 5년','재사용 금지 목록','ab***@n***.com','해시 값(앞 12자리)','edpo.com/telegram-gdpr-data-request'])assert.ok(privacy.includes(added),added);
  for(const removed of ['본인확인된 예금주명','문의·신고 기록은','요청·기록·회원·거래 식별자'])assert.ok(!privacy.includes(removed),removed);
