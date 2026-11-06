@@ -1,3 +1,9 @@
+## 2026-11-06 23:27 KST 운영 배포 refund-notices-20261106 — 콘솔 환불 후 종료·멤버십 알림·법정 표시 (완료)
+- 결정(/pilot-work, 사용자): 법정 표시는 하단+멤버십 결제 확인창에 넣고 배포(호스팅 상호 = AWS 청구서 법인명 Amazon Web Services Korea LLC, 사용자 확인). 멤버십 환불은 콘솔 운영자 도구, 전액만+구독 즉시 종료, 검사 통과 시 배포. 해지·환불 알림은 회원 알림센터+메일, 크리에이터는 환불만. 보안 2건(로그인 해시 DoS·OTP 자가 등록)은 현행 유지. 가이드는 약관에 맞춰 수정·배포(별도 작업, crefans_guide).
+- 서버 prod 48c58f9(feat/membership-refund-notices 81eeddb): POST /admin/subscriptions/:id/refund(SUPER_ADMIN, reason 필수, confirmation=대상 금액 표기 서버 검사, 7일·미이용 조건 미적용, 결제사 취소 사유 고정 '운영자 환불', completeRefund 공유), 구독 목록 refundable, src/platform/membership-notices.ts(해지 예약·판매 중지·운영자 즉시 해지·환불 완료 회원 알림+메일, 크리에이터 정산 알림). 마이그레이션 없음.
+- 검증: lifecycle+admin-console+openapi 97/97, 신규 5건은 알림 호출 제거 시 실패(대조). domain 33 실패는 origin/prod 기준선과 동일 목록(기존 문제). 운영: 배포 스크립트 전 단계 통과, 비로그인 refund 403/401, 랜딩·피드 HTML 법정 표시 확인. 기록 .local/refund-notices-deploy-20261106/deployment.md, 복구본 /Users/ethan/crefans-recovery/20261106/refund-notices(검증 후 서버 사본 정리, 디스크 81%).
+- 미확인/남은 일: 실제 메일 수신(새 kind subscription-cancelled/subscription-ended/refund-completed, 실제 이벤트 발생 시 받은편지함 확인 필요), 운영 실환불 미실행, 출금 신청 중 환불 시 출금 정지 문제(night-work 6번)는 이번 범위 밖. 크리에이터 새 구독·해지 알림은 사용자 결정으로 미적용.
+
 ## 2026-11-06 운영 콘솔 구독 즉시 해지 — 운영 배포 완료 (cancel-now-20261106)
 - 사용자 요청: toss@crefans.com 건을 계기로 콘솔에 멤버십 "즉시 해지". /ask-me 결정 4건 — ①이용권 즉시 종료(ended_at=now, status=EXPIRED) ②환불 없음·결제사 API 미호출 ③모든 구독에 쓰는 상시 기능 ④SUPER_ADMIN 전용. 추가 결정: 해지 사유는 전용 컬럼에 보관(마이그레이션 포함).
 - 브랜치 feat/admin-cancel-now(origin/prod 08345cb 기준, 작업트리 crefans_server-admin-memberships).
