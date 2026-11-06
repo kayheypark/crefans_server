@@ -63,6 +63,7 @@
 | POST | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::member` |
 | GET | `/api/v1/admin/members/:id/terms` | `src/platform/signup-invites.controller.ts::terms` |
 | PUT | `/api/v1/admin/members/:id/terms` | `src/platform/signup-invites.controller.ts::saveTerms` |
+| GET | `/api/v1/admin/memberships` | `src/platform/admin.controller.ts::memberships` |
 | GET | `/api/v1/admin/operators` | `src/platform/admin.controller.ts::operators` |
 | POST | `/api/v1/admin/operators` | `src/platform/admin.controller.ts::createOperator` |
 | DELETE | `/api/v1/admin/operators/:id` | `src/platform/admin.controller.ts::deactivateOperator` |
@@ -88,6 +89,8 @@
 | POST | `/api/v1/admin/revenue/:id/receipt` | `src/platform/admin.controller.ts::receipt` |
 | GET | `/api/v1/admin/settlement-accounts` | `src/platform/admin.controller.ts::settlementAccounts` |
 | POST | `/api/v1/admin/settlement-accounts/:id/verify` | `src/platform/admin.controller.ts::verifyAccount` |
+| GET | `/api/v1/admin/subscriptions` | `src/platform/admin.controller.ts::subscriptions` |
+| POST | `/api/v1/admin/subscriptions/:id/cancel-now` | `src/platform/admin.controller.ts::cancelSubscriptionNow` |
 | GET | `/api/v1/admin/withdrawals` | `src/platform/admin.controller.ts::withdrawals` |
 | POST | `/api/v1/admin/withdrawals/:id/manual-result` | `src/platform/admin.controller.ts::manualResult` |
 | POST | `/api/v1/auth/forgot-password` | `src/platform/auth.controller.ts::forgot` |
@@ -389,6 +392,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261103180000_ad_product_comparison_price`
 - `20261103190000_post_view_metrics`
 - `20261103230000_ad_manual_use`
+- `20261106120000_subscription_admin_cancel`
 
 ## Prisma 전체 정의 (92 models · 15 enums)
 
@@ -693,6 +697,10 @@ model Subscription {
   next_billing_date     DateTime?
   /// 결제 실패 횟수
   payment_failure_count Int                  @default(0)
+  /// 운영 콘솔 즉시 해지 사유 (2026-11-06)
+  cancel_reason         String?              @db.VarChar(500)
+  /// 즉시 해지를 수행한 관리자 (admin.user_sub)
+  cancelled_by          String?              @db.VarChar(191)
   payment_transactions  PaymentTransaction[]
   membership_item       MembershipItem       @relation(fields: [membership_item_id], references: [id])
   transfers             Transfer[]

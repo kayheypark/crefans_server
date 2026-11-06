@@ -115,7 +115,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | PUT | /studio/comments-setting | enabled; 게시물 설정보다 우선 |
 | POST | /studio/content | id?, title/body/media/commentsEnabled/accessPlanId/status/scheduledAt |
 | POST | /studio/content/:id/delete | 소유권 검증 후 soft delete |
-| POST | /studio/memberships | id?, name/price/benefits/image; immutable version 생성 |
+| POST | /studio/memberships | id?, name/price/benefits/image; price는 1~1,100,000원(2026-11-06 토스 신고 단건 최고가, finance.service createOrder도 같은 상한), immutable version 생성 |
 | PUT | /studio/memberships/:id | active 또는 deleted; 삭제는 confirmation에 현재 멤버십 이름 정확히 입력 필수, 잠금 후 이름·소유자·삭제 여부·유효 구독 재확인 |
 | PUT | /studio/comments/:id | hidden, 본인 게시물만 |
 | POST | /studio/comments/:id/reply | body 1~1000자, 본인 게시물·삭제되지 않은 부모, 2뎁스·댓글 수 반영 |
@@ -186,6 +186,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /admin/payments | 매출·정산 조회 권한; from/to 주문 생성일 기준 결제20개 page, PG키/snapshot 제외 |
 | GET | /admin/memberships | 매출·정산 조회 권한, 조회 전용(2026-11-06). 전체 크리에이터의 멤버십 상품 20개 page(생성일 최신순). state=active·inactive·deleted(생략 시 삭제 제외), search=상품명·ID·크리에이터 이름·핸들. 상품별 구독 수: current(이용기간이 남은 ONGOING·CANCELLED)와 저장 상태별 누적 |
 | GET | /admin/subscriptions | 매출·정산 조회 권한, 조회 전용(2026-11-06). 구독 20개 page(생성일 최신순). status=ONGOING(자동 갱신)·CANCELLED(해지 예약, endedAt까지 이용)·EXPIRED, membershipId, search=구독자 ID·활동명·크리에이터 이름·핸들. 구독자는 ID·활동명·탈퇴 여부만, 이메일·빌링키·카드 ID·상품 snapshot 제외. summary는 같은 조건의 전체 집계 |
+| POST | /admin/subscriptions/:id/cancel-now | 활성 SUPER_ADMIN 전용(2026-11-06). 이용 종료 시각을 지금으로 당기고 상태를 EXPIRED로 바꿔 접근을 즉시 차단한다. 환불·결제 취소는 하지 않으며 결제사 API를 호출하지 않는다. 사유(500자) 필수이며 구독 행과 감사 로그에 남는다. 이미 종료된 구독은 409 |
 | GET | /admin/withdrawals | 매출·정산 조회 권한; 전체 출금신청20개 page, 계좌/지급 자격정보 제외 |
 | GET | /admin/inquiries | 문의 조회 |
 | POST | /admin/inquiries/:id/reply | 문의 답변 |
@@ -363,7 +364,7 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | GET | /events/promotion-beans | 회원 본인 이벤트 상태만. available/claimed/ineligible/unavailable, quantity100, claimedAt/expiresAt. 원장 변경 없음, 전체 활성·이메일 확인 회원 |
 | POST | /events/promotion-beans/claim | 회원 본인 고정100콩 즉시 수령. 빈 객체만 허용(400 INVALID_EVENT_CLAIM). 계정 상태/이전 수령 재검사, 회사/회원 잠금과 BeanPromotion 고유 키로 중복 방지. 잔액·로트·감사 원자적 반영. 재시도는 기존 지급·만료 시각 반환, 신규 지급 없이 ineligible/unavailable 반환 가능 |
 | GET | /beans/wallet | 세션 본인 지갑 멱등 생성·5원장잔액·사용가용 합/일반·프로모션 세부합·일반·프로모션 후원 출처 심사 후 출금가용 합/종류별 합·필터 후 충전/이동 각20건·총수, page/from/to/status/direction (후속 필터는 로컬 반영) |
-| POST | /beans/charges | quantity(1~100000 정수), requestId; 110원/콩(VAT 포함) 서버 계산, 환경 snapshot·30분 주문·회사재고 예약, 미완료 최대5건 |
+| POST | /beans/charges | quantity(1~10000 정수, beanPolicy.maxChargeQuantity; 2026-11-06 토스 신고 단건 최고가 1,100,000원에 맞춤. 후원 수량은 PG 결제가 아니므로 이 상한을 쓰지 않는다), requestId; 110원/콩(VAT 포함) 서버 계산, 환경 snapshot·30분 주문·회사재고 예약, 미완료 최대5건 |
 | GET | /beans/charges/:id | 본인 충전 상태, 타인404, paymentKey 미노출 |
 | POST | /beans/charges/:id/payment-window | 본인 유효 주문, 환경 일치·개별 결제창 clientKey/customerKey/orderId/amount |
 | POST | /beans/charges/:id/confirm | paymentKey/orderId/amount 검증, PG lookup/confirm, 원주문 lease·1회 lot/원장; 불확실 결과는 재조회 |
@@ -404,7 +405,7 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 ### 콩 환불·유효기간·미수금 (2026-10-30, /pilot-work D4·D6)
 
 - 환불: 충전 후 7일 이내 미사용 충전콩 전액, 이후 10% 공제(회사 귀책은 운영자가 면제). 사용분·프로모션콩·만료분 제외. 원결제 부분취소(토스 cancelAmount, 공식 문서 docs.tosspayments.com/guides/v2/cancel-payment 2026-10-30 확인 — 카드 부분취소 환불은 영업일 3~4일).
-- 유효기간: 충전콩은 결제일, 일반 프로모션콩은 지급일부터 5년(공개100콩 이벤트는 수령 시점부터30일)(`bean_lots.expires_at`, 기존 lot은 마이그레이션 `20261030200000_pilot_followups`에서 채움). 만료 30일 전 1회 앱 알림+메일(type bean-expiry). 공개100콩 이벤트 lot만 만료 7일 전 1회 이벤트 전용 알림+메일(type event-bean-expiry, 환불 안내 없음, 2026-11-03). 수령 직후 30일 기준으로 먼저 나간 안내는 마이그레이션 `20261103140000_event_bean_expiry_renotice`가 안내 기록만 비워 7일 전에 한 번 더 보낸다, 만료 시 남은 수량을 회사 `expired` 계정으로 이동. 만료 lot은 후원·지갑 사용 가능액에서 제외.
+- 유효기간: 충전콩은 결제일, 일반 프로모션콩은 지급일부터 1년(2026-11-06 토스 심사 신고값에 맞춰 5년에서 단축, 약관 제11조 2026-12-06 시행)(공개100콩 이벤트는 수령 시점부터30일)(`bean_lots.expires_at`, 기존 lot은 마이그레이션 `20261030200000_pilot_followups`에서 채움). 만료 30일 전 1회 앱 알림+메일(type bean-expiry). 공개100콩 이벤트 lot만 만료 7일 전 1회 이벤트 전용 알림+메일(type event-bean-expiry, 환불 안내 없음, 2026-11-03). 수령 직후 30일 기준으로 먼저 나간 안내는 마이그레이션 `20261103140000_event_bean_expiry_renotice`가 안내 기록만 비워 7일 전에 한 번 더 보낸다, 만료 시 남은 수량을 회사 `expired` 계정으로 이동. 만료 lot은 후원·지갑 사용 가능액에서 제외.
 - 미수금(`creator_receivables`): 멤버십은 환불 완료 때 가용잔액이 음수가 되면 min(해당 결제 net, 부족액)을 기록하고 작업(`receivables`)이 이후 수익으로 0 이상이 되면 자동 정산. 콩은 차지백(freezeCharge) 때 이미 paid 지급에 쓰인 출처를 지급 단가(net/quantity)로 환산해 기록, 운영자 정산 전까지 콩 출금 차단. 둘 다 크리에이터에게 정산 알림.
 - 메일 큐 `member_notices`: 운영 조치·콩 만료 안내 메일. 탈퇴·미인증 주소는 건너뜀, 실패 시 지수 백오프.
 
@@ -511,7 +512,7 @@ AdProduct 응답: id/name/description/terms/placement/amount/durationDays/visibl
 - 2026-11-02: `/studio/finance`의 `creatorTerms`는 개별 조건이 없어도 현재 DB 기본값을 반영한 적용 조건을 반환한다. 멤버십 예상 수익은 `platformFeeBps` 기준이며 기존 주문·구독의 공제율 스냅샷은 변경하지 않는다.
 
 ### 프로모션 100콩 이벤트 즉시 받기 (2026-11-03 개정)
-사용자 확정 정책: 전체 회원에게 계정당1회100콩. 명단·13명 상한을 제거했다. 활성·미탈퇴·미정지·이메일 인증 계정과 `BEAN_LEDGER_ENABLED=true`를 검사한다. 신규 이벤트 지급분만 수령 시점+30일(720시간)에 만료하며 기존 충전·일반 프로모션·친구초대 지급분의5년은 유지한다.
+사용자 확정 정책: 전체 회원에게 계정당1회100콩. 명단·13명 상한을 제거했다. 활성·미탈퇴·미정지·이메일 인증 계정과 `BEAN_LEDGER_ENABLED=true`를 검사한다. 신규 이벤트 지급분만 수령 시점+30일(720시간)에 만료하며 기존 충전·일반 프로모션·친구초대 지급분의 유효기간(지급 당시 기준)은 유지한다.
 회사→회원 지갑 잠금 후 수령 여부와 계정 상태를 재검사한다. 서버 고정 수량과 `event:promotion-beans-v1:`+회원ID SHA256 고유 키, actor `system:event:promotion-beans-v1`는 유지한다. 회사 재고·잔액·원장·로트·감사·outbox는 같은 트랜잭션이다. 재고부족·동결·저장실패 시 전체 취소. 수동 지급 일한도와 분리하며 별도 이벤트 인원 상한은 없다.
 GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환한다. 재시도는 원래 기록을 반환하고 기한을 늘리거나 사용/만료 후 다시 지급하지 않는다. 명단 설정 두 키는 폐기했으며 남은 환경값도 사용하지 않는다. 프로모션은 만료가 이른 로트부터 쓰고, 후원받은 earned-promotion은 원본 만료일을 승계하지 않는다. 만료 작업은 미사용 이벤트 잔액만 회수하며 기존 콩·이미 후원한 수익을 만료시키지 않는다. 소멸 알림은 실제 만료일을 사용한다. 신규 migration 없음.
 검증: `tests/platform-event-claim.test.cjs`(격리 MySQL:30일 경계·미사용잔액·기존지급/후원수익·동시수령·13명초과·원자성), `platform-openapi.test.cjs`(인증 대역 HTTP). 실제 운영 지급·PG·은행·메일 검증과 구분한다. 배포 증거/잔여 경계는 PROGRESS.md를 따른다. 근거 확인2026-11-03: [OWASP 업무 검증](https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html), [Prisma6 트랜잭션](https://www.prisma.io/docs/orm/v6/prisma-client/queries/transactions). 30일·전체회원은 법정 기준이 아닌 사용자 확정 이벤트 정책이다.
