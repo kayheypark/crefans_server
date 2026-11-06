@@ -6,9 +6,12 @@ const {PlatformAuthService}=require('../dist/src/platform/auth.service');
 const {PlatformService}=require('../dist/src/platform/service');
 const {publishedCatalog,blockedCatalog}=require('./legal-fixture.cjs');
 const error=code=>e=>e.getResponse().code===code;
-test('the released documents take effect on 2026-10-30 with no open items (2026-10-30 /pilot-work)',()=>{
+test('the released documents are in force with no open items: terms/policy from 2026-11-06, collection/marketing from 2026-10-30',()=>{
  const source=new LegalDocumentsService();assert.deepEqual(source.catalog().blockers,[]);assert.equal(source.signup().signupReady,true);
- for(const d of [source.catalog().documents.terms,source.catalog().documents.policy,source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
+ // 2026-11-06 user decision: the merged revision is now the single version in force, so terms/policy carry that day.
+ for(const d of [source.catalog().documents.terms,source.catalog().documents.policy]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-06');assert.equal(d.effectiveAt,'2026-11-06');assert.doesNotMatch(d.version,/draft/);}
+ for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
+ assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
  const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-03');assert.equal(p.effectiveAt,'2026-11-03');assert.equal(p.version,'2026-11-03.views.1');assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
@@ -67,15 +70,21 @@ test('privacy policy describes the actual withdrawal purge: 30-day grace, erased
  assert.match(body,/탈퇴 후 30일 동안은/);assert.match(body,/작성한 게시물을 삭제합니다/);assert.match(body,/“탈퇴한 사용자”로 표시/);
  assert.doesNotMatch(body,/회원 정보 전체를 파기하지 않습니다/);
 });
-test('the merged revision is published as upcoming and replaces the terms and policy on its KST effective date only (2026-11-06 re-notice: bean validity cut to 1 year)',()=>{
- const legal=new LegalDocumentsService(),before=legal.catalog(new Date('2026-12-05T23:59:00+09:00')),after=legal.catalog(new Date('2026-12-06T00:00:00+09:00'));
- assert.equal(LEGAL_NOTICE_DATE,'2026-11-06');assert.equal(NEXT_TERMS_EFFECTIVE,'2026-12-06','30 days after the 2026-11-06 re-notice');assert.equal(legal.catalog(new Date('2026-12-02T12:00:00+09:00')).documents.terms.version,'2026-10-30.3','the old 12-02 date no longer applies');
- assert.equal(before.documents.terms.version,'2026-10-30.3');assert.equal(before.upcoming.effectiveAt,'2026-12-06');assert.equal(before.upcoming.documents.terms.version,'2026-12-06.2');
- assert.equal(after.documents.terms.version,'2026-12-06.2');assert.equal(after.documents.policy.version,'2026-12-06.1');assert.equal(after.upcoming,undefined);
- assert.equal(after.documents.privacy.version,before.documents.privacy.version,'the privacy revision already applies from the notice day');
+// 2026-11-06 user decision: no real users and no real charges, so this is published as the single version in force
+// from the deploy day. There is no upcoming document and no scheduled-amendment window to honour.
+test('the revision is the single version in force from its KST effective day, with no upcoming document',()=>{
+ const legal=new LegalDocumentsService(),after=legal.catalog(new Date('2026-11-06T00:00:00+09:00'));
+ assert.equal(LEGAL_NOTICE_DATE,'2026-11-06');assert.equal(NEXT_TERMS_EFFECTIVE,LEGAL_NOTICE_DATE,'in force from the deploy day, not 30 days later');
+ assert.equal(after.documents.terms.version,'2026-11-06.2');assert.equal(after.documents.policy.version,'2026-11-06.1');
+ assert.equal(after.upcoming,undefined,'nothing is pending any more');
+ assert.equal(after.documents.terms.effectiveAt,'2026-11-06');assert.equal(after.documents.terms.status,'published');
+ // 시행일 전날은 이전 본이 보이고, 그 이후로는 계속 이 본이다.
+ const before=legal.catalog(new Date('2026-11-05T23:59:00+09:00'));
+ assert.equal(before.documents.terms.version,'2026-10-30.3');assert.equal(before.upcoming.effectiveAt,'2026-11-06');
+ assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-06.2');
  const terms=JSON.stringify(after.documents.terms);
- for(const added of ['11. 콩','10%를 공제','미수금','신고한 회원에게 앱 알림','볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다','오픈베타','회사가 부담하여 신고·납부','화요일 23:59','다음 영업일','친구 초대 보상 등으로 무상 지급한 프로모션콩','12. 친구 초대','남은 콩을 회수','https://crefans.com/핸들','끌 수 없습니다','지급일로부터 1년간 쓸 수 있으며','콩 유효기간을 5년에서 1년으로 줄여'])assert.ok(terms.includes(added),added);
- for(const removed of ['17개 계정','법정 원천징수는 별도','세금 처리 방식(원천징수 여부 포함)','공휴일·신청 마감 등 세부 일정','운영자가 지급한 프로모션콩','지급일로부터 5년간 쓸 수 있으며'])assert.ok(!terms.includes(removed),removed);
+ for(const added of ['11. 콩','10%를 공제','미수금','신고한 회원에게 앱 알림','볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다','오픈베타','회사가 부담하여 신고·납부','화요일 23:59','다음 영업일','친구 초대 보상 등으로 무상 지급한 프로모션콩','12. 친구 초대','남은 콩을 회수','https://crefans.com/핸들','끌 수 없습니다','지급일로부터 1년간 쓸 수 있으며','2026년 11월 6일부터 적용합니다'])assert.ok(terms.includes(added),added);
+ for(const removed of ['17개 계정','법정 원천징수는 별도','세금 처리 방식(원천징수 여부 포함)','공휴일·신청 마감 등 세부 일정','운영자가 지급한 프로모션콩','지급일로부터 5년간 쓸 수 있으며','30일 뒤에 시행','2026년 12월'])assert.ok(!terms.includes(removed),removed);
  const privacy=JSON.stringify(before.documents.privacy);
  for(const added of ['메타데이터를 제거','운영자가 통장 사본 등으로 확인','처리를 마친 날부터 3년','회원 정보 파기 후 5년','재사용 금지 목록','ab***@n***.com','해시 값(앞 12자리)','edpo.com/telegram-gdpr-data-request'])assert.ok(privacy.includes(added),added);
  for(const removed of ['본인확인된 예금주명','문의·신고 기록은','요청·기록·회원·거래 식별자'])assert.ok(!privacy.includes(removed),removed);
