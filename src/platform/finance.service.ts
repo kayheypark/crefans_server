@@ -1,10 +1,11 @@
+import {noticeCancelReserved,noticeRefunded} from './membership-notices';
 import {settlementPending,settlementHoldReasons} from './settlement-receipts';
 import {CREATOR_PROVISION} from './creator-provision';
 import {PAYMENT_TERMS,paymentTermsAccepted} from './payment-terms';
 import {betaPolicy,isBeta,inPayoutBatch,PAYOUT_SCHEDULE_MESSAGE,manualPayouts,paymentEnvironment,renewalPolicy,unusedRefundReason} from './beta-policy';
-import {requirePermission} from './admin-permissions';
+import {requirePermission,requireSuperAdmin} from './admin-permissions';
 import {paymentFailureCodes,renewalDeadline,unusableCardCodes} from './billing-failures';
-import {appendAudit} from './audit';
+import {appendAudit,auditChange} from './audit';
 import {enqueueOperation} from './operations-events';
 import {Injectable} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
@@ -151,7 +152,7 @@ export class PlatformFinanceService {
   await this.db.$transaction(async tx=>{
    await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
    const rows=await tx.subscription.findMany({where:{subscriber_id:member,membership_item:{creator_id:creator},status:{in:['ONGOING','CANCELLED']}}});if(!rows.length)reject(404,'SUBSCRIPTION_NOT_FOUND','구독을 찾을 수 없습니다.');
-   for(const sub of rows){if(sub.auto_renew)await enqueueOperation(tx,'subscription.cancelled',{memberId:member,creatorId:creator,subscriptionId:sub.id,status:'CANCELLED',previousStatus:sub.status});await tx.subscription.update({where:{id:sub.id},data:{auto_renew:false,status:'CANCELLED',next_billing_date:null}});await tx.checkoutOrder.updateMany({where:{subscription_id:sub.id,status:{in:['pending','failed']}},data:{status:'cancelled',retry_at:null}});}
+   for(const sub of rows){if(sub.auto_renew){await enqueueOperation(tx,'subscription.cancelled',{memberId:member,creatorId:creator,subscriptionId:sub.id,status:'CANCELLED',previousStatus:sub.status});await noticeCancelReserved(tx,sub,'member');}await tx.subscription.update({where:{id:sub.id},data:{auto_renew:false,status:'CANCELLED',next_billing_date:null}});await tx.checkoutOrder.updateMany({where:{subscription_id:sub.id,status:{in:['pending','failed']}},data:{status:'cancelled',retry_at:null}});}
   });return{message:'갱신을 해지했습니다. 이용 종료일까지 권한이 유지됩니다.'};
  }
  async resumeSubscription(member:string,id:string,input:any){
@@ -220,24 +221,54 @@ export class PlatformFinanceService {
    const p=await tx.membershipItem.findUniqueOrThrow({where:{id:row.membership_id}});await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${p.creator_id} FOR UPDATE`;
    const updated=await tx.checkoutOrder.update({where:{id},data:{status:'refunding',locked_until:new Date(Date.now()+90000)}});await this.audit(tx,'refund.requested',id,{memberId:member,amount:row.amount,previousStatus:row.status,status:'refunding'});return updated;
   });if(o.status==='refunded')return{message:'환불이 완료되었습니다.'};
+  return this.sendRefund(o,'사용자 환불 요청','member');
+ }
+ // Provider half of a full membership refund, shared by the member 7-day refund and the console refund.
+ private async sendRefund(o:any,cancelReason:string,source:'member'|'admin'){
+  const id=o.id;
   try{
    let result=await this.provider.lookup(providerOrderId(o));
    if(!result||!['DONE','CANCELED'].includes(result.status)||result.orderId!==providerOrderId(o)||result.paymentKey!==o.payment_key||result.totalAmount!==o.amount)reject(503,'REFUND_UNCERTAIN','환불할 결제 확인이 필요합니다.');
    if(result.status==='DONE'){
     // 2026-11-02 user decision: a refused refund is retried under a new idempotency key; reusing the old one could replay the refusal for 15 days.
     const refundAttempt=Number((o.snapshot as any).refundAttempt)||0;
-    try{result=await this.provider.cancel(o.payment_key,'사용자 환불 요청',`refund-${id}${refundAttempt?`_r${refundAttempt}`:''}`);}catch(error:any){
+    try{result=await this.provider.cancel(o.payment_key,cancelReason,`refund-${id}${refundAttempt?`_r${refundAttempt}`:''}`);}catch(error:any){
      if(error.getResponse?.().code==='PAYMENT_FAILED')await this.db.checkoutOrder.updateMany({where:{id,status:'refunding'},data:{status:'paid',locked_until:null,snapshot:{...(o.snapshot as any),refundAttempt:refundAttempt+1}}});
      throw error;
     }
    }
    if(result?.status!=='CANCELED'||result.orderId!==providerOrderId(o)||result.paymentKey!==o.payment_key||result.totalAmount!==o.amount||result.balanceAmount!==0)reject(503,'REFUND_UNCERTAIN','환불 결과 확인이 필요합니다.');
-   await this.completeRefund(o,'member');
+   await this.completeRefund(o,source);
    return{message:'환불이 완료되었습니다.'};
   }finally{await this.db.checkoutOrder.updateMany({where:{id,status:'refunding'},data:{locked_until:null}});}
  }
  // Shared by member refunds and provider-side cancels: revenue reversal and access removal happen once.
- async completeRefund(o:any,source:'member'|'provider'){
+ // 2026-11-06 user decision: SUPER_ADMIN can fully refund a subscription's latest paid order from the console, which
+ // also ends the subscription now. The 7-day/unused rule that limits member self-refunds does not apply; the reason is required.
+ async adminRefund(admin:any,subscriptionId:string,input:any){
+  requireSuperAdmin(admin);const sid=text(subscriptionId,64),reason=text(input?.reason,500);
+  const owner=await this.db.subscription.findUnique({where:{id:sid},select:{subscriber_id:true}});if(!owner)reject(404,'SUBSCRIPTION_NOT_FOUND','구독을 찾을 수 없습니다.');
+  const o=await this.db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM members WHERE id=${owner.subscriber_id} FOR UPDATE`;await tx.$queryRaw`SELECT id FROM subscriptions WHERE id=${sid} FOR UPDATE`;
+   if(await tx.checkoutOrder.count({where:{subscription_id:sid,status:'processing'}}))reject(409,'PAYMENT_IN_PROGRESS','진행 중인 결제 확인 후 환불해주세요.');
+   const row=await tx.checkoutOrder.findFirst({where:{subscription_id:sid,status:{in:['paid','refunding']},payment_key:{not:null}},orderBy:[{paid_at:'desc'},{created_at:'desc'}]});
+   if(!row)reject(409,'NO_REFUNDABLE_PAYMENT','환불할 결제가 없습니다.');
+   if(row.locked_until&&row.locked_until>new Date())reject(409,'REFUND_IN_PROGRESS','환불 결과를 확인 중입니다.');
+   // The console makes the operator type the amount (TypedConfirmDialog); the server checks the same text so a stale screen cannot refund another amount.
+   if(input?.confirmation!==`${Number(row.amount).toLocaleString('ko-KR')}원`)reject(400,'CONFIRMATION_REQUIRED','환불 금액을 정확히 입력해주세요.');
+   const p=await tx.membershipItem.findUniqueOrThrow({where:{id:row.membership_id}});await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${p.creator_id} FOR UPDATE`;
+   const updated=await tx.checkoutOrder.update({where:{id:row.id},data:{status:'refunding',locked_until:new Date(Date.now()+90000)}});await this.audit(tx,'refund.requested',row.id,{memberId:row.member_id,amount:row.amount,previousStatus:row.status,status:'refunding'});return updated;
+  });
+  await this.sendRefund(o,'운영자 환불','admin');
+  await this.db.$transaction(async tx=>{
+   const sub=await tx.subscription.findUniqueOrThrow({where:{id:sid},select:{status:true,auto_renew:true}});
+   await tx.subscription.update({where:{id:sid},data:{cancel_reason:reason,cancelled_by:admin.user_sub}});
+   await appendAudit(tx,{category:'admin',action:'admin.subscription.refunded',entityId:sid,data:auditChange(null,{status:sub.status,auto_renew:sub.auto_renew})});
+  });
+  const after=await this.db.subscription.findUniqueOrThrow({where:{id:sid},select:{status:true,ended_at:true}});
+  return{message:'전액 환불하고 구독을 종료했습니다.',id:sid,orderId:o.id,amount:o.amount,status:after.status,endedAt:after.ended_at,refunded:true};
+ }
+ async completeRefund(o:any,source:'member'|'admin'|'provider'){
   const id=o.id,member=o.member_id;
   await this.db.$transaction(async tx=>{
    await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
@@ -251,7 +282,8 @@ export class PlatformFinanceService {
    if(o.subscription_id){
     const newer=await tx.checkoutOrder.count({where:{subscription_id:o.subscription_id,status:{in:['paid','refunding','processing']},NOT:{id},OR:[{period_start:{gt:o.period_start||o.created_at}},{paid_at:{gt:o.paid_at||o.created_at}},{paid_at:null,created_at:{gt:o.created_at}}]}});
     if(!newer){await tx.subscription.update({where:{id:o.subscription_id},data:{auto_renew:false,status:'EXPIRED',ended_at:new Date(),next_billing_date:null}});await tx.checkoutOrder.updateMany({where:{subscription_id:o.subscription_id,status:{in:['pending','failed']}},data:{status:'cancelled',retry_at:null}});}
-   }
+    await noticeRefunded(tx,o,source,!newer);
+   }else await noticeRefunded(tx,o,source,false);
    if(source==='provider')await enqueueOperation(tx,'payment.external_cancel',{memberId:member,orderId:id,subscriptionId:o.subscription_id||undefined,status:'refunded',previousStatus:'paid'},`external-cancel:${id}`);
   });
  }
@@ -311,7 +343,7 @@ export class PlatformFinanceService {
    // Never abandon an uncertain approval or switch its method/idempotency key.
    if(existing?.status==='processing')return existing;
    const p=await tx.membershipItem.findUnique({where:{id:sub.membership_item_id}}),m=await tx.member.findUnique({where:{id:sub.subscriber_id}});
-   if(!m?.enabled||!p?.is_active||p.is_deleted||!await tx.creator.findFirst({where:{user_id:p.creator_id,is_active:true}})){await tx.subscription.update({where:{id},data:{auto_renew:false,status:'CANCELLED',next_billing_date:null}});if(existing)await tx.checkoutOrder.update({where:{id:existing.id},data:{status:'cancelled'}});await enqueueOperation(tx,'subscription.cancelled',{memberId:sub.subscriber_id,creatorId:p?.creator_id,subscriptionId:sub.id,status:'CANCELLED',previousStatus:sub.status});processed++;return null;}
+   if(!m?.enabled||!p?.is_active||p.is_deleted||!await tx.creator.findFirst({where:{user_id:p.creator_id,is_active:true}})){await tx.subscription.update({where:{id},data:{auto_renew:false,status:'CANCELLED',next_billing_date:null}});if(existing)await tx.checkoutOrder.update({where:{id:existing.id},data:{status:'cancelled'}});await enqueueOperation(tx,'subscription.cancelled',{memberId:sub.subscriber_id,creatorId:p?.creator_id,subscriptionId:sub.id,status:'CANCELLED',previousStatus:sub.status});if(m?.enabled)await noticeCancelReserved(tx,sub,'unavailable');processed++;return null;}
    if(renewalDeadline(sub,retries,hours)<=new Date()||existing?.status==='failed'&&existing.attempts>=retries){await this.stopRenewal(tx,sub,existing);processed++;return null;}
    if(existing){
     if(existing.status!=='failed')return existing;

@@ -91,6 +91,7 @@
 | POST | `/api/v1/admin/settlement-accounts/:id/verify` | `src/platform/admin.controller.ts::verifyAccount` |
 | GET | `/api/v1/admin/subscriptions` | `src/platform/admin.controller.ts::subscriptions` |
 | POST | `/api/v1/admin/subscriptions/:id/cancel-now` | `src/platform/admin.controller.ts::cancelSubscriptionNow` |
+| POST | `/api/v1/admin/subscriptions/:id/refund` | `src/platform/admin.controller.ts::refundSubscription` |
 | GET | `/api/v1/admin/withdrawals` | `src/platform/admin.controller.ts::withdrawals` |
 | POST | `/api/v1/admin/withdrawals/:id/manual-result` | `src/platform/admin.controller.ts::manualResult` |
 | POST | `/api/v1/auth/forgot-password` | `src/platform/auth.controller.ts::forgot` |

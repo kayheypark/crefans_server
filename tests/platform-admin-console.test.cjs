@@ -187,6 +187,13 @@ test('membership and subscription lists are read-only revenue views without bill
   assert.deepEqual((await api('memberships?state=deleted&search='+encodeURIComponent(tag))).data.items.map(p=>p.id),[gone.id]);assert.deepEqual((await api('memberships?state=inactive&search='+encodeURIComponent(tag))).data.items.map(p=>p.id),[off.id]);
   const list=(await api('subscriptions?membershipId='+live.id)).data;assert.equal(list.total,4);assert.deepEqual(list.summary,{current:2,ONGOING:1,CANCELLED:2,EXPIRED:1});assert.equal(list.items[0].subscriber.id,fan);assert.equal(list.items[0].subscriber.nickname,'Admin fixture');assert.equal(list.items[0].membership.name,tag+' 판매');
   assert.equal((await api('subscriptions?status=CANCELLED&search='+encodeURIComponent(tag))).data.total,2);assert.equal((await api('subscriptions?search='+fan+'&membershipId='+live.id)).data.total,4);
+  // refundable = the latest paid order the console full refund would cancel; never the payment key
+  const ongoing=list.items.find(i=>i.status==='ONGOING'),older=await order(owner,Date.now()-2*day,10000,0),latest=await order(owner,Date.now()-day,12000,0);
+  for(const id of[older,latest])await db.checkoutOrder.update({where:{id},data:{subscription_id:ongoing.id}});
+  const withPaid=(await api('subscriptions?membershipId='+live.id)).data.items;
+  assert.deepEqual({...withPaid.find(i=>i.id===ongoing.id).refundable,paidAt:undefined},{orderId:latest,amount:12000,paidAt:undefined});
+  assert.ok(withPaid.filter(i=>i.id!==ongoing.id).every(i=>i.refundable===null));
+  assert.equal(JSON.stringify(withPaid).includes('private-payment-'),false,'payment keys are never listed');
   const text=JSON.stringify([all,list]);for(const secret of['must-not-leak','private-billing-key','private-method-id','billing_key','plan_snapshot','email','password'])assert.equal(text.includes(secret),false,secret);
   for(const q of['memberships?state=all','memberships?page=0','subscriptions?status=ongoing','subscriptions?status=ONGOING&status=EXPIRED','subscriptions?search='+'x'.repeat(101)])assert.equal((await api(q)).status,400,q);
  }finally{await db.subscription.deleteMany({where:{id:{in:subs}}});await db.membershipItem.deleteMany({where:{id:{in:plans}}});}
@@ -235,8 +242,17 @@ test('immediate cancel ends access now, is SUPER_ADMIN only, needs a reason and 
   assert.ok(event,'operators are notified');extra.push(event.id);
 
   assert.equal((await api('subscriptions/'+live.id+'/cancel-now','super',{reason:'재시도'})).status,409,'repeating is rejected, not applied twice');
+  const told=await db.memberNotice.findMany({where:{member_id:fan,kind:'subscription-ended',dedupe_key:'subscription-ended:'+live.id}});
+  assert.equal(told.length,1,'the member is told once in the app and by mail');assert.equal(JSON.stringify(told[0].rows).includes('토스 심사 종료'),false,'the internal reason is not shown to the member');
+  assert.ok(await db.memberNotification.count({where:{member_id:fan,type:'subscription',text:{contains:'운영자 조치로 종료'}}}));
+  // console refund route: SUPER_ADMIN only; with no paid order on this subscription it refuses without calling the provider
+  for(const user of['moderator','admin'])assert.equal((await api('subscriptions/'+live.id+'/refund',user,{reason:'검증'})).status,403,user);
+  assert.equal((await api('subscriptions/'+live.id+'/refund','super',{})).status,400);
+  assert.equal((await api('subscriptions/'+randomUUID()+'/refund','super',{reason:'검증'})).status,404);
+  assert.equal((await api('subscriptions/'+live.id+'/refund','super',{reason:'검증'})).status,409);
  }finally{
   await db.platformAuditLog.deleteMany({where:{action:'admin.subscription.cancelled_now',entity_id:{in:subs}}});
+  await db.memberNotice.deleteMany({where:{dedupe_key:{in:subs.map(id=>'subscription-ended:'+id)}}});
   await db.platformOperationalEvent.deleteMany({where:{id:{in:extra}}});
   await db.subscription.deleteMany({where:{id:{in:subs}}});await db.membershipItem.deleteMany({where:{id:{in:plans}}});
  }

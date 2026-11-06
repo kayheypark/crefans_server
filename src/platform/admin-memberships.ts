@@ -3,6 +3,7 @@ import {requireSuperAdmin} from './admin-permissions';
 import {appendAudit,auditChange} from './audit';
 import {enqueueOperation} from './operations-events';
 import {reject,text} from './http';
+import {noticeEndedByOperator} from './membership-notices';
 
 // 2026-11-06 user request: read-only console lists of every membership plan and every subscription.
 // Same revenue.view permission as payments. Billing keys, card ids and plan snapshots are never selected.
@@ -25,9 +26,11 @@ export async function adminSubscriptions(db:any,admin:any,query:any){financialAd
  const where:any={...(status?{status}:{}),...(membershipId?{membership_item_id:membershipId}:{})};
  if(search){const [members,creatorIds]=await Promise.all([db.member.findMany({where:{OR:[{id:search},{nickname:{contains:search}}]},select:{id:true},take:500}),creatorIdsMatching(db,search)]);where.OR=[{subscriber_id:{in:members.map((m:any)=>m.id)}},{membership_item:{creator_id:{in:creatorIds}}}];}
  const now=new Date(),[rows,total,byStatus,current]=await db.$transaction([db.subscription.findMany({where,select:{id:true,subscriber_id:true,status:true,auto_renew:true,amount:true,started_at:true,ended_at:true,next_billing_date:true,last_payment_date:true,payment_failure_count:true,created_at:true,cancel_reason:true,cancelled_by:true,membership_item:{select:{id:true,name:true,level:true,creator_id:true}}},orderBy:[{created_at:'desc'},{id:'desc'}],skip,take:size}),db.subscription.count({where}),db.subscription.groupBy({by:['status'],where,_count:{_all:true},orderBy:{status:'asc'}}),db.subscription.count({where:{...where,AND:[{status:{in:LIVE}},{ended_at:{gt:now}}]}})]);
- const [subscribers,creators]=await Promise.all([db.member.findMany({where:{id:{in:rows.map((r:any)=>r.subscriber_id)}},select:{id:true,nickname:true,withdrawn_at:true,purged_at:true}}),creatorsById(db,[...new Set<string>(rows.map((r:any)=>r.membership_item.creator_id))])]);
+ const [subscribers,creators,paid]=await Promise.all([db.member.findMany({where:{id:{in:rows.map((r:any)=>r.subscriber_id)}},select:{id:true,nickname:true,withdrawn_at:true,purged_at:true}}),creatorsById(db,[...new Set<string>(rows.map((r:any)=>r.membership_item.creator_id))]),
+  // The latest paid order is what the console full refund (finance.adminRefund) would cancel; no payment key is selected.
+  rows.length?db.checkoutOrder.findMany({where:{subscription_id:{in:rows.map((r:any)=>r.id)},status:'paid',payment_key:{not:null}},select:{id:true,subscription_id:true,amount:true,paid_at:true},orderBy:[{paid_at:'desc'},{created_at:'desc'}]}):[]]);
  const summary={current,ONGOING:0,CANCELLED:0,EXPIRED:0};for(const g of byStatus as any[])(summary as any)[g.status]=g._count._all;
- return{items:rows.map((r:any)=>{const m=subscribers.find((x:any)=>x.id===r.subscriber_id);return{id:r.id,status:r.status,autoRenew:r.auto_renew,amount:Number(r.amount),startedAt:r.started_at,endedAt:r.ended_at,nextBillingDate:r.next_billing_date,lastPaymentDate:r.last_payment_date,paymentFailureCount:r.payment_failure_count,createdAt:r.created_at,cancelReason:r.cancel_reason,cancelledBy:r.cancelled_by,subscriber:{id:r.subscriber_id,nickname:m&&!m.purged_at?m.nickname:null,withdrawn:!m||!!m.withdrawn_at},membership:{id:r.membership_item.id,name:r.membership_item.name,level:r.membership_item.level},creator:creators.get(r.membership_item.creator_id)};}),summary,total,page,pageSize:size};}
+ return{items:rows.map((r:any)=>{const m=subscribers.find((x:any)=>x.id===r.subscriber_id);return{id:r.id,status:r.status,autoRenew:r.auto_renew,amount:Number(r.amount),startedAt:r.started_at,endedAt:r.ended_at,nextBillingDate:r.next_billing_date,lastPaymentDate:r.last_payment_date,paymentFailureCount:r.payment_failure_count,createdAt:r.created_at,cancelReason:r.cancel_reason,cancelledBy:r.cancelled_by,refundable:(o=>o?{orderId:o.id,amount:Number(o.amount),paidAt:o.paid_at}:null)((paid as any[]).find((o:any)=>o.subscription_id===r.id)),subscriber:{id:r.subscriber_id,nickname:m&&!m.purged_at?m.nickname:null,withdrawn:!m||!!m.withdrawn_at},membership:{id:r.membership_item.id,name:r.membership_item.name,level:r.membership_item.level},creator:creators.get(r.membership_item.creator_id)};}),summary,total,page,pageSize:size};}
 
 // 2026-11-06 user decision: console "즉시 해지" ends access now (ended_at=now, EXPIRED) with no refund and no
 // payment-provider call. SUPER_ADMIN only; the reason is stored on the row (audit metadata takes no free text). The member-facing cancel keeps the paid period;
@@ -44,6 +47,7 @@ export async function cancelSubscriptionNow(db:any,admin:any,id:string,input:any
   await tx.subscription.update({where:{id:sub.id},data:{status:'EXPIRED',ended_at:now,auto_renew:false,next_billing_date:null,cancel_reason:reason,cancelled_by:admin.user_sub}});
   await tx.checkoutOrder.updateMany({where:{subscription_id:sub.id,status:{in:['pending','failed']}},data:{status:'cancelled',retry_at:null}});
   await enqueueOperation(tx,'subscription.cancelled',{memberId:sub.subscriber_id,creatorId:sub.membership_item.creator_id,subscriptionId:sub.id,planId:sub.membership_item.id,status:'EXPIRED',previousStatus:sub.status});
+  await noticeEndedByOperator(tx,{id:sub.id,subscriber_id:sub.subscriber_id,membership_item_id:sub.membership_item.id},now);
   await appendAudit(tx,{category:'admin',action:'admin.subscription.cancelled_now',entityId:sub.id,data:auditChange({status:sub.status,auto_renew:sub.auto_renew},{status:'EXPIRED',auto_renew:false})});
   return{message:'구독을 즉시 해지했습니다.',id:sub.id,status:'EXPIRED',endedAt:now,refunded:false};
  });
