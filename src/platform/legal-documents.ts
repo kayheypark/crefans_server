@@ -63,14 +63,16 @@ const catalog:LegalCatalog={documents:{terms,privacy,policy:document('운영정�
 // 2026-11-02 user decision: the separate revision (withholding paid by the company, payout schedule, promotional bean scope,
 // friend invites, watermark) is merged into this scheduled revision and re-announced. Some changes are unfavourable, so the
 // effective date moves to 30 days after the new notice. Draft: crefans_front/.local/legal-draft-20261102/revision-draft.md.
-// LEGAL_NOTICE_DATE must be the day this version is deployed (KST): the privacy revision takes effect that day and signups stay
-// closed while a document's effective date is in the future. If the deploy slips, move both dates (notice + 30 days).
+// 2026-11-06 user decision: the service had no real users and no real charges (invite-only beta, test payments only), so the
+// scheduled revision is published as the single version in force from the deploy day instead of a 30-day-ahead amendment.
+// There is no upcoming document and no earlier accepted version to protect. Both dates must be the deploy day (KST);
+// a future effective date keeps signups closed, so if the deploy slips, move them together.
 export const LEGAL_NOTICE_DATE='2026-11-06';
-export const NEXT_TERMS_EFFECTIVE='2026-12-06';
-const nextVersion='2026-12-06.1';
+export const NEXT_TERMS_EFFECTIVE=LEGAL_NOTICE_DATE;
+const nextVersion='2026-11-06.1';
 const revise=(doc:LegalDocument,edits:Record<string,Array<[string,string]>>,extra:LegalSection[]=[]):LegalDocument=>{
  const sections=doc.sections.map(sec=>{let body=sec.body;for(const [from,to] of edits[sec.title]||[]){if(!body.includes(from))throw Error(`Legal revision anchor missing in ${sec.title}`);body=body.replace(from,to);}return{...sec,body};});
- return{...doc,version:nextVersion,updatedAt:LEGAL_NOTICE_DATE,publishedAt:LEGAL_NOTICE_DATE,effectiveAt:NEXT_TERMS_EFFECTIVE,notice:'2026년 11월 6일 공지했고 2026년 12월 6일부터 적용합니다(2026년 11월 2일 공지한 12월 2일 시행 예정본에서 콩 유효기간을 5년에서 1년으로 줄여 다시 공지합니다. 이용자에게 불리한 변경이라 공지일부터 30일 뒤에 시행합니다). 오픈베타 기간에는 사전 협의된 초대 이메일로 가입하며, 실제 결제와 정산 송금은 준비를 마친 뒤 시작합니다.',sections:[...sections,...extra]};
+ return{...doc,version:nextVersion,updatedAt:LEGAL_NOTICE_DATE,publishedAt:LEGAL_NOTICE_DATE,effectiveAt:NEXT_TERMS_EFFECTIVE,notice:'2026년 11월 6일부터 적용합니다. 오픈베타 기간에는 사전 협의된 초대 이메일로 가입하며, 실제 결제와 정산 송금은 준비를 마친 뒤 시작합니다.',sections:[...sections,...extra]};
 };
 const nextTerms=revise(terms,{
  '1. 목적과 적용 범위':[['통신판매업 신고번호는 확인 중이며, 유료 서비스 개시 전에 신고·표시 의무 적용 여부와 실제 정보를 확인합니다. 신규 이용계약 체결은 가입 개방 후 별도 동의를 받아 진행합니다. 크리에이터가 판매자이고 크레팬스가 중개·결제·정산을 제공하는 기본안이며 실제 PG·세무 및 계약상 역할을 확인한 뒤 유료 운영합니다.','회사는 유료 서비스 개시 전에 통신판매업을 신고하고 신고번호를 이 조와 서비스 하단 사업자 정보에 표시합니다. 크레팬스는 크리에이터 멤버십 거래의 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다. 콩은 크레팬스가 직접 판매합니다.']],
@@ -85,7 +87,7 @@ const nextTerms=revise(terms,{
  '9. 서비스 변경·장애·탈퇴':[['자동 갱신 구독이나 처리 중인 출금이 있으면 먼저 정리해야 할 내역을 안내합니다.','자동 갱신 구독, 처리 중인 출금, 남은 충전콩(먼저 환불 신청)이나 후원받은 콩(먼저 출금)이 있으면 먼저 정리해야 할 내역을 안내하며, 남은 프로모션콩은 탈퇴하면 소멸합니다. 유료 구독자가 있는 크리에이터는 판매를 먼저 중단하고, 이미 결제된 구독 기간이 모두 끝나고 미지급 수익·미수금 정산이 끝난 뒤 탈퇴할 수 있습니다.']],
 },[{title:'11. 콩',body:'콩은 크리에이터 후원에만 쓰며 멤버십·콘텐츠 이용권이 아닙니다. 프로모션콩이 있으면 먼저 사용합니다. 후원은 게시물 열람 권한을 제공하지 않으며, 볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다.\n충전 후 7일 이내 쓰지 않은 콩은 전액 청약철회할 수 있고, 7일이 지난 뒤 쓰지 않은 콩은 10%를 공제하고 환불합니다. 회사 귀책 사유가 있으면 고객센터 요청에 따라 공제하지 않고 환불합니다. 사용한 콩과 회사가 운영자 지급·이벤트·친구 초대 보상 등으로 무상 지급한 프로모션콩은 환불·출금 대상이 아닙니다.\n충전콩은 결제일, 일반 프로모션콩은 지급일로부터 1년간 쓸 수 있으며, 만료 30일 전에 알리고 만료되면 남은 콩은 소멸합니다. 단, 전체 회원이 계정당 한 번 받는 프로모션 100콩 이벤트의 신규 지급분은 받기 전에 안내한 대로 수령 시점부터 30일(720시간) 동안 사용할 수 있습니다. 사용기한이 지나면 미사용 이벤트 콩만 소멸하며, 기존 지급분의 사용기한이나 이미 후원한 크리에이터의 수익은 변경하지 않습니다.'},{title:'12. 친구 초대',body:'회사는 친구 초대 기능을 운영하는 동안 회원에게 초대 링크를 제공합니다. 초대 링크로 가입한 회원의 첫 실결제가 결제 후 7일 동안 환불되지 않으면, 직접 초대한 회원에게 후원에만 쓸 수 있는 프로모션콩 100개를 지급합니다. 보상은 초대받은 회원 1명당 한 번, 초대한 회원 1명당 한국 시간 기준 한 달에 최대 10건이며, 출금·환불할 수 없습니다.\n보상을 지급한 결제가 일부라도 환불되거나 결제 이의제기가 생기면 지급한 보상 중 사용하지 않은 콩을 회수하며, 이미 후원에 쓴 몫은 회수하지 않습니다. 자기 초대, 같은 사람의 여러 계정, 부정 결제 등 정상적인 초대가 아니라고 확인되면 회사는 사유를 기록하고 보상에서 제외하거나 지급한 보상 중 남은 콩을 회수할 수 있으며, 이의가 있으면 고객센터에 자료를 제출할 수 있습니다.\n보상 지급 시점에 초대한 회원의 계정이 이용 정지·탈퇴 상태이면 보상은 소멸합니다. 회사는 친구 초대 기능을 시작하거나 중단할 수 있으며, 중단한 동안에는 새 초대 가입과 새 보상 자격이 생기지 않고 이미 확정 대기 중인 보상은 다시 시작할 때까지 지급이 보류됩니다. 초대 링크로 가입하는 회원은 초대한 회원에게 이메일 일부와 가입·보상 진행 상태가 제공되는 것에 동의해야 합니다(개인정보처리방침 8조).'}]);
 // New voluntary event grants only; existing grants and accepted consent snapshots are preserved.
-nextTerms.version='2026-12-06.2';nextTerms.updatedAt=LEGAL_NOTICE_DATE;nextTerms.publishedAt=LEGAL_NOTICE_DATE;nextTerms.notice+=' 2026년 11월 3일 안내한 신규 프로모션100콩 이벤트의 수령일부터30일 조건도 그대로 적용합니다. 시행일 전에 충전·지급된 콩의 사용기한은 변경하지 않습니다.';
+nextTerms.version='2026-11-06.2';nextTerms.updatedAt=LEGAL_NOTICE_DATE;nextTerms.publishedAt=LEGAL_NOTICE_DATE;nextTerms.notice+=' 전체 회원이 계정당 한 번 받는 프로모션100콩 이벤트의 콩은 수령 시점부터30일 동안 사용할 수 있습니다.';
 const nextPolicy=revise(catalog.documents.policy,{
  '신고와 이의제기':[['게시물·메시지의 신고 기능과 고객센터 문의로 문제를 알릴 수 있습니다.','게시물·댓글·메시지의 신고 기능과 고객센터 문의로 문제를 알릴 수 있습니다. 권리 침해·불법촬영물·저작권 침해 신고는 대표 박경호(khpark@crefans.com)가 이메일로 접수하며, 신고를 처리하면 신고한 회원에게 앱 알림으로 결과를 알립니다. 크리에이터가 차단한 회원은 그 크리에이터에게 메시지와 새 댓글을 보낼 수 없습니다.'],['초기 베타에서는 일반 콘텐츠만 제공합니다.','오픈베타에서는 일반 콘텐츠만 제공합니다.']],
 });
