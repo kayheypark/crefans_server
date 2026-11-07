@@ -38,6 +38,7 @@
 ## 3. 서버 밖 감시 (OPS-02)
 
 - 앱 안 감시(이번 코드 변경, `OPERATIONS_WATCHDOG_ENABLED=true`): worker heartbeat 5분, 결제·환불·콩 충전 처리 30분 초과, Telegram 미전송 15분 초과, 광고 메일 결과 불명, 요청 로그 정리 지연. 같은 이벤트는 1시간에 1회만 보낸다.
+- 디스크 사용률(2026-11-07, worker): 10분마다 호스트 루트 파일시스템을 `statfs`로 읽어 `df` Use%와 같은 기준으로 계산한다. 80% 이상 `디스크 사용률 경고`, 90% 이상 `디스크 사용률 위험`(경고를 이미 보냈어도 즉시), 같은 단계는 24시간에 1회, 80% 미만으로 내려오면 `디스크 사용률 회복` 1회. 문구에 사용률·여유/전체 GB(GiB 기준)·기준값·검사 시각을 넣는다. 회복 후 24시간 안에 같은 단계로 다시 오르면 그 단계는 재알림하지 않는다(90% 도달은 별도로 알림). 상태는 `platform_jobs`의 `disk-alert` 행. 설정은 runtime.env.example의 `DISK_ALERT_*`. 서버 전체가 멈추면 이 알림도 멈추므로 외부 감시를 대신하지 않는다.
 - worker 정체: tick이 15분(`WORKER_STALL_MINUTES`)을 넘으면 기록 후 종료하고, `restart: unless-stopped`가 재시작한다.
 - API 컨테이너 healthcheck(`/api/v1/health`, DB 왕복 포함)를 compose에 추가했다.
 - 같은 서버·DB·Telegram이 모두 멈추는 경우는 앱 감시로 알 수 없다. AWS 쪽에 다음을 만든다.

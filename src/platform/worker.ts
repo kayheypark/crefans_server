@@ -7,6 +7,8 @@ import {PlatformMediaStorage} from './media-storage';
 import {cleanMediaTemp,watermarkNextMedia} from './media-watermark';
 import {transcodeNextVideo} from './video-transcode';
 import {releaseHeldNotices} from './post-notices';
+import {ConfigService} from '@nestjs/config';
+import {checkDisk} from './disk-alert';
 async function run(){
  const app=await NestFactory.createApplicationContext(PlatformModule,{logger:['error','warn']}),jobs=app.get(PlatformJobsService),operations=app.get(PlatformOperationsService);operations.installFatalHandlers();let busy=false;
  let startedAt=0;const tick=async()=>{if(busy)return;busy=true;startedAt=Date.now();try{await jobs.tick();}catch(error){await operations.error('worker.error',error,{job:'worker-tick'});}finally{busy=false;}};
@@ -20,6 +22,10 @@ async function run(){
  const convert=async()=>{if(converting)return;converting=true;try{while(await transcodeNextVideo(db,storage)>0);while(await watermarkNextMedia(db,storage)>0);await releaseHeldNotices(db);}catch(error){await operations.error('worker.error',error,{job:'media-conversion'});}finally{converting=false;}};
  await cleanMediaTemp().catch(error=>operations.error('worker.error',error,{job:'media-temp-cleanup'}));
  void convert();const converter=setInterval(()=>void convert(),15000);
- for(const signal of['SIGINT','SIGTERM'])process.on(signal,async()=>{clearInterval(timer);clearInterval(converter);await app.close();process.exit(0);});
+ // Host root disk usage (2026-11-07): no other check watches the 50GB EBS volume.
+ const config=app.get(ConfigService),diskMs=Math.max(1,Number(process.env.DISK_ALERT_INTERVAL_MINUTES)||10)*60000;
+ const disk=async()=>{try{await checkDisk(db,operations,config);}catch(error){await operations.error('worker.error',error,{job:'disk-alert'});}};
+ void disk();const diskTimer=setInterval(()=>void disk(),diskMs);
+ for(const signal of['SIGINT','SIGTERM'])process.on(signal,async()=>{clearInterval(timer);clearInterval(converter);clearInterval(diskTimer);await app.close();process.exit(0);});
 }
 run().catch(()=>{console.error('Platform worker startup failed.');process.exit(1);});
