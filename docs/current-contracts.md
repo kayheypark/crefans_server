@@ -250,6 +250,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/studio/beans` | 콩 후원·출금 |
 | `/preview/studio` | 대시보드 |
 | `/preview/studio/start` | 크리에이터 시작하기 |
+| `/preview/studio/guard` | 크리에이터 전환 안내 |
 | `/preview/studio/content` | 게시물 |
 | `/preview/studio/content/new` | 게시물 작성 |
 | `/preview/studio/memberships` | 멤버십 |
