@@ -1,0 +1,360 @@
+{
+  "at": "2026-11-07T00:38:59.975626+00:00",
+  "scope": [
+    "mobile card continuous dividers",
+    "exact post title confirmation on desktop/mobile/preview/service",
+    "server current-title ownership/atomic soft-delete"
+  ],
+  "repositories": {
+    "front": {
+      "source": {
+        "commit": "ae908b000683d4d9dfeff1df820bba7b64d6841a",
+        "release": "studio-post-confirm-20261107",
+        "remote": "/home/ubuntu/crefans-studio-post-confirm-20261107-front"
+      },
+      "feature": "943b142e37576a790743a68aaa4e4ae214b2c7d1",
+      "dev": "8ebf060a94518207bbcfe018444ef3ec4485462f",
+      "status": ""
+    },
+    "server": {
+      "source": {
+        "commit": "072368e10e1c4a304c393c80760ec786aa90adf9",
+        "release": "studio-post-confirm-20261107",
+        "remote": "/home/ubuntu/crefans-studio-post-confirm-20261107-api"
+      },
+      "feature": "4e45518829cd7a7732574ca4c8d6c8ebb904e85c",
+      "dev": "dcc05a4056f67000eb462c0ec9639cdc49a75262",
+      "status": ""
+    }
+  },
+  "checks": {
+    "frontUnit": 27,
+    "frontLayers": 434,
+    "frontTypecheckExit": 0,
+    "frontBuildExit": 0,
+    "serverBuildExit": 0,
+    "serverOpenApi": 14,
+    "serverOperations": 15,
+    "negativeControl": "removing title check fails Missing expected rejection; restored check passes",
+    "localBrowser": {
+      "startTime": "2026-11-07T00:34:43.160Z",
+      "duration": 16767.003,
+      "expected": 12,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "productionBrowser": {
+      "startTime": "2026-11-07T00:38:23.842Z",
+      "duration": 18169.902000000002,
+      "expected": 12,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "baselineSource": {
+    "runtime-source-check.json": {
+      "baseline": "079152d",
+      "checked": 555,
+      "differences": []
+    },
+    "api-runtime-source-check.json": {
+      "baseline": "6a36c19",
+      "checked": 256,
+      "differences": []
+    }
+  },
+  "compiledComparison": {
+    "checked": 195,
+    "differences": [
+      "dist/src/platform/studio.controller.js",
+      "dist/src/platform/studio.service.js",
+      "dist/src/platform/openapi-contract.js"
+    ]
+  },
+  "frontImageHashes": {
+    "components/crefans/studio/ManagementPages.tsx": "421b652a975a29fe06ba59663a7fc12c45261c3d0176f94193d46fb7a5867900",
+    "components/crefans/studio/content-list.module.css": "50f5927048e6507421ecc94607ed9e3016e63e198fcccfa76351af28bda11bca",
+    "components/preview/studio/useMockManagement.ts": "0706bd301fcdbffe96f478e37e91dfca19d8208bca0b009caf9646df6a6f6578",
+    "features/service/useStudioModel.ts": "a440a7e754a2bd58231051105e7b7cb089d9127c1e835704b68d9a2c467862a5",
+    "types/crefans-studio-management.ts": "1e24d67aa94442cb8fc934ca9907d6587ae314145360eaf44f100131203dc4e9"
+  },
+  "apiImageHashes": {
+    "src/platform/studio.service.ts": "7f49f650fd7117fb45040baaf14281a2fe3b923a206aed4677d4cc052cd55e9e",
+    "src/platform/studio.controller.ts": "82420fdad863394e9bdeb6b4746aa1be00e65813cad63e56446fe5825c5d5f9b",
+    "src/platform/openapi-contract.ts": "96913d537042588eb9463a4e52d58c0d88a352d3cde3d15415e1bd054bfe1c66",
+    "dist/src/platform/studio.service.js": "b843ffca20ae55b942d80e7c51a3e1ed15bd6362f6bc8d1ebf0f229438dd501e",
+    "dist/src/platform/studio.service.js.map": "a6e17bb305cd026d90f3b46e74d7f342169123775157f219da3306e533cdff22",
+    "dist/src/platform/studio.service.d.ts": "7215f7624077aaff1a8c06c0d9c597254f131f6bc22ee4124e1283c19a9d6cbd",
+    "dist/src/platform/studio.controller.js": "f604fcd3dc264db93b9ee96bf86caa3e84883622e45154845eb2d9118ad7686a",
+    "dist/src/platform/studio.controller.js.map": "bb86b5e8b01fdce286cd6d38193d644e4537d5e99584c1fdb0a4f223a29dbb81",
+    "dist/src/platform/studio.controller.d.ts": "a728735b0921ee78e17034beae7cbb21d45a672c7e31dfa612eb5e54751de79b",
+    "dist/src/platform/openapi-contract.js": "34193f257da2eb1258436551b33949fdf4c18157187cdb502348c5d93fde7ac0",
+    "dist/src/platform/openapi-contract.js.map": "93d02ac22df763a1aee446c8cfe2efef567fc10acb9894b2b938506048f2707c",
+    "dist/src/platform/openapi-contract.d.ts": "9370626dbd5ee044f684ecdc0da6b5cba61e46ca30906e2a95609a4817eaa97c"
+  },
+  "frontDeploy": {
+    "at": "2026-11-07T00:38:11Z",
+    "commit": "ae908b000683d4d9dfeff1df820bba7b64d6841a",
+    "before": {
+      "crefans-beta-frontend-1": {
+        "id": "13c16c222b936b1932fc7fea2ed086c630e26aa327f6fe47d6612067c0a346d3",
+        "tag": "crefans-front:studio-posts-mobile-20261107",
+        "image": "sha256:5ffdf1be17ce9aa5d5ece427b0d5fdb61d84b02c32e11305cb4a0fe9650fa809"
+      },
+      "crefans-beta-worker-1": {
+        "id": "9355ef8f204be1082619e6892f019a43a33a55de20a40897397c686c0473aec3",
+        "tag": "crefans-api:promo-terms-20261107",
+        "image": "sha256:991a70ae50bb8e9ab26ac7d3062183b7cc63b26fb4c7317c3010c64221e0f0a9"
+      },
+      "crefans-beta-api-1": {
+        "id": "efa9c25acdfafc603cacef865e9a3ec6aea5b5dfabeaa0e9f2ebb1d35191efe1",
+        "tag": "crefans-api:promo-terms-20261107",
+        "image": "sha256:991a70ae50bb8e9ab26ac7d3062183b7cc63b26fb4c7317c3010c64221e0f0a9"
+      },
+      "crefans-beta-admin-1": {
+        "id": "b04dbbb64507fa383d51107327ce2308d64b4d3d82555eb3aecf6f6c8f75fc1a",
+        "tag": "crefans-admin:refund-notices-20261106",
+        "image": "sha256:fbcd48e18389fa2f90fd385f4ba213bccbe8a10c72c0271cb739c459d33e9d7d"
+      },
+      "crefans-beta-proxy-1": {
+        "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+        "tag": "caddy:2-alpine",
+        "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f"
+      },
+      "crefans-beta-database-1": {
+        "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+        "tag": "mysql:8.0",
+        "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b"
+      }
+    },
+    "after": {
+      "crefans-beta-frontend-1": {
+        "id": "4acf50e1cc30c0ca8bdea02edc27bb863fa9dd8c15f3369f73cc6d6f91162335",
+        "tag": "crefans-front:studio-post-confirm-20261107",
+        "image": "sha256:99a811e19e843776a4c382b6991fd9752be8f0d48ac07cb8f74b6837a4eb8a6f"
+      },
+      "crefans-beta-worker-1": {
+        "id": "9355ef8f204be1082619e6892f019a43a33a55de20a40897397c686c0473aec3",
+        "tag": "crefans-api:promo-terms-20261107",
+        "image": "sha256:991a70ae50bb8e9ab26ac7d3062183b7cc63b26fb4c7317c3010c64221e0f0a9"
+      },
+      "crefans-beta-api-1": {
+        "id": "efa9c25acdfafc603cacef865e9a3ec6aea5b5dfabeaa0e9f2ebb1d35191efe1",
+        "tag": "crefans-api:promo-terms-20261107",
+        "image": "sha256:991a70ae50bb8e9ab26ac7d3062183b7cc63b26fb4c7317c3010c64221e0f0a9"
+      },
+      "crefans-beta-admin-1": {
+        "id": "b04dbbb64507fa383d51107327ce2308d64b4d3d82555eb3aecf6f6c8f75fc1a",
+        "tag": "crefans-admin:refund-notices-20261106",
+        "image": "sha256:fbcd48e18389fa2f90fd385f4ba213bccbe8a10c72c0271cb739c459d33e9d7d"
+      },
+      "crefans-beta-proxy-1": {
+        "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+        "tag": "caddy:2-alpine",
+        "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f"
+      },
+      "crefans-beta-database-1": {
+        "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+        "tag": "mysql:8.0",
+        "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b"
+      }
+    },
+    "pageStatuses": {
+      "/service/landing": 200,
+      "/preview/studio/content": 200,
+      "/service/studio/content": 200,
+      "/service/creator/crefans": 200
+    },
+    "otherContainersUnchanged": true,
+    "restartCount": 0
+  },
+  "apiDeploy": {
+    "at": "2026-11-07T00:38:23Z",
+    "commit": "072368e10e1c4a304c393c80760ec786aa90adf9",
+    "before": {
+      "crefans-beta-frontend-1": {
+        "id": "4acf50e1cc30c0ca8bdea02edc27bb863fa9dd8c15f3369f73cc6d6f91162335",
+        "tag": "crefans-front:studio-post-confirm-20261107",
+        "image": "sha256:99a811e19e843776a4c382b6991fd9752be8f0d48ac07cb8f74b6837a4eb8a6f"
+      },
+      "crefans-beta-worker-1": {
+        "id": "9355ef8f204be1082619e6892f019a43a33a55de20a40897397c686c0473aec3",
+        "tag": "crefans-api:promo-terms-20261107",
+        "image": "sha256:991a70ae50bb8e9ab26ac7d3062183b7cc63b26fb4c7317c3010c64221e0f0a9"
+      },
+      "crefans-beta-api-1": {
+        "id": "efa9c25acdfafc603cacef865e9a3ec6aea5b5dfabeaa0e9f2ebb1d35191efe1",
+        "tag": "crefans-api:promo-terms-20261107",
+        "image": "sha256:991a70ae50bb8e9ab26ac7d3062183b7cc63b26fb4c7317c3010c64221e0f0a9"
+      },
+      "crefans-beta-admin-1": {
+        "id": "b04dbbb64507fa383d51107327ce2308d64b4d3d82555eb3aecf6f6c8f75fc1a",
+        "tag": "crefans-admin:refund-notices-20261106",
+        "image": "sha256:fbcd48e18389fa2f90fd385f4ba213bccbe8a10c72c0271cb739c459d33e9d7d"
+      },
+      "crefans-beta-proxy-1": {
+        "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+        "tag": "caddy:2-alpine",
+        "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f"
+      },
+      "crefans-beta-database-1": {
+        "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+        "tag": "mysql:8.0",
+        "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b"
+      }
+    },
+    "after": {
+      "crefans-beta-worker-1": {
+        "id": "6cdad4914606ee5f8d862d3062ff2aac3aa506478611a222424f11d7e4b4a01a",
+        "tag": "crefans-api:studio-post-confirm-20261107",
+        "image": "sha256:50c0b837d2a722280be94cf43026baca932b06dd911e6e6fca2d151a494d6dfe"
+      },
+      "crefans-beta-api-1": {
+        "id": "db90f858ab2a04b7cbd8a25369aa3523ff873f8d23b9bead7dca18036798ee19",
+        "tag": "crefans-api:studio-post-confirm-20261107",
+        "image": "sha256:50c0b837d2a722280be94cf43026baca932b06dd911e6e6fca2d151a494d6dfe"
+      },
+      "crefans-beta-frontend-1": {
+        "id": "4acf50e1cc30c0ca8bdea02edc27bb863fa9dd8c15f3369f73cc6d6f91162335",
+        "tag": "crefans-front:studio-post-confirm-20261107",
+        "image": "sha256:99a811e19e843776a4c382b6991fd9752be8f0d48ac07cb8f74b6837a4eb8a6f"
+      },
+      "crefans-beta-admin-1": {
+        "id": "b04dbbb64507fa383d51107327ce2308d64b4d3d82555eb3aecf6f6c8f75fc1a",
+        "tag": "crefans-admin:refund-notices-20261106",
+        "image": "sha256:fbcd48e18389fa2f90fd385f4ba213bccbe8a10c72c0271cb739c459d33e9d7d"
+      },
+      "crefans-beta-proxy-1": {
+        "id": "e0b9112541f9cfe06a577af636ed8c6ea0f93f6a994f2157e383ab236362a65c",
+        "tag": "caddy:2-alpine",
+        "image": "sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f"
+      },
+      "crefans-beta-database-1": {
+        "id": "425b31709730cb9b93851aef50d95d8207d35e7dfbec0bf2f32bc70bdb11be82",
+        "tag": "mysql:8.0",
+        "image": "sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b"
+      }
+    },
+    "apiStatus": 200,
+    "unauthenticatedDelete": 401,
+    "runtimeEnvPreserved": true,
+    "unrelatedContainersPreserved": true
+  },
+  "health": {
+    "at": "2026-11-07T00:38:59Z",
+    "containers": {
+      "crefans-beta-worker-1": {
+        "tag": "crefans-api:studio-post-confirm-20261107",
+        "commit": "072368e10e1c4a304c393c80760ec786aa90adf9",
+        "running": true,
+        "restarts": 0,
+        "oom": false,
+        "health": null
+      },
+      "crefans-beta-api-1": {
+        "tag": "crefans-api:studio-post-confirm-20261107",
+        "commit": "072368e10e1c4a304c393c80760ec786aa90adf9",
+        "running": true,
+        "restarts": 0,
+        "oom": false,
+        "health": "healthy"
+      },
+      "crefans-beta-frontend-1": {
+        "tag": "crefans-front:studio-post-confirm-20261107",
+        "commit": "ae908b000683d4d9dfeff1df820bba7b64d6841a",
+        "running": true,
+        "restarts": 0,
+        "oom": false,
+        "health": null
+      },
+      "crefans-beta-admin-1": {
+        "tag": "crefans-admin:refund-notices-20261106",
+        "commit": null,
+        "running": true,
+        "restarts": 0,
+        "oom": false,
+        "health": null
+      },
+      "crefans-beta-proxy-1": {
+        "tag": "caddy:2-alpine",
+        "commit": null,
+        "running": true,
+        "restarts": 0,
+        "oom": false,
+        "health": null
+      },
+      "crefans-beta-database-1": {
+        "tag": "mysql:8.0",
+        "commit": null,
+        "running": true,
+        "restarts": 0,
+        "oom": false,
+        "health": "healthy"
+      }
+    },
+    "worker": {
+      "completedAt": "2026-11-07T00:38:20.525Z",
+      "failures": {}
+    },
+    "apiStatus": 200
+  },
+  "cleanup": [
+    {
+      "previousImageRemoved": true,
+      "temporarySourceRemoved": true,
+      "freeBytes": 8396591104
+    },
+    {
+      "previousApiRemoved": true,
+      "apiTemporarySourceRemoved": true,
+      "freeBytes": 8397037568
+    }
+  ],
+  "recovery": "/Users/ethan/crefans-recovery/20261107/studio-post-confirm (private; OCI digest/blob and runtime SHA verified)",
+  "limits": [
+    "Browser uses public preview and intercepted service API; no real member deletion",
+    "iPhone WebKit emulation, not physical iPhone",
+    "No DB migration or payment configuration change"
+  ],
+  "failures": [
+    "Shared E2E DB busy caused hook failures; original suite later passed 15/15",
+    "Independent DB adapter rejected by local fixture DB-name guard; no validation claimed",
+    "API build script placeholder syntax error fixed before container changes"
+  ],
+  "commands": {
+    "front": [
+      "node --test tests/crefans-studio-management.test.cjs tests/typed-confirm-dialog.test.cjs",
+      "npm run typecheck",
+      "npm run check:layers",
+      "CREFANS_E2E=true PLATFORM_API_ORIGIN=http://127.0.0.1:3012 npm run build",
+      "npx playwright test -c .local/studio-post-card-confirm/playwright.config.ts",
+      "CARDS_PRODUCTION=true npx playwright test -c .local/studio-post-card-confirm/playwright.config.ts"
+    ],
+    "server": [
+      "npm run build",
+      "CREFANS_E2E=true node --test tests/platform-operations-events.test.cjs",
+      "CREFANS_E2E=true node --test tests/platform-openapi.test.cjs"
+    ]
+  },
+  "logHashes": {
+    ".local/studio-post-card-confirm/unit.log": "4560d28d97d35556dd1d032ca971ca5706a9945446463af453cf4950981006b7",
+    ".local/studio-post-card-confirm/dev-unit.log": "85238c234db0061fa473c564a37b48c617164389f89a9468191641110b125e7c",
+    ".local/studio-post-card-confirm/typecheck.log": "257e4a2cb00fa6fae592277d05df5e7b60f895802456510b5c9bfed9c339fe04",
+    ".local/studio-post-card-confirm/layers.log": "f0b8f03ff1976da1dade2932589a662ed55d125d6a47bcdc4195635eb82bb586",
+    ".local/studio-post-card-confirm/build.log": "f3c9749b79832e8dca30b56c008e9b25d72839738f73008f622c95ef6a1e7717",
+    ".local/studio-post-card-confirm/browser-final.log": "a84bf3139c68375be029f10e8d2f225f4dd5a38055bc28e0e6a56d04b0e844cb",
+    ".local/studio-post-card-confirm/production-browser.log": "bb4dd3925190e558274983042e1e3dc91a29346863cc86d2a9e9d97124ac0f01",
+    ".local/studio-post-card-confirm/deploy.log": "43831b7243dd2cb0411037a29696494b1fedba9ab3fbf77cf223c6353df1f945",
+    ".local/studio-post-card-confirm/api-build.log": "8cd35511c7e212ea826f0f95ecd282bed273a475342ff16d305e30cd4eb62f43",
+    ".local/studio-post-card-confirm/api-deploy.log": "deeb50d4a642231eb9a26f59f3db3dacc8b4dbd339c3ecf43c4d809b381b3ed7",
+    ".local/studio-post-card-confirm/cleanup.log": "982edf053d88e433132638d55c17899f735e55ec241880856133b80cffd3c79c",
+    ".local/studio-post-card-confirm/api-cleanup.log": "eb00b6f51e41dc8f0d412f9fc6b9a813ff280e40eb3c98dbdd4a0ecbc3590945",
+    ".local/studio-post-delete-confirm/build.log": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2",
+    ".local/studio-post-delete-confirm/operations-retry.log": "401d3df7a60891eb03af75ef62d4830f2009e044105ba7ab70655eeeaea2fbc7",
+    ".local/studio-post-delete-confirm/openapi.log": "21defe6a5ef9ccb4126e629d5c829ba694b39017602ae75ef622d92c1012b512",
+    ".local/studio-post-delete-confirm/negative-control.log": "c769b8ae96834b8468317fc3565b30b7c406a1f73ee471a7183cdea27c454594",
+    ".local/studio-post-delete-confirm/restored-control.log": "ee165dce3ffc6e231904a6a98c8554fe2b01dbc3887165c8e26135517f6e7eb1"
+  }
+}

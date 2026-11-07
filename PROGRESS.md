@@ -1,8 +1,8 @@
-## 2026-11-07 게시물 직접 입력 삭제 검증 (운영 미배포)
-- origin/prod 6a36c19 기반 feat/studio-post-delete-confirm. POST /studio/content/:id/delete의 confirmation은 현재 게시물 제목과 정확히 일치해야 한다. 기존 편집과 같은 행 잠금 아래 소유권·제목 재검사 후 soft delete와 운영 이벤트를 원자적으로 기록한다. 누락·오입력 400, 다른 회원/삭제된 게시물 404. DB migration 없음.
-- 합격 기준: 오입력·여분 공백·다른 자료형·소유권·변경 전 제목으로 삭제 불가, 동시 요청 1회만 성공·이벤트 1건, 이벤트 저장 실패 시 삭제 롤백. 현재 제목 확인은 인증/권한 검사를 대체하지 않는다.
-- Nest 빌드 종료0, OpenAPI14/14, 격리 로컬DB operations15/15 통과. 최초 공용 DB 점유로 hook 실패, 다른 테스트 종료 후 원래 테스트 그대로 재실행 통과. 별도 DB 어댑터 시도는 테스트 fixture의 DB 이름 guard에 막혀 실행되지 않았고 검증 근거로 사용하지 않는다. 제목 검사를 제거한 대조는 예상 거절 누락으로 실패, 컴파일 파일 원복 후 동일 검사 통과. 증거 .local/studio-post-delete-confirm. 실운영 게시물 삭제·실외부 발송 미실행.
-- docs/platform-api.md와 OpenAPI 필수 본문 갱신. OWASP Input Validation 2026-11-07 확인, 브라우저·서버 양측 검사 적용. dev/prod·운영 배포는 다음 단계. AGENTS.md 기존 검증/권한/브랜치 규약 유지.
+## 2026-11-07 게시물 직접 입력 삭제 운영 배포 완료
+- origin/prod 6a36c19 → feat 4e45518 → dev dcc05a4 → prod 072368e. front ae908b0와 studio-post-confirm-20261107 배포. POST /studio/content/:id/delete는 confirmation에 현재 제목과 정확히 같은 값을 요구한다. 제목 편집과 동일 행 잠금 아래 소유권·제목 확인, soft delete와 운영 이벤트를 원자적으로 처리. 누락/오입력400, 소유권/삭제된 글404. 마이그레이션 없음.
+- Nest 빌드, OpenAPI14, 격리DB operations15 통과. 오입력·공백·잘못된 자료형·다른 회원·이전 제목·동시 삭제1건·outbox 실패 롤백 확인. 검사 제거 대조 실패/원복 통과. 최초 공용 DB 점유 실패 후 원래 테스트 재실행 성공; 독립DB 어댑터는 fixture guard 거절로 검증 아님.
+- 현재 운영 소스256개 기준 prod 일치, 컴파일 JS195개 중 요청 세 모듈만 차이 확인 후 offline overlay image 생성. 이미지 소스/JS/map/type12개 SHA 확인. frontend 먼저 교체, API/worker 후교체. 운영 health200·인증 없는 삭제401, 기존 runtime 환경값(APP_RELEASE 제외) 동일, 6컨테이너 정상·worker 실패0. 실제 회원 게시물 삭제는 수행하지 않음.
+- 복구 이미지/설정은 /Users/ethan/crefans-recovery/20261107/studio-post-confirm에 digest/SHA 검증 후 운영의 미사용 직전 태그와 이번 임시 소스 정리. 증거 docs/studio-post-confirm-deployment-20261107.json; front .local/studio-post-card-confirm. 소스/API/정책 계약은 docs/platform-api.md. AGENTS.md 기존 규약 유지.
 
 ## 2026-11-07 09:03 KST 운영 배포 promo-terms-20261107 — /ask-me 결정 4건 + 약관 11조 프로모션콩 출금 범위 명확화 (완료)
 - 결정: ① 스튜디오 통계 요약 시안(A~E) **보류** ② 오픈 일정(약관 2조 "2026년 11월까지" 초대제·12월 오픈 vs 본인확인 미연동) **이번엔 보류** — 11월 말 재결정 필요 ③ 친구 초대 링크 가입(서버 허용, 약관 2조는 초대 이메일만) **현행 유지** ④ 프로모션콩 출금 충돌 **코드 기준으로 문구만 정리**.
