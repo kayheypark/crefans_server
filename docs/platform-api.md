@@ -114,7 +114,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | PUT | /studio/activity | active |
 | PUT | /studio/comments-setting | enabled; 게시물 설정보다 우선 |
 | POST | /studio/content | id?, title/body/media/commentsEnabled/accessPlanId/status/scheduledAt |
-| POST | /studio/content/:id/delete | 소유권 검증 후 soft delete |
+| POST | /studio/content/:id/delete | `confirmation`에 현재 제목 정확 입력 필수. 게시물 잠금·소유권 검사 후 soft delete·운영 이벤트를 같은 트랜잭션으로 처리 |
 | POST | /studio/memberships | id?, name/price/benefits/image; price는 1~1,100,000원(2026-11-06 토스 신고 단건 최고가, finance.service createOrder도 같은 상한), immutable version 생성 |
 | PUT | /studio/memberships/:id | active 또는 deleted; 삭제는 confirmation에 현재 멤버십 이름 정확히 입력 필수, 잠금 후 이름·소유자·삭제 여부·유효 구독 재확인 |
 | PUT | /studio/comments/:id | hidden, 본인 게시물만 |
@@ -572,3 +572,9 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 사용자 확정 정책: “해지 취소 후 다음 결제일부터 자동 갱신 재개, 즉시 결제 없음”. 2026-11-05 공식 문서 확인: [Stripe 기간 종료 전 해지 취소](https://docs.stripe.com/billing/subscriptions/cancel)는 남은 유료 기간의 취소 예약 복원을 설명한다. [Toss 자동결제 연동](https://docs.tosspayments.com/guides/v2/billing/integration-api)은 가맹점이 청구 시점을 관리하므로 이번 재개 API에서는 승인 API를 호출하지 않는다. Stripe는 동작 설계 참고이며 실제 결제 공급사는 Toss다.
 
 검증: `tests/platform-payment-lifecycle.test.cjs`의 재개·동의·소유권·만료·중복·카드 오류·기존 조건 유지·예정일 1회 청구, `tests/platform-openapi.test.cjs`의 인증/라우트 계약. 로컬 E2E DB·PG 대역이며 실제 회원이나 실결제 변경은 하지 않았다.
+
+### 게시물 삭제 직접 입력 확인 (2026-11-07)
+
+`POST /studio/content/:id/delete`는 `{confirmation: string}`을 받는다. 소유자가 아니거나 이미 삭제된 글은 404 POST_NOT_FOUND, 현재 제목과 다르거나 누락·다른 자료형은 400 CONFIRMATION_REQUIRED다. 공백 제거·대소문자 보정을 하지 않는다. 제목 편집과 같은 게시물 행 잠금을 잡고 현재 제목을 검사하므로 확인 화면을 연 뒤 제목이 바뀌면 다시 목록에서 확인해야 한다. 실패 시 삭제와 운영 이벤트 모두 생성하지 않는다. 기존 soft delete·권한·운영 기록을 보존하며 DB migration은 없다.
+
+근거: [OWASP Input Validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html), 2026-11-07 확인. 클라이언트 확인만으로 동작을 확정하지 않고 서버에서도 입력 의미와 권한을 별도로 검사하는 규칙을 적용했다. 프론트 공통 TypedConfirmDialog와 콘솔의 직접 입력 패턴을 재사용한다. 검증: `tests/platform-operations-events.test.cjs`의 현재 제목·오입력·소유권·동시 삭제·이벤트 롤백, `tests/platform-openapi.test.cjs`의 요청 계약.

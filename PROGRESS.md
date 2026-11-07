@@ -1,3 +1,9 @@
+## 2026-11-07 게시물 직접 입력 삭제 검증 (운영 미배포)
+- origin/prod 6a36c19 기반 feat/studio-post-delete-confirm. POST /studio/content/:id/delete의 confirmation은 현재 게시물 제목과 정확히 일치해야 한다. 기존 편집과 같은 행 잠금 아래 소유권·제목 재검사 후 soft delete와 운영 이벤트를 원자적으로 기록한다. 누락·오입력 400, 다른 회원/삭제된 게시물 404. DB migration 없음.
+- 합격 기준: 오입력·여분 공백·다른 자료형·소유권·변경 전 제목으로 삭제 불가, 동시 요청 1회만 성공·이벤트 1건, 이벤트 저장 실패 시 삭제 롤백. 현재 제목 확인은 인증/권한 검사를 대체하지 않는다.
+- Nest 빌드 종료0, OpenAPI14/14, 격리 로컬DB operations15/15 통과. 최초 공용 DB 점유로 hook 실패, 다른 테스트 종료 후 원래 테스트 그대로 재실행 통과. 별도 DB 어댑터 시도는 테스트 fixture의 DB 이름 guard에 막혀 실행되지 않았고 검증 근거로 사용하지 않는다. 제목 검사를 제거한 대조는 예상 거절 누락으로 실패, 컴파일 파일 원복 후 동일 검사 통과. 증거 .local/studio-post-delete-confirm. 실운영 게시물 삭제·실외부 발송 미실행.
+- docs/platform-api.md와 OpenAPI 필수 본문 갱신. OWASP Input Validation 2026-11-07 확인, 브라우저·서버 양측 검사 적용. dev/prod·운영 배포는 다음 단계. AGENTS.md 기존 검증/권한/브랜치 규약 유지.
+
 ## 2026-11-07 09:03 KST 운영 배포 promo-terms-20261107 — /ask-me 결정 4건 + 약관 11조 프로모션콩 출금 범위 명확화 (완료)
 - 결정: ① 스튜디오 통계 요약 시안(A~E) **보류** ② 오픈 일정(약관 2조 "2026년 11월까지" 초대제·12월 오픈 vs 본인확인 미연동) **이번엔 보류** — 11월 말 재결정 필요 ③ 친구 초대 링크 가입(서버 허용, 약관 2조는 초대 이메일만) **현행 유지** ④ 프로모션콩 출금 충돌 **코드 기준으로 문구만 정리**.
 - 코드 기준: `bean-policy.ts` withdrawableBuckets=earned-paid·earned-promotion, promotionCashWithdrawal:false, `beans.service.ts` 156-165(자기 후원 제외·지급 출처 확인). 회원이 직접 받은 프로모션콩은 출금 불가, 후원으로 크리에이터가 받은 프로모션콩은 출금 가능.
