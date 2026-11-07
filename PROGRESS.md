@@ -1,3 +1,13 @@
+## 2026-11-07 10:44~10:50 KST 로컬 dev DB 마이그레이션 적용 후 기존 미공개 회귀 재검사 (사용자 승인 "적용하고 재검사")
+- 사용자 결정: 운영 is_public=false 건수 확인 없이 진행 / 미공개 글은 작성자 본인 프로필 목록에서도 제외(현행) / 미공개로 처음 발행한 글은 첫 공개 때 팔로워 알림 1회(현행).
+- dev DB(127.0.0.1:3307 crefans_platform_dev) 백업: crefans_server/.local/devdb-backup-20261107/crefans_platform_dev.sql.gz(CREATE TABLE 88·INSERT 30, gzip -t OK, SHA256SUMS; PROCESS 권한 없음 경고는 테이블스페이스만). `prisma migrate deploy` 9건(20261103010000~20261107120000) 적용 → up to date.
+- 브랜치 dist 를 dev:platform 진입점(dist/src/platform/main.js, PORT 3091)으로, origin/prod cfdfffb 기준선을 3092 로 띄워 같은 DB 에서 비교:
+  - platform.integration: 브랜치 11/2 실패 = 기준선 11/2 실패(9 프로필 핸들·댓글, 11 디렉터리 검색) 동일.
+  - platform-access.integration: 브랜치 0/6 = 기준선 0/6 동일. 원인은 준비 단계 POST /media 가 로컬에서 400 → 미공개·권한 단언까지 도달하지 못함(**기존 미공개 접근 회귀는 여전히 미검증**).
+  - post-view-metrics(E2E DB): 7/7 통과. media-cloud: 실 AWS opt-in 필요로 미실행.
+  - platform-post-visibility(신규): 5/5.
+- 남은 일: 로컬 POST /media 400 원인(미디어 처리 환경) 해결 후 platform-access 재검사.
+
 ## 2026-11-07 게시물 미공개(작성자만) — feat/post-unpublish (미배포)
 - 사용자 결정(2026-11-07): 미공개=작성자만(피드·프로필·검색·링크·구독자 모두 차단, 상호작용 차단, 재공개 시 그대로 복귀). 운영 숨김(hidden_at)과 별도, 크리에이터는 운영 숨김 해제 불가. 운영자 전환은 사유 필수·알림 없음. 이력은 콘솔에서만.
 - 데이터: 기존 `postings.is_public` 재사용(신규 런타임 access/피드/프로필/미디어/공유이미지/조회수가 이미 false=비공개로 처리, 스튜디오 저장은 미사용). 로컬 dev DB에 is_public=0 13행(전부 2026-11-02 테스트 픽스처 제목, PUBLISHED). 운영 DB 분포는 미확인(접근 금지) — 레거시 '링크 전용' 행이 있으면 지금도 비공개로 동작 중이며 이번 변경 후 스튜디오에 '미공개'로 표시되고 크리에이터가 공개 전환 가능.
