@@ -437,7 +437,7 @@ model Posting {
   allow_individual_purchase Boolean        @default(false)
   /// 개별 구매 가격 (원)
   individual_purchase_price Decimal?       @db.Decimal(10, 0)
-  /// 공개 여부
+  /// 공개 여부. false = 미공개(2026-11-07): 작성자 본인만 보임. 크리에이터(스튜디오)·운영자(콘솔)가 전환하고 이력은 moderation_actions. 운영자 숨김(hidden_at)과 별개
   is_public                 Boolean        @default(true)
   /// 민감한 콘텐츠 여부
   is_sensitive              Boolean        @default(false)
@@ -1775,7 +1775,10 @@ model ModerationAction {
   reason String @db.VarChar(500)
   public_reason String? @db.VarChar(500)
   until DateTime?
+  /// 처리자 ID. actor_type CREATOR면 회원(크리에이터) ID
   admin_id String @db.VarChar(191)
+  /// ADMIN(운영자) 또는 CREATOR(게시물 미공개 전환을 작성자 본인이 한 경우, 2026-11-07)
+  actor_type String @default("ADMIN") @db.VarChar(20)
   created_at DateTime @default(now())
   @@index([target_type, target_id, created_at])
   @@map("moderation_actions")

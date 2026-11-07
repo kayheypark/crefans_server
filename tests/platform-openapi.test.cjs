@@ -37,10 +37,10 @@ before(async()=>{
 });
 after(async()=>{await app?.close();});
 const request=(path,cookie)=>fetch(base+path,{headers:cookie?{cookie}:{},redirect:'manual'});
-test('OpenAPI 3 validates, has all 205 runtime operations and no legacy controllers',async()=>{
+test('OpenAPI 3 validates, has all 207 runtime operations and no legacy controllers',async()=>{
  await Parser.validate(structuredClone(document));
  const operations=Object.entries(document.paths).flatMap(([path,item])=>Object.keys(item).filter(method=>['get','post','put','patch','delete','head','options'].includes(method)).map(method=>method+' '+path));
- assert.equal(operations.length,205);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 205: +1 admin subscription full refund (2026-11-06). 204: +1 admin subscription immediate cancel (2026-11-06). 203: +2 admin memberships/subscriptions (2026-11-06). 171: +4 manual payout routes, +1 GET categories (2026-10-31), +1 PUT me/profile/photos, +1 GET me/referral, +3 admin referrals, +1 GET media/:id/status, +1 POST admin/referrals/:id/revoke (2026-11-02) (2026-11-01)
+ assert.equal(operations.length,207);assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 207: +2 post visibility (studio PUT content/:id/visibility, admin POST posts/:id/visibility, 2026-11-07). 205: +1 admin subscription full refund (2026-11-06). 204: +1 admin subscription immediate cancel (2026-11-06). 203: +2 admin memberships/subscriptions (2026-11-06). 171: +4 manual payout routes, +1 GET categories (2026-10-31), +1 PUT me/profile/photos, +1 GET me/referral, +3 admin referrals, +1 GET media/:id/status, +1 POST admin/referrals/:id/revoke (2026-11-02) (2026-11-01)
  assert.ok(operations.every(key=>key.includes(' /api/v1/')));assert.equal(document.info.version,'v1');
  assert.equal(document.components.securitySchemes.memberSession.name,'access_token');
  assert.equal(document.paths['/api/v1/admin/me'].get.security[0].adminSession.length,0);assert.equal(document.paths['/api/v1/admin/me'].get.security[0].memberSession,undefined,'console uses the operator session only');assert.equal(document.components.securitySchemes.adminSession.name,'admin_access_token');
@@ -121,7 +121,7 @@ test('media is documented as binary, JSON APIs have common envelope, key materia
 test('three valid documents isolate business APIs, retain required shared calls and cover all operations',async()=>{
  const operations=doc=>Object.entries(doc.paths).flatMap(([path,item])=>Object.keys(item).map(method=>method+' '+path));
  const user=operations(documents.user),studio=operations(documents.studio),console=operations(documents.console);
- assert.equal(user.length,86);assert.equal(studio.length,48);assert.equal(console.length,91);
+ assert.equal(user.length,86);assert.equal(studio.length,49);assert.equal(console.length,92);// 2026-11-07: +1 studio, +1 console post visibility
  assert.deepEqual([...new Set([...user,...studio,...console])].sort(),operations(document).sort());
  const auth=['post /api/v1/auth/login','post /api/v1/auth/logout','post /api/v1/auth/refresh'];
  assert.deepEqual(user.filter(key=>console.includes(key)).sort(),auth);

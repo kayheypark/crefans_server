@@ -1,3 +1,12 @@
+## 2026-11-07 게시물 미공개(작성자만) — feat/post-unpublish (미배포)
+- 사용자 결정(2026-11-07): 미공개=작성자만(피드·프로필·검색·링크·구독자 모두 차단, 상호작용 차단, 재공개 시 그대로 복귀). 운영 숨김(hidden_at)과 별도, 크리에이터는 운영 숨김 해제 불가. 운영자 전환은 사유 필수·알림 없음. 이력은 콘솔에서만.
+- 데이터: 기존 `postings.is_public` 재사용(신규 런타임 access/피드/프로필/미디어/공유이미지/조회수가 이미 false=비공개로 처리, 스튜디오 저장은 미사용). 로컬 dev DB에 is_public=0 13행(전부 2026-11-02 테스트 픽스처 제목, PUBLISHED). 운영 DB 분포는 미확인(접근 금지) — 레거시 '링크 전용' 행이 있으면 지금도 비공개로 동작 중이며 이번 변경 후 스튜디오에 '미공개'로 표시되고 크리에이터가 공개 전환 가능.
+- 마이그레이션 20261107120000_post_visibility: moderation_actions.actor_type VARCHAR(20) NOT NULL DEFAULT 'ADMIN'만 추가. 이전 이미지 롤백 호환(칸 무시).
+- API: PUT /studio/content/:id/visibility {public}, POST /admin/posts/:id/visibility {public,reason}(content.update), GET /admin/posts/:id/moderation 에 actorType/actorId/actorName 추가. 공통 로직 `src/platform/post-visibility.ts`. 스튜디오 contents에 `unpublished:true`.
+- 차단 경로 보강: 상세 404(작성자 200), 저장/좋아요 컬렉션, 프로필 postCount, 팔로워 알림 보류(announcePost·releaseHeldNotices), 후원내역 postAvailable. 기존부터 차단: access(댓글·좋아요·저장·멘션·후원), 피드·작성자 목록, 미디어/edge, 공유 이미지, 조회수. 전체 목록은 docs/platform-api.md '게시물 미공개' 절.
+- 검증(2026-11-07 10:33 KST, 워크트리 전용 node_modules 복제+prisma generate, 공유 client 해시 불변): nest build 성공. `tests/platform-post-visibility.test.cjs` 5/5(격리 e2e DB, --test-concurrency=1). 대조: access의 is_public 검사+상세 필터 제거 시 2건 실패, 알림 보류+저장 컬렉션 필터 제거 시 3건 실패 → 복원 후 5/5. OpenAPI 14/14(207 ops, studio 49, console 92). 관련 17파일 회귀: 브랜치와 origin/prod(cfdfffb) 통과/실패 목록 동일(access.integration·media-cloud·post-view-metrics·feed-category·billing-recovery 일부·platform.integration은 dev DB에 founding_badge_visible 미적용으로 양쪽 모두 실패 — 무관하나 미공개 관련 기존 회귀(access.integration 5번 등)는 이번에 실행 결과 없음).
+- 남은 일: dev→prod 통합, 운영 migrate deploy 후 API·worker 교체(서버 먼저, 콘솔·프론트 다음).
+
 ## 2026-11-07 게시물 직접 입력 삭제 운영 배포 완료
 - origin/prod 6a36c19 → feat 4e45518 → dev dcc05a4 → prod 072368e. front ae908b0와 studio-post-confirm-20261107 배포. POST /studio/content/:id/delete는 confirmation에 현재 제목과 정확히 같은 값을 요구한다. 제목 편집과 동일 행 잠금 아래 소유권·제목 확인, soft delete와 운영 이벤트를 원자적으로 처리. 누락/오입력400, 소유권/삭제된 글404. 마이그레이션 없음.
 - Nest 빌드, OpenAPI14, 격리DB operations15 통과. 오입력·공백·잘못된 자료형·다른 회원·이전 제목·동시 삭제1건·outbox 실패 롤백 확인. 검사 제거 대조 실패/원복 통과. 최초 공용 DB 점유 실패 후 원래 테스트 재실행 성공; 독립DB 어댑터는 fixture guard 거절로 검증 아님.

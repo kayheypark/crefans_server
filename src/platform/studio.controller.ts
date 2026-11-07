@@ -12,6 +12,7 @@ export class PlatformStudioController {
  @Put('activity') async activity(@Body('active') active:boolean,@Req() r:any){if(typeof active!=='boolean')reject(400,'INVALID_INPUT','활동 상태를 확인해주세요.');const c=await this.studio.db.creator.updateMany({where:{user_id:r.user.sub},data:{is_active:active}});if(!c.count)reject(403,'CREATOR_REQUIRED','크리에이터 등록이 필요합니다.');return{message:'활동 상태를 변경했습니다.'};}
  @Put('comments-setting') async comments(@Body('enabled') enabled:boolean,@Req() r:any){if(typeof enabled!=='boolean')reject(400,'INVALID_INPUT','댓글 상태를 확인해주세요.');const c=await this.studio.db.creator.updateMany({where:{user_id:r.user.sub},data:{comments_enabled:enabled}});if(!c.count)reject(403,'CREATOR_REQUIRED','크리에이터 등록이 필요합니다.');return{message:'댓글 설정을 저장했습니다.'};}
  @Post('content') saveContent(@Body() b:any,@Req() r:any){return this.studio.saveContent(r.user.sub,b);}
+ @Put('content/:id/visibility') contentVisibility(@Param('id') id:string,@Body() body:any,@Req() r:any){return this.studio.setContentVisibility(r.user.sub,id,body);}
  @Post('content/:id/delete') deleteContent(@Param('id') id:string,@Body() body:any,@Req() r:any){return this.studio.deleteContent(r.user.sub,id,body);}
  @Post('memberships') membership(@Body() b:any,@Req() r:any){return this.studio.saveMembership(r.user.sub,b);}
  @Put('memberships/:id') state(@Param('id') id:string,@Body() b:any,@Req() r:any){return this.studio.membershipState(r.user.sub,id,b);}
