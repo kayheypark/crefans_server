@@ -13,7 +13,7 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-03');assert.equal(p.effectiveAt,'2026-11-03');assert.equal(p.version,'2026-11-03.views.1');assert.match(JSON.stringify(p),/cf_post_visitor/);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-07');assert.equal(p.effectiveAt,'2026-11-07');assert.equal(p.version,'2026-11-07.advisor.1');assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -91,3 +91,12 @@ test('the revision is the single version in force from its KST effective day, wi
 });
 
 test('upcoming terms separate the new30-day event from unchanged existing grants',()=>{const c=new LegalDocumentsService().catalog(new Date('2026-11-03T00:00:00Z')),text=JSON.stringify(c.upcoming.documents.terms);assert.match(text,/30일\(720시간\)/);assert.match(text,/기존 지급분의 사용기한이나 이미 후원한 크리에이터의 수익은 변경하지/);assert.equal(c.documents.terms.version,'2026-10-30.3');});
+
+test('guide AI privacy notice distinguishes optional requests, provider retention and ordinary guide use',()=>{
+ const c=new LegalDocumentsService().catalog().documents.privacy;
+ const body=c.sections.find(s=>s.title.startsWith('15.')).body;
+ for(const value of ['OpenAI OpCo, LLC','privacy@openai.com','HTTPS','기본 최대 30일','회원 탈퇴는 필요하지 않습니다','이전 대화','모델 학습','DB나 요청 로그에 저장하지'])assert.ok(body.includes(value),value);
+ assert.match(c.sections.find(s=>s.title.startsWith('8.')).body,/OpenAI OpCo, LLC/);
+ assert.match(c.sections.find(s=>s.title.startsWith('9.')).body,/이 기능을 이용하지 않아도/);
+ assert.ok(c.sections.find(s=>s.title.startsWith('10.')).body.includes('cf_post_visitor'));
+});

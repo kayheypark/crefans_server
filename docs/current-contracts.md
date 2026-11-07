@@ -135,6 +135,7 @@
 | POST | `/api/v1/events/founding-badge/claim` | `src/platform/controller.ts::claimBadge` |
 | GET | `/api/v1/events/promotion-beans` | `src/platform/beans.controller.ts::promotionEvent` |
 | POST | `/api/v1/events/promotion-beans/claim` | `src/platform/beans.controller.ts::claimPromotionEvent` |
+| POST | `/api/v1/guide/advisor` | `src/platform/guide-advisor.ts::ask` |
 | GET | `/api/v1/health` | `src/platform/controller.ts::health` |
 | POST | `/api/v1/identity/callback` | `src/platform/identity.controller.ts::callback` |
 | POST | `/api/v1/identity/start` | `src/platform/identity.controller.ts::start` |
