@@ -103,6 +103,7 @@ test('documented serializers use the current response field names',async()=>{
  const service=new PlatformService({$queryRaw:async()=>[{count:0n}],creator:{findUnique:async()=>({comments_enabled:true})}});service.consumeContent=async()=>true;
  const post=await service.post({id:'example',user_sub:'creator',medias:[],created_at:new Date()});check('Post',post);
  assert.equal(document.paths['/api/v1/studio/content'].post.requestBody.content['application/json'].schema.properties.body.maxLength,10000);
+ const deletion=document.paths['/api/v1/studio/content/{id}/delete'].post.requestBody.content['application/json'].schema;assert.deepEqual(deletion.required,['confirmation']);assert.equal(deletion.properties.confirmation.type,'string');
  assert.equal(document.paths['/api/v1/me/inquiries'].post.requestBody.content['application/json'].schema.properties.title.maxLength,80);
 });
 test('media is documented as binary, JSON APIs have common envelope, key material has no real examples',()=>{
