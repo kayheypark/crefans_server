@@ -382,7 +382,7 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | POST | /studio/bean-withdrawal-quotes | quantity>=1000·accountId 본인 검증계좌·live입금 출처, 총액/20%/실지급 견적. 열린 콩 미수금이 있으면 409 RECEIVABLE_OPEN(멤버십 미수금은 콩 출금을 막지 않음, 2026-10-30). closing:true면 탈퇴 준비 조건 충족 시 출금 가능 전량을 최소 수량 미만이라도 신청(CLOSING_WITHDRAWAL_ALL·EARNINGS_PENDING) |
 | POST | /studio/bean-withdrawals/verify | quantity/accountId/pin, 기존 PIN 해시와5회/30초 제한 재사용, 2분 수량·계좌버전 인증 |
 | POST | /studio/bean-withdrawals | quantity/accountId/authorizationId/requestId, 받은 일반콩 가용 lot를 원자 예약, 중복/경합 방지 |
-| GET | /admin/beans/overview | 활성 ADMIN/SUPER_ADMIN만 회사재고/충전·후원·출금/부채·환경별 집계, page |
+| GET | /admin/beans/overview | 활성 ADMIN/SUPER_ADMIN만 회사재고/충전·후원·출금/부채·환경별 집계, page. 출금마다 `chargebackHold`(2026-11-07): requested/processing이면서 출처 lot이 차지백으로 동결된 건 true — 콘솔이 '차지백 발생 · 이체 전 확인' 경고를 표시 |
 | GET | /admin/beans/wallets/:id | SUPER_ADMIN 본인 업무로 회원 지갑·원장·최근100 출처 lot/충전·배분 추적, page |
 | POST | /admin/beans/promotions | SUPER_ADMIN, 1회·KST 하루 운영자 합계 10,000콩 이하(친구 초대 자동 보상 제외, 2026-11-02), memberId/quantity/reason/requestId, 회사재고→프로모션, 중복 지급 방지·사유 기록 |
 | POST | /admin/beans/charges/:id/receipt | SUPER_ADMIN, amount/reference/receivedAt/reason, live 승인된 원주문 실제입금 대사·불변 기록/감사 |

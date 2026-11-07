@@ -290,9 +290,13 @@ test('a chargeback while a payout is processing does not block it, and paying it
  const p=await payout();bankStatus='pending';await beans.payout(p.id,admin,new Date(WED));assert.equal((await db.beanPayout.findUniqueOrThrow({where:{id:p.id}})).status,'processing');
  const allocations=await db.beanPayoutAllocation.findMany({where:{payout_id:p.id}}),lots=await db.beanLot.findMany({where:{id:{in:allocations.map(a=>a.lot_id)}}}),chargeId=lots[0].charge_id;
  const owed=allocations.filter(a=>lots.find(l=>l.id===a.lot_id).charge_id===chargeId).reduce((n,a)=>n+Math.floor(a.quantity*p.net/p.quantity),0);assert.ok(owed>0);
+ const hold=async()=>{for(let page=1;page<=50;page++){const found=(await beans.adminData(admin,page)).payouts.find(x=>x.id===p.id);if(found)return found.chargebackHold;}throw Error('payout not listed');};
+ assert.equal(await hold(),false,'no warning before a chargeback');
  await beans.freezeCharge(chargeId);assert.equal((await db.beanPayout.findUniqueOrThrow({where:{id:p.id}})).status,'processing','a transfer under way is not blocked');
+ assert.equal(await hold(),true,'the console warns before the transfer is recorded');
  assert.equal(await db.creatorReceivable.count({where:{creator_id:creator,kind:'beans',source_id:chargeId+':'+p.id}}),0,'nothing is owed before the payout is paid');
  bankStatus='paid';await beans.payout(p.id,admin,new Date(THU));assert.equal((await db.beanPayout.findUniqueOrThrow({where:{id:p.id}})).status,'paid');
+ assert.equal(await hold(),false,'a paid payout no longer carries the warning');
  const r=await db.creatorReceivable.findFirstOrThrow({where:{creator_id:creator,kind:'beans',source_id:chargeId+':'+p.id}});assert.deepEqual([r.amount,r.status],[owed,'open']);
  assert.ok((await db.memberNotification.findMany({where:{member_id:creator,type:'settlement'}})).some(n=>n.text.includes(owed.toLocaleString('ko-KR')+'원')));
  await assert.rejects(beans.review(creator,{quantity:1000,accountId:account.id}),code('RECEIVABLE_OPEN'));
