@@ -1,3 +1,9 @@
+## 2026-11-07 11:28 KST 운영 배포 bundle-20261107 완료 (서버·콘솔·프론트 묶음)
+- 내용: 출금·환불 공백(차지백 처리 중 미수금, 음수 출금 반려 API, 콩 원장 일일 대사), 콘솔 반려·차지백 경고·반려 기록 버튼, 사유 길이 수정, 결제 완료 메일 실발송 연결+중개자 고지, 디스크 80/90% 경보, 게시물 미공개(마이그레이션 actor_type 1칸), 결제 상세·가입 완료 중개자 고지, 프론트 standalone(맥 빌드·SSH 전송) 첫 적용.
+- 커밋: server 404d8e8 / admin 06290e2 / front 4120fbc. 이미지 전부 bundle-20261107.
+- 기록: `.local/bundle-deploy-20261107/deployment.md`(단계·시각·검증·복구본). 1차 api 배포는 스크립트 마지막 집계 줄 오류로 자동 롤백 후 재실행, 1차 front 적용은 백업 폴더 이름 충돌로 교체 전 중단 후 재실행 — 둘 다 운영 영향 없이 복귀 확인.
+- 미검증: 결제 완료 메일 실수신, 텔레그램 실수신, 원장 대사 첫 실행. 남은 일: ship-image.sh 백업 폴더 충돌·복구본 ID 대조 보강, 맥 디스크 98%.
+
 ## 2026-11-07 11:10 KST 배포 묶음 통합 release/bundle-20261107 (로컬 커밋만, push·배포 없음)
 - 사용자 지시 "한번에 묶어". 작업트리 `/Users/ethan/repository/crefans_server-bundle`, origin/prod cfdfffb 에서 fix/payout-refund-gaps 4322ffd → fix/intermediary-receipt f214e10 → feat/disk-alert 423a2a4 → feat/post-unpublish 6e3f15a 순서로 --no-ff merge.
 - 충돌: PROGRESS.md(양쪽 기록 유지), tests/platform-openapi.test.cjs(출금 반려 +1, 게시물 공개 상태 +2 → 전체 208, user 86·studio 49·console 93). finance.service.ts·jobs.service.ts·openapi-contract.ts·platform-api.md·payment-lifecycle 테스트는 자동 병합, 결과 diff 검토(finalize 메일 연결과 환불 미수금·출금 반려가 서로 다른 지점). docs/current-contracts.md 는 프론트 `npm run docs:contracts`(CREFANS_SERVER_DIR=이 작업트리)로 재생성: 새 라우트 3·migration 1·schema 주석·test:operations·DISK_ALERT 환경 키.
