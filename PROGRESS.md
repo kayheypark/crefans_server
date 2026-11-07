@@ -1,3 +1,10 @@
+## 2026-11-08 KST 가이드 AI 어드바이저 하루 15회·가드레일·대화 보관 고지 (feat/advisor-guardrails, 로컬·미배포)
+- 사용자 결정(클릭): 같은 비로그인 사용자 = 브라우저 익명 ID 15회/일 + IP 50회/일 보조, 가드레일 = 입력·출력 검사 + Moderation. 추가 요청 '업계표준으로', '대화 기록이 브라우저에 남아야 함'.
+- 근거(2026-11-07 확인): OpenAI Safety best practices(safety_identifier 해시·로그아웃은 세션ID 허용, Moderation, 입력/출력 제한, 적대 테스트, 신고 경로), Moderation 가이드(POST /v1/moderations, omni-moderation-latest, 무료; 한국어 지원 여부는 문서 미기재→실측 필요), OWASP LLM Top 10 2025(LLM01·02·05·07·10).
+- 구현 `src/platform/guide-advisor.ts`: body `client`(16~64자 [A-Za-z0-9_-]) 해시 버킷 15/일(GUIDE_ADVISOR_PER_CLIENT_DAY), 없으면 IP 해시 버킷; 초과 429 DAILY_LIMIT(UTC 창=09:00 KST). 역할 변경·지침/프롬프트/모델 요구 정규식 400 OUT_OF_SCOPE(공급사 호출 전, 오탐 방지 정상 질문 5건 검사). 근거 있을 때만 질문 Moderation→flag 400 UNSAFE_INPUT, 판정 불가 502(fail-closed). Responses에 safety_identifier=sha256(익명ID)(ID 없으면 미전송: 처리방침의 'IP 미전송' 약속). 답변 규칙 검사(공급사·모델명·프롬프트 태그·링크·HTML·개인정보)+답변 Moderation(flag/판정불가)→고정 안내 SAFE_ANSWER.
+- 처리방침 2026-11-07.advisor.2: 15조에 익명 ID·해시 전송·유해성 검사·브라우저 대화 보관(최근 50개, 새 대화/저장소 삭제 시 삭제, 공용 기기 안내). '새로고침 시 삭제' 문구 제거. 법률 검토 아님.
+- 검증: tsc0·nest build0. guide-advisor 15/15, legal 13/13, openapi 14/14, security 18/18. 대조 5/5(사전 차단·브라우저 한도·출력 필터·Moderation fail-open·safety_identifier 제거 각각 해당 테스트 실패, 원복 SHA 동일). 실제 OpenAI Moderation 한국어 판정은 미검증. 생성 계약(current-contracts)은 이번 변경과 무관한 프론트 체크아웃 차이만 생겨 반영하지 않음.
+
 ## 2026-11-07 20:57 KST 가이드 AI 어드바이저 운영 배포 완료
 - 사용자 제공 서비스 키로 실제 API 연결. 서버2419bb8·가이드3494b40, 기능→dev→prod 통합 후 배포. API/worker 20:56 교체·healthy/running, 가이드20:57 server모드. 정적106파일 해시 일치, DB/proxy/front/admin 컨테이너 불변, migration 없음.
 - 운영 검증: 공개 질문 실제 AI 응답·출처, 처리방침2026-11-07.advisor.1, Origin/CORS·개인정보 차단7건. PC Chromium1440·모바일 WebKit390 실제 질문2건·링크200·새 대화·쿠키 미전송·레이아웃 검사 종료0, PNG 육안 확인. 실물 iPhone은 미검증.
