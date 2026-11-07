@@ -1,3 +1,10 @@
+## 2026-11-07 09:40 KST 후속: 콘솔 반려 표시·수동 반려 사유 길이·콩 차지백 경고 (fix/payout-refund-gaps, 배포 보류)
+- 사용자 결정(2026-11-07): 서버 배포 보류. ③ 멤버십 미수금 금액은 **현행 유지**(부족액 전체 기록, 반려 시 receivables 워커가 자동 정산) — 코드 변경 없음.
+- 011efbd: GET /admin/withdrawals 항목에 `rejectable`(requested+출금 가능액 음수, rejectWithdrawal과 같은 조건). 멤버십 수동 결과 반려 사유 500→180자('수동 이체 반려 · ' 11자 포함 note VARCHAR(191)). 이전에는 181자 이상이 DB 길이 초과로 INTERNAL_ERROR(대조에서 확인).
+- cf097d6: GET /admin/beans/overview 출금마다 `chargebackHold`(requested/processing+출처 lot frozen). 콘솔 짝: crefans_admin fix/withdrawal-reject 6a2052d.
+- 검증(09:20~09:34 KST): tsc 0, 관련 9파일 166/166. 대조: 사유 한도 500 원복 → 1 실패(181자 INTERNAL_ERROR), rejectable 항상 false → 1 실패, chargebackHold 항상 false → 1 실패, 상태 조건 제거 → 지급 완료 후 경고 남음 1 실패(+후속 연쇄 2).
+- 미결: 콩 수동 결과 기록도 같은 문제 가능(bean_payouts.note VARCHAR(500) vs 사유 500자+접두어) — 사용자 확인 필요, 미수정.
+
 ## 2026-11-07 09:20 KST 금전 흐름 공백 3건 수정 — 브랜치 fix/payout-refund-gaps (커밋만, push·배포 없음)
 - 계기: night-work `crefans_front/.local/night-work/2026-11-06-1908.md` 589~625행, 사용자 2026-11-07 '실결제 전 코드 수정 + 대사 경보' 선택. 작업트리 `/Users/ethan/repository/crefans_server-payout-gaps`(origin/prod 8e86611 기준), 코드 커밋 e40f34d. 마이그레이션 없음.
 - ① 콩 처리 중 출금+차지백: 결정 = 이체 진행 중(processing)은 막지 않고 **지급 후 미수금**. 근거: 약관 6조(legal-documents.ts, '이미 출금된 수익에 취소·차지백 → 미수금 기록·이후 정산 차감·알림, 미수금 있으면 출금 제한'), 계약서 초안 9조③(확정 부담액만 정산), 기존 rejectPayout이 처리 중 반려를 금지(은행 결과 불명)하는 의도. `finishPayout`이 paid로 끝날 때 동결 lot 출처분을 지급 단가로 미수금(source `충전ID:출금ID`, 기존 recordReceivables 재사용)·알림. 반려로 끝나면 동결 lot으로 돌아갈 뿐 미수금 없음. freezeCharge와 finishPayout은 회사 지갑 잠금으로 직렬화.
