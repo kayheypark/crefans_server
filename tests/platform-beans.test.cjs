@@ -283,6 +283,46 @@ test('a chargeback after a paid payout records a receivable, notifies the creato
  await db.creatorReceivable.deleteMany({where:{creator_id:creator}});await db.beanPayoutAllocation.deleteMany({where:{payout_id:p.id}});await db.beanPayout.deleteMany({where:{id:p.id}});
 });
 
+// 2026-11-07: a chargeback while the payout is processing (bank pending or manual transfer under way) cannot stop the transfer,
+// so the paid result out of frozen lots must become a receivable (terms 6: already withdrawn income -> receivable, payouts stop).
+test('a chargeback while a payout is processing does not block it, and paying it records a receivable for the frozen source',async()=>{
+ const previous=bankStatus;const o=await charge(1000);await receipt(o);await beans.tip(fan,creator,{quantity:1000,requestId:randomUUID()});
+ const p=await payout();bankStatus='pending';await beans.payout(p.id,admin,new Date(WED));assert.equal((await db.beanPayout.findUniqueOrThrow({where:{id:p.id}})).status,'processing');
+ const allocations=await db.beanPayoutAllocation.findMany({where:{payout_id:p.id}}),lots=await db.beanLot.findMany({where:{id:{in:allocations.map(a=>a.lot_id)}}}),chargeId=lots[0].charge_id;
+ const owed=allocations.filter(a=>lots.find(l=>l.id===a.lot_id).charge_id===chargeId).reduce((n,a)=>n+Math.floor(a.quantity*p.net/p.quantity),0);assert.ok(owed>0);
+ await beans.freezeCharge(chargeId);assert.equal((await db.beanPayout.findUniqueOrThrow({where:{id:p.id}})).status,'processing','a transfer under way is not blocked');
+ assert.equal(await db.creatorReceivable.count({where:{creator_id:creator,kind:'beans',source_id:chargeId+':'+p.id}}),0,'nothing is owed before the payout is paid');
+ bankStatus='paid';await beans.payout(p.id,admin,new Date(THU));assert.equal((await db.beanPayout.findUniqueOrThrow({where:{id:p.id}})).status,'paid');
+ const r=await db.creatorReceivable.findFirstOrThrow({where:{creator_id:creator,kind:'beans',source_id:chargeId+':'+p.id}});assert.deepEqual([r.amount,r.status],[owed,'open']);
+ assert.ok((await db.memberNotification.findMany({where:{member_id:creator,type:'settlement'}})).some(n=>n.text.includes(owed.toLocaleString('ko-KR')+'원')));
+ await assert.rejects(beans.review(creator,{quantity:1000,accountId:account.id}),code('RECEIVABLE_OPEN'));
+ await beans.payout(p.id,admin,new Date(THU));assert.equal(await db.creatorReceivable.count({where:{creator_id:creator,kind:'beans',source_id:chargeId+':'+p.id}}),1,'a repeated result records it once');
+ for(const x of await db.creatorReceivable.findMany({where:{creator_id:creator,kind:'beans',status:'open'}}))await beans.settleReceivable(admin,x.id,{note:'테스트 회수 확인'});bankStatus=previous;
+});
+// 2026-11-07: daily ledger reconciliation. The shared E2E DB keeps fixture edits from other suites, so only this suite's wallets are judged.
+test('ledger reconciliation finds balance, journal and lot mismatches, and the worker alerts once a day',async()=>{
+ const wallets=await db.beanWallet.findMany({where:{owner_key:{in:[fan,creator].map(id=>'member:'+id)}}}),mine=(await db.beanAccount.findMany({where:{wallet_id:{in:wallets.map(w=>w.id)}}})).map(a=>a.id);
+ const ours=r=>({accounts:r.accounts.filter(id=>mine.includes(id)),lots:r.lots.filter(id=>mine.includes(id))});
+ assert.deepEqual(ours(await beans.reconcileLedger()),{accounts:[],lots:[]},'this suite left its wallets consistent');
+ const fanWallet=wallets.find(w=>w.owner_key==='member:'+fan),purchased=await db.beanAccount.findFirstOrThrow({where:{wallet_id:fanWallet.id,bucket:'purchased'}});
+ await db.beanAccount.update({where:{id:purchased.id},data:{balance:{increment:1}}});
+ try{const r=ours(await beans.reconcileLedger());assert.deepEqual(r,{accounts:[purchased.id],lots:[purchased.id]},'a balance moved without an entry');}finally{await db.beanAccount.update({where:{id:purchased.id},data:{balance:{decrement:1}}});}
+ const lot=await db.beanLot.findFirstOrThrow({where:{member_id:fan,bucket:'purchased'}});await db.beanLot.update({where:{id:lot.id},data:{available:{increment:1}}});
+ try{assert.deepEqual(ours(await beans.reconcileLedger()),{accounts:[],lots:[purchased.id]},'a lot changed without a posting');}finally{await db.beanLot.update({where:{id:lot.id},data:{available:{decrement:1}}});}
+ const entry=await db.beanEntry.findFirstOrThrow({where:{account_id:purchased.id}});await db.beanEntry.update({where:{id:entry.id},data:{delta:{increment:1}}});await db.beanAccount.update({where:{id:purchased.id},data:{balance:{increment:1}}});
+ try{const r=await beans.reconcileLedger();assert.ok(r.movements.includes(entry.movement_id),'a one-sided movement');assert.deepEqual(ours(r),{accounts:[],lots:[purchased.id]});}finally{await db.beanEntry.update({where:{id:entry.id},data:{delta:{decrement:1}}});await db.beanAccount.update({where:{id:purchased.id},data:{balance:{decrement:1}}});}
+ assert.deepEqual(ours(await beans.reconcileLedger()),{accounts:[],lots:[]});
+ // Worker: once per KST day, one operations alert carrying counts only.
+ const {PlatformJobsService}=require('../dist/src/platform/jobs.service'),calls=[],operations={record:async(...a)=>{calls.push(a);}},now=new Date('2099-03-04T03:00:00Z'),day='2099-03-04';
+ await db.platformJob.deleteMany({where:{id:'beans-ledger-'+day}});
+ assert.equal(await new PlatformJobsService(service,finance,new ConfigService({}),operations,undefined,undefined,undefined,beans).reconcileBeanLedger(now),0);assert.equal(calls.length,0,'off without the bean ledger');
+ const jobs=new PlatformJobsService(service,finance,config,operations,undefined,undefined,undefined,beans);
+ await db.beanAccount.update({where:{id:purchased.id},data:{balance:{increment:1}}});
+ try{await jobs.reconcileBeanLedger(now);await jobs.reconcileBeanLedger(new Date(now.getTime()+3600000));}finally{await db.beanAccount.update({where:{id:purchased.id},data:{balance:{decrement:1}}});}
+ assert.equal(calls.length,1,'one check and one alert per day');const [type,data,key]=calls[0];
+ assert.deepEqual([type,key,data.job,data.status],['beans.ledger_mismatch','beans-ledger-mismatch:'+day,'beans-ledger','mismatch']);assert.ok(data.count>=2);assert.match(data.rule,/^accounts=\d+ movements=\d+ lots=\d+$/);
+ assert.ok((await db.platformJob.findUniqueOrThrow({where:{id:'beans-ledger-'+day}})).completed_at);await db.platformJob.deleteMany({where:{id:'beans-ledger-'+day}});
+});
 // 2026-10-30 hotfix: our own partial cancels must not look like a dispute; unknown-outcome refunds are reconciled; refunds survive a sales stop.
 test('after a member refund the PG monitor keeps the charge paid; only a cancel beyond our refunds freezes it',async()=>{
  const member=randomUUID();ids.push(member);await db.member.create({data:{id:member,email:member+'@example.invalid',name:'Monitor fixture',nickname:'Monitor fixture',preferred_username:member,email_verified:true}});

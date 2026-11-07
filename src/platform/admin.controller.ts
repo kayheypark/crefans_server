@@ -81,6 +81,8 @@ export class PlatformAdminController{
  @Get('withdrawals') @Permit(['revenue','view']) withdrawals(@Query() query:any,@Req() req:any){return adminWithdrawals(this.service.db,req.admin,query);}
  // Manual payout mode: the operator records a bank transfer made outside the app, and confirms settlement accounts by hand.
  @Post('withdrawals/:id/manual-result') @Permit(['revenue','create']) manualResult(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.manualResult(req.admin,id,body);}
+ // A requested withdrawal left above the available balance by a later refund (PAYOUT_BALANCE_CHANGED) is rejected by an operator.
+ @Post('withdrawals/:id/reject') @Permit(['revenue','create']) rejectWithdrawal(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.rejectWithdrawal(req.admin,id,body);}
  @Get('settlement-accounts') @Permit(['revenue','view']) async settlementAccounts(){const rows=await this.service.db.settlementAccount.findMany({where:{verified:false,account_encrypted:{not:null}},orderBy:{created_at:'asc'},take:100,select:{id:true,creator_id:true,bank:true,holder_alias:true,last_four:true,version:true,created_at:true}});return rows.map((r:any)=>({id:r.id,creatorId:r.creator_id,bank:r.bank,holder:r.holder_alias,lastFour:r.last_four,version:r.version,createdAt:r.created_at}));}
  @Post('settlement-accounts/:id/verify') @Permit(['revenue','create']) verifyAccount(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.manualVerifyAccount(req.admin,id,body);}
  @Post('revenue/:id/receipt') @Permit(['revenue','create']) receipt(@Param('id') id:string,@Body() body:any,@Req() req:any){return confirmSettlementReceipt(this.service.db,req.admin,id,body);}

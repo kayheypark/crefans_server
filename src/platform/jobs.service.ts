@@ -52,12 +52,24 @@ export class PlatformJobsService {
   await run('member-notices',async()=>this.memberNotices?.deliver());
   await run('bean-expiry',async()=>this.beans?.expireLots(now));
   await run('receivables',async()=>this.finance.settleReceivables());
+  await run('beans-ledger',()=>this.reconcileBeanLedger(now));
   await run('beans-reconciliation',async()=>this.beans?.tick(async(job,error)=>{failures[job]=(failures[job]||0)+1;await this.operations?.error('worker.error',error,{job});}));
   if((this.config.get('BANK_PAYOUTS_ENABLED')==='true'&&!isBeta(this.config))||manualPayouts(this.config)){const payouts=await this.db.withdrawalRequest.findMany({where:payoutQueue(now),select:{id:true},orderBy:{updated_at:'asc'},take:20});for(const p of payouts)await run('payout',async()=>{try{await this.finance.payout(p.id,now);return 1;}finally{await this.db.withdrawalRequest.updateMany({where:{id:p.id,status:{in:['requested','processing']}},data:{updated_at:now}});}});}
   const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',hour:'2-digit',hourCycle:'h23'}).format(now));
   if(hour>=19)await run('media-cleanup',()=>this.cleanup(now));
   const expired=await this.db.subscription.updateMany({where:{auto_renew:false,status:'CANCELLED',ended_at:{lte:now}},data:{status:'EXPIRED'}});if(expired.count)activity['subscription-expired']=expired.count;
   const note=JSON.stringify({failures}),id='worker-health';await this.db.platformJob.upsert({where:{id},create:{id,locked_until:now,completed_at:now,note},update:{completed_at:now,note}});return{failures};
+ }
+ // Once a KST day (2026-11-07): bean ledger reconciliation; any mismatch goes to the operations channel once that day.
+ // A failed run keeps the day open and is retried after an hour (run() reports the error).
+ async reconcileBeanLedger(now:Date){
+  if(!this.beans||this.config.get('BEAN_LEDGER_ENABLED')!=='true')return 0;
+  const day=dateOnly(now),id=`beans-ledger-${day}`;
+  await this.db.platformJob.upsert({where:{id},create:{id,locked_until:new Date(0)},update:{}});
+  const claim=await this.db.platformJob.updateMany({where:{id,completed_at:null,locked_until:{lt:now}},data:{locked_until:new Date(now.getTime()+3600000)}});if(!claim.count)return 0;
+  const r=await this.beans.reconcileLedger(),count=r.accounts.length+r.movements.length+r.lots.length,rule=`accounts=${r.accounts.length} movements=${r.movements.length} lots=${r.lots.length}`;
+  if(count)await this.operations?.record('beans.ledger_mismatch',{job:'beans-ledger',status:'mismatch',count,rule},`beans-ledger-mismatch:${day}`);
+  await this.db.platformJob.update({where:{id},data:{completed_at:now,note:rule}});return 0;
  }
  async cleanup(now:Date){
   const id=`media-cleanup-${dateOnly(now)}`;

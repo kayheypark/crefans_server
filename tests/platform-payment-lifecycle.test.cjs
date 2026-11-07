@@ -133,6 +133,30 @@ test('refund blocks a queued payout after its revenue has been reversed',async()
  try{await f.finance.refund(f.fan,f.order.id);await assert.rejects(f.finance.payout(withdrawal.id,new Date('2026-10-28T00:00:00Z')),code('PAYOUT_BALANCE_CHANGED'));assert.equal(transfers,0);assert.equal((await db.withdrawalRequest.findUniqueOrThrow({where:{id:withdrawal.id}})).status,'requested');}finally{await db.withdrawalRequest.delete({where:{id:withdrawal.id}});await db.settlementAccount.delete({where:{id:account.id}});}
 });
 
+// 2026-11-07: the stuck withdrawal above has an operator exit, and the notice no longer calls unpaid income paid.
+test('a withdrawal stuck by a later refund is rejected by an operator, then the balance and receivable recover',async()=>{
+ const f=await fixture();await f.finance.pay(f.fan,f.order.id);await db.revenueEntry.update({where:{order_id:f.order.id},data:{receipt_confirmed_at:new Date(),received_amount:10000}});const admin={id:randomUUID(),user_sub:randomUUID(),is_active:true,role:'SUPER_ADMIN'};
+ const account=await db.settlementAccount.create({data:{creator_id:f.creator,bank:'테스트',holder_alias:'검증',last_four:'1234',account_encrypted:'test-account',verified:true}}),withdrawal=await db.withdrawalRequest.create({data:{creator_id:f.creator,request_key:randomUUID(),account_id:account.id,account_label:'테스트',amount:9000,created_at:new Date('2026-10-27T00:00:00Z')}});let transfers=0;f.finance.bank={transfer:async()=>{transfers++;return{status:'paid'};}};
+ try{
+  await assert.rejects(f.finance.rejectWithdrawal(admin,withdrawal.id,{reason:'잔액 충분'}),code('WITHDRAWAL_NOT_BLOCKED'),'a payable request is not rejected this way');
+  await f.finance.refund(f.fan,f.order.id);assert.equal((await f.finance.finance(f.creator)).summary.available,-9000);
+  const notice=(await db.memberNotification.findMany({where:{member_id:f.creator,type:'settlement'}})).map(n=>n.text).join('\n');
+  assert.doesNotMatch(notice,/이미 지급된/,'nothing was paid out yet');assert.match(notice,/아직 지급되지 않은 출금 신청 금액이 출금 가능 수익보다 9,000원 많아졌습니다/);
+  await assert.rejects(f.finance.payout(withdrawal.id,new Date('2026-10-28T00:00:00Z')),code('PAYOUT_BALANCE_CHANGED'));
+  await assert.rejects(f.finance.rejectWithdrawal({...admin,role:'ADMIN',permissions:{revenue:{view:true}}},withdrawal.id,{reason:'권한 없음'}),code('ADMIN_PERMISSION_REQUIRED'));
+  await assert.rejects(f.finance.rejectWithdrawal(admin,withdrawal.id,{reason:''}),code('INVALID_INPUT'));
+  assert.deepEqual(await f.finance.rejectWithdrawal(admin,withdrawal.id,{reason:'환불로 출금 가능 잔액 부족'}),{message:'출금 신청을 반려했습니다.'});
+  const rejected=await db.withdrawalRequest.findUniqueOrThrow({where:{id:withdrawal.id}});assert.deepEqual([rejected.status,rejected.note],['rejected','운영자 반려 · 환불로 출금 가능 잔액 부족']);
+  assert.equal((await f.finance.finance(f.creator)).summary.available,0,'the rejected amount no longer holds the balance');
+  assert.ok((await db.memberNotification.findMany({where:{member_id:f.creator,type:'settlement'}})).some(n=>n.text.includes('출금 9,000원이 반려되었습니다')));
+  assert.equal(await db.platformAuditLog.count({where:{entity_id:withdrawal.id,action:'withdrawal.rejected'}}),1);
+  assert.deepEqual(await f.finance.rejectWithdrawal(admin,withdrawal.id,{reason:'다시'}),{message:'이미 반려된 출금입니다.'});
+  await f.finance.payout(withdrawal.id,new Date('2026-10-28T00:00:00Z'));assert.equal(transfers,0,'a rejected withdrawal is never transferred');
+  await f.finance.settleReceivables();assert.deepEqual((await db.creatorReceivable.findMany({where:{creator_id:f.creator}})).map(r=>r.status),['settled']);
+  await db.withdrawalRequest.update({where:{id:withdrawal.id},data:{status:'processing'}});await assert.rejects(f.finance.rejectWithdrawal(admin,withdrawal.id,{reason:'처리 중'}),code('WITHDRAWAL_NOT_REQUESTED'),'a transfer under way is closed by its result');
+ }finally{await db.creatorReceivable.deleteMany({where:{creator_id:f.creator}});await db.withdrawalRequest.delete({where:{id:withdrawal.id}});await db.settlementAccount.delete({where:{id:account.id}});}
+});
+
 test('definitive refund rejection releases reserved funds without reversing revenue',async()=>{
  const f=await fixture({cancel:async()=>reject(400,'PAYMENT_FAILED','취소 거절')});await f.finance.pay(f.fan,f.order.id);await assert.rejects(f.finance.refund(f.fan,f.order.id),code('PAYMENT_FAILED'));assert.equal((await db.checkoutOrder.findUniqueOrThrow({where:{id:f.order.id}})).status,'paid');assert.equal((await f.finance.finance(f.creator)).summary.refundReserved,0);assert.equal((await db.revenueEntry.findUniqueOrThrow({where:{order_id:f.order.id}})).reversals,0);assert.equal(await db.platformAuditLog.count({where:{entity_id:f.order.id,action:'refund.completed'}}),0);
 });
