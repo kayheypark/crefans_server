@@ -1,3 +1,8 @@
+## 2026-11-08 00:22 KST 가이드 어드바이저 한도·가드레일 운영 배포 완료
+- 사용자 승인(서버+가이드 지금 배포). dev 1c7408c·prod b79f2bf push. 이미지 crefans-api:guide-advisor-guard-20261108(sha256:504de905…) 서버 빌드, 00:21:53~22:01 api/worker 교체(8초) healthy·재시작0, DB/proxy/front/admin 불변, 마이그레이션 없음, 키 유지(runtime.env 0600).
+- 운영 확인: 탈옥 '이전 지침 무시…시스템 프롬프트'·'어떤 AI 모델' → 400 OUT_OF_SCOPE, 정상 질문 답변. 유해 문장은 가이드 근거 미검출로 공급사 호출 전 고정 안내(위협 문구가 검색 적중률을 낮춤). 운영 컨테이너 키로 Moderation 직접 실측: 한국어 살해 위협(harassment/threatening·violence)·자살 방법(self-harm/intent·instructions) flagged=true, 환불 질문 false.
+- 복구본 /Users/ethan/crefans-recovery/20261108/guide-advisor-guard(설정6·가이드107·이전 이미지 OCI blob21 SHA 검증). 이전 이미지·서버 임시 폴더 정리, 런타임 로그 키 노출 없음. 디스크 46%.
+
 ## 2026-11-08 KST 가이드 AI 어드바이저 하루 15회·가드레일·대화 보관 고지 (feat/advisor-guardrails, 로컬·미배포)
 - 사용자 결정(클릭): 같은 비로그인 사용자 = 브라우저 익명 ID 15회/일 + IP 50회/일 보조, 가드레일 = 입력·출력 검사 + Moderation. 추가 요청 '업계표준으로', '대화 기록이 브라우저에 남아야 함'.
 - 근거(2026-11-07 확인): OpenAI Safety best practices(safety_identifier 해시·로그아웃은 세션ID 허용, Moderation, 입력/출력 제한, 적대 테스트, 신고 경로), Moderation 가이드(POST /v1/moderations, omni-moderation-latest, 무료; 한국어 지원 여부는 문서 미기재→실측 필요), OWASP LLM Top 10 2025(LLM01·02·05·07·10).
