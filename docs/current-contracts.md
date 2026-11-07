@@ -75,6 +75,7 @@
 | GET | `/api/v1/admin/posts/:id/moderation` | `src/platform/moderation.ts::postHistory` |
 | POST | `/api/v1/admin/posts/:id/moderation` | `src/platform/moderation.ts::post` |
 | POST | `/api/v1/admin/posts/:id/review` | `src/platform/moderation.ts::review` |
+| POST | `/api/v1/admin/posts/:id/visibility` | `src/platform/moderation.ts::visibility` |
 | GET | `/api/v1/admin/referrals` | `src/platform/admin.controller.ts::referrals` |
 | POST | `/api/v1/admin/referrals/:id/revoke` | `src/platform/admin.controller.ts::revokeReferral` |
 | PUT | `/api/v1/admin/referrals/settings` | `src/platform/admin.controller.ts::referralSettings` |
@@ -94,6 +95,7 @@
 | POST | `/api/v1/admin/subscriptions/:id/refund` | `src/platform/admin.controller.ts::refundSubscription` |
 | GET | `/api/v1/admin/withdrawals` | `src/platform/admin.controller.ts::withdrawals` |
 | POST | `/api/v1/admin/withdrawals/:id/manual-result` | `src/platform/admin.controller.ts::manualResult` |
+| POST | `/api/v1/admin/withdrawals/:id/reject` | `src/platform/admin.controller.ts::rejectWithdrawal` |
 | POST | `/api/v1/auth/forgot-password` | `src/platform/auth.controller.ts::forgot` |
 | POST | `/api/v1/auth/identity` | `src/platform/auth.controller.ts::identity` |
 | POST | `/api/v1/auth/login` | `src/platform/auth.controller.ts::login` |
@@ -196,6 +198,7 @@
 | GET | `/api/v1/studio/community` | `src/platform/studio.controller.ts::community` |
 | POST | `/api/v1/studio/content` | `src/platform/studio.controller.ts::saveContent` |
 | POST | `/api/v1/studio/content/:id/delete` | `src/platform/studio.controller.ts::deleteContent` |
+| PUT | `/api/v1/studio/content/:id/visibility` | `src/platform/studio.controller.ts::contentVisibility` |
 | GET | `/api/v1/studio/finance` | `src/platform/finance.controller.ts::financeData` |
 | POST | `/api/v1/studio/memberships` | `src/platform/studio.controller.ts::membership` |
 | PUT | `/api/v1/studio/memberships/:id` | `src/platform/studio.controller.ts::state` |
@@ -310,7 +313,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 ### server
 
-환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`
+환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `DISK_ALERT_WARNING_PERCENT`, `DISK_ALERT_CRITICAL_PERCENT`, `DISK_ALERT_INTERVAL_MINUTES`, `DISK_ALERT_PATH`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`
 
 | 명령 | package.json 실행문 |
 | --- | --- |
@@ -332,7 +335,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `npm run test:mail` | `npm run build && CREFANS_E2E=true node --test tests/mail-templates.test.cjs tests/platform-mail.integration.test.cjs tests/platform-auth.test.cjs tests/platform-provider-lifecycle.test.cjs tests/platform-provider-http.test.cjs` |
 | `npm run dev:billing` | `npm run build && node scripts/platform-billing-test.cjs` |
 | `npm run test:policy` | `npm run build && CREFANS_E2E=true node --test tests/platform-financial-policy.test.cjs` |
-| `npm run test:operations` | `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs tests/platform-billing-activity.test.cjs` |
+| `npm run test:operations` | `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs tests/platform-billing-activity.test.cjs tests/platform-disk-alert.test.cjs` |
 | `npm run test:audit` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-audit.test.cjs tests/platform-audit-export.test.cjs tests/platform-external-monitor.test.cjs tests/platform-log-config.test.cjs tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs` |
 | `npm run test:openapi` | `npm run build && CREFANS_E2E=true node --test tests/platform-openapi.test.cjs` |
 | `npm run test:beans` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-beans.test.cjs tests/platform-bean-ledger.test.cjs tests/platform-openapi.test.cjs` |
@@ -394,6 +397,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261103190000_post_view_metrics`
 - `20261103230000_ad_manual_use`
 - `20261106120000_subscription_admin_cancel`
+- `20261107120000_post_visibility`
 
 ## Prisma 전체 정의 (92 models · 15 enums)
 
@@ -839,7 +843,7 @@ model Posting {
   allow_individual_purchase Boolean        @default(false)
   /// 개별 구매 가격 (원)
   individual_purchase_price Decimal?       @db.Decimal(10, 0)
-  /// 공개 여부
+  /// 공개 여부. false = 미공개(2026-11-07): 작성자 본인만 보임. 크리에이터(스튜디오)·운영자(콘솔)가 전환하고 이력은 moderation_actions. 운영자 숨김(hidden_at)과 별개
   is_public                 Boolean        @default(true)
   /// 민감한 콘텐츠 여부
   is_sensitive              Boolean        @default(false)
@@ -2177,7 +2181,10 @@ model ModerationAction {
   reason String @db.VarChar(500)
   public_reason String? @db.VarChar(500)
   until DateTime?
+  /// 처리자 ID. actor_type CREATOR면 회원(크리에이터) ID
   admin_id String @db.VarChar(191)
+  /// ADMIN(운영자) 또는 CREATOR(게시물 미공개 전환을 작성자 본인이 한 경우, 2026-11-07)
+  actor_type String @default("ADMIN") @db.VarChar(20)
   created_at DateTime @default(now())
   @@index([target_type, target_id, created_at])
   @@map("moderation_actions")
