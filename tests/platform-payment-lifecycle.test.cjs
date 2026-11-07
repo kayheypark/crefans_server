@@ -359,3 +359,20 @@ test('renewal stopped because the plan stopped selling tells an active member; a
  const g=await fixture();await g.finance.pay(g.fan,g.order.id);const s2=await due(g);await db.member.update({where:{id:g.fan},data:{enabled:false}});await g.finance.renew(s2.id);
  assert.equal((await notices(g.fan,'subscription-cancelled')).length,0);
 });
+// 2026-11-07 user decision: every paid membership order (first payment and renewal) queues one payment-completed mail with the
+// seller (creator display name), alongside exactly one 알림 center entry — no duplicate in-app notice per order.
+test('payment success: first payment and renewal each queue one seller-named payment mail and one in-app notice',async()=>{
+ const f=await fixture();await db.creator.update({where:{user_id:f.creator},data:{display_name:'하루작가'}});
+ await f.finance.pay(f.fan,f.order.id);await f.finance.pay(f.fan,f.order.id);
+ let mail=await notices(f.fan,'payment-completed');assert.equal(mail.length,1,'one mail per paid order, retries do not duplicate');
+ assert.equal(mail[0].dedupe_key,'payment-completed:'+f.order.id);assert.equal(mail[0].path,'/subscriptions');
+ assert.deepEqual(mail[0].rows[0],['판매자','하루작가']);assert.ok(mail[0].rows.some(([k,v])=>k==='결제 금액'&&v==='10,000원'));
+ let told=await inbox(f.fan,'subscription');assert.deepEqual(told.map(n=>n.text),['멤버십 가입이 완료되었습니다.'],'one in-app entry, not one from finalize plus one from the mail notice');
+ const sub=await due(f);await f.finance.renew(sub.id);await f.finance.renew(sub.id);
+ mail=await notices(f.fan,'payment-completed');assert.equal(mail.length,2);const renewal=mail.find(m=>m.dedupe_key!=='payment-completed:'+f.order.id);
+ assert.deepEqual(renewal.rows[0],['판매자','하루작가']);assert.ok(renewal.rows.some(([k,v])=>k==='다음 결제일'&&v!=='없음'));
+ told=await inbox(f.fan,'subscription');assert.deepEqual(told.map(n=>n.text),['멤버십 가입이 완료되었습니다.','멤버십 갱신이 완료되었습니다.']);
+ // the queued rows render into the mail template, which adds the intermediary notice
+ const {noticeMail}=require('../dist/src/auth/local/mail/templates');const m=noticeMail('payment-completed',renewal.rows,'https://crefans.com/service'+renewal.path,renewal.note);
+ assert.match(m.text,/판매자: 하루작가/);assert.match(m.text,/통신판매중개자로 거래 당사자가 아니며/);
+});

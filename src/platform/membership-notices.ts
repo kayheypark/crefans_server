@@ -37,3 +37,14 @@ export async function noticeRefunded(tx:any,order:{id:string;member_id:string;me
   note:'카드사에 따라 결제수단에 환불이 반영되기까지 며칠이 걸릴 수 있습니다.'});
  if(p.creatorId)await tx.memberNotification.create({data:{member_id:p.creatorId,type:'settlement',text:`구독자 결제 1건(${amount})이 환불되어 해당 수익이 정산에서 제외되었습니다.`,path:'/studio/settlements'}});
 }
+
+// 2026-11-07 user decision: every paid membership order (first payment or renewal) reaches the member in the 알림 center and by
+// mail, once per order. The mail is a written contract notice, so it names the seller (creator display name) and the template adds
+// the intermediary notice (전자상거래법 시행규칙 제11조의2).
+export async function noticePaymentCompleted(tx:any,order:{id:string;member_id:string;membership_id:string;amount:number;renewal:boolean},period:{start:Date;end:Date;nextBilling:Date|null},paidAt:Date){
+ const p=await plan(tx,order.membership_id);
+ await notifyMember(tx,{dedupeKey:`payment-completed:${order.id}`,memberId:order.member_id,actorId:p.creatorId,kind:'payment-completed',
+  text:order.renewal?'멤버십 갱신이 완료되었습니다.':'멤버십 가입이 완료되었습니다.',path:'/subscriptions',
+  rows:[['판매자',p.creator],['멤버십',p.name],['결제 금액',won(order.amount)],['결제 시각',at(paidAt)],['이용 기간',`${day(period.start)} ~ ${day(period.end)}`],['다음 결제일',period.nextBilling?day(period.nextBilling):'없음']],
+  note:'결제 내역과 해지·환불 기준은 내 구독에서 확인할 수 있습니다.'});
+}
