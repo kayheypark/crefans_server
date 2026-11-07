@@ -6,7 +6,7 @@ import {requestContext} from './request-context';
 import {createHmac,randomUUID} from 'crypto';
 
 const labels:Record<string,string>={
- 'beans.charge_created':'콩 충전 주문','beans.charge_paid':'콩 충전 완료','beans.tip':'콩 후원','beans.promotion':'프로모션콩 지급','beans.payout_requested':'후원콩 출금 접수','beans.payout_paid':'후원콩 은행 지급 완료','beans.payout_rejected':'후원콩 은행 반려','beans.charge_disputed':'콩 충전 취소·차지백 감지',
+ 'beans.charge_created':'콩 충전 주문','beans.charge_paid':'콩 충전 완료','beans.tip':'콩 후원','beans.promotion':'프로모션콩 지급','beans.payout_requested':'후원콩 출금 접수','beans.payout_paid':'후원콩 은행 지급 완료','beans.payout_rejected':'후원콩 은행 반려','beans.charge_disputed':'콩 충전 취소·차지백 감지','beans.ledger_mismatch':'콩 원장 대사 불일치',
  'worker.stale':'배치 실행 지연','operations.test':'운영 알림 연결 확인','member.signup':'회원가입', 'subscription.started':'멤버십 구독', 'subscription.payment_failed':'멤버십 정기결제 실패','subscription.renewed':'멤버십 정기 갱신', 'subscription.cancelled':'멤버십 구독 해지', 'subscription.resumed':'멤버십 자동 갱신 재개',
  'content.created':'콘텐츠 등록','content.updated':'콘텐츠 수정','content.deleted':'콘텐츠 삭제',
  'member.profile.updated':'회원 프로필 수정','creator.profile.updated':'크리에이터 프로필 수정','http.error':'서버 오류','worker.error':'배치 오류',

@@ -12,6 +12,27 @@
 - 동반: 가이드 fix/promo-bean-wording 6565387(가이드 4곳·소개서 PDF). 프론트 `creator-payout-policy.ts:27-29`·`events.ts` 는 이미 코드와 일치해 수정 없음.
 - 배포(사용자 승인 "둘 다 배포", 공지 문구 추가 없음): api·worker crefans-api:promo-terms-20261107, 09:03:23~55 KST 종료0. 기록 `.local/promo-terms-deploy-20261107/deployment.md`. 공개 약관 API v2026-11-06.4 확인. 가이드 09:05 동반 배포.
 - 같은 날 이어서 결정: 결제 완료 메일·영수증 중개자 고지 추가, 출금·환불 공백(processing 차지백·음수 출금 반려·원장 대사) 코드 수정, 복구 저장소 보관 규칙(이미지 직전 3회+7일, 나머지 30일, 삭제 전 목록 승인) — 각각 진행 중/미배포.
+## 2026-11-07 10:00 KST 콩 수동 반려 사유 길이 (fix/payout-refund-gaps, 배포 보류)
+- 사용자 결정(2026-11-07): 콩 수동 결과 기록 사유를 접두어 포함 저장 칸에 맞춤. bean_payouts.note VARCHAR(500) − '수동 이체 반려 · '(11자) = 사유 489자(서버 검증·OpenAPI·platform-api.md). 콘솔 입력칸은 crefans_admin fix/withdrawal-reject.
+- 실제 재현(옛 한도 500, 490자 사유): Prisma P2000 'value too long … Column: note'. 원장 반영(finishPayout)이 먼저 커밋돼 **상태는 rejected, note는 '은행 반려', 감사 기록 0건으로 반쯤 적용**된 채 오류. 수정 후에는 입력 단계에서 400 INVALID_INPUT, 아무것도 적용되지 않음.
+- 검증(09:52~ KST): 테스트 추가(490자 거절·상태 processing 유지, 489자 반려·note 500자·감사 1건). 대조: 한도 500 원복 → 1 실패. tsc 0, 관련 9파일 167/167(09:53 KST).
+
+## 2026-11-07 09:40 KST 후속: 콘솔 반려 표시·수동 반려 사유 길이·콩 차지백 경고 (fix/payout-refund-gaps, 배포 보류)
+- 사용자 결정(2026-11-07): 서버 배포 보류. ③ 멤버십 미수금 금액은 **현행 유지**(부족액 전체 기록, 반려 시 receivables 워커가 자동 정산) — 코드 변경 없음.
+- 011efbd: GET /admin/withdrawals 항목에 `rejectable`(requested+출금 가능액 음수, rejectWithdrawal과 같은 조건). 멤버십 수동 결과 반려 사유 500→180자('수동 이체 반려 · ' 11자 포함 note VARCHAR(191)). 이전에는 181자 이상이 DB 길이 초과로 INTERNAL_ERROR(대조에서 확인).
+- cf097d6: GET /admin/beans/overview 출금마다 `chargebackHold`(requested/processing+출처 lot frozen). 콘솔 짝: crefans_admin fix/withdrawal-reject 6a2052d.
+- 검증(09:20~09:34 KST): tsc 0, 관련 9파일 166/166. 대조: 사유 한도 500 원복 → 1 실패(181자 INTERNAL_ERROR), rejectable 항상 false → 1 실패, chargebackHold 항상 false → 1 실패, 상태 조건 제거 → 지급 완료 후 경고 남음 1 실패(+후속 연쇄 2).
+- 미결: 콩 수동 결과 기록도 같은 문제 가능(bean_payouts.note VARCHAR(500) vs 사유 500자+접두어) — 사용자 확인 필요, 미수정.
+
+## 2026-11-07 09:20 KST 금전 흐름 공백 3건 수정 — 브랜치 fix/payout-refund-gaps (커밋만, push·배포 없음)
+- 계기: night-work `crefans_front/.local/night-work/2026-11-06-1908.md` 589~625행, 사용자 2026-11-07 '실결제 전 코드 수정 + 대사 경보' 선택. 작업트리 `/Users/ethan/repository/crefans_server-payout-gaps`(origin/prod 8e86611 기준), 코드 커밋 e40f34d. 마이그레이션 없음.
+- ① 콩 처리 중 출금+차지백: 결정 = 이체 진행 중(processing)은 막지 않고 **지급 후 미수금**. 근거: 약관 6조(legal-documents.ts, '이미 출금된 수익에 취소·차지백 → 미수금 기록·이후 정산 차감·알림, 미수금 있으면 출금 제한'), 계약서 초안 9조③(확정 부담액만 정산), 기존 rejectPayout이 처리 중 반려를 금지(은행 결과 불명)하는 의도. `finishPayout`이 paid로 끝날 때 동결 lot 출처분을 지급 단가로 미수금(source `충전ID:출금ID`, 기존 recordReceivables 재사용)·알림. 반려로 끝나면 동결 lot으로 돌아갈 뿐 미수금 없음. freezeCharge와 finishPayout은 회사 지갑 잠금으로 직렬화.
+- ② 멤버십 출금 신청 뒤 환불로 잔액 음수: `POST /admin/withdrawals/:id/reject`(revenue.create, 사유 150자 — note 컬럼 191자 한도) 추가. requested이고 출금 가능액<0일 때만(처리 중 409 WITHDRAWAL_NOT_REQUESTED, 잔액 충분 409 WITHDRAWAL_NOT_BLOCKED). 반려 시 크리에이터 알림·감사 withdrawal.rejected, 금액은 다시 출금 가능액에 포함, 미수금은 기존 receivables 작업이 자동 정산. 환불 알림은 부족액 중 'paid 출금' 몫만 '이미 지급된 수익'으로, 미지급 신청 몫은 '출금 신청 금액 초과·운영 확인'으로 안내. 미수금 행 금액은 기존대로 부족액 전체(탈퇴 차단·자동 정산 의미 유지).
+- ③ 원장 대사: `BeansService.reconcileLedger`(계정=분개 합, 이동 합=0, 회원 버킷=lot 합; 각 한 SQL 문) + `PlatformJobsService.reconcileBeanLedger`(KST 하루 1회 `beans-ledger-YYYY-MM-DD`, 불일치 시 `operations.record('beans.ledger_mismatch')` 건수만·하루 1회 → 기존 텔레그램 outbox). bean_lots(unicode_ci)와 원장 테이블(DB 기본) 콜레이션이 달라 BINARY 비교.
+- 검증(2026-11-07 KST, 로컬 3307 crefans_platform_e2e, 공급사 대역): 작업트리 전용 Prisma 클라이언트(공유 node_modules 해시 불변 확인) 생성 후 tsc 오류 기준선 0 → 변경 후 0. 기준선(origin/prod) 9파일 161/161. 변경 후 `npm run test:beans` 60/60, 나머지 6파일 104/104. 넓은 22파일: 변경 후 226 통과·52 실패, origin/prod도 52 실패로 목록 동일(platform-access 등이 dev DB 미적용 컬럼 founding_badge_visible로 실패, 무관).
+- 대조(수정만 끄고 같은 테스트): ① 미수금 기록 끔 → 1 실패. ② 알림 문구 원복 → 1 실패, 잔액 조건 제거 → 1 실패, origin/prod finance.service → 1 실패. ③ 계정·lot·이동 검사 각각 끔 → 각 1 실패, 경보 기록 끔 → 1 실패.
+- 문서: platform-api.md(새 API·미수금·대사), OpenAPI 205→206·콘솔 91→92. 프론트 check:docs(CREFANS_SERVER_DIR=작업트리)는 기준선과 같은 2건(backup-alerts README 미검토, docs:contracts 재생성 필요)으로 실패 — 프론트 쪽 갱신은 범위 밖.
+- 미결/주의: 공유 e2e DB에 다른 스위트의 직접 lot 수정 잔재로 불일치 55건(전부 Referral fixture)이 있어 테스트는 이 스위트 지갑만 판정. 운영 DB 상태는 조회하지 않아 첫 실행 경보 여부 미확인(과거 코드·수동 수정 잔재가 있으면 첫날 경보). 콘솔 반려 버튼(crefans_admin) 미구현. 실제 은행·PG·텔레그램 발송 미검증.
 
 ## 2026-11-06 23:27 KST 운영 배포 refund-notices-20261106 — 콘솔 환불 후 종료·멤버십 알림·법정 표시 (완료)
 - 결정(/pilot-work, 사용자): 법정 표시는 하단+멤버십 결제 확인창에 넣고 배포(호스팅 상호 = AWS 청구서 법인명 Amazon Web Services Korea LLC, 사용자 확인). 멤버십 환불은 콘솔 운영자 도구, 전액만+구독 즉시 종료, 검사 통과 시 배포. 해지·환불 알림은 회원 알림센터+메일, 크리에이터는 환불만. 보안 2건(로그인 해시 DoS·OTP 자가 등록)은 현행 유지. 가이드는 약관에 맞춰 수정·배포(별도 작업, crefans_guide).

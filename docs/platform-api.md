@@ -190,7 +190,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /admin/subscriptions | 매출·정산 조회 권한, 조회 전용(2026-11-06). 구독 20개 page(생성일 최신순). status=ONGOING(자동 갱신)·CANCELLED(해지 예약, endedAt까지 이용)·EXPIRED, membershipId, search=구독자 ID·활동명·크리에이터 이름·핸들. 구독자는 ID·활동명·탈퇴 여부만, 이메일·빌링키·카드 ID·상품 snapshot 제외. summary는 같은 조건의 전체 집계 |
 | POST | /admin/subscriptions/:id/cancel-now | 활성 SUPER_ADMIN 전용(2026-11-06). 이용 종료 시각을 지금으로 당기고 상태를 EXPIRED로 바꿔 접근을 즉시 차단한다. 환불·결제 취소는 하지 않으며 결제사 API를 호출하지 않는다. 사유(500자) 필수이며 구독 행과 감사 로그에 남는다. 이미 종료된 구독은 409 |
 | POST | /admin/subscriptions/:id/refund | 활성 SUPER_ADMIN 전용(2026-11-06 사용자 결정). 구독의 가장 최근 paid 결제를 결제사 취소 API로 **전액** 환불(부분 환불 없음)하고 구독을 즉시 종료(EXPIRED)한다. 회원 셀프 환불의 7일·미이용 조건은 적용하지 않는다. 콘솔에서 입력한 금액 표기 `confirmation`(예: "12,000원")이 대상 결제 금액과 다르면 400 CONFIRMATION_REQUIRED. 결제사에 보내는 취소 사유는 고정 문구 '운영자 환불'이며 운영자 사유(500자, 필수)는 구독 행에만 저장되고 감사 로그(`admin.subscription.refunded`)에는 자유 문구 없이 남는다. 환불할 결제가 없으면 409 NO_REFUNDABLE_PAYMENT, 처리 중 결제가 있으면 409 PAYMENT_IN_PROGRESS. 수익 차감·미수금·추천 보상 회수는 회원 환불과 같은 `completeRefund` 경로를 쓴다 |
-| GET | /admin/withdrawals | 매출·정산 조회 권한; 전체 출금신청20개 page, 계좌/지급 자격정보 제외 |
+| GET | /admin/withdrawals | 매출·정산 조회 권한; 전체 출금신청20개 page, 계좌/지급 자격정보 제외. 항목마다 `rejectable`(2026-11-07): requested이고 크리에이터 출금 가능액이 음수라 반려 API가 받아들일 건만 true |
 | GET | /admin/inquiries | 문의 조회 |
 | POST | /admin/inquiries/:id/reply | 문의 답변 |
 | GET | /admin/reports | 신고 조회. 댓글 신고는 `comment:{content,posting_id,author_id,hidden,is_deleted}` 포함 |
@@ -199,10 +199,11 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /admin/documents | 공지·FAQ 등록·수정. 코드 관리 법률문서 변경 거부 |
 | POST | /admin/marketing/campaigns | 활성 SUPER_ADMIN; campaignId/subject/body/memberIds(최대100), 현재 증빙 동의자만 중복 없는 광고 대기열 등록. 법률문서 발행·서명키 필요 |
 | POST | /admin/revenue/:id/receipt | 매출·정산 생성 권한; reference/reason/amount/receivedAt, 실제 결제의 PG 입금 대사·감사 기록. 테스트 결제/중복 정정 거부 |
-| POST | /admin/withdrawals/:id/manual-result | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 출금 검사(수요일·잔액·확인 계좌)로 처리 중 전환 후, 운영자가 직접 이체한 결과(paid: 참조번호·이체 시각, rejected: 사유)를 한 번만 기록. 감사 `withdrawal.manual_result`. 은행 API 호출 없음 |
+| POST | /admin/withdrawals/:id/manual-result | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 출금 검사(수요일·잔액·확인 계좌)로 처리 중 전환 후, 운영자가 직접 이체한 결과(paid: 참조번호·이체 시각, rejected: 사유 180자 — 접두어 포함 note 191자, 2026-11-07)를 한 번만 기록. 감사 `withdrawal.manual_result`. 은행 API 호출 없음 |
+| POST | /admin/withdrawals/:id/reject | 매출·정산 생성 권한(2026-11-07). 신청 뒤 환불로 출금 가능 잔액이 음수가 되어 `PAYOUT_BALANCE_CHANGED`로 멈춘 접수(requested) 출금만 사유(150자)와 함께 반려. 처리 중이면 409 `WITHDRAWAL_NOT_REQUESTED`, 잔액이 충분하면 409 `WITHDRAWAL_NOT_BLOCKED`. 반려 금액은 다시 출금 가능액에 포함되고 크리에이터 알림·감사 `withdrawal.rejected`를 남김. 은행 API 호출 없음 |
 | GET | /admin/settlement-accounts | 매출·정산 조회 권한. 수동 지급 모드에서 예금주 확인 대기 계좌(은행·예금주 표시명·끝 4자리, 최대 100건). 전체 계좌번호는 반환하지 않음 |
 | POST | /admin/settlement-accounts/:id/verify | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 통장 사본 등으로 예금주 확인 후 expectedVersion·확인 내용으로 기록, 이미 확인·버전 불일치는 409. 감사 `account.manual_verified` |
-| POST | /admin/beans/withdrawals/:id/manual-result | SUPER_ADMIN(2026-11-02), `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
+| POST | /admin/beans/withdrawals/:id/manual-result | SUPER_ADMIN(2026-11-02), `MANUAL_PAYOUTS_ENABLED`일 때만. 반려 사유 489자(접두어 포함 note 500자, 2026-11-07). 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
 | GET | /admin/financial-policy | 운영 설정 조회 권한; 현재 DB 수수료율/정산 보류·version 조회 |
 | PUT | /admin/financial-policy | 운영 설정 수정 권한; expectedVersion/platformFeeBps/settlementHoldDays/reason와 confirmation='정책 변경'(정확히 일치, 아니면 400 CONFIRMATION_REQUIRED), 충돌409·감사 기록 원자 반영 |
 | GET | /admin/financial-policy/history | 운영 설정 조회 권한; 최근 정책 변경100건 |
@@ -381,7 +382,7 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | POST | /studio/bean-withdrawal-quotes | quantity>=1000·accountId 본인 검증계좌·live입금 출처, 총액/20%/실지급 견적. 열린 콩 미수금이 있으면 409 RECEIVABLE_OPEN(멤버십 미수금은 콩 출금을 막지 않음, 2026-10-30). closing:true면 탈퇴 준비 조건 충족 시 출금 가능 전량을 최소 수량 미만이라도 신청(CLOSING_WITHDRAWAL_ALL·EARNINGS_PENDING) |
 | POST | /studio/bean-withdrawals/verify | quantity/accountId/pin, 기존 PIN 해시와5회/30초 제한 재사용, 2분 수량·계좌버전 인증 |
 | POST | /studio/bean-withdrawals | quantity/accountId/authorizationId/requestId, 받은 일반콩 가용 lot를 원자 예약, 중복/경합 방지 |
-| GET | /admin/beans/overview | 활성 ADMIN/SUPER_ADMIN만 회사재고/충전·후원·출금/부채·환경별 집계, page |
+| GET | /admin/beans/overview | 활성 ADMIN/SUPER_ADMIN만 회사재고/충전·후원·출금/부채·환경별 집계, page. 출금마다 `chargebackHold`(2026-11-07): requested/processing이면서 출처 lot이 차지백으로 동결된 건 true — 콘솔이 '차지백 발생 · 이체 전 확인' 경고를 표시 |
 | GET | /admin/beans/wallets/:id | SUPER_ADMIN 본인 업무로 회원 지갑·원장·최근100 출처 lot/충전·배분 추적, page |
 | POST | /admin/beans/promotions | SUPER_ADMIN, 1회·KST 하루 운영자 합계 10,000콩 이하(친구 초대 자동 보상 제외, 2026-11-02), memberId/quantity/reason/requestId, 회사재고→프로모션, 중복 지급 방지·사유 기록 |
 | POST | /admin/beans/charges/:id/receipt | SUPER_ADMIN, amount/reference/receivedAt/reason, live 승인된 원주문 실제입금 대사·불변 기록/감사 |
@@ -409,7 +410,8 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 
 - 환불: 충전 후 7일 이내 미사용 충전콩 전액, 이후 10% 공제(회사 귀책은 운영자가 면제). 사용분·프로모션콩·만료분 제외. 원결제 부분취소(토스 cancelAmount, 공식 문서 docs.tosspayments.com/guides/v2/cancel-payment 2026-10-30 확인 — 카드 부분취소 환불은 영업일 3~4일).
 - 유효기간: 충전콩은 결제일, 일반 프로모션콩은 지급일부터 1년(2026-11-06 토스 심사 신고값에 맞춰 5년에서 단축, 약관 제11조 2026-12-06 시행)(공개100콩 이벤트는 수령 시점부터30일)(`bean_lots.expires_at`, 기존 lot은 마이그레이션 `20261030200000_pilot_followups`에서 채움). 만료 30일 전 1회 앱 알림+메일(type bean-expiry). 공개100콩 이벤트 lot만 만료 7일 전 1회 이벤트 전용 알림+메일(type event-bean-expiry, 환불 안내 없음, 2026-11-03). 수령 직후 30일 기준으로 먼저 나간 안내는 마이그레이션 `20261103140000_event_bean_expiry_renotice`가 안내 기록만 비워 7일 전에 한 번 더 보낸다, 만료 시 남은 수량을 회사 `expired` 계정으로 이동. 만료 lot은 후원·지갑 사용 가능액에서 제외.
-- 미수금(`creator_receivables`): 멤버십은 환불 완료 때 가용잔액이 음수가 되면 min(해당 결제 net, 부족액)을 기록하고 작업(`receivables`)이 이후 수익으로 0 이상이 되면 자동 정산. 콩은 차지백(freezeCharge) 때 이미 paid 지급에 쓰인 출처를 지급 단가(net/quantity)로 환산해 기록, 운영자 정산 전까지 콩 출금 차단. 둘 다 크리에이터에게 정산 알림.
+- 미수금(`creator_receivables`): 멤버십은 환불 완료 때 가용잔액이 음수가 되면 min(해당 결제 net, 부족액)을 기록하고 작업(`receivables`)이 이후 수익으로 0 이상이 되면 자동 정산. 콩은 차지백(freezeCharge) 때 이미 paid 지급에 쓰인 출처를 지급 단가(net/quantity)로 환산해 기록, 운영자 정산 전까지 콩 출금 차단. 둘 다 크리에이터에게 정산 알림. (2026-11-07) 차지백 때 은행·수동 이체가 진행 중(processing)인 콩 출금은 멈추지 않고, 이후 지급 완료되면 동결 출처분을 같은 단가로 미수금(source `충전ID:출금ID`)으로 기록한다. 멤버십 부족액이 아직 지급되지 않은 출금 신청 때문이면 알림을 '이미 지급된 수익'이 아닌 '출금 신청 금액 초과'로 보내고(미수금 행은 기존처럼 부족액 전체), 운영자는 `POST /admin/withdrawals/:id/reject`로 그 신청을 반려한다.
+- 원장 대사(2026-11-07): 워커가 KST 하루 1회(`platform_jobs` id `beans-ledger-YYYY-MM-DD`, 실패 시 1시간 뒤 재시도) 계정 잔액=분개 합계, 이동별 분개 합계=0, 회원 버킷 잔액=lot 합계(구매·프로모션: available+환불예약 reserved, 받은콩: available, reserved-paid: 받은콩 lot의 출금예약 reserved)를 각각 한 SQL 문으로 확인한다. 불일치가 있으면 운영 알림 `beans.ledger_mismatch`(건수만, 하루 1회)를 남긴다. 자동 수정은 하지 않는다.
 - 메일 큐 `member_notices`: 운영 조치·콩 만료 안내 메일. 탈퇴·미인증 주소는 건너뜀, 실패 시 지수 백오프.
 
 ### 콩 내역 필터와 주문 생성시각 (2026-10-26, 운영 미배포)
