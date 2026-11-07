@@ -1,3 +1,10 @@
+## 2026-11-07 20:57 KST 가이드 AI 어드바이저 운영 배포 완료
+- 사용자 제공 서비스 키로 실제 API 연결. 서버2419bb8·가이드3494b40, 기능→dev→prod 통합 후 배포. API/worker 20:56 교체·healthy/running, 가이드20:57 server모드. 정적106파일 해시 일치, DB/proxy/front/admin 컨테이너 불변, migration 없음.
+- 운영 검증: 공개 질문 실제 AI 응답·출처, 처리방침2026-11-07.advisor.1, Origin/CORS·개인정보 차단7건. PC Chromium1440·모바일 WebKit390 실제 질문2건·링크200·새 대화·쿠키 미전송·레이아웃 검사 종료0, PNG 육안 확인. 실물 iPhone은 미검증.
+- 키는 runtime.env0600에만 보관. 추적641파일·정적 파일·운영 로그 비노출 확인, 임시 로컬 키 제거. 복구본 설정6파일·가이드106파일·이전 이미지 전체OCIblob21개는 /Users/ethan/crefans-recovery/20261107/guide-advisor-live에서 SHA검증. 이전 API 이미지·운영 배포 임시 폴더 정리 완료.
+- 로컬 build·서버60pass/1선택skip·가이드29쪽/149절·화면대역검사 통과. 전체 문서 검사는 미통과: check:docs 문서 인벤토리(backup-alerts/README)와 생성계약, check:guides 형제 저장소 원본 잠금 불일치. 성공처럼 증거를 재생성하지 않았다. 이번 기능/운영 검증과 구분한다.
+- 증거 docs/audit/guide-advisor-live-20261107.json 및 양쪽 .local/*advisor-live-20261107/. 배포 후 추가 커밋은 기록 문서만이다. 가이드 메인 PROGRESS 미커밋 기록은 합쳐 모두 보존하고 기존 autostash도 유지했다.
+
 ## 2026-11-07 가이드 검색 어드바이저 실제 AI 연결·배포 진행
 - 사용자 승인: 제공한 서비스 계정 키로 가이드 서치 어드바이저 운영 배포. 키는 Git 제외 .local 비공개 파일(0600)에만 임시 저장, 운영 runtime.env로 전송 예정. 값/해시를 문서·빌드·로그에 포함하지 않는다.
 - origin/prod 72d3bac에서 feat/guide-advisor-live 분기 후 준비된 feat/guide-advisor bc66215 병합. 마이그레이션 없음. 현재 운영 api/worker bundle-20261107, 다른 서비스 보존.
