@@ -190,7 +190,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /admin/subscriptions | 매출·정산 조회 권한, 조회 전용(2026-11-06). 구독 20개 page(생성일 최신순). status=ONGOING(자동 갱신)·CANCELLED(해지 예약, endedAt까지 이용)·EXPIRED, membershipId, search=구독자 ID·활동명·크리에이터 이름·핸들. 구독자는 ID·활동명·탈퇴 여부만, 이메일·빌링키·카드 ID·상품 snapshot 제외. summary는 같은 조건의 전체 집계 |
 | POST | /admin/subscriptions/:id/cancel-now | 활성 SUPER_ADMIN 전용(2026-11-06). 이용 종료 시각을 지금으로 당기고 상태를 EXPIRED로 바꿔 접근을 즉시 차단한다. 환불·결제 취소는 하지 않으며 결제사 API를 호출하지 않는다. 사유(500자) 필수이며 구독 행과 감사 로그에 남는다. 이미 종료된 구독은 409 |
 | POST | /admin/subscriptions/:id/refund | 활성 SUPER_ADMIN 전용(2026-11-06 사용자 결정). 구독의 가장 최근 paid 결제를 결제사 취소 API로 **전액** 환불(부분 환불 없음)하고 구독을 즉시 종료(EXPIRED)한다. 회원 셀프 환불의 7일·미이용 조건은 적용하지 않는다. 콘솔에서 입력한 금액 표기 `confirmation`(예: "12,000원")이 대상 결제 금액과 다르면 400 CONFIRMATION_REQUIRED. 결제사에 보내는 취소 사유는 고정 문구 '운영자 환불'이며 운영자 사유(500자, 필수)는 구독 행에만 저장되고 감사 로그(`admin.subscription.refunded`)에는 자유 문구 없이 남는다. 환불할 결제가 없으면 409 NO_REFUNDABLE_PAYMENT, 처리 중 결제가 있으면 409 PAYMENT_IN_PROGRESS. 수익 차감·미수금·추천 보상 회수는 회원 환불과 같은 `completeRefund` 경로를 쓴다 |
-| GET | /admin/withdrawals | 매출·정산 조회 권한; 전체 출금신청20개 page, 계좌/지급 자격정보 제외 |
+| GET | /admin/withdrawals | 매출·정산 조회 권한; 전체 출금신청20개 page, 계좌/지급 자격정보 제외. 항목마다 `rejectable`(2026-11-07): requested이고 크리에이터 출금 가능액이 음수라 반려 API가 받아들일 건만 true |
 | GET | /admin/inquiries | 문의 조회 |
 | POST | /admin/inquiries/:id/reply | 문의 답변 |
 | GET | /admin/reports | 신고 조회. 댓글 신고는 `comment:{content,posting_id,author_id,hidden,is_deleted}` 포함 |
@@ -199,7 +199,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /admin/documents | 공지·FAQ 등록·수정. 코드 관리 법률문서 변경 거부 |
 | POST | /admin/marketing/campaigns | 활성 SUPER_ADMIN; campaignId/subject/body/memberIds(최대100), 현재 증빙 동의자만 중복 없는 광고 대기열 등록. 법률문서 발행·서명키 필요 |
 | POST | /admin/revenue/:id/receipt | 매출·정산 생성 권한; reference/reason/amount/receivedAt, 실제 결제의 PG 입금 대사·감사 기록. 테스트 결제/중복 정정 거부 |
-| POST | /admin/withdrawals/:id/manual-result | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 출금 검사(수요일·잔액·확인 계좌)로 처리 중 전환 후, 운영자가 직접 이체한 결과(paid: 참조번호·이체 시각, rejected: 사유)를 한 번만 기록. 감사 `withdrawal.manual_result`. 은행 API 호출 없음 |
+| POST | /admin/withdrawals/:id/manual-result | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 출금 검사(수요일·잔액·확인 계좌)로 처리 중 전환 후, 운영자가 직접 이체한 결과(paid: 참조번호·이체 시각, rejected: 사유 180자 — 접두어 포함 note 191자, 2026-11-07)를 한 번만 기록. 감사 `withdrawal.manual_result`. 은행 API 호출 없음 |
 | POST | /admin/withdrawals/:id/reject | 매출·정산 생성 권한(2026-11-07). 신청 뒤 환불로 출금 가능 잔액이 음수가 되어 `PAYOUT_BALANCE_CHANGED`로 멈춘 접수(requested) 출금만 사유(150자)와 함께 반려. 처리 중이면 409 `WITHDRAWAL_NOT_REQUESTED`, 잔액이 충분하면 409 `WITHDRAWAL_NOT_BLOCKED`. 반려 금액은 다시 출금 가능액에 포함되고 크리에이터 알림·감사 `withdrawal.rejected`를 남김. 은행 API 호출 없음 |
 | GET | /admin/settlement-accounts | 매출·정산 조회 권한. 수동 지급 모드에서 예금주 확인 대기 계좌(은행·예금주 표시명·끝 4자리, 최대 100건). 전체 계좌번호는 반환하지 않음 |
 | POST | /admin/settlement-accounts/:id/verify | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 통장 사본 등으로 예금주 확인 후 expectedVersion·확인 내용으로 기록, 이미 확인·버전 불일치는 409. 감사 `account.manual_verified` |

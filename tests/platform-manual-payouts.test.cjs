@@ -69,3 +69,23 @@ test('a processing withdrawal can be rejected with a reason, which returns the a
  assert.equal((await api(`/admin/withdrawals/${w.id}/manual-result`,'finance',{result:'rejected'})).errorCode,'INVALID_MANUAL_RESULT','a reject needs a reason');
  assert.equal((await api(`/admin/withdrawals/${w.id}/manual-result`,'finance',{result:'rejected',reason:'예금주 불일치'})).status,201);
  assert.equal((await db.withdrawalRequest.findUniqueOrThrow({where:{id:w.id}})).status,'rejected');assert.equal((await finance.finance(creator)).summary.available,before+10000);});
+
+// 2026-11-07: the manual reject reason fits withdrawal_requests.note VARCHAR(191) together with its prefix.
+test('a manual reject reason is limited to what the note column holds after its prefix',async()=>{
+ const w=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:1000,status:'processing'}});
+ assert.equal((await api(`/admin/withdrawals/${w.id}/manual-result`,'finance',{result:'rejected',reason:'가'.repeat(181)})).errorCode,'INVALID_INPUT','181 characters would not fit');
+ assert.equal((await db.withdrawalRequest.findUniqueOrThrow({where:{id:w.id}})).status,'processing');
+ assert.equal((await api(`/admin/withdrawals/${w.id}/manual-result`,'finance',{result:'rejected',reason:'가'.repeat(180)})).status,201);
+ const row=await db.withdrawalRequest.findUniqueOrThrow({where:{id:w.id}});assert.equal(row.status,'rejected');assert.equal(row.note.length,191);});
+
+// 2026-11-07: the console shows the reject button only where the server marks the row rejectable.
+test('the withdrawal list marks only requested rows of a creator with a negative balance as rejectable',async()=>{
+ const available=(await finance.finance(creator)).summary.available;
+ const ok=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:1000,status:'processing'}});
+ let list=await api('/admin/withdrawals?status=open','viewer');assert.equal(list.status,200);assert.equal(list.data.items.find(w=>w.id===ok.id).rejectable,false,'a non-negative balance is not rejectable');
+ const w=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:available,status:'requested'}});
+ list=await api('/admin/withdrawals?status=open','viewer');assert.deepEqual([list.data.items.find(x=>x.id===w.id).rejectable,list.data.items.find(x=>x.id===ok.id).rejectable],[true,false],'requested above the balance only');
+ assert.equal((await api(`/admin/withdrawals/${w.id}/reject`,'viewer',{reason:'환불로 잔액 부족'})).status,403);
+ assert.equal((await api(`/admin/withdrawals/${w.id}/reject`,'finance',{reason:'환불로 잔액 부족'})).status,201);
+ list=await api('/admin/withdrawals','viewer');assert.equal(list.data.items.find(x=>x.id===w.id).rejectable,false);
+ await db.withdrawalRequest.deleteMany({where:{id:{in:[ok.id,w.id]}}});});

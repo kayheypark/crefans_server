@@ -21,6 +21,7 @@ import {hashPassword,verifyPassword} from '../auth/local/credentials';
 import {reject,text,dateOnly} from './http';
 import {clawBackReferralReward,qualifyReferralReward,requireBeanPayoutMember} from './referrals';
 export const nextMonth=(now:Date,anchor:Date=now)=>{const date=new Date(now),day=anchor.getUTCDate();date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+1);date.setUTCDate(Math.min(day,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()));return date;};
+const WITHDRAWAL_NOTE_MAX=191,MANUAL_REJECT_PREFIX='수동 이체 반려 · ';
 @Injectable()
 export class PlatformFinanceService {
  constructor(private service:PlatformService,private provider:PaymentProvider,private config:ConfigService,private bank:BankProvider){}
@@ -369,19 +370,22 @@ export class PlatformFinanceService {
  // (same balance/account/payout-day checks, parked as processing); only then is the transfer recorded, once.
  async manualResult(admin:any,id:string,input:any,now=new Date()){
   if(!manualPayouts(this.config))reject(409,'MANUAL_PAYOUTS_DISABLED','수동 지급이 활성화되어 있지 않습니다.');requirePermission(admin,'revenue','create');
-  const result=input?.result,reference=text(input?.reference??'',100,false),reason=text(input?.reason??'',500,false),at=new Date(input?.transferredAt??now);
+  // withdrawal_requests.note is VARCHAR(191) and stores the reason after its prefix, so the reason fits what is left (2026-11-07).
+  const result=input?.result,reference=text(input?.reference??'',100,false),reason=text(input?.reason??'',WITHDRAWAL_NOTE_MAX-MANUAL_REJECT_PREFIX.length,false),at=new Date(input?.transferredAt??now);
   if(!['paid','rejected'].includes(result)||(result==='paid'&&!reference)||(result==='rejected'&&!reason)||!Number.isFinite(at.getTime())||at>now)reject(400,'INVALID_MANUAL_RESULT','이체 결과·참조번호·이체 시각을 확인해주세요.');
   const first=await this.db.withdrawalRequest.findUnique({where:{id}});if(!first)reject(404,'WITHDRAWAL_NOT_FOUND','출금 신청을 찾을 수 없습니다.');
   if(first.status==='requested')await this.payout(id,now);
   return this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${first.creator_id} FOR UPDATE`;const w=await tx.withdrawalRequest.findUniqueOrThrow({where:{id}});
    if(w.status!=='processing')reject(409,'WITHDRAWAL_NOT_PROCESSING','처리 중인 출금만 이체 결과를 기록할 수 있습니다.');
-   await tx.withdrawalRequest.update({where:{id},data:{status:result,note:result==='paid'?`수동 이체 완료 · ${reference}`:`수동 이체 반려 · ${reason}`}});
+   await tx.withdrawalRequest.update({where:{id},data:{status:result,note:result==='paid'?`수동 이체 완료 · ${reference}`:MANUAL_REJECT_PREFIX+reason}});
    await this.audit(tx,'withdrawal.manual_result',id,{creatorId:w.creator_id,amount:w.amount,previousStatus:'processing',status:result,adminId:admin.id,reference:reference||null,transferredAt:at.toISOString(),reasonDigest:reason?reason.length:0});
    return{message:result==='paid'?'이체 완료를 기록했습니다.':'출금을 반려했습니다.'};});
  }
  // A withdrawal requested before a refund that left the available balance negative can never pass payout() (PAYOUT_BALANCE_CHANGED);
  // the operator rejects it, the amount counts as available again and the creator may request anew (2026-11-07). Only that case,
  // and only before a transfer starts: a processing one is closed by its bank or manual result.
+ // Console hint (2026-11-07): marks the rows rejectWithdrawal would accept now, so the button shows only for them.
+ async withRejectable(items:any[]){const blocked=new Set<string>();for(const creator of new Set<string>(items.filter(w=>w.status==='requested').map(w=>w.creator_id)))if((await this.finance(creator)).summary.available<0)blocked.add(creator);return items.map(w=>({...w,rejectable:w.status==='requested'&&blocked.has(w.creator_id)}));}
  async rejectWithdrawal(admin:any,id:string,input:any){
   requirePermission(admin,'revenue','create');const reason=text(input?.reason,150);
   const first=await this.db.withdrawalRequest.findUnique({where:{id}});if(!first)reject(404,'WITHDRAWAL_NOT_FOUND','출금 신청을 찾을 수 없습니다.');
