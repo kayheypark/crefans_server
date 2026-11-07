@@ -12,18 +12,20 @@ export const GUIDE_ADVISOR_PATH='/api/v1/guide/advisor';
 export const QUESTION_MAX=500;
 const LEGAL_ORIGIN='https://crefans.com/service/legal/';
 const OPENAI_URL='https://api.openai.com/v1/responses';
+// Free moderation endpoint, checked 2026-11-07 on developers.openai.com/api/docs/guides/moderation.
+const MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
 // Default checked 2026-11-07 on developers.openai.com/api/docs/models (most efficient model for high-volume tasks).
 const DEFAULT_MODEL='gpt-6-luna';
 
 export type Chunk={title:string;section:string;url:string;text:string};
 export type Source={title:string;section:string;url:string};
-export type AdvisorConfig={apiKey:string;model:string;reasoning:string;indexUrl:string;timeoutMs:number;perMinute:number;perDay:number;dailyTotal:number;maxOutputTokens:number};
+export type AdvisorConfig={apiKey:string;model:string;reasoning:string;indexUrl:string;timeoutMs:number;perMinute:number;perDay:number;perClientDay:number;dailyTotal:number;maxOutputTokens:number};
 
 const int=(value:unknown,fallback:number)=>{const n=Number(value);return Number.isInteger(n)&&n>0?n:fallback;};
 export function advisorConfig(config:{get:(key:string)=>any}):AdvisorConfig{
  return{apiKey:(config.get('GUIDE_ADVISOR_OPENAI_API_KEY')||'').trim(),model:(config.get('GUIDE_ADVISOR_MODEL')||'').trim()||DEFAULT_MODEL,
   reasoning:(config.get('GUIDE_ADVISOR_REASONING_EFFORT')||'low').trim(),indexUrl:config.get('GUIDE_ADVISOR_INDEX_URL')||'https://guide.crefans.com/advisor-index.json',
-  timeoutMs:int(config.get('GUIDE_ADVISOR_TIMEOUT_MS'),20000),perMinute:int(config.get('GUIDE_ADVISOR_PER_MINUTE'),5),perDay:int(config.get('GUIDE_ADVISOR_PER_DAY'),50),
+  timeoutMs:int(config.get('GUIDE_ADVISOR_TIMEOUT_MS'),20000),perMinute:int(config.get('GUIDE_ADVISOR_PER_MINUTE'),5),perDay:int(config.get('GUIDE_ADVISOR_PER_DAY'),50),perClientDay:int(config.get('GUIDE_ADVISOR_PER_CLIENT_DAY'),15),
   dailyTotal:int(config.get('GUIDE_ADVISOR_DAILY_TOTAL'),1000),maxOutputTokens:int(config.get('GUIDE_ADVISOR_MAX_OUTPUT_TOKENS'),700)};
 }
 
@@ -59,6 +61,27 @@ export function retrieve(question:string,chunks:Chunk[],limit=4){
 
 // LLM02: obvious personal data (email, card/account/phone-length digit runs) is refused before it can leave the server.
 export function containsPersonalData(value:string){return /[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(value)||/\d{10,}/.test(value.replace(/[\s-]/g,''));}
+
+// Anonymous browser id from the guide (random, stored only in that browser). Without a valid id the IP stands in for the quota,
+// and no safety_identifier is sent (the privacy notice promises the IP never reaches the provider).
+export function clientKey(value:unknown,ipDigest:string){return typeof value==='string'&&/^[A-Za-z0-9_-]{16,64}$/.test(value)?'id:'+contentDigest(value):'ip:'+ipDigest;}
+
+// LLM01 guardrail: obvious attempts to change the assistant's role or extract its instructions never reach the model.
+const INJECTION=[
+ /(ignore|disregard|forget|override)\b.{0,40}\b(instruction|prompt|rule|guideline|above|previous)/i,
+ /(system|developer|hidden)\s*(prompt|message|instruction)/i,/\b(jailbreak|DAN mode|developer mode|act as|pretend (to be|you are)|roleplay)\b/i,
+ /(지침|지시|프롬프트|명령)\S{0,3}\s*(전부|모두|다)?\s*(무시|잊어|따르지\s*마|해제|우회)/,/(이전|위의?|앞의?|기존)\s*(대화|내용|규칙)\S{0,3}\s*(무시|잊어)/,
+ /(시스템|개발자|숨겨진|내부)\s*(프롬프트|지침|메시지|명령)|프롬프트\S{0,3}\s*(공개|알려|보여|출력|말해)/,/(너는|넌|당신은)\s*이제|인\s*척\s*(해|하고)|탈옥/,
+ /(무슨|어떤|어느)\s*(ai|AI|모델|엔진|LLM|llm)|(모델|엔진)\s*(이름|명|버전)|gpt|chatgpt|openai|claude|gemini/i,
+];
+export function looksLikeInjection(value:string){return INJECTION.some(pattern=>pattern.test(value));}
+
+// LLM05/LLM07 guardrail: an answer that names the provider, echoes the instructions or prompt tags, carries links/markup or personal data is replaced.
+export const SAFE_ANSWER='가이드에서 확인되지 않는 내용이에요. 고객센터로 문의해 주세요.';
+export function unsafeAnswer(text:string){
+ return /gpt|openai|chatgpt|claude|gemini|anthropic|language model|언어\s*모델|<\/?(documents|question)>|AI 어드바이저입니다|입력한 데이터입니다/i.test(text)
+  ||/https?:\/\/|www\.|<[a-z!/][^>]*>|\]\(/i.test(text)||containsPersonalData(text);
+}
 
 export const INSTRUCTIONS=[
  '당신은 크레팬스 이용 가이드의 AI 어드바이저입니다. 크레팬스 서비스의 사용법과 정책 질문에만 한국어로 답합니다.',
@@ -98,27 +121,45 @@ export class GuideAdvisorService{
    this.cache={at:Date.now(),chunks};return chunks;
   }catch{return this.cache?.chunks||[];}// Stale index beats no index; terms are always available in-process.
  }
+ // Free moderation check (harassment, hate, violence, sexual, self-harm, illicit ...). undefined = no verdict.
+ private async flagged(text:string):Promise<boolean|undefined>{
+  try{
+   const res=await this.fetcher(MODERATION_URL,{method:'POST',signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/json',Authorization:'Bearer '+this.settings.apiKey},body:JSON.stringify({model:MODERATION_MODEL,input:text})});
+   const verdict=res.ok?(await res.json().catch(()=>null))?.results?.[0]?.flagged:undefined;
+   return typeof verdict==='boolean'?verdict:undefined;
+  }catch{return undefined;}
+ }
  async ask(input:any){
   if(!this.settings.apiKey)reject(503,'PROVIDER_NOT_CONFIGURED','AI 어드바이저를 지금 사용할 수 없습니다.');
   const question=typeof input?.question==='string'?input.question.trim():'';
   if(!question||question.length>QUESTION_MAX)reject(400,'INVALID_INPUT',`질문은 1~${QUESTION_MAX}자로 입력해주세요.`);
   if(containsPersonalData(question))reject(400,'PERSONAL_DATA','이메일·전화번호·카드·계좌번호 같은 개인정보는 빼고 질문해주세요.');
-  const ip=contentDigest(requestContext.getStore()?.ip||'unknown');
+  if(looksLikeInjection(question))reject(400,'OUT_OF_SCOPE','크레팬스 이용 방법이나 정책에 관한 질문만 답할 수 있어요.');
+  const ip=contentDigest(requestContext.getStore()?.ip||'unknown'),visitor=clientKey(input?.client,ip);
   await this.limiter.limit('guide-advisor:minute:'+ip,this.settings.perMinute,60);
-  await this.limiter.limit('guide-advisor:day:'+ip,this.settings.perDay,86400);
+  await this.limiter.limit('guide-advisor:day:'+ip,this.settings.perDay,86400);// Backstop for browsers that reset their id.
+  // Daily per-visitor quota. Windows are UTC days, so the count resets at 09:00 KST.
+  try{await this.limiter.limit('guide-advisor:client-day:'+visitor,this.settings.perClientDay,86400);}
+  catch{reject(429,'DAILY_LIMIT',`오늘 질문 ${this.settings.perClientDay}회를 모두 사용했어요. 매일 오전 9시에 다시 이용할 수 있어요.`);}
   const matches=retrieve(question,[...await this.guideChunks(),...legalChunks()]);
   const sources:Source[]=matches.slice(0,3).map(({chunk})=>({title:chunk.title,section:chunk.section,url:chunk.url}));
   if(!matches.length)return{answer:'가이드에서 관련 내용을 찾지 못했어요. 다른 표현으로 다시 물어보시거나 고객센터로 문의해 주세요.',sources:[],found:false};
   await this.limiter.limit('guide-advisor:total',this.settings.dailyTotal,86400);// LLM10: spend ceiling across all visitors.
+  // Input moderation fails closed: no verdict, no answer.
+  const unsafe=await this.flagged(question);
+  if(unsafe===undefined)reject(502,'ADVISOR_UNAVAILABLE','답변을 만들지 못했습니다. 잠시 후 다시 시도하거나 고객센터로 문의해주세요.');
+  if(unsafe)reject(400,'UNSAFE_INPUT','이 질문에는 답할 수 없어요. 크레팬스 이용 방법이나 정책을 물어봐 주세요.');
   let res:Response;
   try{
    res=await this.fetcher(OPENAI_URL,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers:{'Content-Type':'application/json',Authorization:'Bearer '+this.settings.apiKey},
-    body:JSON.stringify({model:this.settings.model,instructions:INSTRUCTIONS,input:prompt(question,matches),store:false,max_output_tokens:this.settings.maxOutputTokens,...(this.settings.reasoning==='off'?{}:{reasoning:{effort:this.settings.reasoning}})})});
+    body:JSON.stringify({model:this.settings.model,instructions:INSTRUCTIONS,input:prompt(question,matches),store:false,...(visitor.startsWith('id:')?{safety_identifier:contentDigest('guide-advisor:'+visitor)}:{}),max_output_tokens:this.settings.maxOutputTokens,...(this.settings.reasoning==='off'?{}:{reasoning:{effort:this.settings.reasoning}})})});
   }catch{reject(504,'ADVISOR_TIMEOUT','답변이 늦어지고 있습니다. 잠시 후 다시 시도해주세요.');}
   if(res.status===429)reject(429,'RATE_LIMITED','질문이 많아 잠시 답변할 수 없습니다. 잠시 후 다시 시도해주세요.');
   if(!res.ok)reject(502,'ADVISOR_UNAVAILABLE','답변을 만들지 못했습니다. 잠시 후 다시 시도하거나 고객센터로 문의해주세요.');
   const answer=outputText(await res.json().catch(()=>null));
   if(!answer)reject(502,'ADVISOR_UNAVAILABLE','답변을 만들지 못했습니다. 잠시 후 다시 시도하거나 고객센터로 문의해주세요.');
+  // Output guardrails: rule check, then moderation; anything doubtful becomes the fixed safe answer.
+  if(unsafeAnswer(answer)||await this.flagged(answer)!==false)return{answer:SAFE_ANSWER,sources,found:true};
   return{answer,sources,found:true};
  }
 }
