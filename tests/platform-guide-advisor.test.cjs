@@ -33,6 +33,13 @@ test('personal data patterns are detected, ordinary questions pass',()=>{
  for(const bad of['제 이메일은 kay@example.com 이에요','010-1234-5678로 연락주세요','카드 1234 5678 9012 3456 결제 실패'])assert.equal(containsPersonalData(bad),true,bad);
  for(const ok of['환불은 7일 이내인가요?','출금 PIN 6자리 재설정','콩 100개 충전'])assert.equal(containsPersonalData(ok),false,ok);
 });
+test('charging how-to questions retain the action instead of matching only beans',()=>{
+ const chunks=[
+  {title:'콩 충전과 후원',section:'콩 가격',url:'/fans/beans/#price',text:'콩 가격과 콩 후원 기준입니다.'},
+  {title:'콩 충전과 후원',section:'충전하기',url:'/fans/beans/#charge',text:'내 프로필 → 내 지갑에서 콩 충전을 누릅니다.'},
+ ];
+ for(const q of ['콩은 어디에서 충전하나요?','콩 충전할까요?','콩은 어디서 충전하죠?'])assert.equal(retrieve(q,chunks)[0].chunk.url,'/fans/beans/#charge',q);
+});
 test('without a key the route reports not configured and never calls the provider',async()=>{
  const fetcher=stub(async()=>{throw Error('must not call');}),s=new GuideAdvisorService(new ConfigService({}),limiter);s.fetcher=fetcher;
  assert.equal(await status(asIp(()=>s.ask({question:'환불 기준'}))),'503 PROVIDER_NOT_CONFIGURED');assert.equal(fetcher.calls.length,0);
@@ -96,4 +103,13 @@ test('HTTP: guide POST answers in the common envelope; other or missing origins 
  assert.equal(res.status,201);assert.equal(body.success,true);assert.equal(body.data.found,true);assert.equal(res.headers.get('access-control-allow-origin'),GUIDE);
  for(const origin of[SERVICE,'https://evil.example',undefined]){const r=await post(origin);assert.equal(r.status,403,String(origin));assert.equal((await r.json()).errorCode,'INVALID_ORIGIN');}
  const long=await post(GUIDE,{question:'환'.repeat(501)});assert.equal(long.status,400);assert.equal((await long.json()).errorCode,'INVALID_INPUT');
+});
+test('equivalent Express paths keep the same advisor origin and CORS boundary',async()=>{
+ for(const path of ['/api/v1/guide/advisor/','/API/v1/guide/ADVISOR']){
+  const allowed=await preflight(path,GUIDE);assert.equal(allowed.headers.get('access-control-allow-origin'),GUIDE);assert.equal(allowed.headers.get('access-control-allow-credentials'),null);
+  for(const origin of [undefined,SERVICE]){
+   const r=await fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',...(origin?{Origin:origin}:{})},body:JSON.stringify({question:'환불 기준'})});
+   assert.equal(r.status,403,path+' '+origin);
+  }
+ }
 });

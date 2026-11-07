@@ -34,6 +34,7 @@ const normalize=(value:string)=>value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'
 export function tokens(value:string){
  const out=new Set<string>();
  for(let word of normalize(value).split(' ')){
+  word=word.replace(/(하나요|할까요|하죠)$/,'');
   if(!word||STOP.has(word)||/(나요|까요|세요|어요|아요|와요|봐요|돼요|워요|해요|예요|에요|줘|니다|가요|죠|래요|는데)$/.test(word))continue;
   if(word.length>2)word=word.replace(/(하려면|했는데|하면|해서|하고|하는|했던|되면|되는|으로|에서|에게|까지|부터|이랑|려면|으면)$/,'');
   if(word.length>2)word=word.replace(/[은는이가을를에의도로와과]$/,'');else if(word.length===2)word=word.replace(/[은는을를의도]$/,'');
