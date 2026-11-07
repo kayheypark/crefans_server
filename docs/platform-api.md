@@ -115,6 +115,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | PUT | /studio/comments-setting | enabled; 게시물 설정보다 우선 |
 | POST | /studio/content | id?, title/body/media/commentsEnabled/accessPlanId/status/scheduledAt |
 | POST | /studio/content/:id/delete | `confirmation`에 현재 제목 정확 입력 필수. 게시물 잠금·소유권 검사 후 soft delete·운영 이벤트를 같은 트랜잭션으로 처리 |
+| PUT | /studio/content/:id/visibility | `{public:boolean}`. 본인 게시물 공개·미공개 전환(사유 없음, 2026-11-07). 아래 '게시물 미공개' 절 참고 |
 | POST | /studio/memberships | id?, name/price/benefits/image; price는 1~1,100,000원(2026-11-06 토스 신고 단건 최고가, finance.service createOrder도 같은 상한), immutable version 생성 |
 | PUT | /studio/memberships/:id | active 또는 deleted; 삭제는 confirmation에 현재 멤버십 이름 정확히 입력 필수, 잠금 후 이름·소유자·삭제 여부·유효 구독 재확인 |
 | PUT | /studio/comments/:id | hidden, 본인 게시물만 |
@@ -485,7 +486,8 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 | DELETE | /admin/invites/:id | invites.delete. expectedVersion 확인 후 revoked_at 기록(이 이메일은 다시 가입 코드 불가). 가입 완료 초대는 409 |
 | POST | /admin/posts/:id/moderation | content.update. hidden(true/false)·reason 필수. 숨긴 게시물은 작성자 외 피드·프로필·상세·댓글·반응·미디어·게시물 후원에서 제외, 스튜디오에는 hiddenByOperator 표시. moderation_actions에 기록. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
 | POST | /admin/posts/:id/review | content.update. 베타 사후 검수 완료 표시(reviewed_at). 작성자가 수정하면 미검수로 복귀, 숨김도 검수로 간주. 목록은 GET /admin/posts?review=pending |
-| GET | /admin/posts/:id/moderation | content.view. 게시물 조치 이력(최신 100건, 사유·처리자·일시) |
+| POST | /admin/posts/:id/visibility | content.update. `{public:boolean, reason}` 사유 필수(공백만 400). 크리에이터 미공개 상태를 운영자가 켜고 끈다. 작성자 알림 없음. 운영자 숨김과 별개 |
+| GET | /admin/posts/:id/moderation | content.view. 게시물 조치·공개 전환 이력(최신 100건). 항목 action·reason(크리에이터 본인 전환은 null)·publicReason·actorType(admin/creator)·actorId·actorName(운영자 이름 또는 크리에이터 활동명)·adminName(호환)·createdAt |
 | POST | /admin/comments/:id/moderation | content.update. hidden·reason 필수. 숨긴 댓글은 모든 목록에서 제외(숨긴 최상위 댓글의 답글 포함)·게시물 댓글 수 감소, 해제 시 복구. moderation_actions(target_type COMMENT) 기록. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
 | GET | /admin/comments/:id/moderation | content.view. 댓글 조치 이력(최신 100건) |
 | POST | /admin/members/:id/suspension | members.update. suspended·days(7/30/null=무기한)·reason. 제한 시 세션 삭제, 기간 중 로그인 403 ACCOUNT_SUSPENDED(비밀번호 일치 후에만 안내), 토큰 검증·갱신도 거부. 기간 경과 시 자동 해제. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
@@ -580,3 +582,13 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 `POST /studio/content/:id/delete`는 `{confirmation: string}`을 받는다. 소유자가 아니거나 이미 삭제된 글은 404 POST_NOT_FOUND, 현재 제목과 다르거나 누락·다른 자료형은 400 CONFIRMATION_REQUIRED다. 공백 제거·대소문자 보정을 하지 않는다. 제목 편집과 같은 게시물 행 잠금을 잡고 현재 제목을 검사하므로 확인 화면을 연 뒤 제목이 바뀌면 다시 목록에서 확인해야 한다. 실패 시 삭제와 운영 이벤트 모두 생성하지 않는다. 기존 soft delete·권한·운영 기록을 보존하며 DB migration은 없다.
 
 근거: [OWASP Input Validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html), 2026-11-07 확인. 클라이언트 확인만으로 동작을 확정하지 않고 서버에서도 입력 의미와 권한을 별도로 검사하는 규칙을 적용했다. 프론트 공통 TypedConfirmDialog와 콘솔의 직접 입력 패턴을 재사용한다. 검증: `tests/platform-operations-events.test.cjs`의 현재 제목·오입력·소유권·동시 삭제·이벤트 롤백, `tests/platform-openapi.test.cjs`의 요청 계약.
+
+## 게시물 미공개 (2026-11-07)
+
+- 사용자 결정: 미공개 범위는 작성자만. 운영자 숨김(`hidden_at`)과 별도 상태이며 둘 중 하나라도 켜져 있으면 작성자 외에는 보이지 않는다. 크리에이터는 운영 숨김을 해제할 수 없다. 운영자는 콘솔에서 미공개도 켜고 끈다(사유 필수, 크리에이터 알림 없음). 처리 이력은 콘솔에서만 보인다.
+- 데이터: 기존 `postings.is_public`(기본 true)을 재사용한다. 신규 플랫폼 코드는 이미 `is_public=false`를 비공개로 취급하고 있었고(access·피드·프로필 목록·미디어·공유 이미지·조회수), 스튜디오 저장(`POST /studio/content`)은 이 칸을 쓰지 않는다. 레거시 런타임의 "링크로만 접근" 의미는 신규 런타임에서 쓰이지 않는다. 이력은 `moderation_actions`(target_type POST, action `post.unpublished`/`post.republished`, `actor_type` ADMIN/CREATOR, 크리에이터면 `admin_id`에 회원 ID, reason 빈 값)와 `platform_audit_logs`(`admin.post_unpublished`·`creator.post_republished` 등)를 같은 트랜잭션으로 기록한다.
+- 마이그레이션 `20261107120000_post_visibility`: `moderation_actions.actor_type VARCHAR(20) NOT NULL DEFAULT 'ADMIN'` 추가만. 기존 행은 ADMIN. 롤백 시 이전 API 이미지는 이 칸을 무시하므로 그대로 동작하며(삽입은 기본값), 칸 삭제는 크리에이터 이력 구분이 사라지므로 하지 않는다.
+- 작성자 외 차단 경로: 상세 `GET /posts/:id`(404, 작성자는 200), 피드 `/bootstrap`·`/posts`·작성자별 `/posts?creatorId=`(작성자 본인 프로필 목록 포함 제외), 저장·좋아요 컬렉션, 프로필 `postCount`, 댓글 목록·페이지·작성·수정·삭제·멘션 후보, 좋아요·저장, 게시물 콩 후원(403 POST_ACCESS_REQUIRED), 미디어 GET/HEAD/Range·CDN edge 승인(공용 파일이라도 제한 링크 하나로 거부), 공유 이미지(대체 이미지로 302), 조회수 기록, 팔로워 새 게시물 알림(미공개 중 발행되면 `notify_pending`으로 보류하고 다시 공개되면 워커가 1회 발송), 후원 내역 `postAvailable`. 검색은 크리에이터만 대상이고 사이트맵에는 게시물이 없다. 기존 알림 링크는 상세 404로 막힌다. 멤버십 구독자도 같은 규칙.
+- 미차단(의도): 신고 접수는 게시물 존재만 확인한다. 운영 콘솔 목록·스튜디오는 상태를 보여 준다.
+- 검증: `tests/platform-post-visibility.test.cjs`(격리 e2e DB, `--test-concurrency=1`).
+
