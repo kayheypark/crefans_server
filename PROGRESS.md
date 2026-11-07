@@ -3,8 +3,9 @@
 - origin/prod 72d3bac에서 feat/guide-advisor-live 분기 후 준비된 feat/guide-advisor bc66215 병합. 마이그레이션 없음. 현재 운영 api/worker bundle-20261107, 다른 서비스 보존.
 - 합격 조건: 실제 공급사 응답·공개 가이드 출처, 서버 키 비노출, 개인정보/Origin/요청량 회귀, PC/모바일 API 연결, 운영 health·기존 데이터 불변, 복구본 운영 밖 검증.
 - 실제 provider 예시 1건 HTTP200·completed(2.2초). 기본 gpt-6-luna. nest build 통과, 로컬 보안/API 45통과·1선택검사 skip. 명령 후 셸 종료코드 수집은 zsh 예약변수 status 사용으로 실패(검사 로그는 0실패), 다음 검사에서 별도 변수 사용.
-- 공개 활성화 전 질문: 외부 AI 전송 안내와 개인정보처리방침 반영 여부 사용자 답변 대기. API 질문·공개 문서만 전송, store:false; OpenAI 기본 남용 감시 최대30일은 완전 무보관과 다름.
+- 외부 전송 안내 반영 선호를 질문했으나 미응답. 원래 실제 AI 배포 지시의 필요한 사실 고지로 판단해 안내·처리방침 반영을 진행한다고 알렸다(별도 사업 정책/보관 설정 변경 없음). 처리방침 2026-11-07.advisor.1: 8·9조 참조, 15조 선택 AI 범위/비저장/수탁자·처리국가·보관·거부방법. 법률 검토 완료를 의미하지 않음. 공급사는 기본30일+법령/안전 예외, AI 미사용 시 기존 서비스 계속 이용 가능.
 - 후속 검증: 실제 공개 추천 질문4건 모두 provider HTTP200·completed. 충전 위치 검색 누락1건 발견 후 서버/가이드 어미 처리 보완, 실제 재호출에서 올바른 경로 확인. Express 대소문자/끝슬래시 동등 경로에도 Origin/CORS 경계 유지하도록 보완. 최신 로컬 회귀47통과·1선택검사 skip, 신규 보정2개 제거 대조 각 실패 후 복원.
+- 최종 로컬 회귀60통과·1선택검사 skip, API 키는 실 응답 검증 완료. 운영 밖 설정6개·가이드106개·이전 API 이미지 OCI index/전체 blob 해시 검증. 최초 이미지 검사는 config digest와 OCI image index digest 혼동으로 실패했으며 index 기반으로 바로잡고 전체 blob을 재검증했다.
 - 증거 .local/guide-advisor-live-20261107/. 현재 준비 중, 운영 교체 아직 없음.
 
 ## 2026-11-07 16:10 KST 가이드 AI 어드바이저 API — feat/guide-advisor (origin/prod 72d3bac 기준, 로컬 커밋만, push·배포 없음)
