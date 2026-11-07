@@ -1,8 +1,56 @@
+## 2026-11-07 11:10 KST 배포 묶음 통합 release/bundle-20261107 (로컬 커밋만, push·배포 없음)
+- 사용자 지시 "한번에 묶어". 작업트리 `/Users/ethan/repository/crefans_server-bundle`, origin/prod cfdfffb 에서 fix/payout-refund-gaps 4322ffd → fix/intermediary-receipt f214e10 → feat/disk-alert 423a2a4 → feat/post-unpublish 6e3f15a 순서로 --no-ff merge.
+- 충돌: PROGRESS.md(양쪽 기록 유지), tests/platform-openapi.test.cjs(출금 반려 +1, 게시물 공개 상태 +2 → 전체 208, user 86·studio 49·console 93). finance.service.ts·jobs.service.ts·openapi-contract.ts·platform-api.md·payment-lifecycle 테스트는 자동 병합, 결과 diff 검토(finalize 메일 연결과 환불 미수금·출금 반려가 서로 다른 지점). docs/current-contracts.md 는 프론트 `npm run docs:contracts`(CREFANS_SERVER_DIR=이 작업트리)로 재생성: 새 라우트 3·migration 1·schema 주석·test:operations·DISK_ALERT 환경 키.
+- 검증(10:57~11:03 KST, 작업트리 전용 node_modules 복제+prisma generate, 공유 client 해시 불변): tsc 0, nest build 0. 40개 테스트 파일 파일별 순차(--test-concurrency=1, 3307 dev/e2e DB): 통합본 387 통과·25 실패, origin/prod 기준선 368·25, 실패 이름 목록 동일(finance 수요일 1·provider-http 1·audit watchdog 2·feed-category 1·platform.integration/access 서버 미기동). 서버 기동형 2개는 메일·텔레그램 설정을 비운 로컬 API(3091 통합본/3092 기준선)로 재실행: platform.integration 11/2·access 0/6 양쪽 동일, post-view-metrics(E2E DB) 7/7 양쪽. 신규: disk-alert 5/5, post-visibility 5/5, beans 42(+3), manual-payouts 7(+2), payment-lifecycle 69(+2), mail-templates 26(+2), openapi 14/14(208).
+- 남은 일: dev/prod 통합·push, 운영 배포(계획 `.local/bundle-deploy-20261107/plan.md`, 사용자 승인 필요). 실제 SMTP·텔레그램·은행 미검증.
+
+## 2026-11-07 운영 디스크 사용률 텔레그램 알림 — 구현·로컬 검증 (미배포)
+- 사용자 결정(2026-11-07): "EBS 50GB 유지 + 80% 경보". 기존에는 서버 crontab·timer·`scripts/platform-external-monitor.cjs` 어디에도 디스크 검사가 없었다. 브랜치 feat/disk-alert(origin/prod cfdfffb 기준, 작업트리 crefans_server-disk-alert, 작업트리 전용 node_modules `cp -c` 복제 후 prisma generate — 공유 node_modules의 .prisma·@prisma/client 해시 전후 동일).
+- 방식 근거(운영 읽기 전용 확인 2026-11-07 00:49 UTC, `sudo -n docker exec/inspect`·`df`만): 호스트 `/`=/dev/nvme0n1p1 ext4 50,884,108,288B 33%, Docker data-root=/var/lib/docker(같은 루트). crefans-beta-worker-1 안 `df /`(overlay)와 `/data/media`(named volume crefans-beta_media, 소스 /var/lib/docker/volumes/...)가 호스트와 같은 크기·사용량, node `statfsSync` 블록 수 12,422,878/bfree 8,402,050/bavail 8,397,954 동일. 따라서 compose 변경·추가 마운트 없이 worker가 `/`를 statfs. data-root를 다른 디스크로 옮길 때만 호스트 `/` 읽기 전용 마운트+`DISK_ALERT_PATH` 필요.
+- 구현: `src/platform/disk-alert.ts`(df Use% 기준 계산, 기본 80/90, `DISK_ALERT_*` 환경변수, 상태는 platform_jobs `disk-alert`), worker.ts 10분 주기(`DISK_ALERT_INTERVAL_MINUTES`), 기존 operations outbox(`record`)→`[crefans] operations` Telegram. 단계별 24시간 1회, 90% 도달은 즉시 별도 단계, 경고 미만 회복 시 1회(알림을 보낸 뒤에만). outbox 저장 실패 시 상태를 갱신하지 않고 다음 검사에서 같은 dedupe 키로 재시도. 문구: 사용률·여유·전체(GiB 기준, "GB" 표기)·기준·검사시각. 감사 원장 category worker, 경고/위험 level warning. 회복 후 24시간 안 같은 단계 재진입은 재알림하지 않음(규칙 그대로, 90%는 별도).
+- 검증(2026-11-07 09:52~09:54 KST, 로컬 3307 crefans_platform_dev, CREFANS_E2E=true, --test-concurrency=1, HEAD cfdfffb+미커밋): nest build 0, tsc 오류 0(기준선 0). `tests/platform-disk-alert.test.cjs` 5/5. `npm run test:operations`(신규 포함) 54 통과·0 실패·1 skip(기존 선택 MySQL). audit·audit-export·external-monitor·log-config·jobs 14 통과·2 실패 — platform-audit의 watchdog 2건은 origin/prod 원본 빌드에서도 같은 2건 실패(테스트 가짜 DB에 mediaWatermarkJob 없음, 기존 문제).
+- 대조(소스 변형→빌드→실행→원복, SHA 8580dcb2… 원복 확인 후 5/5): 비교 반전(>=→<) 3실패, 경계(>=→>) 1실패, 하루 1회 제한 제거 1실패, 회복 알림 제거 1실패.
+- 미실행: 실제 Telegram 발송, 운영 배포, 운영 컨테이너에서 새 코드 실행. 배포 시 worker 이미지만 교체하면 되며(마이그레이션 없음) 환경변수는 기본값이면 추가 불필요. 문서: infra/platform/README.md 디스크 절, resilience-runbook.md 3절, runtime.env.example.
+## 2026-11-07 10:44~10:50 KST 로컬 dev DB 마이그레이션 적용 후 기존 미공개 회귀 재검사 (사용자 승인 "적용하고 재검사")
+- 사용자 결정: 운영 is_public=false 건수 확인 없이 진행 / 미공개 글은 작성자 본인 프로필 목록에서도 제외(현행) / 미공개로 처음 발행한 글은 첫 공개 때 팔로워 알림 1회(현행).
+- dev DB(127.0.0.1:3307 crefans_platform_dev) 백업: crefans_server/.local/devdb-backup-20261107/crefans_platform_dev.sql.gz(CREATE TABLE 88·INSERT 30, gzip -t OK, SHA256SUMS; PROCESS 권한 없음 경고는 테이블스페이스만). `prisma migrate deploy` 9건(20261103010000~20261107120000) 적용 → up to date.
+- 브랜치 dist 를 dev:platform 진입점(dist/src/platform/main.js, PORT 3091)으로, origin/prod cfdfffb 기준선을 3092 로 띄워 같은 DB 에서 비교:
+  - platform.integration: 브랜치 11/2 실패 = 기준선 11/2 실패(9 프로필 핸들·댓글, 11 디렉터리 검색) 동일.
+  - platform-access.integration: 브랜치 0/6 = 기준선 0/6 동일. 원인은 준비 단계 POST /media 가 로컬에서 400 → 미공개·권한 단언까지 도달하지 못함(**기존 미공개 접근 회귀는 여전히 미검증**).
+  - post-view-metrics(E2E DB): 7/7 통과. media-cloud: 실 AWS opt-in 필요로 미실행.
+  - platform-post-visibility(신규): 5/5.
+- 남은 일: 로컬 POST /media 400 원인(미디어 처리 환경) 해결 후 platform-access 재검사.
+
+## 2026-11-07 게시물 미공개(작성자만) — feat/post-unpublish (미배포)
+- 사용자 결정(2026-11-07): 미공개=작성자만(피드·프로필·검색·링크·구독자 모두 차단, 상호작용 차단, 재공개 시 그대로 복귀). 운영 숨김(hidden_at)과 별도, 크리에이터는 운영 숨김 해제 불가. 운영자 전환은 사유 필수·알림 없음. 이력은 콘솔에서만.
+- 데이터: 기존 `postings.is_public` 재사용(신규 런타임 access/피드/프로필/미디어/공유이미지/조회수가 이미 false=비공개로 처리, 스튜디오 저장은 미사용). 로컬 dev DB에 is_public=0 13행(전부 2026-11-02 테스트 픽스처 제목, PUBLISHED). 운영 DB 분포는 미확인(접근 금지) — 레거시 '링크 전용' 행이 있으면 지금도 비공개로 동작 중이며 이번 변경 후 스튜디오에 '미공개'로 표시되고 크리에이터가 공개 전환 가능.
+- 마이그레이션 20261107120000_post_visibility: moderation_actions.actor_type VARCHAR(20) NOT NULL DEFAULT 'ADMIN'만 추가. 이전 이미지 롤백 호환(칸 무시).
+- API: PUT /studio/content/:id/visibility {public}, POST /admin/posts/:id/visibility {public,reason}(content.update), GET /admin/posts/:id/moderation 에 actorType/actorId/actorName 추가. 공통 로직 `src/platform/post-visibility.ts`. 스튜디오 contents에 `unpublished:true`.
+- 차단 경로 보강: 상세 404(작성자 200), 저장/좋아요 컬렉션, 프로필 postCount, 팔로워 알림 보류(announcePost·releaseHeldNotices), 후원내역 postAvailable. 기존부터 차단: access(댓글·좋아요·저장·멘션·후원), 피드·작성자 목록, 미디어/edge, 공유 이미지, 조회수. 전체 목록은 docs/platform-api.md '게시물 미공개' 절.
+- 검증(2026-11-07 10:33 KST, 워크트리 전용 node_modules 복제+prisma generate, 공유 client 해시 불변): nest build 성공. `tests/platform-post-visibility.test.cjs` 5/5(격리 e2e DB, --test-concurrency=1). 대조: access의 is_public 검사+상세 필터 제거 시 2건 실패, 알림 보류+저장 컬렉션 필터 제거 시 3건 실패 → 복원 후 5/5. OpenAPI 14/14(207 ops, studio 49, console 92). 관련 17파일 회귀: 브랜치와 origin/prod(cfdfffb) 통과/실패 목록 동일(access.integration·media-cloud·post-view-metrics·feed-category·billing-recovery 일부·platform.integration은 dev DB에 founding_badge_visible 미적용으로 양쪽 모두 실패 — 무관하나 미공개 관련 기존 회귀(access.integration 5번 등)는 이번에 실행 결과 없음).
+- 남은 일: dev→prod 통합, 운영 migrate deploy 후 API·worker 교체(서버 먼저, 콘솔·프론트 다음).
+
 ## 2026-11-07 게시물 직접 입력 삭제 운영 배포 완료
 - origin/prod 6a36c19 → feat 4e45518 → dev dcc05a4 → prod 072368e. front ae908b0와 studio-post-confirm-20261107 배포. POST /studio/content/:id/delete는 confirmation에 현재 제목과 정확히 같은 값을 요구한다. 제목 편집과 동일 행 잠금 아래 소유권·제목 확인, soft delete와 운영 이벤트를 원자적으로 처리. 누락/오입력400, 소유권/삭제된 글404. 마이그레이션 없음.
 - Nest 빌드, OpenAPI14, 격리DB operations15 통과. 오입력·공백·잘못된 자료형·다른 회원·이전 제목·동시 삭제1건·outbox 실패 롤백 확인. 검사 제거 대조 실패/원복 통과. 최초 공용 DB 점유 실패 후 원래 테스트 재실행 성공; 독립DB 어댑터는 fixture guard 거절로 검증 아님.
 - 현재 운영 소스256개 기준 prod 일치, 컴파일 JS195개 중 요청 세 모듈만 차이 확인 후 offline overlay image 생성. 이미지 소스/JS/map/type12개 SHA 확인. frontend 먼저 교체, API/worker 후교체. 운영 health200·인증 없는 삭제401, 기존 runtime 환경값(APP_RELEASE 제외) 동일, 6컨테이너 정상·worker 실패0. 실제 회원 게시물 삭제는 수행하지 않음.
 - 복구 이미지/설정은 /Users/ethan/crefans-recovery/20261107/studio-post-confirm에 digest/SHA 검증 후 운영의 미사용 직전 태그와 이번 임시 소스 정리. 증거 docs/studio-post-confirm-deployment-20261107.json; front .local/studio-post-card-confirm. 소스/API/정책 계약은 docs/platform-api.md. AGENTS.md 기존 규약 유지.
+
+## 2026-11-07 멤버십 결제 완료 메일 발송 연결 (fix/intermediary-receipt, 미배포)
+- 사용자 결정(2026-11-07): `payment-completed` 메일을 멤버십 첫 결제 승인과 자동 갱신 결제 성공 때 회원에게 보낸다. 기존 notifyMember/member-notices outbox 재사용, 판매자=크리에이터 표시 이름, 중개자 고지 포함, 결제 1건당 1회.
+- 발송 지점: `finance.service.ts` finalize(첫 결제·갱신·한 달 결제가 모두 지나는 유일한 paid 전환, 같은 트랜잭션) → `membership-notices.ts` `noticePaymentCompleted` → `notifyMember`(dedupe `payment-completed:{orderId}`) → 워커 `MemberNoticesService.deliver` 가 SMTP 발송. 줄: 판매자·멤버십·결제 금액·결제 시각·이용 기간·다음 결제일(한 달 결제·해지 예약은 '없음').
+- 알림센터 중복 정리: finalize 가 따로 만들던 '멤버십 가입/갱신이 완료되었습니다' 알림 생성을 notifyMember 의 알림 1건으로 대체(같은 문구·type subscription·actor 크리에이터). 결제 1건당 알림 1건 + 메일 1건.
+- 템플릿: 판매자는 별도 인자 대신 '판매자' 줄로 받는다(outbox rows 그대로 렌더). '판매자' 줄이 없거나 비면 payment-completed 메일 생성 거부. 크리에이터 display_name 이 없으면 기존 알림과 같은 대체값 '크리에이터'.
+- 검증(2026-11-07 로컬, 격리 E2E DB): 공유 node_modules Prisma 클라이언트가 옛 스키마라 이 워크트리에 node_modules 를 APFS 복제(cp -c)하고 워크트리 안에서만 prisma generate(공유 node_modules 무변경, 공유 client cancel_reason 0건 확인). 그 상태로 nest build 오류 0. payment-lifecycle 68/68(신규 1: 첫 결제·갱신 각 메일 1건·알림 1건, 재호출 무중복, 판매자 줄, 렌더에 고지). 대조 3건(발송 호출 제거, 기존 알림+발송 중복, 판매자 줄 제거) 각 1 fail 후 원복(SHA 동일) 통과. mail-templates 26/26, 템플릿 대조 3건(고지 제거·12px·판매자 검사 제거) 각 1 fail. 메일·인증·관리 콘솔·billing-recovery·openapi 묶음 125 중 43 실패 — 로컬 dev DB(3307 crefans_platform_dev)에 founding_badge 컬럼이 없어 생기는 환경 문제이며 origin/prod 코드 기준선 123 중 43 실패와 이름 동일.
+- 배포 시 영향: api·worker 이미지. 배포 후 모든 멤버십 결제·갱신 성공마다 회원 메일 1통 발송(실제 SMTP). 마이그레이션 없음(member_notices 기존 테이블). 배포 전 이미 paid 인 주문에는 소급 발송 없음.
+- 미실행: 실제 SMTP 발송·받은편지함 확인, 운영 배포. origin/prod 는 이 브랜치 분기(3ea2cfe) 이후 6a36c19 로 앞서 있어 배포 때 합쳐야 함.
+
+## 2026-11-07 멤버십 결제 메일 템플릿에 판매자·통신판매중개자 고지 (fix/intermediary-receipt, 미배포)
+- 사용자 결정(2026-11-07): 결제 완료 메일·영수증에도 통신판매중개자 고지를 넣는다(배포는 별도 승인). 근거 전자상거래법 시행규칙 제11조의2 — 청약 절차와 계약내용 서면에도 당사자가 아님을 알리고, 계약 당사자(판매자) 표시와 같거나 더 큰 글씨로 표시.
+- 변경: `src/auth/local/mail/templates.ts` `intermediaryNotice`(약관 제1조·프론트 lib/content/business.ts 와 같은 문장), `noticeMail(..., seller)` — `payment-completed` 는 판매자(크리에이터 표시 이름) 없으면 거부, 표 첫 줄 '판매자'와 고지 문단 모두 13px, 텍스트 본문에도 포함. 다른 알림(콩·출금·계정 등)에는 넣지 않음(콩은 직접 판매).
+- 중요: `payment-completed` 메일은 템플릿만 있고 실제 발송 연결이 없다(PROGRESS 2026-10 기록과 동일, 이번에도 연결하지 않음). 따라서 이번 변경만으로 회원이 받는 메일은 바뀌지 않는다. 발송 연결 여부는 사용자 결정 필요.
+- 검증(2026-11-07 로컬): tests/mail-templates 26/26(신규 2: 판매자·고지 문구·글씨 크기 고지≥판매자·판매자 누락 거부, 비멤버십 알림 미포함). 대조 3건(고지 제거, 고지 12px, 판매자 필수 제거) 각각 1 fail 후 원복(SHA 동일) 26/26. test:mail 묶음(빌드 단계 제외, 로컬 3307 dev DB) 65 중 59 통과·6 실패, origin/prod 3ea2cfe 기준선 63 중 57·6 실패와 실패 이름 동일(기존 문제). nest build TS 오류 34건, 기준선 34건과 위치 목록 완전 동일(신규 0), dist 생성. 렌더 PNG(예시 데이터, computed font-size 고지 13px=판매자 13px)는 작업 세션 스크래치에만 있음.
+- 미실행: 실제 SMTP 발송·수신 확인, 운영 배포.
 
 ## 2026-11-07 09:03 KST 운영 배포 promo-terms-20261107 — /ask-me 결정 4건 + 약관 11조 프로모션콩 출금 범위 명확화 (완료)
 - 결정: ① 스튜디오 통계 요약 시안(A~E) **보류** ② 오픈 일정(약관 2조 "2026년 11월까지" 초대제·12월 오픈 vs 본인확인 미연동) **이번엔 보류** — 11월 말 재결정 필요 ③ 친구 초대 링크 가입(서버 허용, 약관 2조는 초대 이메일만) **현행 유지** ④ 프로모션콩 출금 충돌 **코드 기준으로 문구만 정리**.
@@ -12,6 +60,27 @@
 - 동반: 가이드 fix/promo-bean-wording 6565387(가이드 4곳·소개서 PDF). 프론트 `creator-payout-policy.ts:27-29`·`events.ts` 는 이미 코드와 일치해 수정 없음.
 - 배포(사용자 승인 "둘 다 배포", 공지 문구 추가 없음): api·worker crefans-api:promo-terms-20261107, 09:03:23~55 KST 종료0. 기록 `.local/promo-terms-deploy-20261107/deployment.md`. 공개 약관 API v2026-11-06.4 확인. 가이드 09:05 동반 배포.
 - 같은 날 이어서 결정: 결제 완료 메일·영수증 중개자 고지 추가, 출금·환불 공백(processing 차지백·음수 출금 반려·원장 대사) 코드 수정, 복구 저장소 보관 규칙(이미지 직전 3회+7일, 나머지 30일, 삭제 전 목록 승인) — 각각 진행 중/미배포.
+## 2026-11-07 10:00 KST 콩 수동 반려 사유 길이 (fix/payout-refund-gaps, 배포 보류)
+- 사용자 결정(2026-11-07): 콩 수동 결과 기록 사유를 접두어 포함 저장 칸에 맞춤. bean_payouts.note VARCHAR(500) − '수동 이체 반려 · '(11자) = 사유 489자(서버 검증·OpenAPI·platform-api.md). 콘솔 입력칸은 crefans_admin fix/withdrawal-reject.
+- 실제 재현(옛 한도 500, 490자 사유): Prisma P2000 'value too long … Column: note'. 원장 반영(finishPayout)이 먼저 커밋돼 **상태는 rejected, note는 '은행 반려', 감사 기록 0건으로 반쯤 적용**된 채 오류. 수정 후에는 입력 단계에서 400 INVALID_INPUT, 아무것도 적용되지 않음.
+- 검증(09:52~ KST): 테스트 추가(490자 거절·상태 processing 유지, 489자 반려·note 500자·감사 1건). 대조: 한도 500 원복 → 1 실패. tsc 0, 관련 9파일 167/167(09:53 KST).
+
+## 2026-11-07 09:40 KST 후속: 콘솔 반려 표시·수동 반려 사유 길이·콩 차지백 경고 (fix/payout-refund-gaps, 배포 보류)
+- 사용자 결정(2026-11-07): 서버 배포 보류. ③ 멤버십 미수금 금액은 **현행 유지**(부족액 전체 기록, 반려 시 receivables 워커가 자동 정산) — 코드 변경 없음.
+- 011efbd: GET /admin/withdrawals 항목에 `rejectable`(requested+출금 가능액 음수, rejectWithdrawal과 같은 조건). 멤버십 수동 결과 반려 사유 500→180자('수동 이체 반려 · ' 11자 포함 note VARCHAR(191)). 이전에는 181자 이상이 DB 길이 초과로 INTERNAL_ERROR(대조에서 확인).
+- cf097d6: GET /admin/beans/overview 출금마다 `chargebackHold`(requested/processing+출처 lot frozen). 콘솔 짝: crefans_admin fix/withdrawal-reject 6a2052d.
+- 검증(09:20~09:34 KST): tsc 0, 관련 9파일 166/166. 대조: 사유 한도 500 원복 → 1 실패(181자 INTERNAL_ERROR), rejectable 항상 false → 1 실패, chargebackHold 항상 false → 1 실패, 상태 조건 제거 → 지급 완료 후 경고 남음 1 실패(+후속 연쇄 2).
+- 미결: 콩 수동 결과 기록도 같은 문제 가능(bean_payouts.note VARCHAR(500) vs 사유 500자+접두어) — 사용자 확인 필요, 미수정.
+
+## 2026-11-07 09:20 KST 금전 흐름 공백 3건 수정 — 브랜치 fix/payout-refund-gaps (커밋만, push·배포 없음)
+- 계기: night-work `crefans_front/.local/night-work/2026-11-06-1908.md` 589~625행, 사용자 2026-11-07 '실결제 전 코드 수정 + 대사 경보' 선택. 작업트리 `/Users/ethan/repository/crefans_server-payout-gaps`(origin/prod 8e86611 기준), 코드 커밋 e40f34d. 마이그레이션 없음.
+- ① 콩 처리 중 출금+차지백: 결정 = 이체 진행 중(processing)은 막지 않고 **지급 후 미수금**. 근거: 약관 6조(legal-documents.ts, '이미 출금된 수익에 취소·차지백 → 미수금 기록·이후 정산 차감·알림, 미수금 있으면 출금 제한'), 계약서 초안 9조③(확정 부담액만 정산), 기존 rejectPayout이 처리 중 반려를 금지(은행 결과 불명)하는 의도. `finishPayout`이 paid로 끝날 때 동결 lot 출처분을 지급 단가로 미수금(source `충전ID:출금ID`, 기존 recordReceivables 재사용)·알림. 반려로 끝나면 동결 lot으로 돌아갈 뿐 미수금 없음. freezeCharge와 finishPayout은 회사 지갑 잠금으로 직렬화.
+- ② 멤버십 출금 신청 뒤 환불로 잔액 음수: `POST /admin/withdrawals/:id/reject`(revenue.create, 사유 150자 — note 컬럼 191자 한도) 추가. requested이고 출금 가능액<0일 때만(처리 중 409 WITHDRAWAL_NOT_REQUESTED, 잔액 충분 409 WITHDRAWAL_NOT_BLOCKED). 반려 시 크리에이터 알림·감사 withdrawal.rejected, 금액은 다시 출금 가능액에 포함, 미수금은 기존 receivables 작업이 자동 정산. 환불 알림은 부족액 중 'paid 출금' 몫만 '이미 지급된 수익'으로, 미지급 신청 몫은 '출금 신청 금액 초과·운영 확인'으로 안내. 미수금 행 금액은 기존대로 부족액 전체(탈퇴 차단·자동 정산 의미 유지).
+- ③ 원장 대사: `BeansService.reconcileLedger`(계정=분개 합, 이동 합=0, 회원 버킷=lot 합; 각 한 SQL 문) + `PlatformJobsService.reconcileBeanLedger`(KST 하루 1회 `beans-ledger-YYYY-MM-DD`, 불일치 시 `operations.record('beans.ledger_mismatch')` 건수만·하루 1회 → 기존 텔레그램 outbox). bean_lots(unicode_ci)와 원장 테이블(DB 기본) 콜레이션이 달라 BINARY 비교.
+- 검증(2026-11-07 KST, 로컬 3307 crefans_platform_e2e, 공급사 대역): 작업트리 전용 Prisma 클라이언트(공유 node_modules 해시 불변 확인) 생성 후 tsc 오류 기준선 0 → 변경 후 0. 기준선(origin/prod) 9파일 161/161. 변경 후 `npm run test:beans` 60/60, 나머지 6파일 104/104. 넓은 22파일: 변경 후 226 통과·52 실패, origin/prod도 52 실패로 목록 동일(platform-access 등이 dev DB 미적용 컬럼 founding_badge_visible로 실패, 무관).
+- 대조(수정만 끄고 같은 테스트): ① 미수금 기록 끔 → 1 실패. ② 알림 문구 원복 → 1 실패, 잔액 조건 제거 → 1 실패, origin/prod finance.service → 1 실패. ③ 계정·lot·이동 검사 각각 끔 → 각 1 실패, 경보 기록 끔 → 1 실패.
+- 문서: platform-api.md(새 API·미수금·대사), OpenAPI 205→206·콘솔 91→92. 프론트 check:docs(CREFANS_SERVER_DIR=작업트리)는 기준선과 같은 2건(backup-alerts README 미검토, docs:contracts 재생성 필요)으로 실패 — 프론트 쪽 갱신은 범위 밖.
+- 미결/주의: 공유 e2e DB에 다른 스위트의 직접 lot 수정 잔재로 불일치 55건(전부 Referral fixture)이 있어 테스트는 이 스위트 지갑만 판정. 운영 DB 상태는 조회하지 않아 첫 실행 경보 여부 미확인(과거 코드·수동 수정 잔재가 있으면 첫날 경보). 콘솔 반려 버튼(crefans_admin) 미구현. 실제 은행·PG·텔레그램 발송 미검증.
 
 ## 2026-11-06 23:27 KST 운영 배포 refund-notices-20261106 — 콘솔 환불 후 종료·멤버십 알림·법정 표시 (완료)
 - 결정(/pilot-work, 사용자): 법정 표시는 하단+멤버십 결제 확인창에 넣고 배포(호스팅 상호 = AWS 청구서 법인명 Amazon Web Services Korea LLC, 사용자 확인). 멤버십 환불은 콘솔 운영자 도구, 전액만+구독 즉시 종료, 검사 통과 시 배포. 해지·환불 알림은 회원 알림센터+메일, 크리에이터는 환불만. 보안 2건(로그인 해시 DoS·OTP 자가 등록)은 현행 유지. 가이드는 약관에 맞춰 수정·배포(별도 작업, crefans_guide).

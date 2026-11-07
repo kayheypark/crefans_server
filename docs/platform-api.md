@@ -115,6 +115,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | PUT | /studio/comments-setting | enabled; 게시물 설정보다 우선 |
 | POST | /studio/content | id?, title/body/media/commentsEnabled/accessPlanId/status/scheduledAt |
 | POST | /studio/content/:id/delete | `confirmation`에 현재 제목 정확 입력 필수. 게시물 잠금·소유권 검사 후 soft delete·운영 이벤트를 같은 트랜잭션으로 처리 |
+| PUT | /studio/content/:id/visibility | `{public:boolean}`. 본인 게시물 공개·미공개 전환(사유 없음, 2026-11-07). 아래 '게시물 미공개' 절 참고 |
 | POST | /studio/memberships | id?, name/price/benefits/image; price는 1~1,100,000원(2026-11-06 토스 신고 단건 최고가, finance.service createOrder도 같은 상한), immutable version 생성 |
 | PUT | /studio/memberships/:id | active 또는 deleted; 삭제는 confirmation에 현재 멤버십 이름 정확히 입력 필수, 잠금 후 이름·소유자·삭제 여부·유효 구독 재확인 |
 | PUT | /studio/comments/:id | hidden, 본인 게시물만 |
@@ -190,7 +191,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /admin/subscriptions | 매출·정산 조회 권한, 조회 전용(2026-11-06). 구독 20개 page(생성일 최신순). status=ONGOING(자동 갱신)·CANCELLED(해지 예약, endedAt까지 이용)·EXPIRED, membershipId, search=구독자 ID·활동명·크리에이터 이름·핸들. 구독자는 ID·활동명·탈퇴 여부만, 이메일·빌링키·카드 ID·상품 snapshot 제외. summary는 같은 조건의 전체 집계 |
 | POST | /admin/subscriptions/:id/cancel-now | 활성 SUPER_ADMIN 전용(2026-11-06). 이용 종료 시각을 지금으로 당기고 상태를 EXPIRED로 바꿔 접근을 즉시 차단한다. 환불·결제 취소는 하지 않으며 결제사 API를 호출하지 않는다. 사유(500자) 필수이며 구독 행과 감사 로그에 남는다. 이미 종료된 구독은 409 |
 | POST | /admin/subscriptions/:id/refund | 활성 SUPER_ADMIN 전용(2026-11-06 사용자 결정). 구독의 가장 최근 paid 결제를 결제사 취소 API로 **전액** 환불(부분 환불 없음)하고 구독을 즉시 종료(EXPIRED)한다. 회원 셀프 환불의 7일·미이용 조건은 적용하지 않는다. 콘솔에서 입력한 금액 표기 `confirmation`(예: "12,000원")이 대상 결제 금액과 다르면 400 CONFIRMATION_REQUIRED. 결제사에 보내는 취소 사유는 고정 문구 '운영자 환불'이며 운영자 사유(500자, 필수)는 구독 행에만 저장되고 감사 로그(`admin.subscription.refunded`)에는 자유 문구 없이 남는다. 환불할 결제가 없으면 409 NO_REFUNDABLE_PAYMENT, 처리 중 결제가 있으면 409 PAYMENT_IN_PROGRESS. 수익 차감·미수금·추천 보상 회수는 회원 환불과 같은 `completeRefund` 경로를 쓴다 |
-| GET | /admin/withdrawals | 매출·정산 조회 권한; 전체 출금신청20개 page, 계좌/지급 자격정보 제외 |
+| GET | /admin/withdrawals | 매출·정산 조회 권한; 전체 출금신청20개 page, 계좌/지급 자격정보 제외. 항목마다 `rejectable`(2026-11-07): requested이고 크리에이터 출금 가능액이 음수라 반려 API가 받아들일 건만 true |
 | GET | /admin/inquiries | 문의 조회 |
 | POST | /admin/inquiries/:id/reply | 문의 답변 |
 | GET | /admin/reports | 신고 조회. 댓글 신고는 `comment:{content,posting_id,author_id,hidden,is_deleted}` 포함 |
@@ -199,10 +200,11 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /admin/documents | 공지·FAQ 등록·수정. 코드 관리 법률문서 변경 거부 |
 | POST | /admin/marketing/campaigns | 활성 SUPER_ADMIN; campaignId/subject/body/memberIds(최대100), 현재 증빙 동의자만 중복 없는 광고 대기열 등록. 법률문서 발행·서명키 필요 |
 | POST | /admin/revenue/:id/receipt | 매출·정산 생성 권한; reference/reason/amount/receivedAt, 실제 결제의 PG 입금 대사·감사 기록. 테스트 결제/중복 정정 거부 |
-| POST | /admin/withdrawals/:id/manual-result | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 출금 검사(수요일·잔액·확인 계좌)로 처리 중 전환 후, 운영자가 직접 이체한 결과(paid: 참조번호·이체 시각, rejected: 사유)를 한 번만 기록. 감사 `withdrawal.manual_result`. 은행 API 호출 없음 |
+| POST | /admin/withdrawals/:id/manual-result | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 출금 검사(수요일·잔액·확인 계좌)로 처리 중 전환 후, 운영자가 직접 이체한 결과(paid: 참조번호·이체 시각, rejected: 사유 180자 — 접두어 포함 note 191자, 2026-11-07)를 한 번만 기록. 감사 `withdrawal.manual_result`. 은행 API 호출 없음 |
+| POST | /admin/withdrawals/:id/reject | 매출·정산 생성 권한(2026-11-07). 신청 뒤 환불로 출금 가능 잔액이 음수가 되어 `PAYOUT_BALANCE_CHANGED`로 멈춘 접수(requested) 출금만 사유(150자)와 함께 반려. 처리 중이면 409 `WITHDRAWAL_NOT_REQUESTED`, 잔액이 충분하면 409 `WITHDRAWAL_NOT_BLOCKED`. 반려 금액은 다시 출금 가능액에 포함되고 크리에이터 알림·감사 `withdrawal.rejected`를 남김. 은행 API 호출 없음 |
 | GET | /admin/settlement-accounts | 매출·정산 조회 권한. 수동 지급 모드에서 예금주 확인 대기 계좌(은행·예금주 표시명·끝 4자리, 최대 100건). 전체 계좌번호는 반환하지 않음 |
 | POST | /admin/settlement-accounts/:id/verify | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 통장 사본 등으로 예금주 확인 후 expectedVersion·확인 내용으로 기록, 이미 확인·버전 불일치는 409. 감사 `account.manual_verified` |
-| POST | /admin/beans/withdrawals/:id/manual-result | SUPER_ADMIN(2026-11-02), `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
+| POST | /admin/beans/withdrawals/:id/manual-result | SUPER_ADMIN(2026-11-02), `MANUAL_PAYOUTS_ENABLED`일 때만. 반려 사유 489자(접두어 포함 note 500자, 2026-11-07). 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
 | GET | /admin/financial-policy | 운영 설정 조회 권한; 현재 DB 수수료율/정산 보류·version 조회 |
 | PUT | /admin/financial-policy | 운영 설정 수정 권한; expectedVersion/platformFeeBps/settlementHoldDays/reason와 confirmation='정책 변경'(정확히 일치, 아니면 400 CONFIRMATION_REQUIRED), 충돌409·감사 기록 원자 반영 |
 | GET | /admin/financial-policy/history | 운영 설정 조회 권한; 최근 정책 변경100건 |
@@ -381,7 +383,7 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | POST | /studio/bean-withdrawal-quotes | quantity>=1000·accountId 본인 검증계좌·live입금 출처, 총액/20%/실지급 견적. 열린 콩 미수금이 있으면 409 RECEIVABLE_OPEN(멤버십 미수금은 콩 출금을 막지 않음, 2026-10-30). closing:true면 탈퇴 준비 조건 충족 시 출금 가능 전량을 최소 수량 미만이라도 신청(CLOSING_WITHDRAWAL_ALL·EARNINGS_PENDING) |
 | POST | /studio/bean-withdrawals/verify | quantity/accountId/pin, 기존 PIN 해시와5회/30초 제한 재사용, 2분 수량·계좌버전 인증 |
 | POST | /studio/bean-withdrawals | quantity/accountId/authorizationId/requestId, 받은 일반콩 가용 lot를 원자 예약, 중복/경합 방지 |
-| GET | /admin/beans/overview | 활성 ADMIN/SUPER_ADMIN만 회사재고/충전·후원·출금/부채·환경별 집계, page |
+| GET | /admin/beans/overview | 활성 ADMIN/SUPER_ADMIN만 회사재고/충전·후원·출금/부채·환경별 집계, page. 출금마다 `chargebackHold`(2026-11-07): requested/processing이면서 출처 lot이 차지백으로 동결된 건 true — 콘솔이 '차지백 발생 · 이체 전 확인' 경고를 표시 |
 | GET | /admin/beans/wallets/:id | SUPER_ADMIN 본인 업무로 회원 지갑·원장·최근100 출처 lot/충전·배분 추적, page |
 | POST | /admin/beans/promotions | SUPER_ADMIN, 1회·KST 하루 운영자 합계 10,000콩 이하(친구 초대 자동 보상 제외, 2026-11-02), memberId/quantity/reason/requestId, 회사재고→프로모션, 중복 지급 방지·사유 기록 |
 | POST | /admin/beans/charges/:id/receipt | SUPER_ADMIN, amount/reference/receivedAt/reason, live 승인된 원주문 실제입금 대사·불변 기록/감사 |
@@ -409,7 +411,8 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 
 - 환불: 충전 후 7일 이내 미사용 충전콩 전액, 이후 10% 공제(회사 귀책은 운영자가 면제). 사용분·프로모션콩·만료분 제외. 원결제 부분취소(토스 cancelAmount, 공식 문서 docs.tosspayments.com/guides/v2/cancel-payment 2026-10-30 확인 — 카드 부분취소 환불은 영업일 3~4일).
 - 유효기간: 충전콩은 결제일, 일반 프로모션콩은 지급일부터 1년(2026-11-06 토스 심사 신고값에 맞춰 5년에서 단축, 약관 제11조 2026-12-06 시행)(공개100콩 이벤트는 수령 시점부터30일)(`bean_lots.expires_at`, 기존 lot은 마이그레이션 `20261030200000_pilot_followups`에서 채움). 만료 30일 전 1회 앱 알림+메일(type bean-expiry). 공개100콩 이벤트 lot만 만료 7일 전 1회 이벤트 전용 알림+메일(type event-bean-expiry, 환불 안내 없음, 2026-11-03). 수령 직후 30일 기준으로 먼저 나간 안내는 마이그레이션 `20261103140000_event_bean_expiry_renotice`가 안내 기록만 비워 7일 전에 한 번 더 보낸다, 만료 시 남은 수량을 회사 `expired` 계정으로 이동. 만료 lot은 후원·지갑 사용 가능액에서 제외.
-- 미수금(`creator_receivables`): 멤버십은 환불 완료 때 가용잔액이 음수가 되면 min(해당 결제 net, 부족액)을 기록하고 작업(`receivables`)이 이후 수익으로 0 이상이 되면 자동 정산. 콩은 차지백(freezeCharge) 때 이미 paid 지급에 쓰인 출처를 지급 단가(net/quantity)로 환산해 기록, 운영자 정산 전까지 콩 출금 차단. 둘 다 크리에이터에게 정산 알림.
+- 미수금(`creator_receivables`): 멤버십은 환불 완료 때 가용잔액이 음수가 되면 min(해당 결제 net, 부족액)을 기록하고 작업(`receivables`)이 이후 수익으로 0 이상이 되면 자동 정산. 콩은 차지백(freezeCharge) 때 이미 paid 지급에 쓰인 출처를 지급 단가(net/quantity)로 환산해 기록, 운영자 정산 전까지 콩 출금 차단. 둘 다 크리에이터에게 정산 알림. (2026-11-07) 차지백 때 은행·수동 이체가 진행 중(processing)인 콩 출금은 멈추지 않고, 이후 지급 완료되면 동결 출처분을 같은 단가로 미수금(source `충전ID:출금ID`)으로 기록한다. 멤버십 부족액이 아직 지급되지 않은 출금 신청 때문이면 알림을 '이미 지급된 수익'이 아닌 '출금 신청 금액 초과'로 보내고(미수금 행은 기존처럼 부족액 전체), 운영자는 `POST /admin/withdrawals/:id/reject`로 그 신청을 반려한다.
+- 원장 대사(2026-11-07): 워커가 KST 하루 1회(`platform_jobs` id `beans-ledger-YYYY-MM-DD`, 실패 시 1시간 뒤 재시도) 계정 잔액=분개 합계, 이동별 분개 합계=0, 회원 버킷 잔액=lot 합계(구매·프로모션: available+환불예약 reserved, 받은콩: available, reserved-paid: 받은콩 lot의 출금예약 reserved)를 각각 한 SQL 문으로 확인한다. 불일치가 있으면 운영 알림 `beans.ledger_mismatch`(건수만, 하루 1회)를 남긴다. 자동 수정은 하지 않는다.
 - 메일 큐 `member_notices`: 운영 조치·콩 만료 안내 메일. 탈퇴·미인증 주소는 건너뜀, 실패 시 지수 백오프.
 
 ### 콩 내역 필터와 주문 생성시각 (2026-10-26, 운영 미배포)
@@ -483,7 +486,8 @@ worker는 충전/결과불명·만료·승인 후 취소와 지급 대사를 반
 | DELETE | /admin/invites/:id | invites.delete. expectedVersion 확인 후 revoked_at 기록(이 이메일은 다시 가입 코드 불가). 가입 완료 초대는 409 |
 | POST | /admin/posts/:id/moderation | content.update. hidden(true/false)·reason 필수. 숨긴 게시물은 작성자 외 피드·프로필·상세·댓글·반응·미디어·게시물 후원에서 제외, 스튜디오에는 hiddenByOperator 표시. moderation_actions에 기록. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
 | POST | /admin/posts/:id/review | content.update. 베타 사후 검수 완료 표시(reviewed_at). 작성자가 수정하면 미검수로 복귀, 숨김도 검수로 간주. 목록은 GET /admin/posts?review=pending |
-| GET | /admin/posts/:id/moderation | content.view. 게시물 조치 이력(최신 100건, 사유·처리자·일시) |
+| POST | /admin/posts/:id/visibility | content.update. `{public:boolean, reason}` 사유 필수(공백만 400). 크리에이터 미공개 상태를 운영자가 켜고 끈다. 작성자 알림 없음. 운영자 숨김과 별개 |
+| GET | /admin/posts/:id/moderation | content.view. 게시물 조치·공개 전환 이력(최신 100건). 항목 action·reason(크리에이터 본인 전환은 null)·publicReason·actorType(admin/creator)·actorId·actorName(운영자 이름 또는 크리에이터 활동명)·adminName(호환)·createdAt |
 | POST | /admin/comments/:id/moderation | content.update. hidden·reason 필수. 숨긴 댓글은 모든 목록에서 제외(숨긴 최상위 댓글의 답글 포함)·게시물 댓글 수 감소, 해제 시 복구. moderation_actions(target_type COMMENT) 기록. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
 | GET | /admin/comments/:id/moderation | content.view. 댓글 조치 이력(최신 100건) |
 | POST | /admin/members/:id/suspension | members.update. suspended·days(7/30/null=무기한)·reason. 제한 시 세션 삭제, 기간 중 로그인 403 ACCOUNT_SUSPENDED(비밀번호 일치 후에만 안내), 토큰 검증·갱신도 거부. 기간 경과 시 자동 해제. publicReason(당사자에게 보일 사유, 500자) 필수(2026-10-30 D11): 당사자에게 앱 알림(type moderation, 목록 분류 "운영 안내")과 메일 큐(member_notices)로 공개 사유를 알림. reason은 내부 기록 |
@@ -578,3 +582,13 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 `POST /studio/content/:id/delete`는 `{confirmation: string}`을 받는다. 소유자가 아니거나 이미 삭제된 글은 404 POST_NOT_FOUND, 현재 제목과 다르거나 누락·다른 자료형은 400 CONFIRMATION_REQUIRED다. 공백 제거·대소문자 보정을 하지 않는다. 제목 편집과 같은 게시물 행 잠금을 잡고 현재 제목을 검사하므로 확인 화면을 연 뒤 제목이 바뀌면 다시 목록에서 확인해야 한다. 실패 시 삭제와 운영 이벤트 모두 생성하지 않는다. 기존 soft delete·권한·운영 기록을 보존하며 DB migration은 없다.
 
 근거: [OWASP Input Validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html), 2026-11-07 확인. 클라이언트 확인만으로 동작을 확정하지 않고 서버에서도 입력 의미와 권한을 별도로 검사하는 규칙을 적용했다. 프론트 공통 TypedConfirmDialog와 콘솔의 직접 입력 패턴을 재사용한다. 검증: `tests/platform-operations-events.test.cjs`의 현재 제목·오입력·소유권·동시 삭제·이벤트 롤백, `tests/platform-openapi.test.cjs`의 요청 계약.
+
+## 게시물 미공개 (2026-11-07)
+
+- 사용자 결정: 미공개 범위는 작성자만. 운영자 숨김(`hidden_at`)과 별도 상태이며 둘 중 하나라도 켜져 있으면 작성자 외에는 보이지 않는다. 크리에이터는 운영 숨김을 해제할 수 없다. 운영자는 콘솔에서 미공개도 켜고 끈다(사유 필수, 크리에이터 알림 없음). 처리 이력은 콘솔에서만 보인다.
+- 데이터: 기존 `postings.is_public`(기본 true)을 재사용한다. 신규 플랫폼 코드는 이미 `is_public=false`를 비공개로 취급하고 있었고(access·피드·프로필 목록·미디어·공유 이미지·조회수), 스튜디오 저장(`POST /studio/content`)은 이 칸을 쓰지 않는다. 레거시 런타임의 "링크로만 접근" 의미는 신규 런타임에서 쓰이지 않는다. 이력은 `moderation_actions`(target_type POST, action `post.unpublished`/`post.republished`, `actor_type` ADMIN/CREATOR, 크리에이터면 `admin_id`에 회원 ID, reason 빈 값)와 `platform_audit_logs`(`admin.post_unpublished`·`creator.post_republished` 등)를 같은 트랜잭션으로 기록한다.
+- 마이그레이션 `20261107120000_post_visibility`: `moderation_actions.actor_type VARCHAR(20) NOT NULL DEFAULT 'ADMIN'` 추가만. 기존 행은 ADMIN. 롤백 시 이전 API 이미지는 이 칸을 무시하므로 그대로 동작하며(삽입은 기본값), 칸 삭제는 크리에이터 이력 구분이 사라지므로 하지 않는다.
+- 작성자 외 차단 경로: 상세 `GET /posts/:id`(404, 작성자는 200), 피드 `/bootstrap`·`/posts`·작성자별 `/posts?creatorId=`(작성자 본인 프로필 목록 포함 제외), 저장·좋아요 컬렉션, 프로필 `postCount`, 댓글 목록·페이지·작성·수정·삭제·멘션 후보, 좋아요·저장, 게시물 콩 후원(403 POST_ACCESS_REQUIRED), 미디어 GET/HEAD/Range·CDN edge 승인(공용 파일이라도 제한 링크 하나로 거부), 공유 이미지(대체 이미지로 302), 조회수 기록, 팔로워 새 게시물 알림(미공개 중 발행되면 `notify_pending`으로 보류하고 다시 공개되면 워커가 1회 발송), 후원 내역 `postAvailable`. 검색은 크리에이터만 대상이고 사이트맵에는 게시물이 없다. 기존 알림 링크는 상세 404로 막힌다. 멤버십 구독자도 같은 규칙.
+- 미차단(의도): 신고 접수는 게시물 존재만 확인한다. 운영 콘솔 목록·스튜디오는 상태를 보여 준다.
+- 검증: `tests/platform-post-visibility.test.cjs`(격리 e2e DB, `--test-concurrency=1`).
+

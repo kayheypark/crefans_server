@@ -22,7 +22,7 @@
     "test:mail": "npm run build && CREFANS_E2E=true node --test tests/mail-templates.test.cjs tests/platform-mail.integration.test.cjs tests/platform-auth.test.cjs tests/platform-provider-lifecycle.test.cjs tests/platform-provider-http.test.cjs",
     "dev:billing": "npm run build && node scripts/platform-billing-test.cjs",
     "test:policy": "npm run build && CREFANS_E2E=true node --test tests/platform-financial-policy.test.cjs",
-    "test:operations": "CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs tests/platform-billing-activity.test.cjs",
+    "test:operations": "CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs tests/platform-billing-activity.test.cjs tests/platform-disk-alert.test.cjs",
     "test:audit": "npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-audit.test.cjs tests/platform-audit-export.test.cjs tests/platform-external-monitor.test.cjs tests/platform-log-config.test.cjs tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs",
     "test:openapi": "npm run build && CREFANS_E2E=true node --test tests/platform-openapi.test.cjs",
     "test:beans": "npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-beans.test.cjs tests/platform-bean-ledger.test.cjs tests/platform-openapi.test.cjs"

@@ -1,4 +1,4 @@
-import {noticeCancelReserved,noticeRefunded} from './membership-notices';
+import {noticeCancelReserved,noticePaymentCompleted,noticeRefunded} from './membership-notices';
 import {settlementPending,settlementHoldReasons} from './settlement-receipts';
 import {CREATOR_PROVISION} from './creator-provision';
 import {PAYMENT_TERMS,paymentTermsAccepted} from './payment-terms';
@@ -21,6 +21,7 @@ import {hashPassword,verifyPassword} from '../auth/local/credentials';
 import {reject,text,dateOnly} from './http';
 import {clawBackReferralReward,qualifyReferralReward,requireBeanPayoutMember} from './referrals';
 export const nextMonth=(now:Date,anchor:Date=now)=>{const date=new Date(now),day=anchor.getUTCDate();date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+1);date.setUTCDate(Math.min(day,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()));return date;};
+const WITHDRAWAL_NOTE_MAX=191,MANUAL_REJECT_PREFIX='수동 이체 반려 · ';
 @Injectable()
 export class PlatformFinanceService {
  constructor(private service:PlatformService,private provider:PaymentProvider,private config:ConfigService,private bank:BankProvider){}
@@ -143,7 +144,8 @@ export class PlatformFinanceService {
    if(!Number.isInteger(bps)||bps<0||bps>10000)reject(503,'FEE_POLICY_REQUIRED','주문의 수수료 정책 확인이 필요합니다.');
    if(!Number.isInteger(hold)||hold<0||hold>365)reject(503,'SETTLEMENT_POLICY_REQUIRED','주문의 정산 정책 확인이 필요합니다.');
    const fees=Math.floor(o.amount*bps/10000);await tx.revenueEntry.create({data:{creator_id:p.creator_id,order_id:o.id,title:(o.snapshot as any).name,gross:o.amount,fees,net:o.amount-fees,available_at:new Date(now.getTime()+hold*86400000)}});
-   await tx.memberNotification.create({data:{member_id:o.member_id,actor_id:p.creator_id,type:'subscription',text:o.subscription_id?'멤버십 갱신이 완료되었습니다.':'멤버십 가입이 완료되었습니다.',path:'/subscriptions'}});
+   // One 알림 center entry plus one queued mail per paid order (replaces the in-app-only notification; 2026-11-07).
+   await noticePaymentCompleted(tx,{id:o.id,member_id:o.member_id,membership_id:p.id,amount:o.amount,renewal:!!o.subscription_id},{start,end,nextBilling:(o.subscription_id?sub.auto_renew:(o.snapshot as any).paymentMode!=='one-time')?end:null},now);
    await enqueueOperation(tx,o.subscription_id?'subscription.renewed':'subscription.started',{memberId:o.member_id,creatorId:p.creator_id,subscriptionId:sub.id,orderId:o.id,planId:p.id},`subscription.paid:${o.id}`);
    await qualifyReferralReward(tx,o.member_id,'checkout',o.id,(o.snapshot as any).paymentEnvironment==='live');
   });
@@ -189,7 +191,9 @@ export class PlatformFinanceService {
  async verifyAccount(member:string,id:string){const account=await this.db.settlementAccount.findFirst({where:{id,creator_id:member}});if(!account)reject(404,'ACCOUNT_NOT_FOUND','계좌를 찾을 수 없습니다.');const result=await this.bank.verify(account.bank,this.provider.decrypt(account.account_encrypted),(await this.service.member(member)).name,`verify-${account.id}-${account.version}`);if(result.verified!==true)reject(400,'ACCOUNT_VERIFICATION_FAILED','계좌와 예금주를 확인해주세요.');const saved=await this.db.settlementAccount.updateMany({where:{id,creator_id:member,version:account.version},data:{verified:true}});if(saved.count!==1)reject(409,'ACCOUNT_CHANGED','계좌가 변경되었습니다.');return{message:'계좌 확인을 완료했습니다.'};}
  async defaultAccount(member:string,id:string){await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${member} FOR UPDATE`;const a=await tx.settlementAccount.findFirst({where:{id,creator_id:member,verified:true}});if(!a)reject(409,'ACCOUNT_NOT_VERIFIED','확인된 계좌만 기본 설정할 수 있습니다.');await tx.settlementAccount.updateMany({where:{creator_id:member},data:{is_default:false}});await tx.settlementAccount.update({where:{id},data:{is_default:true}});});return{message:'기본 계좌를 설정했습니다.'};}
  async setupPin(member:string,pin:string,identityProof?:string){await requireBeanPayoutMember(this.db,member);if(!/^\d{6}$/.test(pin))reject(400,'INVALID_PIN','숫자 6자리를 입력해주세요.');if(!identityProof)reject(403,'IDENTITY_VERIFICATION_REQUIRED','PASS 본인인증 후 간편비밀번호를 설정할 수 있습니다.');const hash=await hashPassword(`withdrawal-pin:${pin}`);await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${member} FOR UPDATE`;const proof=await tx.identityProof.findFirst({where:{token_hash:digest(identityProof),member_id:member,purpose:'withdrawal-pin',consumed_at:null,expires_at:{gt:new Date()}}});if(!proof)reject(403,'IDENTITY_VERIFICATION_REQUIRED','본인인증이 만료되었거나 일치하지 않습니다.');const used=await tx.identityProof.updateMany({where:{id:proof.id,consumed_at:null},data:{consumed_at:new Date()}});if(used.count!==1)reject(409,'PROOF_USED','이미 사용한 본인인증입니다.');await tx.withdrawalCredential.upsert({where:{creator_id:member},create:{creator_id:member,pin_hash:hash},update:{pin_hash:hash}});await tx.withdrawalAuthorization.deleteMany({where:{creator_id:member}});await tx.beanWithdrawalAuthorization.deleteMany({where:{creator_id:member}});});return{message:'간편비밀번호를 설정했습니다.'};}
- private async recordReceivable(tx:any,creator:string,orderId:string,amount:number,entry:any){if(await tx.creatorReceivable.findUnique({where:{kind_source_id_creator_id:{kind:'membership',source_id:orderId,creator_id:creator}}}))return;await tx.creatorReceivable.create({data:{creator_id:creator,kind:'membership',source_id:orderId,amount}});await tx.memberNotification.create({data:{member_id:creator,type:'settlement',text:`결제 취소로 이미 지급된 멤버십 수익 ${amount.toLocaleString('ko-KR')}원이 미수금으로 기록되었습니다(원거래: ${dateOnly(entry.created_at)} ${entry.title} 결제). 이후 정산에서 차감됩니다. 이의가 있으면 고객센터로 알려 주세요.`,path:'/studio/finance'}});}
+ // paid is the part of amount already paid out; the rest is only held by a withdrawal not yet paid (requested/processing),
+ // which the notice must not call paid income (2026-11-07). The receivable row keeps the whole shortfall as before.
+ private async recordReceivable(tx:any,creator:string,orderId:string,amount:number,entry:any,paid=amount){if(await tx.creatorReceivable.findUnique({where:{kind_source_id_creator_id:{kind:'membership',source_id:orderId,creator_id:creator}}}))return;await tx.creatorReceivable.create({data:{creator_id:creator,kind:'membership',source_id:orderId,amount}});const origin=`(원거래: ${dateOnly(entry.created_at)} ${entry.title} 결제)`,won=(n:number)=>`${n.toLocaleString('ko-KR')}원`;await tx.memberNotification.create({data:{member_id:creator,type:'settlement',text:paid>=amount?`결제 취소로 이미 지급된 멤버십 수익 ${won(amount)}이 미수금으로 기록되었습니다${origin}. 이후 정산에서 차감됩니다. 이의가 있으면 고객센터로 알려 주세요.`:`결제 취소로 멤버십 수익이 취소되어${origin} 아직 지급되지 않은 출금 신청 금액이 출금 가능 수익보다 ${won(amount-paid)} 많아졌습니다. 해당 출금 신청은 운영 확인이 필요하며, 반려되면 남은 금액으로 다시 신청할 수 있습니다.${paid>0?` 이미 지급된 수익 ${won(paid)}은 미수금으로 기록되어 이후 정산에서 차감됩니다.`:''} 이의가 있으면 고객센터로 알려 주세요.`,path:'/studio/finance'}});}
  // Membership receivables settle by themselves once later income covers them (available back at zero or above).
  async settleReceivables(){const open=await this.db.creatorReceivable.findMany({where:{kind:'membership',status:'open'},select:{creator_id:true},distinct:['creator_id'],take:100});let count=0;for(const {creator_id} of open){if((await this.finance(creator_id)).summary.available>=0){const r=await this.db.creatorReceivable.updateMany({where:{creator_id,kind:'membership',status:'open'},data:{status:'settled',settled_by:'system',settled_at:new Date(),note:'이후 정산에서 차감 완료'}});count+=r.count;}}return count;}
  async review(member:string,input:any,tx:any=this.db){let minimum=(await withdrawalTerms(tx,member)).minimumWithdrawalKrw;
@@ -278,7 +282,7 @@ export class PlatformFinanceService {
    if(source==='provider'&&current.status!=='paid')return;
    const entry=await tx.revenueEntry.findUnique({where:{order_id:id}});await tx.checkoutOrder.update({where:{id},data:{status:'refunded',locked_until:null}});await tx.revenueEntry.update({where:{order_id:id},data:{reversals:o.amount,fees:0,net:0}});await clawBackReferralReward(tx,'checkout',id);
    // D4: when the reversed income was already paid out, the shortfall becomes a receivable taken from later settlements.
-   const shortfall=-(await this.finance(p.creator_id,tx)).summary.available;if(shortfall>0&&entry?.net>0)await this.recordReceivable(tx,p.creator_id,id,Math.min(entry.net,shortfall),entry);await this.audit(tx,source==='provider'?'refund.external_cancel':'refund.completed',id,{memberId:member,subscriptionId:o.subscription_id,amount:o.amount,previousStatus:current.status,status:'refunded'});
+   const after=(await this.finance(p.creator_id,tx)).summary,shortfall=-after.available;if(shortfall>0&&entry?.net>0){const amount=Math.min(entry.net,shortfall);await this.recordReceivable(tx,p.creator_id,id,amount,entry,Math.min(amount,Math.max(0,shortfall-after.requested)));}await this.audit(tx,source==='provider'?'refund.external_cancel':'refund.completed',id,{memberId:member,subscriptionId:o.subscription_id,amount:o.amount,previousStatus:current.status,status:'refunded'});
    if(o.subscription_id){
     const newer=await tx.checkoutOrder.count({where:{subscription_id:o.subscription_id,status:{in:['paid','refunding','processing']},NOT:{id},OR:[{period_start:{gt:o.period_start||o.created_at}},{paid_at:{gt:o.paid_at||o.created_at}},{paid_at:null,created_at:{gt:o.created_at}}]}});
     if(!newer){await tx.subscription.update({where:{id:o.subscription_id},data:{auto_renew:false,status:'EXPIRED',ended_at:new Date(),next_billing_date:null}});await tx.checkoutOrder.updateMany({where:{subscription_id:o.subscription_id,status:{in:['pending','failed']}},data:{status:'cancelled',retry_at:null}});}
@@ -367,15 +371,33 @@ export class PlatformFinanceService {
  // (same balance/account/payout-day checks, parked as processing); only then is the transfer recorded, once.
  async manualResult(admin:any,id:string,input:any,now=new Date()){
   if(!manualPayouts(this.config))reject(409,'MANUAL_PAYOUTS_DISABLED','수동 지급이 활성화되어 있지 않습니다.');requirePermission(admin,'revenue','create');
-  const result=input?.result,reference=text(input?.reference??'',100,false),reason=text(input?.reason??'',500,false),at=new Date(input?.transferredAt??now);
+  // withdrawal_requests.note is VARCHAR(191) and stores the reason after its prefix, so the reason fits what is left (2026-11-07).
+  const result=input?.result,reference=text(input?.reference??'',100,false),reason=text(input?.reason??'',WITHDRAWAL_NOTE_MAX-MANUAL_REJECT_PREFIX.length,false),at=new Date(input?.transferredAt??now);
   if(!['paid','rejected'].includes(result)||(result==='paid'&&!reference)||(result==='rejected'&&!reason)||!Number.isFinite(at.getTime())||at>now)reject(400,'INVALID_MANUAL_RESULT','이체 결과·참조번호·이체 시각을 확인해주세요.');
   const first=await this.db.withdrawalRequest.findUnique({where:{id}});if(!first)reject(404,'WITHDRAWAL_NOT_FOUND','출금 신청을 찾을 수 없습니다.');
   if(first.status==='requested')await this.payout(id,now);
   return this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${first.creator_id} FOR UPDATE`;const w=await tx.withdrawalRequest.findUniqueOrThrow({where:{id}});
    if(w.status!=='processing')reject(409,'WITHDRAWAL_NOT_PROCESSING','처리 중인 출금만 이체 결과를 기록할 수 있습니다.');
-   await tx.withdrawalRequest.update({where:{id},data:{status:result,note:result==='paid'?`수동 이체 완료 · ${reference}`:`수동 이체 반려 · ${reason}`}});
+   await tx.withdrawalRequest.update({where:{id},data:{status:result,note:result==='paid'?`수동 이체 완료 · ${reference}`:MANUAL_REJECT_PREFIX+reason}});
    await this.audit(tx,'withdrawal.manual_result',id,{creatorId:w.creator_id,amount:w.amount,previousStatus:'processing',status:result,adminId:admin.id,reference:reference||null,transferredAt:at.toISOString(),reasonDigest:reason?reason.length:0});
    return{message:result==='paid'?'이체 완료를 기록했습니다.':'출금을 반려했습니다.'};});
+ }
+ // A withdrawal requested before a refund that left the available balance negative can never pass payout() (PAYOUT_BALANCE_CHANGED);
+ // the operator rejects it, the amount counts as available again and the creator may request anew (2026-11-07). Only that case,
+ // and only before a transfer starts: a processing one is closed by its bank or manual result.
+ // Console hint (2026-11-07): marks the rows rejectWithdrawal would accept now, so the button shows only for them.
+ async withRejectable(items:any[]){const blocked=new Set<string>();for(const creator of new Set<string>(items.filter(w=>w.status==='requested').map(w=>w.creator_id)))if((await this.finance(creator)).summary.available<0)blocked.add(creator);return items.map(w=>({...w,rejectable:w.status==='requested'&&blocked.has(w.creator_id)}));}
+ async rejectWithdrawal(admin:any,id:string,input:any){
+  requirePermission(admin,'revenue','create');const reason=text(input?.reason,150);
+  const first=await this.db.withdrawalRequest.findUnique({where:{id}});if(!first)reject(404,'WITHDRAWAL_NOT_FOUND','출금 신청을 찾을 수 없습니다.');
+  return this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${first.creator_id} FOR UPDATE`;const w=await tx.withdrawalRequest.findUniqueOrThrow({where:{id}});
+   if(w.status==='rejected')return{message:'이미 반려된 출금입니다.'};
+   if(w.status!=='requested')reject(409,'WITHDRAWAL_NOT_REQUESTED','이체 전 신청 상태의 출금만 반려할 수 있습니다.');
+   if((await this.finance(w.creator_id,tx)).summary.available>=0)reject(409,'WITHDRAWAL_NOT_BLOCKED','출금 가능 잔액이 부족해진 신청만 반려할 수 있습니다.');
+   await tx.withdrawalRequest.update({where:{id},data:{status:'rejected',note:`운영자 반려 · ${reason}`}});
+   await tx.memberNotification.create({data:{member_id:w.creator_id,type:'settlement',text:`결제 취소·환불로 출금 가능 수익이 줄어 ${dateOnly(w.created_at)}에 신청한 출금 ${w.amount.toLocaleString('ko-KR')}원이 반려되었습니다. 출금 가능 금액을 확인한 뒤 다시 신청해 주세요. 이의가 있으면 고객센터로 알려 주세요.`,path:'/studio/finance'}});
+   await this.audit(tx,'withdrawal.rejected',id,{creatorId:w.creator_id,amount:w.amount,previousStatus:'requested',status:'rejected',adminId:admin.id,reasonLength:reason.length});
+   return{message:'출금 신청을 반려했습니다.'};});
  }
  // Operator check of a settlement account (holder name vs. bank book copy) when no bank verification API is connected.
  async manualVerifyAccount(admin:any,id:string,input:any){

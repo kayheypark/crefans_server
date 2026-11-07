@@ -2,12 +2,12 @@ import {Prisma} from '@prisma/client';
 /** Read-only attribution. Financial amounts continue to come from the immutable ledger. */
 export async function attributeTips(db:any,tips:any[]){
  const ids=[...new Set(tips.map(t=>t.post_id).filter(Boolean))];
- const posts=ids.length?await db.posting.findMany({where:{id:{in:ids}},select:{id:true,title:true,status:true,is_deleted:true}}):[];
+ const posts=ids.length?await db.posting.findMany({where:{id:{in:ids}},select:{id:true,title:true,status:true,is_deleted:true,is_public:true}}):[];
  const byId=new Map<string,any>(posts.map((p:any)=>[p.id,p]));
  return tips.map(t=>{const post=byId.get(t.post_id),snapshot=t.post_title_snapshot;
   return {...t,sourceType:t.post_id?'post':'profile',postTitle:t.post_id?(snapshot??post?.title??null):null,
    postTitleSource:t.post_id?(snapshot!==null&&snapshot!==undefined?'snapshot':post?'current':'unavailable'):null,
-   postAvailable:!!post&&!post.is_deleted&&post.status==='PUBLISHED'};
+   postAvailable:!!post&&!post.is_deleted&&post.status==='PUBLISHED'&&post.is_public!==false};
  });
 }
 /** Each earned lot belongs to one tip. Count only the portion reserved in this payout. */

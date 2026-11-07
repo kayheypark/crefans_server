@@ -6,14 +6,15 @@ import {requestContext} from './request-context';
 import {createHmac,randomUUID} from 'crypto';
 
 const labels:Record<string,string>={
- 'beans.charge_created':'콩 충전 주문','beans.charge_paid':'콩 충전 완료','beans.tip':'콩 후원','beans.promotion':'프로모션콩 지급','beans.payout_requested':'후원콩 출금 접수','beans.payout_paid':'후원콩 은행 지급 완료','beans.payout_rejected':'후원콩 은행 반려','beans.charge_disputed':'콩 충전 취소·차지백 감지',
+ 'beans.charge_created':'콩 충전 주문','beans.charge_paid':'콩 충전 완료','beans.tip':'콩 후원','beans.promotion':'프로모션콩 지급','beans.payout_requested':'후원콩 출금 접수','beans.payout_paid':'후원콩 은행 지급 완료','beans.payout_rejected':'후원콩 은행 반려','beans.charge_disputed':'콩 충전 취소·차지백 감지','beans.ledger_mismatch':'콩 원장 대사 불일치',
  'worker.stale':'배치 실행 지연','operations.test':'운영 알림 연결 확인','member.signup':'회원가입', 'subscription.started':'멤버십 구독', 'subscription.payment_failed':'멤버십 정기결제 실패','subscription.renewed':'멤버십 정기 갱신', 'subscription.cancelled':'멤버십 구독 해지', 'subscription.resumed':'멤버십 자동 갱신 재개',
  'content.created':'콘텐츠 등록','content.updated':'콘텐츠 수정','content.deleted':'콘텐츠 삭제',
  'member.profile.updated':'회원 프로필 수정','creator.profile.updated':'크리에이터 프로필 수정','http.error':'서버 오류','worker.error':'배치 오류',
  'process.error':'프로세스 치명 오류','worker.completed':'배치 처리 완료','worker.hourly':'배치 1시간 요약',
+ 'disk.warning':'디스크 사용률 경고','disk.critical':'디스크 사용률 위험','disk.recovered':'디스크 사용률 회복',
  'security.injection_detected':'인젝션 시도 감지','security.ip_blocked':'공격 IP 자동 차단','security.ip_released':'IP 차단 만료',
 };
-const allowed=new Set(['ip','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','failures','activity','fingerprint','release']);
+const allowed=new Set(['ip','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각']);
 function metadata(data:Record<string,unknown>){
  const result:Record<string,any>={};
  for(const [key,value] of Object.entries(data)){

@@ -7,6 +7,7 @@ import {PlatformService} from './service';
 import {SUSPENSION_DAYS} from './suspension';
 import {notifyMember} from './member-notices';
 import {purgeMember} from './member-purge';
+import {setPostVisibility} from './post-visibility';
 
 // Operator moderation promised by terms §8: hide a post, restrict an account. Every action is kept in moderation_actions.
 // reason is internal; publicReason is what the affected member reads in the app notice and mail (D11, 2026-10-30).
@@ -107,14 +108,19 @@ export async function eraseMember(service:PlatformService,admin:any,id:string,in
 }
 export async function moderationHistory(db:any,type:'POST'|'MEMBER'|'COMMENT',id:string){
  const rows=await db.moderationAction.findMany({where:{target_type:type,target_id:id},orderBy:{created_at:'desc'},take:100});
- const admins=await db.admin.findMany({where:{id:{in:[...new Set(rows.map((r:any)=>r.admin_id))]}},select:{id:true,name:true}});
- return rows.map((r:any)=>({action:r.action,reason:r.reason,publicReason:r.public_reason,until:r.until,adminName:admins.find((a:any)=>a.id===r.admin_id)?.name??null,createdAt:r.created_at}));
+ const admins=await db.admin.findMany({where:{id:{in:[...new Set(rows.filter((r:any)=>r.actor_type!=='CREATOR').map((r:any)=>r.admin_id))]}},select:{id:true,name:true}});
+ // A creator's own visibility change names the creator (activity name, else nickname); they give no reason.
+ const creatorIds=[...new Set(rows.filter((r:any)=>r.actor_type==='CREATOR').map((r:any)=>r.admin_id))];
+ const [creators,members]=creatorIds.length?await Promise.all([db.creator.findMany({where:{user_id:{in:creatorIds}},select:{user_id:true,display_name:true}}),db.member.findMany({where:{id:{in:creatorIds}},select:{id:true,nickname:true,enabled:true}})]):[[],[]];
+ const creatorName=(memberId:string)=>{const m=members.find((x:any)=>x.id===memberId);return m?.enabled?creators.find((c:any)=>c.user_id===memberId)?.display_name||m.nickname:null;};
+ return rows.map((r:any)=>{const creator=r.actor_type==='CREATOR';return{action:r.action,reason:r.reason||null,publicReason:r.public_reason,until:r.until,actorType:creator?'creator':'admin',actorId:r.admin_id,actorName:creator?creatorName(r.admin_id):admins.find((a:any)=>a.id===r.admin_id)?.name??null,adminName:creator?null:admins.find((a:any)=>a.id===r.admin_id)?.name??null,createdAt:r.created_at};});
 }
 
 @Controller('admin') @UseGuards(PlatformAdminGuard)
 export class ModerationAdminController {
  constructor(private service:PlatformService){}
  @Post('posts/:id/moderation') @Permit(['content','update']) post(@Req() r:any,@Param('id') id:string,@Body() body:any){return moderatePost(this.service.db,r.admin,id,body);}
+ @Post('posts/:id/visibility') @Permit(['content','update']) visibility(@Req() r:any,@Param('id') id:string,@Body() body:any){return setPostVisibility(this.service.db,{type:'ADMIN',id:r.admin.id},id,body);}
  @Post('posts/:id/review') @Permit(['content','update']) review(@Req() r:any,@Param('id') id:string){return reviewPost(this.service.db,r.admin,id);}
  @Get('posts/:id/moderation') @Permit(['content','view']) postHistory(@Param('id') id:string){return moderationHistory(this.service.db,'POST',id);}
  @Post('comments/:id/moderation') @Permit(['content','update']) comment(@Req() r:any,@Param('id') id:string,@Body() body:any){return moderateComment(this.service.db,r.admin,id,body);}
