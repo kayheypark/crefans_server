@@ -4,6 +4,22 @@
 - 현재 운영 소스256개 기준 prod 일치, 컴파일 JS195개 중 요청 세 모듈만 차이 확인 후 offline overlay image 생성. 이미지 소스/JS/map/type12개 SHA 확인. frontend 먼저 교체, API/worker 후교체. 운영 health200·인증 없는 삭제401, 기존 runtime 환경값(APP_RELEASE 제외) 동일, 6컨테이너 정상·worker 실패0. 실제 회원 게시물 삭제는 수행하지 않음.
 - 복구 이미지/설정은 /Users/ethan/crefans-recovery/20261107/studio-post-confirm에 digest/SHA 검증 후 운영의 미사용 직전 태그와 이번 임시 소스 정리. 증거 docs/studio-post-confirm-deployment-20261107.json; front .local/studio-post-card-confirm. 소스/API/정책 계약은 docs/platform-api.md. AGENTS.md 기존 규약 유지.
 
+## 2026-11-07 멤버십 결제 완료 메일 발송 연결 (fix/intermediary-receipt, 미배포)
+- 사용자 결정(2026-11-07): `payment-completed` 메일을 멤버십 첫 결제 승인과 자동 갱신 결제 성공 때 회원에게 보낸다. 기존 notifyMember/member-notices outbox 재사용, 판매자=크리에이터 표시 이름, 중개자 고지 포함, 결제 1건당 1회.
+- 발송 지점: `finance.service.ts` finalize(첫 결제·갱신·한 달 결제가 모두 지나는 유일한 paid 전환, 같은 트랜잭션) → `membership-notices.ts` `noticePaymentCompleted` → `notifyMember`(dedupe `payment-completed:{orderId}`) → 워커 `MemberNoticesService.deliver` 가 SMTP 발송. 줄: 판매자·멤버십·결제 금액·결제 시각·이용 기간·다음 결제일(한 달 결제·해지 예약은 '없음').
+- 알림센터 중복 정리: finalize 가 따로 만들던 '멤버십 가입/갱신이 완료되었습니다' 알림 생성을 notifyMember 의 알림 1건으로 대체(같은 문구·type subscription·actor 크리에이터). 결제 1건당 알림 1건 + 메일 1건.
+- 템플릿: 판매자는 별도 인자 대신 '판매자' 줄로 받는다(outbox rows 그대로 렌더). '판매자' 줄이 없거나 비면 payment-completed 메일 생성 거부. 크리에이터 display_name 이 없으면 기존 알림과 같은 대체값 '크리에이터'.
+- 검증(2026-11-07 로컬, 격리 E2E DB): 공유 node_modules Prisma 클라이언트가 옛 스키마라 이 워크트리에 node_modules 를 APFS 복제(cp -c)하고 워크트리 안에서만 prisma generate(공유 node_modules 무변경, 공유 client cancel_reason 0건 확인). 그 상태로 nest build 오류 0. payment-lifecycle 68/68(신규 1: 첫 결제·갱신 각 메일 1건·알림 1건, 재호출 무중복, 판매자 줄, 렌더에 고지). 대조 3건(발송 호출 제거, 기존 알림+발송 중복, 판매자 줄 제거) 각 1 fail 후 원복(SHA 동일) 통과. mail-templates 26/26, 템플릿 대조 3건(고지 제거·12px·판매자 검사 제거) 각 1 fail. 메일·인증·관리 콘솔·billing-recovery·openapi 묶음 125 중 43 실패 — 로컬 dev DB(3307 crefans_platform_dev)에 founding_badge 컬럼이 없어 생기는 환경 문제이며 origin/prod 코드 기준선 123 중 43 실패와 이름 동일.
+- 배포 시 영향: api·worker 이미지. 배포 후 모든 멤버십 결제·갱신 성공마다 회원 메일 1통 발송(실제 SMTP). 마이그레이션 없음(member_notices 기존 테이블). 배포 전 이미 paid 인 주문에는 소급 발송 없음.
+- 미실행: 실제 SMTP 발송·받은편지함 확인, 운영 배포. origin/prod 는 이 브랜치 분기(3ea2cfe) 이후 6a36c19 로 앞서 있어 배포 때 합쳐야 함.
+
+## 2026-11-07 멤버십 결제 메일 템플릿에 판매자·통신판매중개자 고지 (fix/intermediary-receipt, 미배포)
+- 사용자 결정(2026-11-07): 결제 완료 메일·영수증에도 통신판매중개자 고지를 넣는다(배포는 별도 승인). 근거 전자상거래법 시행규칙 제11조의2 — 청약 절차와 계약내용 서면에도 당사자가 아님을 알리고, 계약 당사자(판매자) 표시와 같거나 더 큰 글씨로 표시.
+- 변경: `src/auth/local/mail/templates.ts` `intermediaryNotice`(약관 제1조·프론트 lib/content/business.ts 와 같은 문장), `noticeMail(..., seller)` — `payment-completed` 는 판매자(크리에이터 표시 이름) 없으면 거부, 표 첫 줄 '판매자'와 고지 문단 모두 13px, 텍스트 본문에도 포함. 다른 알림(콩·출금·계정 등)에는 넣지 않음(콩은 직접 판매).
+- 중요: `payment-completed` 메일은 템플릿만 있고 실제 발송 연결이 없다(PROGRESS 2026-10 기록과 동일, 이번에도 연결하지 않음). 따라서 이번 변경만으로 회원이 받는 메일은 바뀌지 않는다. 발송 연결 여부는 사용자 결정 필요.
+- 검증(2026-11-07 로컬): tests/mail-templates 26/26(신규 2: 판매자·고지 문구·글씨 크기 고지≥판매자·판매자 누락 거부, 비멤버십 알림 미포함). 대조 3건(고지 제거, 고지 12px, 판매자 필수 제거) 각각 1 fail 후 원복(SHA 동일) 26/26. test:mail 묶음(빌드 단계 제외, 로컬 3307 dev DB) 65 중 59 통과·6 실패, origin/prod 3ea2cfe 기준선 63 중 57·6 실패와 실패 이름 동일(기존 문제). nest build TS 오류 34건, 기준선 34건과 위치 목록 완전 동일(신규 0), dist 생성. 렌더 PNG(예시 데이터, computed font-size 고지 13px=판매자 13px)는 작업 세션 스크래치에만 있음.
+- 미실행: 실제 SMTP 발송·수신 확인, 운영 배포.
+
 ## 2026-11-07 09:03 KST 운영 배포 promo-terms-20261107 — /ask-me 결정 4건 + 약관 11조 프로모션콩 출금 범위 명확화 (완료)
 - 결정: ① 스튜디오 통계 요약 시안(A~E) **보류** ② 오픈 일정(약관 2조 "2026년 11월까지" 초대제·12월 오픈 vs 본인확인 미연동) **이번엔 보류** — 11월 말 재결정 필요 ③ 친구 초대 링크 가입(서버 허용, 약관 2조는 초대 이메일만) **현행 유지** ④ 프로모션콩 출금 충돌 **코드 기준으로 문구만 정리**.
 - 코드 기준: `bean-policy.ts` withdrawableBuckets=earned-paid·earned-promotion, promotionCashWithdrawal:false, `beans.service.ts` 156-165(자기 후원 제외·지급 출처 확인). 회원이 직접 받은 프로모션콩은 출금 불가, 후원으로 크리에이터가 받은 프로모션콩은 출금 가능.

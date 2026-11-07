@@ -47,13 +47,24 @@ export function marketingMail(subject:string,body:string,unsubscribeUrl:string,a
  return{...result,replyTo:'khpark@crefans.com',headers:{'List-Unsubscribe':`<${url.href}>`,'List-Unsubscribe-Post':'List-Unsubscribe=One-Click'}};
 }
 // Billing notices deliver payment-failed/renewal-stopped; member notices deliver moderation/bean-expiry/event-bean-expiry
-// and, since 2026-11-06, subscription-cancelled/subscription-ended/refund-completed (membership-notices.ts).
+// and, since 2026-11-06, subscription-cancelled/subscription-ended/refund-completed (membership-notices.ts);
+// since 2026-11-07 also payment-completed (membership payment and renewal success, finance.service finalize).
 // Other notice templates remain prepared only, without event delivery.
+/**
+ * 통신판매중개자 고지(전자상거래법 제20조①, 시행규칙 제11조의2: 계약내용에 관한 서면에도 고지하고, 계약 당사자를 알리는 글씨와
+ * 같거나 더 크게 표시). 문구는 이용약관 제1조(src/platform/legal-documents.ts)·프론트 lib/content/business.ts 와 같다. 2026-11-07 사용자 결정.
+ */
+export const intermediaryNotice = '크레팬스는 크리에이터 멤버십 거래의 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다. 콩은 크레팬스가 직접 판매합니다.';
+// Membership payment mail is a written contract notice: it must carry a '판매자' (creator) row and the notice.
+const sellerKinds = new Set<string>(['payment-completed']);
+const rowStyle = 'padding:8px 0;vertical-align:top;font-size:13px';
 export function noticeMail(kind: keyof typeof noticeCopy, rows: Array<[string,string]>, actionUrl: string, note: string) {
   if (!Object.prototype.hasOwnProperty.call(noticeCopy,kind)) throw new Error('Unknown notice');
   const url = new URL(actionUrl);
   if (url.protocol !== 'https:' || !['crefans.com','beta.crefans.com'].includes(url.hostname) || url.username || url.password || url.port) throw new Error('Invalid mail action URL');
+  if (sellerKinds.has(kind) && !rows.some(([label,value])=>label==='판매자'&&String(value||'').trim())) throw new Error('Seller required');
   const [subject,title,intro,action] = noticeCopy[kind];
-  const table = rows.map(([label,value])=>`<tr><td style="padding:8px 0;color:#626b7c;vertical-align:top;font-size:13px">${escape(label)}</td><td align="right" style="padding:8px 0;vertical-align:top;font-size:13px">${escape(value)}</td></tr>`).join('');
-  return render(subject,title,intro,`<table role="presentation" width="100%" style="font-size:13px;margin:24px 0">${table}</table><a href="${escape(url.href)}" style="${linkStyle}">${escape(action)}</a>`,rows.map(([k,v])=>`${k}: ${v}`).join('\n')+`\n${action}: ${url.href}`,note);
+  const table = rows.map(([label,value])=>`<tr><td style="${rowStyle};color:#626b7c">${escape(label)}</td><td align="right" style="${rowStyle}">${escape(value)}</td></tr>`).join('');
+  const notice = sellerKinds.has(kind) ? `<p data-notice="intermediary" style="font-size:13px;line-height:1.8;color:#262832;margin:0 0 24px;word-break:keep-all;overflow-wrap:anywhere">${escape(intermediaryNotice)}</p>` : '';
+  return render(subject,title,intro,`<table role="presentation" width="100%" style="font-size:13px;margin:24px 0">${table}</table>${notice}<a href="${escape(url.href)}" style="${linkStyle}">${escape(action)}</a>`,rows.map(([k,v])=>`${k}: ${v}`).join('\n')+(notice?`\n${intermediaryNotice}`:'')+`\n${action}: ${url.href}`,note);
 }
