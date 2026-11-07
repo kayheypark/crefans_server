@@ -1,3 +1,8 @@
+## 2026-11-07 10:00 KST 콩 수동 반려 사유 길이 (fix/payout-refund-gaps, 배포 보류)
+- 사용자 결정(2026-11-07): 콩 수동 결과 기록 사유를 접두어 포함 저장 칸에 맞춤. bean_payouts.note VARCHAR(500) − '수동 이체 반려 · '(11자) = 사유 489자(서버 검증·OpenAPI·platform-api.md). 콘솔 입력칸은 crefans_admin fix/withdrawal-reject.
+- 실제 재현(옛 한도 500, 490자 사유): Prisma P2000 'value too long … Column: note'. 원장 반영(finishPayout)이 먼저 커밋돼 **상태는 rejected, note는 '은행 반려', 감사 기록 0건으로 반쯤 적용**된 채 오류. 수정 후에는 입력 단계에서 400 INVALID_INPUT, 아무것도 적용되지 않음.
+- 검증(09:52~ KST): 테스트 추가(490자 거절·상태 processing 유지, 489자 반려·note 500자·감사 1건). 대조: 한도 500 원복 → 1 실패. tsc 0, 관련 9파일 167/167(09:53 KST).
+
 ## 2026-11-07 09:40 KST 후속: 콘솔 반려 표시·수동 반려 사유 길이·콩 차지백 경고 (fix/payout-refund-gaps, 배포 보류)
 - 사용자 결정(2026-11-07): 서버 배포 보류. ③ 멤버십 미수금 금액은 **현행 유지**(부족액 전체 기록, 반려 시 receivables 워커가 자동 정산) — 코드 변경 없음.
 - 011efbd: GET /admin/withdrawals 항목에 `rejectable`(requested+출금 가능액 음수, rejectWithdrawal과 같은 조건). 멤버십 수동 결과 반려 사유 500→180자('수동 이체 반려 · ' 11자 포함 note VARCHAR(191)). 이전에는 181자 이상이 DB 길이 초과로 INTERNAL_ERROR(대조에서 확인).

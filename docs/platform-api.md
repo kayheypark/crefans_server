@@ -203,7 +203,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /admin/withdrawals/:id/reject | 매출·정산 생성 권한(2026-11-07). 신청 뒤 환불로 출금 가능 잔액이 음수가 되어 `PAYOUT_BALANCE_CHANGED`로 멈춘 접수(requested) 출금만 사유(150자)와 함께 반려. 처리 중이면 409 `WITHDRAWAL_NOT_REQUESTED`, 잔액이 충분하면 409 `WITHDRAWAL_NOT_BLOCKED`. 반려 금액은 다시 출금 가능액에 포함되고 크리에이터 알림·감사 `withdrawal.rejected`를 남김. 은행 API 호출 없음 |
 | GET | /admin/settlement-accounts | 매출·정산 조회 권한. 수동 지급 모드에서 예금주 확인 대기 계좌(은행·예금주 표시명·끝 4자리, 최대 100건). 전체 계좌번호는 반환하지 않음 |
 | POST | /admin/settlement-accounts/:id/verify | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 통장 사본 등으로 예금주 확인 후 expectedVersion·확인 내용으로 기록, 이미 확인·버전 불일치는 409. 감사 `account.manual_verified` |
-| POST | /admin/beans/withdrawals/:id/manual-result | SUPER_ADMIN(2026-11-02), `MANUAL_PAYOUTS_ENABLED`일 때만. 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
+| POST | /admin/beans/withdrawals/:id/manual-result | SUPER_ADMIN(2026-11-02), `MANUAL_PAYOUTS_ENABLED`일 때만. 반려 사유 489자(접두어 포함 note 500자, 2026-11-07). 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
 | GET | /admin/financial-policy | 운영 설정 조회 권한; 현재 DB 수수료율/정산 보류·version 조회 |
 | PUT | /admin/financial-policy | 운영 설정 수정 권한; expectedVersion/platformFeeBps/settlementHoldDays/reason와 confirmation='정책 변경'(정확히 일치, 아니면 400 CONFIRMATION_REQUIRED), 충돌409·감사 기록 원자 반영 |
 | GET | /admin/financial-policy/history | 운영 설정 조회 권한; 최근 정책 변경100건 |

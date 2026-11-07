@@ -421,6 +421,18 @@ test('manual payout mode: a Wednesday claim parks the payout without a bank call
  await assert.rejects(manual.manualResult(admin,p.id,{result:'paid',reference:'BANK-REF-1'},new Date(WED)),code('PAYOUT_NOT_PROCESSING'),'a recorded payout cannot be recorded again');
  assert.equal(await db.platformAuditLog.count({where:{entity_id:p.id,action:'bean.payout_manual_result'}}),1);});
 
+// 2026-11-07: a manual reject reason fits bean_payouts.note VARCHAR(500) together with its prefix.
+test('manual payout mode: a reject reason is limited to what the note column holds after its prefix',async()=>{
+ const {BankProvider}=require('../dist/src/platform/bank-provider');const manualConfig=new ConfigService({BEAN_LEDGER_ENABLED:'true',BEAN_LIVE_PAYMENTS_APPROVED:'true',BETA_MODE:'true',MANUAL_PAYOUTS_ENABLED:'true'});
+ const manual=new BeansService(service,finance,provider,new BankProvider(manualConfig,db),manualConfig);
+ const o=await charge(1000);await receipt(o);await beans.tip(fan,creator,{quantity:1000,requestId:randomUUID()});const p=await payout(1000);
+ await manual.payout(p.id,admin,new Date(WED));assert.equal((await db.beanPayout.findUniqueOrThrow({where:{id:p.id}})).status,'processing');
+ await assert.rejects(manual.manualResult(admin,p.id,{result:'rejected',reason:'가'.repeat(490)},new Date(WED)),code('INVALID_INPUT'),'490 characters would not fit');
+ assert.equal((await db.beanPayout.findUniqueOrThrow({where:{id:p.id}})).status,'processing','nothing applied');
+ await manual.manualResult(admin,p.id,{result:'rejected',reason:'가'.repeat(489)},new Date(WED));
+ const row=await db.beanPayout.findUniqueOrThrow({where:{id:p.id}});assert.deepEqual([row.status,row.note.length],['rejected',500]);
+ assert.equal(await db.platformAuditLog.count({where:{entity_id:p.id,action:'bean.payout_manual_result'}}),1);});
+
 test('unapproved terminal PG orders release their reservation exactly once without a locally saved payment key',async()=>{
  const originalConfirm=charges;
  for(const status of ['EXPIRED','ABORTED']){

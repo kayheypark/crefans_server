@@ -33,6 +33,7 @@ const EVENT_ACTOR='system:event:promotion-beans-v1',EVENT_PREFIX='event:promotio
 const quantity=(v:any)=>{if(!Number.isSafeInteger(v)||v<1||v>100000)reject(400,'INVALID_BEAN_QUANTITY','1~100,000콩 사이의 정수로 입력해주세요.');return v as number;};
 const view=(v:any):any=>JSON.parse(JSON.stringify(v,(_k,x)=>typeof x==='bigint'?x.toString():x));
 const pageOf=(v:any)=>{const p=Number(v||1);if(!Number.isSafeInteger(p)||p<1||p>10000)reject(400,'INVALID_PAGE','페이지를 확인해주세요.');return p;};
+const BEAN_NOTE_MAX=500,BEAN_REJECT_PREFIX='수동 이체 반려 · ';
 @Injectable()
 export class BeansService {
  constructor(private service:PlatformService,private finance:PlatformFinanceService,private provider:PaymentProvider,private bank:BankProvider,private config:ConfigService){}
@@ -201,13 +202,14 @@ if(!await this.service.access(post,member,tx))reject(403,'POST_ACCESS_REQUIRED',
  // transfer result is applied once through the same ledger path as a bank result.
  async manualResult(admin:any,id:string,input:any,now=new Date()){
   this.enabled();this.admin(admin,'update');requireSuperAdmin(admin);if(!manualPayouts(this.config))reject(409,'MANUAL_PAYOUTS_DISABLED','수동 지급이 활성화되어 있지 않습니다.');
-  const result=input?.result,reference=text(input?.reference??'',100,false),reason=text(input?.reason??'',500,false),at=new Date(input?.transferredAt??now);
+  // bean_payouts.note is VARCHAR(500) and stores the reason after its prefix, so the reason fits what is left (2026-11-07).
+  const result=input?.result,reference=text(input?.reference??'',100,false),reason=text(input?.reason??'',BEAN_NOTE_MAX-BEAN_REJECT_PREFIX.length,false),at=new Date(input?.transferredAt??now);
   if(!['paid','rejected'].includes(result)||(result==='paid'&&!reference)||(result==='rejected'&&!reason)||!Number.isFinite(at.getTime())||at>now)reject(400,'INVALID_MANUAL_RESULT','이체 결과·참조번호·이체 시각을 확인해주세요.');
   const first=await this.db.beanPayout.findUnique({where:{id}});if(!first)reject(404,'PAYOUT_NOT_FOUND','출금 신청을 찾을 수 없습니다.');
   if(first.status==='requested')await this.payout(id,admin,now);
   const current=await this.db.beanPayout.findUniqueOrThrow({where:{id}});if(current.status!=='processing')reject(409,'PAYOUT_NOT_PROCESSING','처리 중인 출금만 이체 결과를 기록할 수 있습니다.');
   await this.finishPayout(id,result);
-  await this.transaction(async tx=>{await tx.beanPayout.update({where:{id},data:{note:result==='paid'?`수동 이체 완료 · ${reference}`:`수동 이체 반려 · ${reason}`}});await appendAudit(tx,{category:'finance',action:'bean.payout_manual_result',entityId:id,data:{creatorId:first.creator_id,net:first.net,status:result,adminId:admin.id,reference:reference||null,transferredAt:at.toISOString()}});});
+  await this.transaction(async tx=>{await tx.beanPayout.update({where:{id},data:{note:result==='paid'?`수동 이체 완료 · ${reference}`:BEAN_REJECT_PREFIX+reason}});await appendAudit(tx,{category:'finance',action:'bean.payout_manual_result',entityId:id,data:{creatorId:first.creator_id,net:first.net,status:result,adminId:admin.id,reference:reference||null,transferredAt:at.toISOString()}});});
   return{message:result==='paid'?'이체 완료를 기록했습니다.':'출금을 반려했습니다.'};
  }
  private async finishPayout(id:string,status:string){const first=await this.db.beanPayout.findUniqueOrThrow({where:{id}});await this.transaction(async tx=>{await this.lock(tx,[first.creator_id],true,true);await tx.$queryRaw`SELECT id FROM bean_payouts WHERE id=${id} FOR UPDATE`;const p=await tx.beanPayout.findUniqueOrThrow({where:{id}});if(p.status!=='processing')return;const {allocations,lots}=await this.payoutSources(tx,p);for(const a of allocations)await tx.beanLot.update({where:{id:a.lot_id},data:{reserved:{decrement:a.quantity},...(status==='rejected'?{available:{increment:a.quantity}}:{})}});await this.move(tx,`payout-result:${id}`,'payout.result',p.creator_id,status==='paid'?'은행 지급 완료·회사 콩 회수':'은행 반려·출금 예약 반환',id,[{member:p.creator_id,bucket:'reserved-paid',delta:-p.quantity},...(status==='paid'?[{member:'company',bucket:'stock',delta:p.quantity}]:allocations.map(a=>({member:p.creator_id,bucket:lots.find(l=>l.id===a.lot_id).bucket,delta:a.quantity})))]);await tx.beanPayout.update({where:{id},data:{status,locked_until:null,note:status==='paid'?'은행 지급 완료':'은행 반려'}});
