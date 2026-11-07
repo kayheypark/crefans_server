@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import {NestFactory} from '@nestjs/core';
-import {cookieParser,originGuard,originList} from './middleware';
+import {cookieParser,corsOptions,originGuard,originList} from './middleware';
 import {PlatformOperationsService} from './operations.service';
 import {PlatformSecurityService} from './security.service';
 import {PlatformModule} from './module';
@@ -13,8 +13,9 @@ async function bootstrap(){
  operations.installFatalHandlers();operations.startWatchdog();app.enableShutdownHooks();
  app.setGlobalPrefix('api/v1');app.use(cookieParser());app.use((req:any,res:any,next:any)=>{if(req.path.startsWith('/api/v1/')){res.setHeader('Cache-Control','private, no-store');res.vary('Cookie');}next();});app.useGlobalInterceptors(new EnvelopeInterceptor());app.useGlobalFilters(new PlatformExceptionFilter(operations));
  const origins=originList(process.env.FRONTEND_ORIGINS,'http://127.0.0.1:3010,http://localhost:3010,http://127.0.0.1:3002,http://localhost:3002'),adminOrigins=originList(process.env.ADMIN_ORIGINS,'');
- app.enableCors({origin:Array.from(new Set([...origins,...adminOrigins])),credentials:true,exposedHeaders:['X-Request-ID']});
- app.use(originGuard(origins,adminOrigins));
+ const guideOrigins=originList(process.env.GUIDE_ORIGINS,'https://guide.crefans.com');
+ app.enableCors(corsOptions(Array.from(new Set([...origins,...adminOrigins])),guideOrigins));
+ app.use(originGuard(origins,adminOrigins,guideOrigins));
  installPlatformOpenApi(app);
  await app.listen(Number(process.env.PORT||3001),process.env.HOST||'127.0.0.1');
 }

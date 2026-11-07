@@ -1,3 +1,20 @@
+## 2026-11-07 가이드 검색 어드바이저 실제 AI 연결·배포 진행
+- 사용자 승인: 제공한 서비스 계정 키로 가이드 서치 어드바이저 운영 배포. 키는 Git 제외 .local 비공개 파일(0600)에만 임시 저장, 운영 runtime.env로 전송 예정. 값/해시를 문서·빌드·로그에 포함하지 않는다.
+- origin/prod 72d3bac에서 feat/guide-advisor-live 분기 후 준비된 feat/guide-advisor bc66215 병합. 마이그레이션 없음. 현재 운영 api/worker bundle-20261107, 다른 서비스 보존.
+- 합격 조건: 실제 공급사 응답·공개 가이드 출처, 서버 키 비노출, 개인정보/Origin/요청량 회귀, PC/모바일 API 연결, 운영 health·기존 데이터 불변, 복구본 운영 밖 검증.
+- 실제 provider 예시 1건 HTTP200·completed(2.2초). 기본 gpt-6-luna. nest build 통과, 로컬 보안/API 45통과·1선택검사 skip. 명령 후 셸 종료코드 수집은 zsh 예약변수 status 사용으로 실패(검사 로그는 0실패), 다음 검사에서 별도 변수 사용.
+- 외부 전송 안내 반영 선호를 질문했으나 미응답. 원래 실제 AI 배포 지시의 필요한 사실 고지로 판단해 안내·처리방침 반영을 진행한다고 알렸다(별도 사업 정책/보관 설정 변경 없음). 처리방침 2026-11-07.advisor.1: 8·9조 참조, 15조 선택 AI 범위/비저장/수탁자·처리국가·보관·거부방법. 법률 검토 완료를 의미하지 않음. 공급사는 기본30일+법령/안전 예외, AI 미사용 시 기존 서비스 계속 이용 가능.
+- 후속 검증: 실제 공개 추천 질문4건 모두 provider HTTP200·completed. 충전 위치 검색 누락1건 발견 후 서버/가이드 어미 처리 보완, 실제 재호출에서 올바른 경로 확인. Express 대소문자/끝슬래시 동등 경로에도 Origin/CORS 경계 유지하도록 보완. 최신 로컬 회귀47통과·1선택검사 skip, 신규 보정2개 제거 대조 각 실패 후 복원.
+- 최종 로컬 회귀60통과·1선택검사 skip, API 키는 실 응답 검증 완료. 운영 밖 설정6개·가이드106개·이전 API 이미지 OCI index/전체 blob 해시 검증. 최초 이미지 검사는 config digest와 OCI image index digest 혼동으로 실패했으며 index 기반으로 바로잡고 전체 blob을 재검증했다.
+- 증거 .local/guide-advisor-live-20261107/. 현재 준비 중, 운영 교체 아직 없음.
+
+## 2026-11-07 16:10 KST 가이드 AI 어드바이저 API — feat/guide-advisor (origin/prod 72d3bac 기준, 로컬 커밋만, push·배포 없음)
+- 요청: guide.crefans.com 'AI 어드바이저' 채팅의 실연결 준비(토큰만 넣으면 동작, 모델 비노출). 가이드 쪽 crefans_guide feat/ai-advisor, 설계·조사 출처는 가이드 `docs/ai-advisor.md`(OpenAI Responses·데이터 보관·키 안전·모델·안전 모범사례, OWASP LLM Top 10 2025, 확인일 2026-11-07).
+- 구현 `src/platform/guide-advisor.ts`: `POST /api/v1/guide/advisor` {question}. 키(`GUIDE_ADVISOR_OPENAI_API_KEY`) 없으면 503 PROVIDER_NOT_CONFIGURED(가짜 성공 없음). 1~500자, 이메일·10자리 이상 숫자 400 PERSONAL_DATA. IP별 5/분·50/일(기존 auth_rate_buckets 리미터), 근거 있을 때만 전체 1000/일 후 Responses API fetch(store:false, max_output_tokens 700, reasoning low, 20초). 근거 = 가이드 `/advisor-index.json`(10분 캐시, 실패 시 이전 캐시) + 현행 약관·처리방침·운영정책(LegalDocumentsService). 근거 없으면 공급사 호출 없이 고정 안내. 응답 {answer,sources,found} — 모델명 없음, 링크는 색인에서만. 기본 모델 gpt-6-luna(공식 모델 페이지 2026-11-07), `GUIDE_ADVISOR_MODEL`로 변경. 질문 원문은 로그·DB에 저장하지 않음(요청 감사 로그는 기존대로 경로·상태만).
+- CORS/출처: `corsOptions`로 이 경로만 `GUIDE_ORIGINS`(기본 https://guide.crefans.com)·credentials 없음, 다른 경로는 기존 목록 그대로. originGuard는 이 경로에서 가이드 출처만 통과(없음/다른 출처 403). OpenAPI user 87·전체 209, platform-api.md 행, runtime.env.example GUIDE_* 설명, current-contracts.md 라우트 1행(생성기 결과 중 이 변경분만 반영 — 프론트 작업트리 차이로 생긴 preview 경로 변동은 제외).
+- 검증(16:00~16:05, 작업트리 전용 node_modules `cp -c` 복제+prisma generate, 공유 .prisma index.js 수정시각 11-02 그대로; .local/platform.env 는 메인 저장소 파일 심볼릭 링크): tsc 0·nest build 0. `tests/platform-guide-advisor.test.cjs` 9/9(OpenAI 대역, 리미터는 3307 dev DB 실테이블), openapi 14/14, security 18 통과·실패 0, auth-hardening 4·categories 4·reserved-handles 8 통과. 대조 6/6(dist 변형→실행→SHA 원복): 출처 검사 제거·credentials true·개인정보 검사 제거·분당 제한 제거·store true·키 검사 제거 각각 해당 테스트 1건만 실패, 원복 9/9. 기록 `.local/guide-advisor-20261107/mutations.{py,txt}`. 실제 OpenAI 호출·운영 검증 없음.
+- 배포 시: runtime.env에 키(필요 시 한도·모델) → api 이미지 교체(마이그레이션 없음) → 가이드를 엔드포인트로 재빌드. api 컨테이너에서 guide.crefans.com 색인·api.openai.com 접근 확인 필요. 결정 필요: 처리방침 국외 이전(OpenAI) 반영, 질문 로그, 비용 한도·월 예산, safety_identifier.
+
 ## 2026-11-07 11:28 KST 운영 배포 bundle-20261107 완료 (서버·콘솔·프론트 묶음)
 - 내용: 출금·환불 공백(차지백 처리 중 미수금, 음수 출금 반려 API, 콩 원장 일일 대사), 콘솔 반려·차지백 경고·반려 기록 버튼, 사유 길이 수정, 결제 완료 메일 실발송 연결+중개자 고지, 디스크 80/90% 경보, 게시물 미공개(마이그레이션 actor_type 1칸), 결제 상세·가입 완료 중개자 고지, 프론트 standalone(맥 빌드·SSH 전송) 첫 적용.
 - 커밋: server 404d8e8 / admin 06290e2 / front 4120fbc. 이미지 전부 bundle-20261107.

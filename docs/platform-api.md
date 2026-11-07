@@ -309,6 +309,7 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | GET | /admin/logs/:id | 동일 권한. 상세·동일 요청/대상/배치의 최근100건 타임라인·outbox 발송 상태, 미존재404 |
 | POST | /admin/client-errors | 활성 관리자. 비신뢰 브라우저 오류 종류·정적 JS 위치 보고, IP별10회/분 |
 | POST | /telemetry/browser-errors | 선택 인증. 서비스 브라우저 오류 보고, 동일 제한·허용 목록 재검증 |
+| POST | /guide/advisor | 비로그인·쿠키 없음, `GUIDE_ORIGINS`(기본 guide.crefans.com) 출처만(CORS·Origin 모두). `{question}` 1~500자, 이메일·10자리 이상 숫자 400 PERSONAL_DATA. 가이드 색인+현행 약관 3종에서 근거를 찾아 OpenAI Responses API(store=false)로 평문 답변 `{answer,sources,found}`; 근거 없으면 공급사 호출 없이 고정 안내. 키 없음 503 PROVIDER_NOT_CONFIGURED, IP별 5회/분·50회/일·전체 1000회/일 429, 시간 초과 504, 공급사 오류 502. 모델명 비노출, 질문 원문 미저장. 구현 `src/platform/guide-advisor.ts` |
 
 응답 envelope 4개 필드는 유지하며 `X-Request-ID` 응답 헤더를 추가했다. 클라이언트 입력 ID는 신뢰하지 않는다. 로그 API는 수정/삭제를 제공하지 않는다. 수집·보관·감사/외부 공급사 실패 경계·공식 근거는 [운영 사고 추적 로그](./operational-logging.md)를 따른다. 운영 배포 상태는 PROGRESS 최신 기록과 실행 증거를 확인한다.
 
