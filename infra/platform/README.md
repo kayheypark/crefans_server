@@ -88,6 +88,10 @@ Compose private network는172.30.90.0/24, 동적주소범위172.30.90.128/25(고
 
 실제 운영 IP 할당 충돌을 피하려고 고정 Caddy .2를 동적 ip_range(172.30.90.128/25) 밖에 둔다. 정의 근거는 [Docker Compose IPAM](https://docs.docker.com/reference/compose-file/networks/#ipam), 확인2026-10-22. 배포용 schema/app 준비 명령은 일반 Docker --env-file로 dotenv 파일을 읽지 말고 Compose run의 env_file 파싱을 사용한다. 값·DB URL을 에러로 출력하지 않는다.
 
+### 디스크 사용률 알림 (2026-11-07)
+
+EBS 50GB 유지 결정에 따라 worker가 10분마다 호스트 루트 디스크 사용률을 검사해 기존 `[crefans] operations` outbox로 보낸다(80% 경고, 90% 위험, 같은 단계 하루 1회, 회복 1회). compose 변경은 없다: 운영 worker에서 `/`(overlay2)와 `/data/media`(named volume) 모두 호스트 `/dev/root`(ext4, 50,884,108,288 bytes)와 같은 블록 수를 반환함을 2026-11-07 읽기 전용으로 확인했다. Docker data-root를 다른 디스크로 옮기면 `/`는 그 디스크를 보게 되므로 그때는 호스트 `/`를 읽기 전용으로 마운트하고 `DISK_ALERT_PATH`를 바꾼다. 코드 `src/platform/disk-alert.ts`, 테스트 `tests/platform-disk-alert.test.cjs`, 동작 상세는 [resilience-runbook](resilience-runbook.md) 3절.
+
 ### 독립 운영 콘솔·전용 Telegram (2026-10-22)
 
 관리자는별도crefans_admin소스/이미지이며 https://admin.crefans.com/console. 실제운영은 compose.yml + compose.beta.yml + compose.admin.yml 세파일을함께사용한다. ADMIN_IMAGE/ADMIN_DOMAIN설정,관리자384MiB/readonly/비루트·호스트3002포트비공개·비밀값전달없음. Caddy의관리자admin/auth허용API만직접API로전달하여trustedproxy IP규약을유지하고다른API404, 정확한Origin/host-onlySecure쿠키. 사용자요청신규운영자만수동bootstrap후실로그인검증,기본계정/기존회원덮어쓰기없음. 전용crefans_operations_bot의게시만권한과local/beta실수신확인,토큰공개문서복제금지. 기존14migration상태확인만수행,DB/미디어/Caddy볼륨과이전이미지보존. 롤백설정 /opt/crefans-backup-admin-20261022(700). 근거·미검증범위는crefans_admin/docs/deployment-20261022.json.

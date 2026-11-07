@@ -60,6 +60,6 @@ export async function observeAudit(db:any,input:AuditInput,context:PlatformReque
  catch{console.error(JSON.stringify({event:'audit_persist_failed',id:data.id,category:data.category,action:data.action,requestId:data.request_id}));}
 }
 export async function auditOperation(db:any,event:any,extra:Record<string,unknown>={}){
- const prefix=event.type.split('.')[0],category:AuditCategory=prefix==='admin'?'admin':prefix==='security'?'security':prefix==='worker'?'worker':['http','process'].includes(prefix)?'error':'business';
- return appendAudit(db,{category,action:event.type,level:category==='error'||event.type==='worker.error'?'error':category==='security'||event.type==='worker.stale'?'warning':'info',status:typeof event.data.status==='number'?event.data.status:undefined,sourceId:event.id,entityId:event.data.orderId||event.data.postId||event.data.targetId||event.data.subscriptionId||event.data.memberId,data:{...event.data,...extra}});
+ const prefix=event.type.split('.')[0],category:AuditCategory=prefix==='admin'?'admin':prefix==='security'?'security':prefix==='worker'||prefix==='disk'?'worker':['http','process'].includes(prefix)?'error':'business';
+ return appendAudit(db,{category,action:event.type,level:category==='error'||event.type==='worker.error'?'error':category==='security'||['worker.stale','disk.warning','disk.critical'].includes(event.type)?'warning':'info',status:typeof event.data.status==='number'?event.data.status:undefined,sourceId:event.id,entityId:event.data.orderId||event.data.postId||event.data.targetId||event.data.subscriptionId||event.data.memberId,data:{...event.data,...extra}});
 }

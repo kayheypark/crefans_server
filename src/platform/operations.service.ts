@@ -11,9 +11,10 @@ const labels:Record<string,string>={
  'content.created':'콘텐츠 등록','content.updated':'콘텐츠 수정','content.deleted':'콘텐츠 삭제',
  'member.profile.updated':'회원 프로필 수정','creator.profile.updated':'크리에이터 프로필 수정','http.error':'서버 오류','worker.error':'배치 오류',
  'process.error':'프로세스 치명 오류','worker.completed':'배치 처리 완료','worker.hourly':'배치 1시간 요약',
+ 'disk.warning':'디스크 사용률 경고','disk.critical':'디스크 사용률 위험','disk.recovered':'디스크 사용률 회복',
  'security.injection_detected':'인젝션 시도 감지','security.ip_blocked':'공격 IP 자동 차단','security.ip_released':'IP 차단 만료',
 };
-const allowed=new Set(['ip','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','failures','activity','fingerprint','release']);
+const allowed=new Set(['ip','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각']);
 function metadata(data:Record<string,unknown>){
  const result:Record<string,any>={};
  for(const [key,value] of Object.entries(data)){
