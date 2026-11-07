@@ -1,0 +1,72 @@
+{
+  "checkedAt": "2026-11-07T12:00:03.935746+00:00",
+  "deployedSource": {
+    "server": "2419bb8786c3b5feb05adae207cb2f48ddb71292",
+    "guide": "3494b40"
+  },
+  "api": {
+    "result": "deployed",
+    "startedAt": "2026-11-07T11:55:59Z",
+    "finishedAt": "2026-11-07T11:56:07Z",
+    "revision": "2419bb8786c3b5feb05adae207cb2f48ddb71292",
+    "image": "crefans-api:guide-advisor-live-20261107",
+    "imageId": "sha256:c589c33012d92b37a18a838e329b14a523dc1996363cc3c2f9fca90f81e44fbe",
+    "apiHealthy": true,
+    "workerRunning": true,
+    "otherContainersUnchanged": true,
+    "runtimeKeyInstalled": true,
+    "runtimeMode": "0o600",
+    "migrationsRun": false
+  },
+  "guide": {
+    "at": "2026-11-07T11:57:04Z",
+    "filesVerified": 106,
+    "livePagesVerified": 4,
+    "containersUnchanged": true,
+    "temporaryFilesRemoved": true,
+    "mode": "server"
+  },
+  "productionChecks": {
+    "api": 7,
+    "browser": [
+      "desktop Chromium 1440x1000",
+      "mobile WebKit emulation 390x844"
+    ],
+    "physicalIphone": false
+  },
+  "localChecks": {
+    "serverTestsPassed": 60,
+    "serverTestsSkipped": 1,
+    "guidePages": 29,
+    "advisorSections": 149,
+    "negativeControls": [
+      "retrieval regression detected",
+      "Origin alias regression detected"
+    ]
+  },
+  "documentChecks": {
+    "checkDocs": "failed: unreviewed backup-alerts/README and stale generated contracts",
+    "checkGuides": "failed: source review lock differs from sibling repositories",
+    "snapshotsRegenerated": false
+  },
+  "cleanup": {
+    "at": "2026-11-07T11:58:29Z",
+    "oldImageRemoved": "crefans-api:bundle-20261107",
+    "offsiteArchiveVerified": true,
+    "serverBuildFilesRemoved": true,
+    "runtimeLogsContainKey": false,
+    "apiHealthy": true,
+    "workerRunning": true,
+    "trackedFilesScanned": 641,
+    "temporaryLocalKeyRemoved": true
+  },
+  "evidenceHashes": {
+    "/Users/ethan/repository/crefans_server-guide-advisor/.local/guide-advisor-live-20261107/tests.log": "62bbc3b09ff2bee099cb0d294ca8f3a6ccf3962c287ea0c4acc0ade0dfa39e8c",
+    "/Users/ethan/repository/crefans_server-guide-advisor/.local/guide-advisor-live-20261107/build.log": "7aa1638731242a1ef372b25af70d8e696bbb2cf4a43de8594e5172824ec1cad2",
+    "/Users/ethan/repository/crefans_server-guide-advisor/.local/guide-advisor-live-20261107/production-api-check.json": "92566b5730d168fe4750d06f208d2c209503a0d0e456bce07d8c1f926fe6eeca",
+    "/Users/ethan/repository/crefans_guide-advisor-design/.local/advisor-live-20261107/browser/results.json": "0b205a5cb8b5e732cd891753f977b122f96682ad48150e2f93abf506ff7402cf",
+    "/Users/ethan/repository/crefans_guide-advisor-design/.local/advisor-live-20261107/deployed-files.json": "774c3c04c68b94d9b8952c5ebc81ce468529484e24c29cf577e931a25ed8ff38",
+    "/Users/ethan/repository/crefans_server-guide-advisor/.local/guide-advisor-live-20261107/check-docs.log": "18366d36a095beb131759b1455b421fe0674dc19d62568788eb76dcbc851b1c2",
+    "/Users/ethan/repository/crefans_guide-advisor-design/.local/advisor-live-20261107/check-guides.log": "4f3d6fe5a93daac8c71d7afb950a9a9536cac31348ce7a25a24425edab11e969"
+  }
+}
