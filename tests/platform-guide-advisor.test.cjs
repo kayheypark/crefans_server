@@ -2,7 +2,7 @@ require('reflect-metadata');require('dotenv').config({path:'.local/platform.env'
 // Guide AI advisor: OpenAI is always a stub (no network). Rate limits use the real auth_rate_buckets table on the local 3307 dev DB.
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),{randomUUID}=require('node:crypto');
 const {PrismaClient}=require('@prisma/client'),{ConfigService}=require('@nestjs/config'),{NestFactory}=require('@nestjs/core'),{Module}=require('@nestjs/common');
-const {GuideAdvisorService,GuideAdvisorController,retrieve,fuse,MIN_SIMILARITY,REWRITE_INSTRUCTIONS,rewrites,containsPersonalData,legalChunks,QUESTION_MAX,looksLikeInjection,unsafeAnswer,SAFE_ANSWER}=require('../dist/src/platform/guide-advisor');
+const {GuideAdvisorService,GuideAdvisorController,retrieve,fuse,MIN_SIMILARITY,REWRITE_INSTRUCTIONS,rewrites,INSTRUCTIONS,OFF_TOPIC,containsPersonalData,legalChunks,QUESTION_MAX,looksLikeInjection,unsafeAnswer,SAFE_ANSWER}=require('../dist/src/platform/guide-advisor');
 const {LocalMemberService}=require('../dist/src/auth/local/local-member.service');
 const {requestContext}=require('../dist/src/platform/request-context');
 const {corsOptions,originGuard}=require('../dist/src/platform/middleware');
@@ -19,7 +19,7 @@ const reply=text=>({id:'resp_x',model:'internal-model-name',output:[{type:'reaso
 // Query-rewrite calls share the Responses URL; they are logged with a '#rewrite' suffix and answer fn.rewrite (default: no rewrites, false: HTTP 500).
 const isRewrite=init=>{try{return JSON.parse(init.body).instructions===REWRITE_INSTRUCTIONS;}catch{return false;}};
 function stub(handler){const calls=[];const fn=async(url,init)=>{if(String(url).endsWith('/v1/responses')&&isRewrite(init)){calls.push({url:String(url)+'#rewrite',init});return fn.rewrite===false?new Response('{}',{status:500}):new Response(JSON.stringify(reply(fn.rewrite||'')),{status:200});}calls.push({url:String(url),init});if(String(url).endsWith('advisor-index.json'))return new Response(JSON.stringify(index),{status:200});if(String(url).endsWith('/v1/moderations')&&!fn.moderation)return new Response(JSON.stringify({results:[{flagged:false}]}),{status:200});return handler(url,init);};fn.calls=calls;return fn;}
-const service=(env={},fetcher=stub(async()=>new Response(JSON.stringify(reply('7일 이내에 열람하지 않았다면 환불을 요청할 수 있어요.')),{status:200})))=>{const s=new GuideAdvisorService(new ConfigService({GUIDE_ADVISOR_OPENAI_API_KEY:KEY,...env}),limiter);s.fetcher=fetcher;return s;};
+const service=(env={},fetcher=stub(async()=>new Response(JSON.stringify(reply('7일 이내에 열람하지 않았다면 환불을 요청할 수 있어요.')),{status:200})))=>{const s=new GuideAdvisorService(new ConfigService({GUIDE_ADVISOR_OPENAI_API_KEY:KEY,GUIDE_ADVISOR_DAILY_TOTAL:'1000000000',...env}),limiter);s.fetcher=fetcher;return s;};// The global ceiling bucket is shared by every run on the dev DB; its own test sets 0.
 const asIp=(fn,ip='test-'+randomUUID())=>requestContext.run({ip,peerIp:ip,requestId:randomUUID()},fn);
 const status=async promise=>{try{await promise;return 'ok';}catch(e){return `${e.getStatus?.()} ${e.getResponse?.().code||''}`.trim();}};
 // Buckets are left to expire on their own (<=1 day); other sessions share this table, so nothing is bulk-deleted.
@@ -172,6 +172,22 @@ test('query rewrite: synonyms become guide wording and are searched with the que
 test('a not-found answer from the model hides the guide list',async()=>{
  const s=service({},stub(async()=>new Response(JSON.stringify(reply(SAFE_ANSWER)),{status:200})));
  assert.deepEqual(await asIp(()=>s.ask({question:'구독 환불은 어떻게 받나요?'})),{answer:SAFE_ANSWER,sources:[],found:false});
+});
+test('an off-topic refusal from the model hides the guide list too, even in bold',async()=>{
+ for(const text of [OFF_TOPIC,'**'+OFF_TOPIC+'**']){
+  const s=service({},stub(async()=>new Response(JSON.stringify(reply(text)),{status:200})));
+  assert.deepEqual(await asIp(()=>s.ask({question:'구독 환불은 어떻게 받나요?'})),{answer:text,sources:[],found:false});
+ }
+ assert.ok(INSTRUCTIONS.includes(OFF_TOPIC),'the model is told the exact refusal');
+});
+test('answers may use bold and pipe tables; up to 6 sections reach the model, 3 are listed',async()=>{
+ assert.match(INSTRUCTIONS,/\*\*굵게\*\*/);assert.match(INSTRUCTIONS,/마크다운 표/);assert.doesNotMatch(INSTRUCTIONS,/마크다운 표는 쓰지/);
+ const formatted='**화요일 23:59**까지 신청하면 **수요일**에 지급돼요.\n| 구분 | 지급일 |\n|---|---|\n| 멤버십 수익 | 수요일 |';
+ assert.equal(unsafeAnswer(formatted),false,'bold and tables are not unsafe');
+ const s=service({},stub(async()=>new Response(JSON.stringify(reply(formatted)),{status:200})));s.fetcher.rewrite='환불 기준\n구독 환불\n콩 충전 환불';
+ const r=await asIp(()=>s.ask({question:'환불 기준'}));assert.equal(r.answer,formatted);assert.equal(r.sources.length,3);
+ const body=JSON.parse(s.fetcher.calls.find(c=>c.url==='https://api.openai.com/v1/responses').init.body);
+ const docs=(body.input.match(/^\[\d+\] /gm)||[]).length;assert.ok(docs>4&&docs<=6,'documents sent: '+docs);
 });
 test('fusion keeps sections found by either search, both-found first',()=>{
  const [a,b,c]=index.chunks;
