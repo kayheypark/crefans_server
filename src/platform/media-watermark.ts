@@ -24,7 +24,7 @@ export async function ensureWatermarkedMedia(tx:any,sourceId:string,creatorId:st
  if(existing)return existing.target_id;
  const id=randomUUID(),remote=managedMediaKey(source.s3_upload_key);
  if(!remote&&!source.s3_upload_key.startsWith('local/'))reject(409,'MEDIA_MIGRATION_REQUIRED','이 미디어는 다시 업로드해주세요.');
- await tx.media.create({data:{id,user_sub:creatorId,type:source.type,original_name:source.original_name,file_name:id,file_size:0,mime_type:source.type==='IMAGE'?'image/webp':'video/mp4',original_url:`/api/v1/media/${id}/file`,s3_upload_key:`${remote?'platform':'local'}/${id}`,processing_status:'PROCESSING',processing_job_id:WATERMARK_PENDING,metadata:{watermark:{version:WATERMARK_VERSION,handle,sourceId}}}});
+ await tx.media.create({data:{id,user_sub:creatorId,type:source.type,original_name:source.original_name,file_name:id,file_size:0,mime_type:source.type==='IMAGE'?'image/webp':'video/mp4',original_url:`/api/v1/media/${id}/file`,s3_upload_key:`${remote?'platform':'local'}/${id}`,processing_status:'PROCESSING',processing_job_id:WATERMARK_PENDING,metadata:{watermark:{version:WATERMARK_VERSION,handle,sourceId},...(source.metadata?.aiGenerated===true?{aiGenerated:true}:{})}}});
  await tx.mediaWatermarkJob.create({data:{source_id:sourceId,target_id:id,creator_id:creatorId,handle,version:WATERMARK_VERSION}});
  return id;
 }

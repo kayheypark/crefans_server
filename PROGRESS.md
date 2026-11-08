@@ -1,3 +1,10 @@
+## 2026-11-08 스튜디오 AI 사진 편집 생성 API + 처리방침 aiphoto.1 (feat/ai-photo-edit, 미병합·미배포)
+- 사용자 요청: AI 사진 생성 기능 추가. 이미지 전용 키는 사용자가 별도 발급(가이드 AI 키와 다름, 맥 ~/.crefans/ai-photo-openai.key 600 보관, 원문 미기록).
+- 추가: src/platform/ai-photo.ts(AiPhotoService/Controller, /studio/ai-photo/quota·edit), module 등록, 워터마크 파생에 aiGenerated 승계, 팬 게시물·스튜디오 목록 응답 aiGenerated, openapi 2개(전체 215·스튜디오 51), 처리방침 2026-11-08.aiphoto.1(8번 위탁 한 줄 + 16번 항목), runtime.env.example.
+- 근거(2026-11-08): OpenAI your-data — /v1/images/edits 학습 미사용·남용 감시 30일·CSAM 검사, /v1/moderations 보관 없음. 이미지 모델 목록에 gpt-image-2 확인(운영 키, 원문 미출력).
+- 검증: nest build 0, platform-ai-photo 6/6(대역: 허용 목록·입력 규칙·포즈 2장 저장·원본 불변·마스크 크기·실패 시 되돌림/차단 차감·출력 차단·하루 한도). 대조: 허용 검사 제거 5건 실패, 되돌림 제거 1건 실패. platform-legal 13/13(판 번호 기대값 갱신), guide-advisor 22/22, ai-photo-grants 3/3, openapi 14/14. 워터마크 파생 aiGenerated 승계는 코드 변경만(전용 테스트 없음).
+- 다음: 처리방침 문구 사용자 승인 후 운영 배포(runtime.env 에 AI_PHOTO_OPENAI_API_KEY 추가), 운영 실제 생성 1회 확인.
+
 ## 2026-11-08 AI 사진 편집 허용 크리에이터 테이블·관리 API (feat/ai-photo-grants, 미병합·미배포)
 - 사용자 요청: 스튜디오 AI 사진 편집을 허락할 크리에이터 테이블 + 운영 콘솔 관리. 콘솔은 crefans_admin feat/ai-photo-grants `/console/ai-photo`.
 - 추가: Prisma AiPhotoGrant/AiPhotoGrantChange, 마이그레이션 20261108200000_ai_photo_grants(새 테이블 2개만, 기존 데이터 변경 없음), src/platform/ai-photo-grants.ts(list/history/grant/revoke/aiPhotoAllowed), admin.controller 4개 경로(members 권한), openapi-contract 4개.
