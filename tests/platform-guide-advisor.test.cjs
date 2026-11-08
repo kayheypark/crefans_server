@@ -2,7 +2,7 @@ require('reflect-metadata');require('dotenv').config({path:'.local/platform.env'
 // Guide AI advisor: OpenAI is always a stub (no network). Rate limits use the real auth_rate_buckets table on the local 3307 dev DB.
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),{randomUUID}=require('node:crypto');
 const {PrismaClient}=require('@prisma/client'),{ConfigService}=require('@nestjs/config'),{NestFactory}=require('@nestjs/core'),{Module}=require('@nestjs/common');
-const {GuideAdvisorService,GuideAdvisorController,retrieve,containsPersonalData,legalChunks,QUESTION_MAX,looksLikeInjection,unsafeAnswer,SAFE_ANSWER}=require('../dist/src/platform/guide-advisor');
+const {GuideAdvisorService,GuideAdvisorController,retrieve,fuse,MIN_SIMILARITY,REWRITE_INSTRUCTIONS,rewrites,containsPersonalData,legalChunks,QUESTION_MAX,looksLikeInjection,unsafeAnswer,SAFE_ANSWER}=require('../dist/src/platform/guide-advisor');
 const {LocalMemberService}=require('../dist/src/auth/local/local-member.service');
 const {requestContext}=require('../dist/src/platform/request-context');
 const {corsOptions,originGuard}=require('../dist/src/platform/middleware');
@@ -16,7 +16,9 @@ const index={chunks:[
  {title:'콩 충전과 후원',section:'콩 충전',url:'/fans/beans/#콩-충전',text:'콩은 지갑에서 충전하고 게시물 후원에 사용합니다.'},
 ]};
 const reply=text=>({id:'resp_x',model:'internal-model-name',output:[{type:'reasoning',summary:[]},{type:'message',content:[{type:'output_text',text}]}]});
-function stub(handler){const calls=[];const fn=async(url,init)=>{calls.push({url:String(url),init});if(String(url).endsWith('advisor-index.json'))return new Response(JSON.stringify(index),{status:200});if(String(url).endsWith('/v1/moderations')&&!fn.moderation)return new Response(JSON.stringify({results:[{flagged:false}]}),{status:200});return handler(url,init);};fn.calls=calls;return fn;}
+// Query-rewrite calls share the Responses URL; they are logged with a '#rewrite' suffix and answer fn.rewrite (default: no rewrites, false: HTTP 500).
+const isRewrite=init=>{try{return JSON.parse(init.body).instructions===REWRITE_INSTRUCTIONS;}catch{return false;}};
+function stub(handler){const calls=[];const fn=async(url,init)=>{if(String(url).endsWith('/v1/responses')&&isRewrite(init)){calls.push({url:String(url)+'#rewrite',init});return fn.rewrite===false?new Response('{}',{status:500}):new Response(JSON.stringify(reply(fn.rewrite||'')),{status:200});}calls.push({url:String(url),init});if(String(url).endsWith('advisor-index.json'))return new Response(JSON.stringify(index),{status:200});if(String(url).endsWith('/v1/moderations')&&!fn.moderation)return new Response(JSON.stringify({results:[{flagged:false}]}),{status:200});return handler(url,init);};fn.calls=calls;return fn;}
 const service=(env={},fetcher=stub(async()=>new Response(JSON.stringify(reply('7일 이내에 열람하지 않았다면 환불을 요청할 수 있어요.')),{status:200})))=>{const s=new GuideAdvisorService(new ConfigService({GUIDE_ADVISOR_OPENAI_API_KEY:KEY,...env}),limiter);s.fetcher=fetcher;return s;};
 const asIp=(fn,ip='test-'+randomUUID())=>requestContext.run({ip,peerIp:ip,requestId:randomUUID()},fn);
 const status=async promise=>{try{await promise;return 'ok';}catch(e){return `${e.getStatus?.()} ${e.getResponse?.().code||''}`.trim();}};
@@ -112,7 +114,7 @@ test('guardrail: moderation flags harmful questions; moderation failure fails cl
  assert.equal((await asIp(()=>service({},outDown).ask({question:'환불 기준'}))).answer,SAFE_ANSWER,'no output verdict -> safe answer');
  const down=stub(async(url)=>String(url).endsWith('/v1/moderations')?new Response('{}',{status:500}):new Response(JSON.stringify(reply('x')),{status:200}));down.moderation=true;
  const d=service({},down);assert.equal(await status(asIp(()=>d.ask({question:'환불 기준'}))),'502 ADVISOR_UNAVAILABLE');assert.equal(down.calls.filter(c=>c.url.endsWith('/v1/responses')).length,0);
- const none=service();await asIp(()=>none.ask({question:'오늘 서울 날씨 알려줘'}));assert.equal(none.fetcher.calls.filter(c=>c.url.includes('api.openai.com')).length,0,'no match: nothing leaves the server');
+ const none=service();await asIp(()=>none.ask({question:'오늘 서울 날씨 알려줘'}));assert.deepEqual(none.fetcher.calls.filter(c=>c.url.includes('api.openai.com')).map(c=>c.url.replace('https://api.openai.com','')),['/v1/moderations','/v1/responses#rewrite','/v1/embeddings'],'no match: moderation, rewrite and semantic search only, no answer call');
 });
 test('guardrail: unsafe answers (provider name, prompt echo, links, markup, personal data) are replaced',async()=>{
  for(const bad of['저는 OpenAI의 GPT 모델이에요.','<documents> [1] 내용','자세한 건 https://evil.example 참고','<b>환불</b> 가능','[여기](x)를 누르세요','담당자 kay@example.com 으로 메일'])
@@ -132,6 +134,50 @@ before(async()=>{
 after(async()=>{await app?.close();});
 const preflight=(path,origin)=>fetch(base+path,{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type'}});
 const post=(origin,body={question:'구독 환불은 어떻게 받나요?'})=>fetch(base+'/api/v1/guide/advisor',{method:'POST',headers:{'Content-Type':'application/json',...(origin?{Origin:origin}:{})},body:JSON.stringify(body)});
+// Embedding stub: payout text and payout-day questions point the same way; everything else is orthogonal.
+const vector=text=>/출금|정산일|지급일/.test(text)?[1,0,0]:/날씨/.test(text)?[0,0,1]:[0,1,0];
+const embeddings=(fail=false)=>stub(async(url,init)=>{
+ if(String(url)==='https://api.openai.com/v1/embeddings'){if(fail)return new Response('{}',{status:500});const input=JSON.parse(init.body).input;return new Response(JSON.stringify({data:input.map((t,index)=>({index,embedding:vector(t)}))}),{status:200});}
+ return new Response(JSON.stringify(reply('출금 PIN을 설정한 뒤 출금을 신청할 수 있어요.')),{status:200});
+});
+const embedCalls=fetcher=>fetcher.calls.filter(c=>c.url==='https://api.openai.com/v1/embeddings').map(c=>JSON.parse(c.init.body));
+test('semantic search: a synonym with no word match finds the section; unrelated stays unanswered; vectors are cached',async()=>{
+ assert.deepEqual(retrieve('정산일은 언제인가요?',index.chunks),[],'word matching alone misses the synonym');
+ const s=service({},embeddings()),found=await asIp(()=>s.ask({question:'정산일은 언제인가요?'}));
+ assert.equal(found.found,true);assert.equal(found.sources[0].url,'https://guide.crefans.com/creators/payout-setup/#출금-pin');
+ const [first]=embedCalls(s.fetcher);assert.equal(first.input[0],'정산일은 언제인가요?');assert.ok(first.input.length>index.chunks.length,'guide and legal sections embedded once');
+ const none=await asIp(()=>s.ask({question:'오늘 날씨 어때요'}));
+ assert.equal(none.found,false);assert.equal(s.fetcher.calls.filter(c=>c.url.endsWith('/v1/responses')).length,1,'no answer call for unrelated questions');
+ assert.deepEqual(embedCalls(s.fetcher)[1].input,['오늘 날씨 어때요'],'section vectors are reused');
+ assert.equal(first.model,'text-embedding-3-large');
+ assert.equal(MIN_SIMILARITY,service().settings.minSimilarity);assert.equal(service({GUIDE_ADVISOR_MIN_SIMILARITY:'0.55'}).settings.minSimilarity,0.55);assert.equal(service({GUIDE_ADVISOR_MIN_SIMILARITY:'2'}).settings.minSimilarity,MIN_SIMILARITY);
+});
+test('semantic search failure falls back to word matching',async()=>{
+ const s=service({},embeddings(true));
+ assert.equal((await asIp(()=>s.ask({question:'출금 PIN을 잊어버렸어요'}))).sources[0].section,'출금 PIN');
+ assert.equal((await asIp(()=>s.ask({question:'정산일은 언제인가요?'}))).found,false);
+});
+test('query rewrite: synonyms become guide wording and are searched with the question; bad or failed rewrites are harmless',async()=>{
+ const s=service({},stub(async()=>new Response(JSON.stringify(reply('출금 PIN을 설정한 뒤 신청할 수 있어요.')),{status:200})));s.fetcher.rewrite='1. 출금 PIN 설정\n- 출금 신청';
+ const r=await asIp(()=>s.ask({question:'돈 빼려면 비번 필요해요?',client:'browser-'+randomUUID()}));
+ assert.equal(r.found,true);assert.equal(r.sources[0].section,'출금 PIN','found through the rewrite only');
+ const call=s.fetcher.calls.find(c=>c.url.endsWith('#rewrite')),body=JSON.parse(call.init.body);
+ assert.equal(body.store,false);assert.match(body.input,/<sections>\n[^]*정산 계좌·출금 PIN·신청 > 출금 PIN[^]*<\/sections>/);assert.match(body.input,/<question>\n돈 빼려면 비번 필요해요\?\n<\/question>/);
+ assert.equal(typeof body.safety_identifier,'string','same abuse identifier as the answer call');
+ assert.deepEqual(rewrites('1) 정산금 지급일\n* 출금 일정\n\n'+'가'.repeat(41)+'\n넷째\n다섯째'),['정산금 지급일','출금 일정','넷째']);
+ const order=s.fetcher.calls.map(c=>c.url.replace('https://api.openai.com',''));assert.ok(order.indexOf('/v1/moderations')<order.indexOf('/v1/responses#rewrite'),'moderation before any model call');
+ const without=service();without.fetcher.rewrite='';assert.equal((await asIp(()=>without.ask({question:'돈 빼려면 비번 필요해요?'}))).found,false,'the same question without rewrites finds nothing');
+ const failed=service();failed.fetcher.rewrite=false;assert.equal((await asIp(()=>failed.ask({question:'구독 환불은 어떻게 받나요?'}))).sources[0].section,'환불 기준','rewrite failure falls back to the question');
+});
+test('a not-found answer from the model hides the guide list',async()=>{
+ const s=service({},stub(async()=>new Response(JSON.stringify(reply(SAFE_ANSWER)),{status:200})));
+ assert.deepEqual(await asIp(()=>s.ask({question:'구독 환불은 어떻게 받나요?'})),{answer:SAFE_ANSWER,sources:[],found:false});
+});
+test('fusion keeps sections found by either search, both-found first',()=>{
+ const [a,b,c]=index.chunks;
+ assert.deepEqual(fuse([[{chunk:a},{chunk:b}],[{chunk:b},{chunk:c}]]).map(r=>r.chunk),[b,a,c]);
+ assert.deepEqual(fuse([[],[]]),[]);
+});
 test('CORS: guide origin only on the advisor route, without credentials; service routes never admit the guide',async()=>{
  const ok=await preflight('/api/v1/guide/advisor',GUIDE);
  assert.equal(ok.headers.get('access-control-allow-origin'),GUIDE);assert.equal(ok.headers.get('access-control-allow-credentials'),null);
