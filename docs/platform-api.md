@@ -67,6 +67,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /profiles/:id/connections | kind=followers/following, offset 기본0·20명. 비공개는 소유자 외403 CONNECTIONS_PRIVATE. show_followers/show_following 기본true, 비활성 회원 제외 |
 | GET | /profiles/:id/following | 팔로잉 공개 또는 본인만 조회 |
 | GET | /posts | creatorId/cursor/category; 20개 + nextCursor. 홈 category는 크리에이터 분야로 페이지 분할 전에 필터(전체/미지정은 기존 전체). creatorId 직접 조회에서는 category 무시 |
+| GET | /posts/search | 비로그인 허용. `query`(최대 100자)·`cursor`. 피드와 같은 공개 조건 + 검색 공개 끔(allow_search=false)·비활성 회원 크리에이터 제외. 제목은 모든 글, 본문은 멤버십·상품 전용·민감 글이 아닌 글만 일치. 최신순 20개, `{posts,creators,nextCursor}`(빈 검색어는 빈 목록). 잠긴 글 본문은 피드와 같이 비움. |
 | GET | /posts/:id | 직접 게시물 조회; 서버가 유료 본문·미디어 차단; views는 DB 누적 조회수 |
 | GET | /posts/:id/comments-page | offset; 댓글 10개 + nextOffset |
 | GET | /posts/:id/comments | parentId가 있으면 2뎁스 답글; 권한·전역/게시물 댓글 설정 검증 |
@@ -110,7 +111,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /studio/overview | 본인 프로필·시작 여부·콘텐츠·멤버십·가입자·지표 |
 | GET | /studio/community | 본인 게시물 댓글/답글·메시지 상대방/대화 |
 | POST | /studio/start | name/handle/bio/category |
-| PUT | /studio/profile | 위 정보 + about/links(youtube/instagram/facebook) |
+| PUT | /studio/profile | 위 정보 + about/links(youtube/instagram/facebook). 링크는 칸마다 해당 서비스 주소만: `https://youtube.com/@아이디`·`https://instagram.com/아이디`·`https://facebook.com/아이디`(http·www·m 변형 허용, 아이디는 영문·숫자·`.`·`_`·`-`), 정규 전체 주소로 저장. 이미 저장된 다른 형식 주소(예: 유튜브 /channel/…)는 같은 값을 다시 보낼 때만 유지, 그 밖은 400 INVALID_URL. 빈 칸은 저장하지 않음(src/platform/social-links.ts, 프론트 lib/crefans/social-links.ts 와 같은 규칙). |
 | PUT | /studio/activity | active |
 | PUT | /studio/comments-setting | enabled; 게시물 설정보다 우선 |
 | POST | /studio/content | id?, title/body/media/commentsEnabled/accessPlanId/status/scheduledAt |
