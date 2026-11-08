@@ -1,3 +1,8 @@
+## 2026-11-08 10:43~10:56 KST 어드바이저 답변 굵게·표·출처 숨김 운영 배포 완료
+- 서버: 10:43 crefans-api:advisor-format-20261108(d62ca8d) → 비교 질문에 표를 안 써서 지침 강화(차이·비교·2개 이상 기준은 반드시 표, 머리행·구분선 형식 명시) → 10:50 crefans-api:advisor-table-20261108(prod a71b33a, dev 524188a), 각 8초 healthy, 마이그레이션 없음, 키 유지. 이전 이미지 2개 정리, 로그 키 노출 없음. 복구본 /Users/ethan/crefans-recovery/20261108/advisor-format·advisor-table(OCI blob21 SHA 검증).
+- 가이드(crefans_guide release/advisor-format-prod): 10:43 굵게·표 렌더러, 10:51·10:56 표 셀 줄바꿈 수정(keep-all + overflow-wrap normal; 말풍선의 overflow-wrap:anywhere 상속이 원인). 각 107파일 검증.
+- 운영 실질문(.local/advisor-format-20261108/live-check.jsonl, crefans_guide .local/format-release/live-*.png): 정산일·돈은 언제 들어와요 → 화요일 23:59 마감 수요일 지급(굵게), 넷플릭스 해지 → 고정 거절 문구·출처 0개·found:false, '멤버십 수익이랑 후원콩 출금 차이' → 5행 표(390px 모바일, 단어 끊김 없음). 응답 6~7초(재작성 포함)로 느려진 점은 남은 과제.
+
 ## 2026-11-08 KST 어드바이저 답변 굵게·표, 무관 질문 출처 숨김, 근거 6개 (feat/advisor-format)
 - 사용자 결정: 어드바이저 답변에 강조는 굵게·비교는 표, 운영 ⚠️ 2건(무관 질문인데 출처 3개 표시, '돈은 언제 들어와요' 지급 요일 누락) 수정 후 바로 배포.
 - INSTRUCTIONS: 링크·HTML 금지 유지, 금액·기간·요일·조건 **굵게**, 항목 비교 시에만 마크다운 표, 그 밖의 마크다운 금지. 무관 질문은 고정 문구 OFF_TOPIC(사전 차단 OUT_OF_SCOPE와 같은 문장)만 답하게 하고, 답이 '가이드에서 확인되지 않는'/OFF_TOPIC으로 시작하면(** 제거 후) sources [], found:false. 모델에 근거 6개(fuse limit 6), 출처 표시는 3개.
