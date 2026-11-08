@@ -1,3 +1,8 @@
+## 2026-11-09 /ask-me 결정 기록
+- 맥 복구 저장소: 보관 규칙 초과 이미지 묶음 22개(8.99GB) 삭제 승인·실행, 15GB→6.1GB. 목록 .local/mac-cleanup-20261109/deleted.tsv, /Users/ethan/crefans-recovery/RETENTION.md 에 기록.
+- 대화에 붙여넣은 OpenAI 키 2개(GUIDE_ADVISOR_OPENAI_API_KEY·AI_PHOTO_OPENAI_API_KEY): 사용자 결정 '그대로 둠'(교체·한도 설정 안 함). 노출 위험은 안내함.
+- AI 사진 첫 허용: 사용자가 운영콘솔 /console/ai-photo 에서 직접 허용·시험하기로 함(에이전트는 운영 계정 로그인 안 함).
+
 ## 2026-11-08 SNS 링크 서버 검사·게시물 검색 API 문서 (feat/social-link-validation, /pilot-work 합의)
 - 사용자 결정(클릭): 서버도 화면과 같은 SNS 규칙. src/platform/social-links.ts normalizeSocialLinks: 칸마다 youtube.com/@·instagram.com/·facebook.com/ (http·www·m 허용) + 아이디 [A-Za-z0-9._-]{1,100} → 정규 전체 주소 저장. 이미 저장된 다른 형식 주소는 같은 값을 다시 보낼 때만 유지, 그 밖은 400 INVALID_URL '<서비스> 주소를 확인해주세요.'. studio.service updateProfile 이 기존 links 를 읽어 전달. 온보딩은 링크 저장 안 함(기존과 동일).
 - 문서: platform-api.md 에 /posts/search 행 추가(프론트 check:docs 'API explanation missing' 해소), /studio/profile 링크 규칙.
