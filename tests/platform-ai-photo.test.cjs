@@ -31,10 +31,10 @@ before(async()=>{
 after(async()=>{await app?.close();try{const made=await db.media.findMany({where:{user_sub:{in:members}},select:{id:true}});await db.media.deleteMany({where:{id:{in:made.map(m=>m.id)}}});await db.aiPhotoGrant.deleteMany({where:{creator_user_id:{in:members}}});await db.creator.deleteMany({where:{user_id:{in:members}}});await db.member.deleteMany({where:{id:{in:members}}});fs.rmSync(mediaRoot,{recursive:true,force:true});}finally{await db.$disconnect();await release?.();}});
 
 test('only allow-listed creators: quota shows not allowed and edits are refused until granted',async()=>{
- reset();assert.deepEqual(await photos.quota(creator),{allowed:false,limit:10,remaining:0});
+ reset();assert.deepEqual(await photos.quota(creator),{allowed:false,limit:10,remaining:0,typicalSeconds:null});
  await assert.rejects(photos.edit(creator,base()),code('AI_PHOTO_NOT_ALLOWED'));assert.equal(calls.length,0);
  await db.aiPhotoGrant.create({data:{creator_user_id:creator,reason:'테스트 허용'}});
- assert.deepEqual(await photos.quota(creator),{allowed:true,limit:10,remaining:10});
+ {const q=await photos.quota(creator);assert.deepEqual([q.allowed,q.limit,q.remaining],[true,10,10]);assert.ok(q.typicalSeconds===null||Number.isInteger(q.typicalSeconds));}
 });
 
 test('input rules are checked before the provider: consent, prompt, personal data, mask, own photo only',async()=>{
@@ -58,8 +58,9 @@ test('pose edit: moderation of prompt and photo, two images requested, saved as 
  const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields.n,'2');assert.equal(edit.fields.model,'gpt-image-2');assert.equal(edit.fields.size,'1024x1536');assert.equal(edit.fields.moderation,'auto');assert.ok(!('mask' in edit.fields));
  assert.equal(edit.fields.prompt,aiPhotoPrompt('pose','photo','벚꽃 아래 벤치에 앉은 포즈'));assert.match(edit.fields.prompt,/Do not add nudity/);assert.match(edit.fields.safety_identifier,/^[a-f0-9]{64}$/);
  assert.equal(calls.filter(c=>c.kind==='moderation').length,3,'input + each output');
- for(const img of r.images){const row=await db.media.findUnique({where:{id:img.id}});assert.equal(row.user_sub,creator);assert.equal(row.metadata.aiGenerated,true);assert.equal(row.metadata.aiSourceId,sourceId);assert.equal(row.metadata.aiKind,'pose');assert.equal(row.metadata.watermarkEligible!==undefined,true);assert.ok(fs.existsSync(path.join(mediaRoot,row.file_name)));}
+ for(const img of r.images){const row=await db.media.findUnique({where:{id:img.id}});assert.equal(row.user_sub,creator);assert.equal(row.metadata.aiGenerated,true);assert.equal(row.metadata.aiSourceId,sourceId);assert.equal(row.metadata.aiKind,'pose');assert.equal(typeof row.metadata.aiDurationMs,'number');assert.ok(row.metadata.aiDurationMs>=0);assert.equal(row.metadata.watermarkEligible!==undefined,true);assert.ok(fs.existsSync(path.join(mediaRoot,row.file_name)));}
  assert.deepEqual(fs.readFileSync(path.join(mediaRoot,sourceId)),before);
+ const q=await photos.quota(creator);assert.ok(Number.isInteger(q.typicalSeconds)&&q.typicalSeconds>=1,'typical time comes from finished edits');
 });
 
 test('outfit edit sends the mask resized to the provider image',async()=>{

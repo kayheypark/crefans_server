@@ -205,6 +205,19 @@ export class PlatformService {
  }
  async postPage(viewer:string|undefined,creatorId?:string,cursor?:string,category=''){category=text(category,60,false);const active=await this.db.creator.findMany({where:{is_active:true,...(!creatorId&&category&&category!=='전체'?{category:{name:category}}:{})},select:{user_id:true}});let resolved=creatorId?(await this.creator(creatorId)).user_id:undefined;if(resolved&&!active.some(c=>c.user_id===resolved)&&viewer!==resolved)reject(404,'CREATOR_UNAVAILABLE','공개되지 않은 프로필입니다.');
    const rows=await this.db.posting.findMany({where:{user_sub:resolved||{in:active.map(c=>c.user_id)},status:'PUBLISHED',is_deleted:false,hidden_at:null,is_public:true,OR:[{publish_start_at:null},{publish_start_at:{lte:new Date()}}],AND:[{OR:[{publish_end_at:null},{publish_end_at:{gt:new Date()}}]}]},...(cursor?{cursor:{id:cursor},skip:1}:{}),include:{medias:{include:{media:true},orderBy:{sort_order:'asc'}}},orderBy:[{published_at:'desc'},{id:'desc'}],take:21});const more=rows.length>20;if(more)rows.pop();const authors=await Promise.all([...new Set(rows.map(p=>p.user_sub))].map(id=>this.publicProfile(id,viewer)));return{posts:await Promise.all(rows.map(p=>this.post(p,viewer))),creators:authors,nextCursor:more?rows[rows.length-1].id:null};}
+ // Post search (2026-11-08 user decision): same visibility as the feed plus the creator search opt-out; the body is
+ // searched only for posts anyone may read (not membership, not plan-only, not sensitive), so paid text never matches.
+ async postSearch(viewer:string|undefined,query:unknown,cursor?:string){
+  const q=text(query??'',100,false).trim();if(!q)return{posts:[],creators:[],nextCursor:null};
+  const [active,hidden,disabled]=await Promise.all([this.db.creator.findMany({where:{is_active:true},select:{user_id:true}}),this.db.accountPreference.findMany({where:{allow_search:false},select:{member_id:true}}),this.db.$queryRaw<Array<{user_id:string}>>`SELECT c.user_id FROM creators c INNER JOIN members m ON m.id=c.user_id WHERE m.enabled=0`]);
+  const excluded=new Set([...hidden.map(h=>h.member_id),...disabled.map(d=>d.user_id)]),ids=active.map(c=>c.user_id).filter(id=>!excluded.has(id));
+  const now=new Date(),rows=await this.db.posting.findMany({where:{user_sub:{in:ids},status:'PUBLISHED',is_deleted:false,hidden_at:null,is_public:true,OR:[{publish_start_at:null},{publish_start_at:{lte:now}}],
+   AND:[{OR:[{publish_end_at:null},{publish_end_at:{gt:now}}]},{OR:[{title:{contains:q}},{is_membership:false,access_plan_id:null,is_sensitive:false,content:{contains:q}}]}]},
+   ...(cursor?{cursor:{id:cursor},skip:1}:{}),include:{medias:{include:{media:true},orderBy:{sort_order:'asc'}}},orderBy:[{published_at:'desc'},{id:'desc'}],take:21});
+  const more=rows.length>20;if(more)rows.pop();
+  const authors=await Promise.all([...new Set(rows.map(p=>p.user_sub))].map(id=>this.publicProfile(id,viewer)));
+  return{posts:await Promise.all(rows.map(p=>this.post(p,viewer))),creators:authors,nextCursor:more?rows[rows.length-1].id:null};
+ }
  // An unpublished post (is_public=false, 2026-11-07) answers 404 to everyone but its author, like a missing one.
   async postDetail(id:string,viewer?:string){const p=await this.db.posting.findFirst({where:{id,is_deleted:false,hidden_at:null,status:'PUBLISHED',OR:[{is_public:true},...(viewer?[{user_sub:viewer}]:[])]},include:{medias:{include:{media:true},orderBy:{sort_order:'asc'}}}});if(!p)reject(404,'POST_NOT_FOUND','게시물을 찾을 수 없습니다.');return{post:await this.post(p,viewer),creator:await this.publicProfile(p.user_sub,viewer)};}
  async notifyPost(post:any,tx:any=this.db){return notifyPost(tx,post);}

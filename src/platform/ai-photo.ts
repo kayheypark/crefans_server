@@ -51,7 +51,15 @@ export class AiPhotoService{
  async quota(sub:string){
   await this.service.requireCreator(sub);
   const allowed=await aiPhotoAllowed(this.service.db,sub)&&!!this.settings.apiKey;
-  return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub))):0};
+  return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub))):0,typicalSeconds:allowed?await this.typicalSeconds():null};
+ }
+ /** Median whole-request time of the latest real edits (all creators), shown while a new one runs. null until one has finished. */
+ async typicalSeconds():Promise<number|null>{
+  const rows=await this.service.db.media.findMany({where:{type:'IMAGE',metadata:{path:'$.aiGenerated',equals:true}},orderBy:{created_at:'desc'},take:60,select:{metadata:true}});
+  const seen=new Set<string>(),values:number[]=[];
+  for(const row of rows){const m:any=row.metadata;const key=String(m?.aiCreatedAt||'');if(typeof m?.aiDurationMs!=='number'||m.aiDurationMs<=0||seen.has(key))continue;seen.add(key);values.push(m.aiDurationMs);if(values.length>=30)break;}
+  if(!values.length)return null;values.sort((a,b)=>a-b);const mid=values.length>>1;
+  return Math.max(1,Math.round((values.length%2?values[mid]:(values[mid-1]+values[mid])/2)/1000));
  }
  /** undefined = no verdict (the caller fails closed). */
  private async flagged(input:unknown[]):Promise<boolean|undefined>{
@@ -82,7 +90,7 @@ export class AiPhotoService{
   }finally{if(remote){try{await unlink(destination);}catch{}}}
  }
  async edit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number}){
-  await this.service.requireCreator(sub);
+  const started=Date.now();await this.service.requireCreator(sub);
   if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');
   if(!this.settings.apiKey)reject(503,'PROVIDER_NOT_CONFIGURED','AI 사진 편집을 지금 사용할 수 없어요.');
   const kind=String(input?.kind||''),style=String(input?.style||'photo'),prompt=typeof input?.prompt==='string'?input.prompt.trim():'';
@@ -125,7 +133,7 @@ export class AiPhotoService{
    for(const out of outputs){const v=await this.flagged([{type:'image_url',image_url:{url:'data:image/png;base64,'+out.toString('base64')}}]);if(v===false)safe.push(out);}
    charged=false;// The provider was paid from here on; a blocked or unchecked result still counts.
    if(!safe.length)reject(400,'UNSAFE_OUTPUT','만든 사진이 안전 기준을 통과하지 못했어요. 다른 표현으로 다시 시도해 주세요.');
-   const meta={aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiModel:this.settings.model,aiCreatedAt:new Date().toISOString()};
+   const meta={aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiModel:this.settings.model,aiCreatedAt:new Date().toISOString(),aiDurationMs:Date.now()-started};
    const images=[];for(const out of safe)images.push(await this.save(sub,out,meta));
    return{images,remaining:Math.max(0,this.settings.perDay-await this.used(key))};
   }catch(error){
