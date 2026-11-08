@@ -1,4 +1,5 @@
 import {listReservedHandles,reservedHandleHistory,saveReservedHandle,deleteReservedHandle} from './reserved-handles';
+import {aiPhotoGrantHistory,grantAiPhoto,listAiPhotoGrants,revokeAiPhoto} from './ai-photo-grants';
 import {CategoriesService} from './categories.service';
 import {Res,UploadedFile,UseInterceptors} from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express';
@@ -67,6 +68,11 @@ export class PlatformAdminController{
  @Post('reserved-handles') @Permit(['reserved-handles','create']) createReservedHandle(@Body() body:any,@Req() req:any){return saveReservedHandle(this.service.db,req.admin,undefined,body);}
  @Put('reserved-handles/:id') @Permit(['reserved-handles','update']) updateReservedHandle(@Param('id') id:string,@Body() body:any,@Req() req:any){return saveReservedHandle(this.service.db,req.admin,id,body);}
  @Delete('reserved-handles/:id') @Permit(['reserved-handles','delete']) removeReservedHandle(@Param('id') id:string,@Body() body:any,@Req() req:any){return deleteReservedHandle(this.service.db,req.admin,id,body);}
+ // Studio AI photo editor allow-list (2026-11-08): members.view lists, members.update grants/revokes with a reason.
+ @Get('ai-photo-grants') @Permit(['members','view']) aiPhotoGrants(@Query() query:any,@Req() req:any){return listAiPhotoGrants(this.service.db,req.admin,query);}
+ @Get('ai-photo-grants/:creatorId/history') @Permit(['members','view']) aiPhotoGrantHistory(@Param('creatorId') id:string,@Query() query:any,@Req() req:any){return aiPhotoGrantHistory(this.service.db,req.admin,id,query);}
+ @Post('ai-photo-grants') @Permit(['members','update']) grantAiPhoto(@Body() body:any,@Req() req:any){return grantAiPhoto(this.service.db,req.admin,body);}
+ @Delete('ai-photo-grants/:creatorId') @Permit(['members','update']) revokeAiPhoto(@Param('creatorId') id:string,@Body() body:any,@Req() req:any){return revokeAiPhoto(this.service.db,req.admin,id,body);}
  @Get('members') @Permit(['members','view']) members(@Query() query:any){return adminMembers(this.service.db,query);}
  @Get('referrals') @Permit(['referrals','view']) referrals(@Query() query:any){return adminReferrals(this.service.db,query);}
  @Put('referrals/settings') @Permit(['referrals','update']) referralSettings(@Body() body:any,@Req() req:any){return updateReferralSettings(this.service.db,req.admin,body);}

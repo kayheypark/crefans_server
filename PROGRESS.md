@@ -1,3 +1,9 @@
+## 2026-11-08 AI 사진 편집 허용 크리에이터 테이블·관리 API (feat/ai-photo-grants, 미병합·미배포)
+- 사용자 요청: 스튜디오 AI 사진 편집을 허락할 크리에이터 테이블 + 운영 콘솔 관리. 콘솔은 crefans_admin feat/ai-photo-grants `/console/ai-photo`.
+- 추가: Prisma AiPhotoGrant/AiPhotoGrantChange, 마이그레이션 20261108200000_ai_photo_grants(새 테이블 2개만, 기존 데이터 변경 없음), src/platform/ai-photo-grants.ts(list/history/grant/revoke/aiPhotoAllowed), admin.controller 4개 경로(members 권한), openapi-contract 4개.
+- 검증: nest build 0, tests/platform-ai-photo-grants 3/3(격리 crefans_platform_e2e: 권한·Origin, 핸들 정규화·사유 검사·비활성/없음 404·중복 409·목록, 해제 사유·404·이력·감사에 사유 원문 없음). 대조: 허용을 view 권한으로 낮추면 3건 실패, 해제 감사 제거 시 1건 실패. platform-openapi 14/14(작업 수 209→213, 콘솔 93→97), platform-reserved-handles 8/8. 로컬 개발 DB(3307 crefans_platform_dev)에 마이그레이션 적용. 콘솔 E2E 서버 시드 크리에이터에 handle console_creator 추가.
+- 다음: 운영 배포 시 prisma migrate deploy 필요(승인 필요). 스튜디오 AI 생성 API 연결 시 aiPhotoAllowed 검사.
+
 ## 2026-11-08 10:43~10:56 KST 어드바이저 답변 굵게·표·출처 숨김 운영 배포 완료
 - 서버: 10:43 crefans-api:advisor-format-20261108(d62ca8d) → 비교 질문에 표를 안 써서 지침 강화(차이·비교·2개 이상 기준은 반드시 표, 머리행·구분선 형식 명시) → 10:50 crefans-api:advisor-table-20261108(prod a71b33a, dev 524188a), 각 8초 healthy, 마이그레이션 없음, 키 유지. 이전 이미지 2개 정리, 로그 키 노출 없음. 복구본 /Users/ethan/crefans-recovery/20261108/advisor-format·advisor-table(OCI blob21 SHA 검증).
 - 가이드(crefans_guide release/advisor-format-prod): 10:43 굵게·표 렌더러, 10:51·10:56 표 셀 줄바꿈 수정(keep-all + overflow-wrap normal; 말풍선의 overflow-wrap:anywhere 상속이 원인). 각 107파일 검증.

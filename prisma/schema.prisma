@@ -1988,3 +1988,25 @@ model AdPurchase {
  @@index([creator_id, status, ends_at])
  @@map("ad_purchases")
 }
+
+/// Creators allowed to use the studio AI photo editor (2026-11-08 user request: allow-list managed in the console).
+/// One row per creator while allowed; revoking deletes the row. Every grant/revoke is kept in ai_photo_grant_changes.
+model AiPhotoGrant {
+ creator_user_id String @id @db.VarChar(191)
+ reason String @db.VarChar(500)
+ granted_by String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@index([created_at])
+ @@map("ai_photo_grants")
+}
+model AiPhotoGrantChange {
+ id String @id @default(uuid())
+ creator_user_id String @db.VarChar(191)
+ /// granted | revoked
+ action String @db.VarChar(16)
+ reason String @db.VarChar(500)
+ changed_by String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@index([creator_user_id, created_at])
+ @@map("ai_photo_grant_changes")
+}
