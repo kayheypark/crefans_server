@@ -1,3 +1,8 @@
+## 2026-11-08 AI 사진 편집 보통 걸리는 시간 (feat/ai-photo-timing, 미병합·미배포)
+- 사용자 요청: 만드는 동안 보통 몇 초 걸리는지와 진행 초 표시. 성공한 요청의 전체 처리 시간(aiDurationMs)을 결과 미디어 metadata 에 저장하고, /studio/ai-photo/quota 가 최근 실제 생성 최대 30건(요청 단위 중복 제거)의 중간값을 typicalSeconds 로 준다. 기록이 없으면 null(추정값을 만들지 않음).
+- 운영 컨테이너에서 기준 시간을 재려던 실제 생성(medium 2장)은 권한 설정에 막혀 실행하지 않음. 앞서 low 1장 11.2초만 측정됨.
+- 검증: nest build 0, platform-ai-photo 6/6(typicalSeconds null→생성 후 정수, aiDurationMs 저장), platform-openapi 14/14.
+
 ## 2026-11-08 스튜디오 AI 사진 편집 생성 API + 처리방침 aiphoto.1 (feat/ai-photo-edit, 미병합·미배포)
 - 사용자 요청: AI 사진 생성 기능 추가. 이미지 전용 키는 사용자가 별도 발급(가이드 AI 키와 다름, 맥 ~/.crefans/ai-photo-openai.key 600 보관, 원문 미기록).
 - 추가: src/platform/ai-photo.ts(AiPhotoService/Controller, /studio/ai-photo/quota·edit), module 등록, 워터마크 파생에 aiGenerated 승계, 팬 게시물·스튜디오 목록 응답 aiGenerated, openapi 2개(전체 215·스튜디오 51), 처리방침 2026-11-08.aiphoto.1(8번 위탁 한 줄 + 16번 항목), runtime.env.example.
