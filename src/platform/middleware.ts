@@ -10,8 +10,9 @@ export const originList=(value:string|undefined,fallback:string)=>(value||fallba
 export function originGuard(origins:string[],adminOrigins:string[],guideOrigins:string[]=[]){
  const consoleOrigins=adminOrigins.length?adminOrigins:origins,fanOrigins=origins.filter(o=>!adminOrigins.includes(o));
  return (req:any,res:any,next:any)=>{
-  // The guide advisor is the only route the static guide may call, and only from the guide origin, without cookies.
-  if(isGuideAdvisorPath(req.path)&&req.method!=='OPTIONS')return guideOrigins.includes(req.get('Origin'))?next():res.status(403).json(fail('허용되지 않은 요청입니다.','INVALID_ORIGIN'));
+  // The guide advisor is the only route the static guide may call (credential-less CORS below). The fan service
+  // calls it same-origin from its support page (2026-11-08); the console origin is never accepted here.
+  if(isGuideAdvisorPath(req.path)&&req.method!=='OPTIONS')return [...guideOrigins,...fanOrigins].includes(req.get('Origin'))?next():res.status(403).json(fail('허용되지 않은 요청입니다.','INVALID_ORIGIN'));
   if(req.path==='/api/v1/identity/callback'||req.path==='/api/v1/marketing/unsubscribe'||['GET','HEAD','OPTIONS'].includes(req.method))return next();
   const origin=req.get('Origin'),consoleRoute=req.path==='/api/v1/admin'||req.path.startsWith('/api/v1/admin/');
   if(origin&&!(consoleRoute?consoleOrigins:fanOrigins).includes(origin))return res.status(403).json(fail('허용되지 않은 요청입니다.','INVALID_ORIGIN'));

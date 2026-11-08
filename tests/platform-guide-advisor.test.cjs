@@ -9,7 +9,7 @@ const {corsOptions,originGuard}=require('../dist/src/platform/middleware');
 const {EnvelopeInterceptor,PlatformExceptionFilter}=require('../dist/src/platform/http');
 assert.match(process.env.DATABASE_URL||'',/@127\.0\.0\.1:3307\/crefans_platform_dev$/);
 const db=new PrismaClient(),limiter={limit:(...args)=>LocalMemberService.prototype.limit.apply({prisma:db},args)};
-const GUIDE='https://guide.crefans.com',SERVICE='https://crefans.com',KEY='sk-test-'+'x'.repeat(20);
+const GUIDE='https://guide.crefans.com',SERVICE='https://crefans.com',ADMIN='https://admin.crefans.com',KEY='sk-test-'+'x'.repeat(20);
 const index={chunks:[
  {title:'멤버십 구독·해지·환불',section:'환불 기준',url:'/fans/membership/#환불-기준',text:'구독 결제 후 콘텐츠를 열람하지 않았다면 7일 이내 전액 환불을 요청할 수 있습니다.'},
  {title:'정산 계좌·출금 PIN·신청',section:'출금 PIN',url:'/creators/payout-setup/#출금-pin',text:'출금 PIN 6자리를 설정해야 출금을 신청할 수 있습니다. PIN을 잊으면 재설정합니다.'},
@@ -127,7 +127,7 @@ before(async()=>{
  // Shared 'unknown' IP across repeated runs: lift per-IP limits here (the limit itself is covered above).
  class Mod{};Module({controllers:[GuideAdvisorController],providers:[{provide:GuideAdvisorService,useFactory:()=>service({GUIDE_ADVISOR_PER_MINUTE:'1000',GUIDE_ADVISOR_PER_DAY:'100000',GUIDE_ADVISOR_PER_CLIENT_DAY:'100000'})}]})(Mod);
  app=await NestFactory.create(Mod,{logger:false});app.setGlobalPrefix('api/v1');
- app.enableCors(corsOptions([SERVICE],[GUIDE]));app.use(originGuard([SERVICE],[],[GUIDE]));
+ app.enableCors(corsOptions([SERVICE,ADMIN],[GUIDE]));app.use(originGuard([SERVICE,ADMIN],[ADMIN],[GUIDE]));
  app.useGlobalInterceptors(new EnvelopeInterceptor());app.useGlobalFilters(new PlatformExceptionFilter());
  await app.listen(0,'127.0.0.1');base=await app.getUrl();
 });
@@ -201,16 +201,17 @@ test('CORS: guide origin only on the advisor route, without credentials; service
  assert.equal((await preflight('/api/v1/me',GUIDE)).headers.get('access-control-allow-origin'),null);
  const service=await preflight('/api/v1/me',SERVICE);assert.equal(service.headers.get('access-control-allow-origin'),SERVICE);assert.equal(service.headers.get('access-control-allow-credentials'),'true');
 });
-test('HTTP: guide POST answers in the common envelope; other or missing origins are refused',async()=>{
+test('HTTP: guide and same-origin service POST answer in the common envelope; console, other or missing origins are refused',async()=>{
  const res=await post(GUIDE),body=await res.json();
  assert.equal(res.status,201);assert.equal(body.success,true);assert.equal(body.data.found,true);assert.equal(res.headers.get('access-control-allow-origin'),GUIDE);
- for(const origin of[SERVICE,'https://evil.example',undefined]){const r=await post(origin);assert.equal(r.status,403,String(origin));assert.equal((await r.json()).errorCode,'INVALID_ORIGIN');}
+ {const r=await post(SERVICE),b=await r.json();assert.equal(r.status,201);assert.equal(b.success,true);}
+ for(const origin of[ADMIN,'https://evil.example',undefined]){const r=await post(origin);assert.equal(r.status,403,String(origin));assert.equal((await r.json()).errorCode,'INVALID_ORIGIN');}
  const long=await post(GUIDE,{question:'환'.repeat(501)});assert.equal(long.status,400);assert.equal((await long.json()).errorCode,'INVALID_INPUT');
 });
 test('equivalent Express paths keep the same advisor origin and CORS boundary',async()=>{
  for(const path of ['/api/v1/guide/advisor/','/API/v1/guide/ADVISOR']){
   const allowed=await preflight(path,GUIDE);assert.equal(allowed.headers.get('access-control-allow-origin'),GUIDE);assert.equal(allowed.headers.get('access-control-allow-credentials'),null);
-  for(const origin of [undefined,SERVICE]){
+  for(const origin of [undefined,ADMIN]){
    const r=await fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',...(origin?{Origin:origin}:{})},body:JSON.stringify({question:'환불 기준'})});
    assert.equal(r.status,403,path+' '+origin);
   }
