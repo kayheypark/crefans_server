@@ -181,7 +181,7 @@ test('an off-topic refusal from the model hides the guide list too, even in bold
  assert.ok(INSTRUCTIONS.includes(OFF_TOPIC),'the model is told the exact refusal');
 });
 test('answers may use bold and pipe tables; up to 6 sections reach the model, 3 are listed',async()=>{
- assert.match(INSTRUCTIONS,/\*\*굵게\*\*/);assert.match(INSTRUCTIONS,/마크다운 표/);assert.doesNotMatch(INSTRUCTIONS,/마크다운 표는 쓰지/);
+ assert.match(INSTRUCTIONS,/\*\*굵게\*\*/);assert.match(INSTRUCTIONS,/차이·비교를 묻거나[^\n]*반드시 마크다운 표/);assert.doesNotMatch(INSTRUCTIONS,/마크다운 표는 쓰지/);
  const formatted='**화요일 23:59**까지 신청하면 **수요일**에 지급돼요.\n| 구분 | 지급일 |\n|---|---|\n| 멤버십 수익 | 수요일 |';
  assert.equal(unsafeAnswer(formatted),false,'bold and tables are not unsafe');
  const s=service({},stub(async()=>new Response(JSON.stringify(reply(formatted)),{status:200})));s.fetcher.rewrite='환불 기준\n구독 환불\n콩 충전 환불';
