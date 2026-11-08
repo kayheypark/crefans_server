@@ -1,3 +1,6 @@
+## 2026-11-08 게시물 검색·AI 소요 시간 운영 배포 (crefans-api:post-search-20261108)
+- prod 64874c1 배포. 1차는 검증식 오류로 자동 복귀, 2차 성공. 상세·증거 .local/post-search-20261108/deployment.md. 복구본 /Users/ethan/crefans-recovery/20261108/post-search-api. 미확인: 로그인 계정 검색, 실제 AI 생성 시 보통 소요 시간 표시.
+
 ## 2026-11-08 게시물 검색 API (feat/post-search, feat/ai-photo-timing 위)
 - 사용자 결정: 전체 공개는 제목+본문, 멤버십은 제목만. GET /api/v1/posts/search?query=&cursor= (비로그인 허용). 피드와 같은 공개 조건 + 크리에이터 검색 공개 끔(allow_search=false)·비활성 회원 제외. 본문은 is_membership=false·access_plan_id 없음·is_sensitive=false 인 글만. 최신순 20개, 응답 {posts,creators,nextCursor}. openapi +1(전체 216·user 88).
 - 검증: nest build 0, platform-post-search 2/2(공개 제목·공개 본문·멤버십 제목만 일치, 멤버십 본문·상품 전용·민감·미공개·숨김·임시·예약·삭제·검색 끔·비활성·정지 제외, 비로그인 멤버십 본문 잠김, 빈 검색어). 대조: 본문 조건 제거 시 1건 실패. platform-openapi 14/14.
