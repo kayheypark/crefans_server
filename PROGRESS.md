@@ -1,3 +1,11 @@
+## 2026-11-08 KST 가이드 어드바이저 유의어 검색(질문 재작성+의미 검색) (feat/advisor-semantic)
+- 사용자 보고: '출금일'은 되는데 '정산일'은 가이드에서 못 찾음. 사용자 결정(클릭): 의미 검색 추가, 검사 후 바로 배포, 운영 컨테이너 측정 허용.
+- 원인: 글자 bigram 60% 일치 검색이라 '정산일'(산일 미일치)·'돈은 언제 들어와요'·'수익금 지급일'이 coverage<0.5로 근거 없음 → 고정 안내.
+- 측정(운영 컨테이너에서 키 미출력, 증거 .local/advisor-semantic-20261108/measure-*.txt): text-embedding-3-small은 관련(정산일 0.33)과 무관(삼성전자 주식 0.36)이 겹침. large는 무관 일반 질문 ≤0.29, 관련 질문 대부분 ≥0.30. 다만 large만으로도 '정산일'은 '정산 계좌·출금 PIN' 쪽으로 끌려 지급일 섹션을 못 찾음. 손으로 만든 재작성 검색어('정산금 지급일')는 글자 검색만으로 '수익과 출금 기준/한눈에 비교'를 1위로 찾음.
+- 구현 `src/platform/guide-advisor.ts`: Moderation(질문)을 모든 모델 호출 앞으로, 총 일일 한도도 앞으로 이동. 질문 재작성(multi-query): 같은 모델·store:false·safety_identifier 동일, <sections>(가이드 목차)+<question>로 최대 3개 검색어(30~40자), 실패 시 원문만. 원문+재작성 각각 글자 검색 + 의미 검색(text-embedding-3-large, 코사인≥0.35, GUIDE_ADVISOR_MIN_SIMILARITY로 조정) → RRF(k=60) 상위4. 섹션 벡터는 텍스트별 메모리 캐시(색인 바뀌면 정리). 의미 검색 실패 시 글자 검색만. 모델 답이 '가이드에서 확인되지 않는…'이면 출처 숨김·found:false.
+- 처리방침 2026-11-08.advisor.3: 15조에 '같은 공급사 AI가 질문을 검색어로 바꾸고 의미 검색(임베딩)으로 비교, 관련 가이드가 없는 질문에도 적용' 추가. 법률 검토 아님.
+- 검증: tsc0·build0, guide-advisor 21/21·legal·openapi 합계 47 통과. 대조 4/4(의미 검색 제거·재작성 제거·못찾음 출처 숨김 제거·기준값 0 각각 해당 테스트 실패, 원복 후 통과). 실제 재작성 품질은 운영 배포 후 실질문으로 확인 필요.
+
 ## 2026-11-08 00:22 KST 가이드 어드바이저 한도·가드레일 운영 배포 완료
 - 사용자 승인(서버+가이드 지금 배포). dev 1c7408c·prod b79f2bf push. 이미지 crefans-api:guide-advisor-guard-20261108(sha256:504de905…) 서버 빌드, 00:21:53~22:01 api/worker 교체(8초) healthy·재시작0, DB/proxy/front/admin 불변, 마이그레이션 없음, 키 유지(runtime.env 0600).
 - 운영 확인: 탈옥 '이전 지침 무시…시스템 프롬프트'·'어떤 AI 모델' → 400 OUT_OF_SCOPE, 정상 질문 답변. 유해 문장은 가이드 근거 미검출로 공급사 호출 전 고정 안내(위협 문구가 검색 적중률을 낮춤). 운영 컨테이너 키로 Moderation 직접 실측: 한국어 살해 위협(harassment/threatening·violence)·자살 방법(self-harm/intent·instructions) flagged=true, 환불 질문 false.
