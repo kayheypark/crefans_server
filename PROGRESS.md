@@ -1,3 +1,9 @@
+## 2026-11-08 SNS 링크 서버 검사·게시물 검색 API 문서 (feat/social-link-validation, /pilot-work 합의)
+- 사용자 결정(클릭): 서버도 화면과 같은 SNS 규칙. src/platform/social-links.ts normalizeSocialLinks: 칸마다 youtube.com/@·instagram.com/·facebook.com/ (http·www·m 허용) + 아이디 [A-Za-z0-9._-]{1,100} → 정규 전체 주소 저장. 이미 저장된 다른 형식 주소는 같은 값을 다시 보낼 때만 유지, 그 밖은 400 INVALID_URL '<서비스> 주소를 확인해주세요.'. studio.service updateProfile 이 기존 links 를 읽어 전달. 온보딩은 링크 저장 안 함(기존과 동일).
+- 문서: platform-api.md 에 /posts/search 행 추가(프론트 check:docs 'API explanation missing' 해소), /studio/profile 링크 규칙.
+- 검증: nest build 0, platform-social-links 3/3(다른 사이트 거부 제거 대조 시 2 실패), platform-openapi 통과.
+- AI 사진 가이드 페이지는 사용자 결정으로 보류(시범 단계).
+
 ## 2026-11-08 게시물 검색·AI 소요 시간 운영 배포 (crefans-api:post-search-20261108)
 - prod 64874c1 배포. 1차는 검증식 오류로 자동 복귀, 2차 성공. 상세·증거 .local/post-search-20261108/deployment.md. 복구본 /Users/ethan/crefans-recovery/20261108/post-search-api. 미확인: 로그인 계정 검색, 실제 AI 생성 시 보통 소요 시간 표시.
 
