@@ -593,3 +593,13 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - 미차단(의도): 신고 접수는 게시물 존재만 확인한다. 운영 콘솔 목록·스튜디오는 상태를 보여 준다.
 - 검증: `tests/platform-post-visibility.test.cjs`(격리 e2e DB, `--test-concurrency=1`).
 
+### 스튜디오 AI 사진 편집 허용 크리에이터 (2026-11-08)
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | /admin/ai-photo-grants | members.view. 허용 중인 크리에이터(핸들·활동명·사유·허용 운영자·시각) 최신순 20개 페이지, `search`는 핸들·활동명·사유. |
+| GET | /admin/ai-photo-grants/:creatorId/history | members.view. granted/revoked·사유·처리자·시각 최신순. |
+| POST | /admin/ai-photo-grants | members.update. `{handle,reason}` 활성 크리에이터 핸들(앞 @·대문자 허용), 사유 2~500자. 없거나 비활성 404 CREATOR_NOT_FOUND, 이미 허용 409 ALREADY_GRANTED. |
+| DELETE | /admin/ai-photo-grants/:creatorId | members.update. `{reason}` 2~500자. 목록에 없으면 404 GRANT_NOT_FOUND. |
+
+- 저장: 현재 목록 `ai_photo_grants`(크리에이터당 1행, 해제 시 삭제), 전체 이력 `ai_photo_grant_changes`. 허용·해제·이력·감사(`admin.ai_photo_granted`/`admin.ai_photo_revoked`, 사유는 contentHash만)를 한 트랜잭션에 쓰고 크리에이터 행을 잠근다.
+- 사용 검사: 스튜디오 AI 사진 편집 API는 요청마다 `aiPhotoAllowed(db,creatorUserId)`(src/platform/ai-photo-grants.ts)로 허용 여부를 확인해야 한다(서버 생성 API는 아직 없음).
