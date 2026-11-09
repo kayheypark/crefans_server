@@ -1,3 +1,9 @@
+## 2026-11-09 게시물 검색은 열람 기록 제외 (fix/search-no-consume)
+- 사용자 결정(/ask-me): "검색은 제외, 피드·상세는 열람". postSearch 가 this.post(p,viewer,false)(미리보기)를 사용 → 멤버십 글은 구독자에게도 canAccess=false·본문/미디어/image 없음, consumeContent(checkout_orders.content_accessed_at, 7일 전액 환불 판단) 호출 안 함. 전체 공개 글은 consumeContent 가 어차피 access() 로 바로 반환하므로 동일(본문·미디어 그대로). 피드(postPage)·상세(postDetail)는 기존대로 기록. 응답 형태 불변.
+- 문서: platform-api.md /posts/search 행, openapi-contract 설명.
+- 검증: tests/platform-post-search.test.cjs 신규 1건(구독자 검색 → null 유지, 비구독자 잠김, 공개 글 본문 유지, 상세 → 기록·canAccess, 비구독자 상세 잠김) 3/3. 대조: prod service.ts 로 빌드 시 신규 테스트 실패(canAccess true). nest build 0, test:openapi·beta-policy 통과. platform-access(3001 서버 필요)·media-cloud(AWS opt-in) 은 환경 미충족으로 미실행. 증거 .local/search-preview-20261109/.
+- 남은 점: 검색 결과 카드에서 좋아요/저장(reaction) 은 기존대로 consumeContent 를 거치므로 기록됨(검색 표시와 별개 행동). 작성자 본인도 검색 결과에서는 잠김 → 프론트 fix/search-preview-card 가 '게시물 보기' 링크로 처리. 운영 배포는 사용자 지시 대기.
+
 ## 2026-11-09 /ask-me 결정 기록
 - 맥 복구 저장소: 보관 규칙 초과 이미지 묶음 22개(8.99GB) 삭제 승인·실행, 15GB→6.1GB. 목록 .local/mac-cleanup-20261109/deleted.tsv, /Users/ethan/crefans-recovery/RETENTION.md 에 기록.
 - 대화에 붙여넣은 OpenAI 키 2개(GUIDE_ADVISOR_OPENAI_API_KEY·AI_PHOTO_OPENAI_API_KEY): 사용자 결정 '그대로 둠'(교체·한도 설정 안 함). 노출 위험은 안내함.
