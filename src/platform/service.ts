@@ -216,7 +216,9 @@ export class PlatformService {
    ...(cursor?{cursor:{id:cursor},skip:1}:{}),include:{medias:{include:{media:true},orderBy:{sort_order:'asc'}}},orderBy:[{published_at:'desc'},{id:'desc'}],take:21});
   const more=rows.length>20;if(more)rows.pop();
   const authors=await Promise.all([...new Set(rows.map(p=>p.user_sub))].map(id=>this.publicProfile(id,viewer)));
-  return{posts:await Promise.all(rows.map(p=>this.post(p,viewer))),creators:authors,nextCursor:more?rows[rows.length-1].id:null};
+  // 2026-11-09 user decision "검색은 제외, 피드·상세는 열람": results are previews (expose=false), so membership posts stay
+  // locked even for subscribers and consumeContent never records content_accessed_at; opening the detail does.
+  return{posts:await Promise.all(rows.map(p=>this.post(p,viewer,false))),creators:authors,nextCursor:more?rows[rows.length-1].id:null};
  }
  // An unpublished post (is_public=false, 2026-11-07) answers 404 to everyone but its author, like a missing one.
   async postDetail(id:string,viewer?:string){const p=await this.db.posting.findFirst({where:{id,is_deleted:false,hidden_at:null,status:'PUBLISHED',OR:[{is_public:true},...(viewer?[{user_sub:viewer}]:[])]},include:{medias:{include:{media:true},orderBy:{sort_order:'asc'}}}});if(!p)reject(404,'POST_NOT_FOUND','게시물을 찾을 수 없습니다.');return{post:await this.post(p,viewer),creator:await this.publicProfile(p.user_sub,viewer)};}
