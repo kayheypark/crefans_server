@@ -1,3 +1,11 @@
+## 2026-11-10 이번 주 지급 목록·계좌번호 보기 API (feat/payout-list, 미커밋·미배포)
+- 요청: 수동 이체 시작 전에 크리에이터별 이체 금액 목록과 실제 계좌번호 필요(기존 콘솔은 끝 4자리뿐이라 이체 불가).
+- `src/platform/admin-payout-list.ts` GET /admin/payouts/due(revenue.view, no-store): 접수·처리 중 멤버십 출금(수수료 공제 후 금액)+beans.view면 콩 출금 net, 크리에이터·계좌 요약, 크리에이터별/전체 합계, 테스트 콩 출금 합계 제외, 종류별 500건 상한.
+- `finance.service.ts` revealAccount → POST /admin/settlement-accounts/:id/reveal(revenue.create, MANUAL_PAYOUTS_ENABLED, 열린 출금이 걸린 계좌만, no-store). 감사 account.number_revealed(관리자·계좌·버전, 번호 미기록).
+- 문서: docs/platform-api.md 2행, openapi-contract 2건(테스트 기대 수 216→218, console 97→99).
+- 검증(로컬 3307 e2e DB): tests/platform-manual-payouts 8/8, test:openapi 14/14, tsc 0. 대조: 열린 출금 검사를 끄면 새 테스트 FAIL 확인 후 복원. 실은행·운영 미검증.
+- 남은 것: 커밋·통합·배포 승인, 운영 MANUAL_PAYOUTS_ENABLED 켜기 결정.
+
 ## 2026-11-09 게시물 검색은 열람 기록 제외 (fix/search-no-consume)
 - 사용자 결정(/ask-me): "검색은 제외, 피드·상세는 열람". postSearch 가 this.post(p,viewer,false)(미리보기)를 사용 → 멤버십 글은 구독자에게도 canAccess=false·본문/미디어/image 없음, consumeContent(checkout_orders.content_accessed_at, 7일 전액 환불 판단) 호출 안 함. 전체 공개 글은 consumeContent 가 어차피 access() 로 바로 반환하므로 동일(본문·미디어 그대로). 피드(postPage)·상세(postDetail)는 기존대로 기록. 응답 형태 불변.
 - 문서: platform-api.md /posts/search 행, openapi-contract 설명.

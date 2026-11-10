@@ -11,7 +11,8 @@ import {LocalMemberService} from '../auth/local/local-member.service';
 import {reportClientError} from './client-errors';
 import {adminLogs,adminLogDetail} from './admin-logs';
 import {actorContext,auditChange,contentDigest,appendAudit} from './audit';
-import {Body,CanActivate,Controller,Delete,ExecutionContext,Get,Injectable,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
+import {Body,CanActivate,Controller,Delete,ExecutionContext,Get,Header,HttpCode,Injectable,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
+import {adminPayoutList} from './admin-payout-list';
 import {Reflector} from '@nestjs/core';
 import {ADMIN_PERMISSION,AdminRule,Permit,effectivePermissions,requirePermission,requireSuperAdmin} from './admin-permissions';
 import {changeMyPassword,createOperator,listOperators,myProfile,resetOperatorPassword,updateMyProfile,updateOperator} from './admin-operators';
@@ -90,6 +91,8 @@ export class PlatformAdminController{
  // A requested withdrawal left above the available balance by a later refund (PAYOUT_BALANCE_CHANGED) is rejected by an operator.
  @Post('withdrawals/:id/reject') @Permit(['revenue','create']) rejectWithdrawal(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.rejectWithdrawal(req.admin,id,body);}
  @Get('settlement-accounts') @Permit(['revenue','view']) async settlementAccounts(){const rows=await this.service.db.settlementAccount.findMany({where:{verified:false,account_encrypted:{not:null}},orderBy:{created_at:'asc'},take:100,select:{id:true,creator_id:true,bank:true,holder_alias:true,last_four:true,version:true,created_at:true}});return rows.map((r:any)=>({id:r.id,creatorId:r.creator_id,bank:r.bank,holder:r.holder_alias,lastFour:r.last_four,version:r.version,createdAt:r.created_at}));}
+ @Get('payouts/due') @Header('Cache-Control','private, no-store') @Permit(['revenue','view']) payoutsDue(@Req() req:any){return adminPayoutList(this.service.db,req.admin);}
+ @Post('settlement-accounts/:id/reveal') @HttpCode(200) @Header('Cache-Control','private, no-store') @Permit(['revenue','create']) revealAccount(@Param('id') id:string,@Req() req:any){return this.finance.revealAccount(req.admin,id);}
  @Post('settlement-accounts/:id/verify') @Permit(['revenue','create']) verifyAccount(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.manualVerifyAccount(req.admin,id,body);}
  @Post('revenue/:id/receipt') @Permit(['revenue','create']) receipt(@Param('id') id:string,@Body() body:any,@Req() req:any){return confirmSettlementReceipt(this.service.db,req.admin,id,body);}
  @Get('financial-policy') @Permit(['settings','view']) async financialPolicy(){return policyView(await this.service.db.financialPolicy.findUnique({where:{id:'platform'}}));}

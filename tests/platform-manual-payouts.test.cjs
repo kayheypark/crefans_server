@@ -89,3 +89,20 @@ test('the withdrawal list marks only requested rows of a creator with a negative
  assert.equal((await api(`/admin/withdrawals/${w.id}/reject`,'finance',{reason:'환불로 잔액 부족'})).status,201);
  list=await api('/admin/withdrawals','viewer');assert.equal(list.data.items.find(x=>x.id===w.id).rejectable,false);
  await db.withdrawalRequest.deleteMany({where:{id:{in:[ok.id,w.id]}}});});
+
+// 2026-11-10: weekly payout list and audited full-number reveal for the operator's manual bank transfer.
+test('payout list shows the transfer amount per creator without the account number; reveal is limited and audited',async()=>{
+ await db.withdrawalRequest.updateMany({where:{creator_id:creator,status:{in:['requested','processing']}},data:{status:'rejected'}});
+ assert.equal((await api(`/admin/settlement-accounts/${account.id}/reveal`,'finance',{})).errorCode,'NO_OPEN_PAYOUT','no open payout, no number');
+ const w1=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:70000,status:'requested'}});
+ const w2=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:30000,status:'processing'}});
+ const res=await fetch(origin+'/api/v1/admin/payouts/due',{headers:{Origin:'https://beta.crefans.com',cookie:cookies.viewer}});assert.equal(res.status,200);assert.match(res.headers.get('cache-control')||'',/no-store/);
+ const list=(await res.json()).data;assert.equal(JSON.stringify(list).includes('110123455678'),false,'no full number in the list');assert.equal(list.beans,false,'no bean rows without bean permission');
+ const mine=list.items.filter(i=>i.creatorId===creator);assert.deepEqual(mine.map(i=>i.amount).sort(),[30000,70000]);assert.equal(mine[0].creatorName,'수동 '+tag);assert.equal(mine[0].account.lastFour,'5678');assert.equal(mine[0].account.verified,true);
+ const group=list.creators.find(g=>g.creatorId===creator);assert.equal(group.amount,100000);assert.equal(group.count,2);
+ assert.equal((await api(`/admin/settlement-accounts/${account.id}/reveal`,'viewer',{})).status,403,'view permission cannot reveal');
+ const before=await db.platformAuditLog.count({where:{entity_id:account.id,action:'account.number_revealed'}});
+ const shown=await fetch(origin+`/api/v1/admin/settlement-accounts/${account.id}/reveal`,{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://beta.crefans.com',cookie:cookies.finance},body:'{}'});
+ assert.equal(shown.status,200);assert.match(shown.headers.get('cache-control')||'',/no-store/);assert.equal((await shown.json()).data.accountNumber,'110123455678');
+ const audit=await db.platformAuditLog.findMany({where:{entity_id:account.id,action:'account.number_revealed'}});assert.equal(audit.length,before+1);assert.equal(JSON.stringify(audit).includes('110123455678'),false,'the number is not written to the audit log');
+ await db.withdrawalRequest.deleteMany({where:{id:{in:[w1.id,w2.id]}}});});
