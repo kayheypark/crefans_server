@@ -3,7 +3,7 @@ import {settlementPending,settlementHoldReasons} from './settlement-receipts';
 import {CREATOR_PROVISION} from './creator-provision';
 import {PAYMENT_TERMS,paymentTermsAccepted} from './payment-terms';
 import {betaPolicy,isBeta,inPayoutBatch,PAYOUT_SCHEDULE_MESSAGE,manualPayouts,paymentEnvironment,renewalPolicy,unusedRefundReason} from './beta-policy';
-import {requirePermission,requireSuperAdmin} from './admin-permissions';
+import {can,requirePermission,requireSuperAdmin} from './admin-permissions';
 import {paymentFailureCodes,renewalDeadline,unusableCardCodes} from './billing-failures';
 import {appendAudit,auditChange} from './audit';
 import {enqueueOperation} from './operations-events';
@@ -400,6 +400,18 @@ export class PlatformFinanceService {
    return{message:'출금 신청을 반려했습니다.'};});
  }
  // Operator check of a settlement account (holder name vs. bank book copy) when no bank verification API is connected.
+ // Manual transfer needs the full number (2026-11-10). Only for an account with an open payout the operator may see,
+ // never cached, and every reveal is audited (who, which account and version) without storing the number itself.
+ async revealAccount(admin:any,id:string){
+  if(!manualPayouts(this.config))reject(409,'MANUAL_PAYOUTS_DISABLED','수동 지급이 활성화되어 있지 않습니다.');requirePermission(admin,'revenue','create');
+  const a=await this.db.settlementAccount.findUnique({where:{id}});if(!a?.account_encrypted)reject(404,'ACCOUNT_NOT_FOUND','계좌를 찾을 수 없습니다.');
+  const open={account_id:id,status:{in:['requested','processing']}},beans=can(admin,'beans','view');
+  const count=await this.db.withdrawalRequest.count({where:open})+(beans?await this.db.beanPayout.count({where:open}):0);
+  if(!count)reject(409,'NO_OPEN_PAYOUT','이체할 출금이 있는 계좌만 볼 수 있습니다.');
+  const accountNumber=this.provider.decrypt(a.account_encrypted);
+  await this.db.$transaction(async tx=>this.audit(tx,'account.number_revealed',id,{creatorId:a.creator_id,adminId:admin.id,version:a.version}));
+  return{id,bank:a.bank,holder:a.holder_alias,accountNumber,version:a.version};
+ }
  async manualVerifyAccount(admin:any,id:string,input:any){
   if(!manualPayouts(this.config))reject(409,'MANUAL_PAYOUTS_DISABLED','수동 지급이 활성화되어 있지 않습니다.');requirePermission(admin,'revenue','create');
   const reason=text(input?.reason??'',500);const a=await this.db.settlementAccount.findUnique({where:{id}});if(!a)reject(404,'ACCOUNT_NOT_FOUND','계좌를 찾을 수 없습니다.');
