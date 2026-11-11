@@ -31,7 +31,7 @@ test('email-only signup consumes a verified email and records consents without m
  assert.equal(await db.memberConsent.count({where:{member_id:member.id}}),2);assert.equal(await db.signupChallenge.count({where:{email:data.email}}),0);
  await assert.rejects(client.signup(data),code('EMAIL_VERIFICATION_REQUIRED'));
  const service=new PlatformService(db);assert.equal(await service.access({user_sub:randomUUID(),is_sensitive:true},member.id),false);
- await db.creator.create({data:{user_id:member.id}});await assert.rejects(new PlatformFinanceService(service,{},new ConfigService(),{}).setupPin(member.id,'123456'),code('IDENTITY_VERIFICATION_REQUIRED'));
+ await db.creator.create({data:{user_id:member.id}});await assert.rejects(new PlatformFinanceService(service,{},new ConfigService(),{}).setupPin(member.id,'246813'),code('IDENTITY_VERIFICATION_REQUIRED'));
 });
 test('invite restriction applies to both mail and signup; deferred identity cannot bypass unpublished policies',async()=>{
  const client=auth(),data=await input(client),restricted=auth({SIGNUP_EMAIL_ALLOWLIST:'invited@example.invalid'}),sent=messages.length;

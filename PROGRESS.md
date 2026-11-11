@@ -1,3 +1,18 @@
+## 2026-11-11 약관 6조 출금 개정 (feat/payout-hardening, 커밋·미배포)
+- 사용자 결정(11-11 ask-me): 6조 출금만 먼저, 배포일 즉시 시행(사전 공지 기간 없음, 크리에이터에게 유리한 변경). 4조 실결제 문구는 토스 심사 후 별도 개정.
+- `legal-documents.ts`: `PAYOUT_TERMS_DATE='2026-11-11'`, terms 2026-11-11.payout.1(11-10까지는 2026-11-06.4). 6조 '테스트 베타에서는 실제 출금을 처리하지 않습니다' → '출금은 회사가 공지한 시작일부터 회사가 확인한 본인 명의 정산 계좌로 회사가 직접 이체하며, 이체 결과(지급 완료 또는 반려 사유)를 스튜디오 출금 내역에 기록합니다.' 4조는 '실제 청구를 하지 않습니다. 크리에이터 출금은 제6조에 따릅니다.'로 출금 부분만 정리. 다른 조항 불변(테스트로 확인).
+- **배포일이 11-11이 아니면 PAYOUT_TERMS_DATE를 배포일로 옮긴다**(11-06 개정과 같은 규칙).
+- 참고(2차 자료, 확인일 2026-11-11): 업계 약관은 공정위 전자상거래 표준약관 형식으로 7일 전 공지·불리한 변경 30일 전 공지(올리브영·오아시스 등 공개 약관). 원문 고시 미확인.
+- 검증: legal·beta-policy·signup·referrals·ai-photo·reserved-handles 62/62. 프론트 FAQ·이벤트, 가이드 3문서 같은 문구로 각 저장소 브랜치에 커밋.
+
+## 2026-11-11 출금 보안·수동 지급 준비 (feat/payout-hardening, 커밋·미배포)
+- 사용자 결정(11-11 ask-me): PIN 변경 알림 = 사이트 알림+메일, 수동 지급 전 고칠 것 = 지급 목록 범위·PIN 잠금 강화·감사 로그 반복 기록(약관·FAQ는 별도).
+- PIN(`src/platform/withdrawal-pin.ts`, 멤버십·콩 출금 공용): 5회/30초 유지 + 24시간 10회 실패 시 PIN 삭제·열린 출금 확인 취소·PASS 재설정 요구(423 PIN_RESET_REQUIRED), 앱 알림·메일·security 감사. 정답 입력 시 두 카운터 초기화. 같은 숫자 반복·연속(순환 포함)·흔한 번호 15개는 설정 시 400 WEAK_PIN(PASS 증명 소비 전). PIN을 덮어쓰면 알림·메일(withdrawal-pin-changed, 알림 type settlement). 근거: NIST SP 800-63B-4 3.1.1.2·3.2.2, OWASP(night-work security-review.md). 기준값 10회/24시간은 기술 권장 기본값.
+- 지급 목록: `due`/`holdReason`/`batchCutoff`/`totals.heldCount·heldAmount`. 합계는 이번 수요일 묶음(processing 또는 nextPayoutCutoff 전 접수)·확인된·버전 같은 계좌만. 콘솔 화면 반영은 admin 저장소.
+- 감사: 수동 모드 provider.manual_pending을 sourceId `manual-pending:<id>`로 지급 건당 1행.
+- 테스트 PIN 123456/654321 → 246813/864213(흔한 번호 차단 때문, 프론트 e2e도 함께 변경 필요).
+- 검증: build·openapi 14/14, manual-payouts 9/9, finance 9/10, 관련 묶음(beans·bean-ledger·provider·signup-mode·mail·audit) 실패 4건 = origin/prod 기준선과 동일(watchdog 2, 수요일 날짜 계산 2). 대조: 세 수정을 되돌리면 새 테스트 3건+목록 테스트 FAIL.
+
 ## 2026-11-10 이번 주 지급 목록·계좌번호 보기 API (feat/payout-list, 미커밋·미배포)
 - 요청: 수동 이체 시작 전에 크리에이터별 이체 금액 목록과 실제 계좌번호 필요(기존 콘솔은 끝 4자리뿐이라 이체 불가).
 - `src/platform/admin-payout-list.ts` GET /admin/payouts/due(revenue.view, no-store): 접수·처리 중 멤버십 출금(수수료 공제 후 금액)+beans.view면 콩 출금 net, 크리에이터·계좌 요약, 크리에이터별/전체 합계, 테스트 콩 출금 합계 제외, 종류별 500건 상한.

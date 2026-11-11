@@ -21,6 +21,8 @@ export const noticeCopy = {
   'withdrawal-received': ['출금 신청이 접수되었습니다', '출금 신청이 접수되었습니다', '신청하신 출금 내용을 확인해주세요. 처리 상태는 출금 내역에서 확인할 수 있습니다.', '출금 내역 보기'],
   'withdrawal-completed': ['출금이 완료되었습니다', '출금이 완료되었습니다', '수령 계좌의 입금 내역을 확인해주세요.', '출금 상세 보기'],
   'withdrawal-failed': ['출금을 완료하지 못했습니다', '출금 계좌를 확인해주세요', '아래 사유와 수령 계좌 정보를 확인해주세요.', '출금 상세 보기'],
+  'withdrawal-pin-changed': ['출금 PIN이 변경되었습니다', '출금 PIN이 변경되었습니다', 'PASS 본인인증으로 출금 PIN을 새 번호로 바꿨습니다.', '출금 PIN 확인'],
+  'withdrawal-pin-locked': ['출금 PIN 사용이 중지되었습니다', '출금 PIN을 다시 설정해주세요', '출금 PIN을 여러 번 잘못 입력해 PIN 사용을 중지했습니다. PASS 본인인증으로 새 PIN을 설정해주세요.', '출금 PIN 재설정'],
 } as const;
 const clean = (value: string) => String(value).replace(/\u2014/g, ', ');
 const escape = (value: string) => clean(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

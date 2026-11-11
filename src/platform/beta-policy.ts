@@ -31,5 +31,8 @@ export const isPayoutDay=(now=new Date())=>new Date(now.getTime()+9*3600000).get
 // Wednesday waits for the next week. (A Wednesday public holiday moves the operator's transfer to the next business day.)
 export const payoutCutoff=(now=new Date())=>{const kst=new Date(now.getTime()+9*3600000);kst.setUTCHours(0,0,0,0);return new Date(kst.getTime()-9*3600000);};
 export const inPayoutBatch=(createdAt:Date,now=new Date())=>isPayoutDay(now)&&new Date(createdAt).getTime()<payoutCutoff(now).getTime();
+// The batch the operator transfers next: on Wednesday the one being paid today, otherwise the coming Wednesday's
+// (requests received before that Wednesday 00:00 KST). Used by the console worklist (2026-11-11).
+export const nextPayoutCutoff=(now=new Date())=>{const kst=new Date(now.getTime()+9*3600000),days=(3-kst.getUTCDay()+7)%7;kst.setUTCHours(0,0,0,0);return new Date(kst.getTime()+days*86400000-9*3600000);};
 export const PAYOUT_SCHEDULE_MESSAGE='출금은 화요일 23:59(한국 시간)까지 신청한 건을 매주 수요일에 처리합니다.';
 export const payoutQueue=(now=new Date())=>isPayoutDay(now)?{OR:[{status:'processing'},{status:'requested',created_at:{lt:payoutCutoff(now)}}]}:{status:'processing'};
