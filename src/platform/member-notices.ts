@@ -7,10 +7,11 @@ import {MemberMailService} from '../auth/local/member-mail.service';
 // operator actions (D11, with the public reason) and bean expiry (D6, 30 days ahead; 30-day event beans 7 days ahead).
 // 2026-11-06 user decision: membership cancel/end/refund also reach the member in the app and by mail (kinds below).
 // 2026-11-07 user decision: membership payment success (first payment and renewal) also reaches the member by mail (payment-completed).
-export type MemberNoticeKind='moderation'|'bean-expiry'|'event-bean-expiry'|'subscription-cancelled'|'subscription-ended'|'refund-completed'|'payment-completed';
-const labels:Record<MemberNoticeKind,string>={moderation:'운영 안내','bean-expiry':'콩','event-bean-expiry':'콩','subscription-cancelled':'멤버십','subscription-ended':'멤버십','refund-completed':'멤버십','payment-completed':'멤버십'};
+export type MemberNoticeKind='moderation'|'bean-expiry'|'event-bean-expiry'|'subscription-cancelled'|'subscription-ended'|'refund-completed'|'payment-completed'|'withdrawal-pin-changed'|'withdrawal-pin-locked';
+const labels:Record<MemberNoticeKind,string>={moderation:'운영 안내','bean-expiry':'콩','event-bean-expiry':'콩','subscription-cancelled':'멤버십','subscription-ended':'멤버십','refund-completed':'멤버십','payment-completed':'멤버십','withdrawal-pin-changed':'출금 보안','withdrawal-pin-locked':'출금 보안'};
 // Membership notices are stored as the existing 'subscription' notification type so they sit in the 멤버십 tab.
-const notificationType=(kind:MemberNoticeKind)=>labels[kind]==='멤버십'?'subscription':kind;
+// Withdrawal PIN notices (2026-11-11) sit with the other payout notices under the existing 'settlement' type.
+const notificationType=(kind:MemberNoticeKind)=>labels[kind]==='멤버십'?'subscription':labels[kind]==='출금 보안'?'settlement':kind;
 export async function notifyMember(tx:any,input:{dedupeKey:string;memberId:string;kind:MemberNoticeKind;text:string;path:string;rows:Array<[string,string]>;note:string;actorId?:string}){
  if(await tx.memberNotice.findUnique({where:{dedupe_key:input.dedupeKey}}))return;
  await tx.memberNotification.create({data:{member_id:input.memberId,actor_id:input.actorId||null,type:notificationType(input.kind),text:input.text,path:input.path}});
