@@ -57,6 +57,14 @@ test('membership withdrawal: claimed on Wednesday with the usual checks, then th
  assert.equal(await db.platformAuditLog.count({where:{entity_id:w.id,action:'withdrawal.manual_result'}}),1);
  assert.equal((await finance.finance(creator)).summary.paid,100000);});
 
+// 2026-11-11: the worker retries a waiting transfer every minute; the manual-pending audit is written once per payout.
+test('a waiting manual transfer is audited once however often the worker retries it',async()=>{
+ const w=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:100000,status:'processing'}});
+ for(let i=0;i<3;i++)await finance.payout(w.id,WED);
+ assert.equal((await db.withdrawalRequest.findUniqueOrThrow({where:{id:w.id}})).status,'processing','still waits for the operator');
+ assert.equal(await db.platformAuditLog.count({where:{entity_id:w.id,action:'provider.manual_pending'}}),1);
+ await db.withdrawalRequest.update({where:{id:w.id},data:{status:'rejected'}});});
+
 test('a request made on the payout Wednesday itself waits for the next week (Tuesday 23:59 KST cutoff)',async()=>{
  const w=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:10000,status:'requested',created_at:WED}});
  await assert.rejects(finance.manualResult(admins[0],w.id,{result:'paid',reference:'BANK-CUT',transferredAt:WED.toISOString()},WED),code('PAYOUT_SCHEDULED'));
@@ -94,15 +102,21 @@ test('the withdrawal list marks only requested rows of a creator with a negative
 test('payout list shows the transfer amount per creator without the account number; reveal is limited and audited',async()=>{
  await db.withdrawalRequest.updateMany({where:{creator_id:creator,status:{in:['requested','processing']}},data:{status:'rejected'}});
  assert.equal((await api(`/admin/settlement-accounts/${account.id}/reveal`,'finance',{})).errorCode,'NO_OPEN_PAYOUT','no open payout, no number');
- const w1=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:70000,status:'requested'}});
+ const {nextPayoutCutoff}=require('../dist/src/platform/beta-policy'),cutoff=nextPayoutCutoff();
+ const w1=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:70000,status:'requested',created_at:new Date(cutoff.getTime()-8*86400000)}});
+ // 2026-11-11: a request after the batch cutoff and a payout to an unverified account are listed apart and kept out of the total.
+ const late=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:5000,status:'requested',created_at:new Date(cutoff.getTime()+60000)}});
+ const unverified=await db.settlementAccount.create({data:{creator_id:creator,bank:'Synthetic',holder_alias:'미확인',last_four:'9999',account_encrypted:'x',verified:false}});
+ const held=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:unverified.id,account_label:'Synthetic',amount:9000,status:'processing'}});
  const w2=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:30000,status:'processing'}});
  const res=await fetch(origin+'/api/v1/admin/payouts/due',{headers:{Origin:'https://beta.crefans.com',cookie:cookies.viewer}});assert.equal(res.status,200);assert.match(res.headers.get('cache-control')||'',/no-store/);
  const list=(await res.json()).data;assert.equal(JSON.stringify(list).includes('110123455678'),false,'no full number in the list');assert.equal(list.beans,false,'no bean rows without bean permission');
- const mine=list.items.filter(i=>i.creatorId===creator);assert.deepEqual(mine.map(i=>i.amount).sort(),[30000,70000]);assert.equal(mine[0].creatorName,'수동 '+tag);assert.equal(mine[0].account.lastFour,'5678');assert.equal(mine[0].account.verified,true);
- const group=list.creators.find(g=>g.creatorId===creator);assert.equal(group.amount,100000);assert.equal(group.count,2);
+ const mine=list.items.filter(i=>i.creatorId===creator),due=mine.filter(i=>i.due);assert.deepEqual(due.map(i=>i.amount).sort(),[30000,70000]);assert.equal(due[0].creatorName,'수동 '+tag);assert.equal(due[0].account.lastFour,'5678');assert.equal(due[0].account.verified,true);
+ assert.equal(mine.find(i=>i.id===late.id).holdReason,'next-batch');assert.equal(mine.find(i=>i.id===held.id).holdReason,'account-unverified');assert.equal(new Date(list.batchCutoff).getTime(),cutoff.getTime());
+ const group=list.creators.find(g=>g.creatorId===creator);assert.equal(group.amount,100000,'only this batch on a verified account is in the transfer total');assert.equal(group.count,2);
  assert.equal((await api(`/admin/settlement-accounts/${account.id}/reveal`,'viewer',{})).status,403,'view permission cannot reveal');
  const before=await db.platformAuditLog.count({where:{entity_id:account.id,action:'account.number_revealed'}});
  const shown=await fetch(origin+`/api/v1/admin/settlement-accounts/${account.id}/reveal`,{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://beta.crefans.com',cookie:cookies.finance},body:'{}'});
  assert.equal(shown.status,200);assert.match(shown.headers.get('cache-control')||'',/no-store/);assert.equal((await shown.json()).data.accountNumber,'110123455678');
  const audit=await db.platformAuditLog.findMany({where:{entity_id:account.id,action:'account.number_revealed'}});assert.equal(audit.length,before+1);assert.equal(JSON.stringify(audit).includes('110123455678'),false,'the number is not written to the audit log');
- await db.withdrawalRequest.deleteMany({where:{id:{in:[w1.id,w2.id]}}});});
+ await db.withdrawalRequest.deleteMany({where:{id:{in:[w1.id,w2.id,late.id,held.id]}}});await db.settlementAccount.delete({where:{id:unverified.id}});});

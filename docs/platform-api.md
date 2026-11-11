@@ -173,7 +173,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 
 주문은 pending → processing → paid 또는 failed. 타임아웃은 processing을 유지하며 worker가 공급자를 조회한다. 동일 승인으로 구독/수익 원장이 두 번 생성되지 않는다. 가입 금액·혜택은 snapshot, 수수료·보류 기간은 승인 요청 직전에 고정한다. 갱신은 이전 구독 조건을 사용하며 확정 실패의 재시도 횟수/간격은 사업 설정을 따른다. 환불 불확실성은 refunding으로 유지하고 재확인한다.
 
-계좌와 PIN/CI 증명·빌링키는 일반 조회에서 반환하지 않는다. PIN은 목적이 분리된 scrypt hash이며 5회 실패 시 30초 잠근다. 출금은 creator 행 잠금·잔액 재검증·grant 소비·requestId 멱등 처리를 한 transaction에서 수행한다. 접수 중 계좌 편집을 막는다. 은행은 요청 키를 유지하여 재조회·송금 중복 방지를 담당한다. 로컬 접수는 은행 지급 완료와 다르다.
+계좌와 PIN/CI 증명·빌링키는 일반 조회에서 반환하지 않는다. PIN은 목적이 분리된 scrypt hash이며 5회 실패 시 30초 잠근다. 24시간 안에 10회 틀리면 PIN을 지우고 열린 출금 확인을 취소해 PASS 재설정을 요구한다(423 PIN_RESET_REQUIRED, 앱 알림·메일·security 감사). 같은 숫자 반복·연속 숫자·흔한 번호는 설정 시 400 WEAK_PIN, PIN을 바꾸면 크리에이터에게 앱 알림·메일(2026-11-11, `src/platform/withdrawal-pin.ts`). 출금은 creator 행 잠금·잔액 재검증·grant 소비·requestId 멱등 처리를 한 transaction에서 수행한다. 접수 중 계좌 편집을 막는다. 은행은 요청 키를 유지하여 재조회·송금 중복 방지를 담당한다. 로컬 접수는 은행 지급 완료와 다르다.
 
 ## 관리자·운영
 
@@ -205,7 +205,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /admin/withdrawals/:id/reject | 매출·정산 생성 권한(2026-11-07). 신청 뒤 환불로 출금 가능 잔액이 음수가 되어 `PAYOUT_BALANCE_CHANGED`로 멈춘 접수(requested) 출금만 사유(150자)와 함께 반려. 처리 중이면 409 `WITHDRAWAL_NOT_REQUESTED`, 잔액이 충분하면 409 `WITHDRAWAL_NOT_BLOCKED`. 반려 금액은 다시 출금 가능액에 포함되고 크리에이터 알림·감사 `withdrawal.rejected`를 남김. 은행 API 호출 없음 |
 | GET | /admin/settlement-accounts | 매출·정산 조회 권한. 수동 지급 모드에서 예금주 확인 대기 계좌(은행·예금주 표시명·끝 4자리, 최대 100건). 전체 계좌번호는 반환하지 않음 |
 | POST | /admin/settlement-accounts/:id/verify | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 통장 사본 등으로 예금주 확인 후 expectedVersion·확인 내용으로 기록, 이미 확인·버전 불일치는 409. 감사 `account.manual_verified` |
-| GET | /admin/payouts/due | 매출·정산 조회 권한. 이번 주 지급 목록(2026-11-10): 접수·처리 중 멤버십 출금(수수료 공제 후 이체 금액)과 콩 조회 권한이 있으면 콩 출금(net)을 크리에이터·계좌 요약(은행·예금주·끝 4자리·확인 여부)과 함께, 크리에이터별·전체 합계 포함. 테스트 환경 콩 출금은 합계 제외. 종류별 최대 500건. 전체 계좌번호 미반환, no-store |
+| GET | /admin/payouts/due | 매출·정산 조회 권한. 이번 주 지급 목록(2026-11-10): 접수·처리 중 멤버십 출금(수수료 공제 후 이체 금액)과 콩 조회 권한이 있으면 콩 출금(net)을 크리에이터·계좌 요약(은행·예금주·끝 4자리·확인 여부)과 함께, 크리에이터별·전체 합계 포함. 테스트 환경 콩 출금은 합계 제외. 2026-11-11부터 합계는 이번 수요일 묶음(처리 중, 또는 batchCutoff 전 접수)이면서 확인된·바뀌지 않은 계좌 건만(`due`), 나머지는 `holdReason`(next-batch·account-unverified·account-changed·account-missing·test)과 heldCount·heldAmount로 따로 표시. 종류별 최대 500건. 전체 계좌번호 미반환, no-store |
 | POST | /admin/settlement-accounts/:id/reveal | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. 접수·처리 중 출금이 걸린 계좌만 전체 계좌번호 반환(없으면 409 NO_OPEN_PAYOUT). 조회마다 감사 기록 account.number_revealed(번호는 기록하지 않음), no-store |
 | POST | /admin/beans/withdrawals/:id/manual-result | SUPER_ADMIN(2026-11-02), `MANUAL_PAYOUTS_ENABLED`일 때만. 반려 사유 489자(접두어 포함 note 500자, 2026-11-07). 접수 건은 기존 콩 지급 처리(수요일·실입금 출처)로 처리 중 전환 후 이체 결과를 은행 결과와 같은 원장 경로로 한 번만 반영. 감사 `bean.payout_manual_result` |
 | GET | /admin/financial-policy | 운영 설정 조회 권한; 현재 DB 수수료율/정산 보류·version 조회 |

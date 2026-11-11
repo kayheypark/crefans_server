@@ -9,7 +9,9 @@ const error=code=>e=>e.getResponse().code===code;
 test('the released documents are in force with no open items: terms/policy from 2026-11-06, collection/marketing from 2026-10-30',()=>{
  const source=new LegalDocumentsService();assert.deepEqual(source.catalog().blockers,[]);assert.equal(source.signup().signupReady,true);
  // 2026-11-06 user decision: the merged revision is now the single version in force, so terms/policy carry that day.
- for(const d of [source.catalog().documents.terms,source.catalog().documents.policy]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-06');assert.equal(d.effectiveAt,'2026-11-06');assert.doesNotMatch(d.version,/draft/);}
+ for(const d of [source.catalog().documents.policy]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-06');assert.equal(d.effectiveAt,'2026-11-06');assert.doesNotMatch(d.version,/draft/);}
+ // 2026-11-11 user decision: the payout revision of article 6 is in force from its deploy day.
+ {const d=source.catalog().documents.terms;assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-11');assert.equal(d.effectiveAt,'2026-11-11');assert.equal(d.version,'2026-11-11.payout.1');}
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
@@ -72,6 +74,18 @@ test('privacy policy describes the actual withdrawal purge: 30-day grace, erased
 });
 // 2026-11-06 user decision: no real users and no real charges, so this is published as the single version in force
 // from the deploy day. There is no upcoming document and no scheduled-amendment window to honour.
+test('2026-11-11 payout revision: article 6 states the company transfer from the announced start, article 4 keeps no real charges',()=>{
+ const legal=new LegalDocumentsService(),{PAYOUT_TERMS_DATE}=require('../dist/src/platform/legal-documents');assert.equal(PAYOUT_TERMS_DATE,'2026-11-11');
+ const before=legal.catalog(new Date('2026-11-10T23:59:00+09:00')).documents.terms,after=legal.catalog(new Date('2026-11-11T00:00:00+09:00')).documents.terms;
+ assert.equal(before.version,'2026-11-06.4');assert.equal(after.version,'2026-11-11.payout.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-11.payout.1');
+ const body=title=>after.sections.find(s=>s.title===title).body;
+ assert.match(body('6. 크리에이터 수수료·정산·출금'),/회사가 공지한 시작일부터 회사가 확인한 본인 명의 정산 계좌로 회사가 직접 이체/);assert.doesNotMatch(JSON.stringify(after),/실제 출금을 처리하지 않습니다|청구와 출금을 하지 않습니다/);
+ assert.match(body('4. 결제와 자동 갱신'),/베타에서는 실제 청구를 하지 않습니다\. 크리에이터 출금은 제6조에 따릅니다/);
+ assert.deepEqual(after.sections.map(s=>s.title),before.sections.map(s=>s.title),'no section added or dropped');
+ for(const s of after.sections)if(!/^[46]\./.test(s.title))assert.equal(s.body,before.sections.find(x=>x.title===s.title).body,s.title);
+ assert.match(after.notice,/2026년 11월 11일 개정/);assert.equal(legal.signup().published,true);
+});
+
 test('the revision is the single version in force from its KST effective day, with no upcoming document',()=>{
  const legal=new LegalDocumentsService(),after=legal.catalog(new Date('2026-11-06T00:00:00+09:00'));
  assert.equal(LEGAL_NOTICE_DATE,'2026-11-06');assert.equal(NEXT_TERMS_EFFECTIVE,LEGAL_NOTICE_DATE,'in force from the deploy day, not 30 days later');
@@ -81,7 +95,7 @@ test('the revision is the single version in force from its KST effective day, wi
  // 시행일 전날은 이전 본이 보이고, 그 이후로는 계속 이 본이다.
  const before=legal.catalog(new Date('2026-11-05T23:59:00+09:00'));
  assert.equal(before.documents.terms.version,'2026-10-30.3');assert.equal(before.upcoming.effectiveAt,'2026-11-06');
- assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-06.4');
+ assert.equal(legal.catalog(new Date('2026-11-10T23:59:00+09:00')).documents.terms.version,'2026-11-06.4');
  const terms=JSON.stringify(after.documents.terms);
  for(const added of ['11. 콩','10%를 공제','미수금','신고한 회원에게 앱 알림','볼 수 없는 멤버십 전용 게시물에는 후원할 수 없습니다','오픈베타','회사가 부담하여 신고·납부','화요일 23:59','다음 영업일','친구 초대 보상 등으로 무상 지급한 프로모션콩','받은 회원이 환불하거나 출금할 수 없습니다','프로모션콩으로 후원해 크리에이터가 받은 콩은 일반 후원 콩과 같이 제6조 기준에 따라 출금할 수 있습니다','12. 친구 초대','남은 콩을 회수','https://crefans.com/핸들','끌 수 없습니다','지급일로부터 1년간 쓸 수 있으며','2026년 11월 6일부터 적용합니다','통신판매업 신고번호: 2026-서울관악-2144'])assert.ok(terms.includes(added),added);
  for(const removed of ['17개 계정','프로모션콩은 환불·출금 대상이 아닙니다','법정 원천징수는 별도','세금 처리 방식(원천징수 여부 포함)','공휴일·신청 마감 등 세부 일정','운영자가 지급한 프로모션콩','지급일로부터 5년간 쓸 수 있으며','30일 뒤에 시행','2026년 12월','통신판매업을 신고하고 신고번호를','통신판매업 신고번호는 확인 중'])assert.ok(!terms.includes(removed),removed);
