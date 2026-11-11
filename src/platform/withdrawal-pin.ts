@@ -54,6 +54,6 @@ export async function noticePinChanged(tx:any,member:string,replaced:boolean){
   rows:[['내용','출금 PIN 재설정'],['인증','PASS 본인인증']],note:'바꾸기 전에 확인한 출금은 새 PIN으로 다시 확인해야 합니다.'});
 }
 export const pinCheckMessage:Record<Exclude<PinCheck,null>,string>={
- PIN_LOCKED:`${PIN_SHORT_LOCK.ms/1000}초 후 다시 인증해주세요.`,PIN_NOT_CONFIGURED:'간편비밀번호를 설정해주세요.',INVALID_PIN:'간편비밀번호를 확인해주세요.',
+ PIN_LOCKED:`${PIN_SHORT_LOCK.ms/1000}초 후 다시 인증해주세요.`,PIN_NOT_CONFIGURED:'출금 PIN을 설정해주세요.',INVALID_PIN:'출금 PIN을 확인해주세요.',
  PIN_RESET_REQUIRED:`24시간 안에 ${PIN_DAILY_LIMIT.failures}번 잘못 입력해 출금 PIN을 사용할 수 없게 했어요. PASS 본인인증으로 새 PIN을 설정해 주세요.`};
 export const pinCheckStatus=(error:Exclude<PinCheck,null>)=>error==='PIN_LOCKED'?429:error==='PIN_RESET_REQUIRED'?423:403;
