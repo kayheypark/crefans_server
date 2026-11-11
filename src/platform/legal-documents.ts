@@ -120,12 +120,24 @@ catalog.documents.privacy={...catalog.documents.privacy,version:'2026-11-08.advi
 const AI_PHOTO_PRIVACY_SECTION={title:'16. 선택 기능: 스튜디오 AI 사진 편집',body:"운영팀이 허용한 크리에이터가 스튜디오 게시물 작성에서 'AI로 사진 만들기'를 선택하면, 크리에이터가 고른 본인 업로드 사진, 옷을 바꿀 때 사진 위에 칠한 영역, 원하는 모습 문구, 회원 ID를 변환한 익명 식별값으로 사진을 편집합니다. 이메일·이름·결제 정보·접속 IP는 AI 공급사에 보내지 않습니다. 사진 속 인물은 크리에이터 본인이거나 동의를 받은 사람이어야 하며, 노출·성적인 합성, 미성년자, 다른 사람 얼굴 합성은 만들 수 없습니다.\n\n요청 문구와 원본 사진, 만든 사진은 유해성 검사(같은 공급사의 검사 기능)를 거칩니다. 만든 사진은 크레팬스 비공개 저장소에 해당 크리에이터의 미디어로 저장되고, 게시물에 넣으면 팬 화면에 'AI 생성' 표시가 붙습니다. 원본 사진은 바뀌지 않으며, 요청 문구 원문은 크레팬스 DB에 저장하지 않습니다. 만든 사진의 보관·삭제는 다른 업로드 미디어와 같은 기준을 따르고, 하루 사용 횟수 제한 기록은 기존 보안 기록 보관 기준을 따릅니다.\n\n기능을 사용할 때마다 위 정보가 HTTPS를 통해 OpenAI OpCo, LLC(1455 Third Street, San Francisco, California 94158, United States; privacy@openai.com)에 전달됩니다. 목적은 사진 편집과 유해성 검사이며, 처리 국가는 15번 항목에 적은 미국과 공급사 하위처리자 목록의 국가입니다. 공급사는 기본적으로 API 데이터를 모델 학습에 사용하지 않으며, 사진 편집 요청은 남용 감시를 위해 최대 30일 보관할 수 있습니다. 아동 성착취물 탐지를 위해 이미지가 검사되고, 탐지된 이미지는 공급사의 별도 검토를 위해 보관될 수 있습니다. 국외 이전을 원하지 않으면 이 기능을 쓰지 않고 직접 찍은 사진만 올리면 되며, 회원 탈퇴는 필요하지 않습니다.",links:[{label:'OpenAI API 데이터 처리·보관',href:'https://developers.openai.com/api/docs/guides/your-data'},{label:'OpenAI 데이터 처리 계약',href:'https://openai.com/policies/data-processing-addendum/'},{label:'OpenAI 하위처리자와 처리 국가',href:'https://openai.com/policies/sub-processor-list/'}]};
 catalog.documents.privacy={...catalog.documents.privacy,version:'2026-11-08.aiphoto.1',updatedAt:'2026-11-08',publishedAt:'2026-11-08',effectiveAt:'2026-11-08',notice:'2026년 11월 8일부터 운영팀이 허용한 크리에이터가 쓰는 선택 기능인 스튜디오 AI 사진 편집의 사진 처리·위탁·국외 이전을 추가 안내합니다. 기존 동의 사본은 보존합니다.',sections:[...catalog.documents.privacy.sections.map(section=>section.title==='8. 처리 위탁과 제3자 제공'?{...section,body:section.body+'\n스튜디오 AI 사진 편집의 사진 편집·유해성 검사를 OpenAI OpCo, LLC에 위탁합니다. 처리 범위와 국외 이전은 16번 항목을 확인하세요.'}:section),AI_PHOTO_PRIVACY_SECTION]};
 const nextCatalog:LegalCatalog={...catalog,documents:{...catalog.documents,terms:nextTerms,policy:nextPolicy}};
+// 2026-11-11 user decision (ask-me, manual payouts): article 6 drops "no real payouts in the test beta" and states that the
+// company transfers payouts itself from the start date it announces; article 4 keeps "no real charges" (real payments are a
+// separate revision after the Toss review) and only stops saying payouts are not made. Favourable to creators; the user chose
+// to apply it from the deploy day (no prior notice period). If the deploy slips, move PAYOUT_TERMS_DATE with it.
+export const PAYOUT_TERMS_DATE='2026-11-11';
+const payoutEdits:Record<string,[string,string]>={
+ '4. 결제와 자동 갱신':['베타에서는 실제 청구와 출금을 하지 않습니다.','베타에서는 실제 청구를 하지 않습니다. 크리에이터 출금은 제6조에 따릅니다.'],
+ '6. 크리에이터 수수료·정산·출금':['테스트 베타에서는 실제 출금을 처리하지 않습니다.','출금은 회사가 공지한 시작일부터 회사가 확인한 본인 명의 정산 계좌로 회사가 직접 이체하며, 이체 결과(지급 완료 또는 반려 사유)를 스튜디오 출금 내역에 기록합니다.']};
+const payoutTerms:LegalDocument={...nextTerms,version:'2026-11-11.payout.1',updatedAt:PAYOUT_TERMS_DATE,publishedAt:PAYOUT_TERMS_DATE,effectiveAt:PAYOUT_TERMS_DATE,
+ notice:nextTerms.notice+' 2026년 11월 11일 개정: 제6조에 회사가 공지한 시작일부터 확인된 본인 명의 계좌로 매주 직접 이체한다는 출금 방식을 넣고, 제4조에서 출금 관련 문장을 정리했습니다. 이전 동의 사본은 보존합니다.',
+ sections:nextTerms.sections.map(sec=>{const e=payoutEdits[sec.title];if(!e)return sec;if(!sec.body.includes(e[0]))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(e[0],e[1])};})};
+const payoutCatalog:LegalCatalog={...nextCatalog,documents:{...nextCatalog.documents,terms:payoutTerms}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{return structuredClone(kstDate(now)>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=PAYOUT_TERMS_DATE?payoutCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=new Date().toISOString().slice(0,10));
