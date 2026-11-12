@@ -33,3 +33,8 @@ h2{font-size:13pt;line-height:1.5;letter-spacing:-.2px;margin:4mm 0 2mm;padding:
 .contract-columns .clause{padding-left:3.5mm;text-indent:-3.5mm;margin-bottom:1.2mm;orphans:3;widows:3;text-align:justify}
 
 .contract-columns .clause{break-inside:avoid}
+
+/* 2026-11-12: RRN row (party table) and 7조⑤ sentence added; keep 5 pages without shrinking the 9pt article text. */
+.parties td.ex{padding-bottom:8.5mm}
+.contract-columns .clause{margin-bottom:.9mm}
+.contract-columns{line-height:1.47}
