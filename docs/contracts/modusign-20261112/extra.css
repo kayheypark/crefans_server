@@ -1,0 +1,20 @@
+/* Attachment documents for Modusign (2026-11-12): one page, same monochrome look as the two-column contract. */
+body>h1{font-size:24pt;margin:2mm 0 5mm;padding-bottom:4mm}
+.terms th{width:24%}.terms td{font-size:10pt}
+.article{font-size:9.5pt;line-height:1.55;margin-top:2mm}
+.signature{break-before:avoid}.signature>h1{font-size:15pt;margin:4mm 0 2mm;padding-bottom:2mm}
+.signature p{font-size:9.5pt;margin:1mm 0}.signature .date{margin:3mm 0}
+.signature td{height:auto;padding:4mm}.signature .signline{margin-top:5mm}
+.legal h2{font-size:11pt}.legal .meta{color:#5a5a5a;font-size:9pt;margin:0 0 4mm}
+.legal .body{font-size:9.5pt;line-height:1.6;white-space:pre-wrap;margin:0 0 3mm}
+.legal .doc{break-before:page}.legal .doc:first-of-type{break-before:auto}
+.legal a{color:#333}
+.line{display:inline-block;border-bottom:1px solid #797979;height:1.1em;vertical-align:-2px;margin:0 1mm}
+body>.article:first-of-type{break-before:auto}
+.terms th,.terms td{padding:2.4mm 3.5mm}
+.legal .intro{max-width:none}
+body>h1{font-size:20pt;margin:0 0 4mm;padding-bottom:3mm}
+.intro{margin-bottom:4mm}
+.terms{margin:2mm 0 3mm}
+.signature td{padding:3mm 4mm}.signature td b{font-size:11pt}.signature .signline{margin-top:3mm}
+.signature table{margin-top:1mm}
