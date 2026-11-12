@@ -77,3 +77,5 @@
 - 프로필 상단의 120자 짧은 소개는 `user_profiles.bio`만 사용한다. 회원·크리에이터 수정/조회에서 공유하며 `creators.about`의 1,000자 상세 소개는 별도 보존한다. 통합 migration의 운영 적용 전 API/worker 교체·DB 백업 절차는 `docs/platform-api.md`를 따른다.
 
 - 광고상품 비교가격은 VAT 포함 동일 기간 기준가와 산정 근거를 함께 표시한다. 할인율은 (기준가−결제금액)/기준가를 내림한 값이며, 기간2배 상품의 durationDays는 혜택이 포함된 최종기간이다. 일반 상품 기간이나 기존 이력을 자동 변경하지 않는다.
+
+- AI 사진 편집 kind는 outfit/makeup/expression/pose/background를 지원한다. 메이크업·표정은 전용 공급사 지시로 처리하며 기존 허용·본인 원본·동의·마스크·한도·모더레이션 경계를 유지한다.
