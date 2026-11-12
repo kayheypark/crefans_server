@@ -13,7 +13,7 @@ const code=c=>e=>e.getResponse?.().code===c;
 async function api(path,actor,body,method=body?'POST':'GET'){const res=await fetch(origin+'/api/v1'+path,{method,headers:{'Content-Type':'application/json',Origin:'https://beta.crefans.com',...(actor?{cookie:cookies[actor]}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});return{status:res.status,...await res.json()};}
 before(async()=>{release=await require('./e2e-db-lock.cjs').lockE2EDatabase(source);
  const r=require('node:child_process').spawnSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy'],{env:process.env,encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);
- await db.member.create({data:{id:creator,email:`creator-${tag}@manual.test.invalid`,password_hash:'x',nickname:'수동'+tag,name:'수동 지급 검증',preferred_username:'mp'+tag,email_verified:true,status:'CONFIRMED'}});await db.creator.create({data:{user_id:creator,display_name:'수동 '+tag,handle:'mp'+tag}});
+ await db.member.create({data:{id:creator,email:`creator-${tag}@manual.test.invalid`,password_hash:'x',nickname:'수동'+tag,name:'수동 지급 검증',preferred_username:'mp'+tag,email_verified:true,status:'CONFIRMED'}});await db.creator.create({data:{is_verified:true,user_id:creator,display_name:'수동 '+tag,handle:'mp'+tag}});
  const token='la.'+randomBytes(32).toString('base64url');cookies.creator='access_token='+token;await db.memberSession.create({data:{member_id:creator,access_hash:digest(token),refresh_hash:digest(randomUUID()),access_until:new Date(Date.now()+3600000),expires_at:new Date(Date.now()+3600000)}});
  for(const [name,permissions] of [['finance',{revenue:{view:true,create:true}}],['viewer',{revenue:{view:true}}]]){const a=await db.admin.create({data:{user_sub:randomUUID(),name,email:randomUUID()+'@manual.test.invalid',role:'ADMIN',permissions}});admins.push(a);cookies[name]=await require('./admin-session.cjs')(db,a.id);}
  app=await NestFactory.create(PlatformModule,{logger:false});app.setGlobalPrefix('api/v1');app.use(cookieParser());app.use((req,res,next)=>requestContext.run({ip:'127.0.0.1',peerIp:'127.0.0.1',requestId:randomUUID()},next));app.useGlobalInterceptors(new EnvelopeInterceptor());app.useGlobalFilters(new PlatformExceptionFilter());await app.listen(0,'127.0.0.1');origin=await app.getUrl();
@@ -120,3 +120,26 @@ test('payout list shows the transfer amount per creator without the account numb
  assert.equal(shown.status,200);assert.match(shown.headers.get('cache-control')||'',/no-store/);assert.equal((await shown.json()).data.accountNumber,'110123455678');
  const audit=await db.platformAuditLog.findMany({where:{entity_id:account.id,action:'account.number_revealed'}});assert.equal(audit.length,before+1);assert.equal(JSON.stringify(audit).includes('110123455678'),false,'the number is not written to the audit log');
  await db.withdrawalRequest.deleteMany({where:{id:{in:[w1.id,w2.id,late.id,held.id]}}});await db.settlementAccount.delete({where:{id:unverified.id}});});
+
+// 2026-11-12 user decision (ask-me): the verified badge marks a signed partnership contract and only partners withdraw.
+// Accounts and the PIN stay open; a request already accepted before the badge is removed is held, not rejected.
+test('without the partner badge: PIN check and request are refused, open requests are held, paid recording is refused, reject still works',async()=>{
+ await db.creator.update({where:{user_id:creator},data:{is_verified:false}});
+ try{
+  await assert.rejects(finance.verifyPin(creator,{amount:100000,accountId:account.id,pin:'000000'}),code('PARTNER_CONTRACT_REQUIRED'));
+  await assert.rejects(finance.requestWithdrawal(creator,{requestId:randomUUID(),amount:100000,accountId:account.id,authorizationId:randomUUID()}),code('PARTNER_CONTRACT_REQUIRED'));
+  const http=await api('/studio/withdraw/verify','creator',{amount:100000,accountId:account.id,pin:'000000'});assert.equal(http.status,403);assert.equal(http.errorCode,'PARTNER_CONTRACT_REQUIRED');assert.match(http.errorMessage,/파트너 계약/);
+  const w=await db.withdrawalRequest.create({data:{creator_id:creator,request_key:randomUUID(),account_id:account.id,account_label:'Synthetic',amount:1000,status:'requested',created_at:new Date(WED.getTime()-8*86400000)}});
+  await finance.payout(w.id,WED);// the worker path holds it quietly
+  assert.equal((await db.withdrawalRequest.findUniqueOrThrow({where:{id:w.id}})).status,'requested','held, not claimed');
+  await assert.rejects(finance.manualResult(admins[0],w.id,{result:'paid',reference:'BANK-P',transferredAt:WED.toISOString()},WED),code('PARTNER_CONTRACT_REQUIRED'));
+  assert.equal((await db.withdrawalRequest.findUniqueOrThrow({where:{id:w.id}})).status,'requested');
+  const list=(await api('/admin/payouts/due','viewer')).data;const row=list.items.find(i=>i.id===w.id);assert.equal(row.holdReason,'partner-unverified');assert.equal(row.due,false);
+  assert.equal(list.creators.find(g=>g.creatorId===creator)?.amount||0,0,'held rows stay out of the transfer total');
+  await finance.manualResult(admins[0],w.id,{result:'rejected',reason:'파트너 계약 종료'},WED);
+  assert.equal((await db.withdrawalRequest.findUniqueOrThrow({where:{id:w.id}})).status,'rejected','an operator can still reject');
+  await db.withdrawalRequest.delete({where:{id:w.id}});
+ }finally{await db.creator.update({where:{user_id:creator},data:{is_verified:true}});}
+ // with the badge back the same checks pass the partner gate (they fail later on PIN or authorization instead)
+ await assert.rejects(finance.requestWithdrawal(creator,{requestId:randomUUID(),amount:100000,accountId:account.id,authorizationId:randomUUID()}),code('AUTHORIZATION_EXPIRED'));
+});

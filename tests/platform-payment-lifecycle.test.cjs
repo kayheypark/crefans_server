@@ -11,7 +11,7 @@ const settings={PLATFORM_FEE_BPS:'1000',SETTLEMENT_HOLD_DAYS:'0',REFUND_WINDOW_D
 async function fixture(overrides={}){
  const creator=randomUUID(),fan=randomUUID();members.push(creator,fan);creators.push(creator);
  for(const id of[creator,fan])await db.member.create({data:{id,email:id+'@example.invalid',name:'결제 검증',nickname:'검증',preferred_username:id,email_verified:true}});
- await db.creator.create({data:{user_id:creator}});
+ await db.creator.create({data:{is_verified:true,user_id:creator}});
  const plan=await db.membershipItem.create({data:{creator_id:creator,name:'월 구독',price:10000,benefits:'["혜택"]',billing_unit:'MONTH'}});
  const card=await db.billingMethod.create({data:{member_id:fan,customer_key:randomUUID(),billing_key_encrypted:'test-billing-key',label:'테스트카드',last_four:'1234',is_default:true}});
  const approved=new Map(),calls=[];

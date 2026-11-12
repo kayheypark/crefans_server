@@ -10,8 +10,8 @@ test('the released documents are in force with no open items: terms/policy from 
  const source=new LegalDocumentsService();assert.deepEqual(source.catalog().blockers,[]);assert.equal(source.signup().signupReady,true);
  // 2026-11-06 user decision: the merged revision is now the single version in force, so terms/policy carry that day.
  for(const d of [source.catalog().documents.policy]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-06');assert.equal(d.effectiveAt,'2026-11-06');assert.doesNotMatch(d.version,/draft/);}
- // 2026-11-11 user decision: the payout revision of article 6 is in force from its deploy day.
- {const d=source.catalog().documents.terms;assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-11');assert.equal(d.effectiveAt,'2026-11-11');assert.equal(d.version,'2026-11-11.payout.1');}
+ // 2026-11-13: the partner revision of article 6 (only partners withdraw) is in force from its deploy day.
+ {const d=source.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-13');assert.equal(d.effectiveAt,'2026-11-13');assert.equal(d.version,'2026-11-13.partner.1');}
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
@@ -77,13 +77,26 @@ test('privacy policy describes the actual withdrawal purge: 30-day grace, erased
 test('2026-11-11 payout revision: article 6 states the company transfer from the announced start, article 4 keeps no real charges',()=>{
  const legal=new LegalDocumentsService(),{PAYOUT_TERMS_DATE}=require('../dist/src/platform/legal-documents');assert.equal(PAYOUT_TERMS_DATE,'2026-11-11');
  const before=legal.catalog(new Date('2026-11-10T23:59:00+09:00')).documents.terms,after=legal.catalog(new Date('2026-11-11T00:00:00+09:00')).documents.terms;
- assert.equal(before.version,'2026-11-06.4');assert.equal(after.version,'2026-11-11.payout.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-11.payout.1');
+ assert.equal(before.version,'2026-11-06.4');assert.equal(after.version,'2026-11-11.payout.1');assert.equal(legal.catalog(new Date('2026-11-12T23:59:00+09:00')).documents.terms.version,'2026-11-11.payout.1');
  const body=title=>after.sections.find(s=>s.title===title).body;
  assert.match(body('6. 크리에이터 수수료·정산·출금'),/회사가 공지한 시작일부터 회사가 확인한 본인 명의 정산 계좌로 회사가 직접 이체/);assert.doesNotMatch(JSON.stringify(after),/실제 출금을 처리하지 않습니다|청구와 출금을 하지 않습니다/);
  assert.match(body('4. 결제와 자동 갱신'),/베타에서는 실제 청구를 하지 않습니다\. 크리에이터 출금은 제6조에 따릅니다/);
  assert.deepEqual(after.sections.map(s=>s.title),before.sections.map(s=>s.title),'no section added or dropped');
  for(const s of after.sections)if(!/^[46]\./.test(s.title))assert.equal(s.body,before.sections.find(x=>x.title===s.title).body,s.title);
  assert.match(after.notice,/2026년 11월 11일 개정/);assert.equal(legal.signup().published,true);
+});
+
+// 2026-11-12 user decision (ask-me): the verified badge marks a signed partnership contract and only partners withdraw.
+// Applied from the deploy day (2026-11-13 KST); only article 6 changes.
+test('2026-11-13 partner revision: article 6 limits withdrawals to partner creators and keeps the account/PIN and hold rules',()=>{
+ const legal=new LegalDocumentsService(),{PARTNER_TERMS_DATE}=require('../dist/src/platform/legal-documents');assert.equal(PARTNER_TERMS_DATE,'2026-11-13');
+ const before=legal.catalog(new Date('2026-11-12T23:59:00+09:00')).documents.terms,after=legal.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;
+ assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');
+ const six=after.sections.find(s=>s.title==='6. 크리에이터 수수료·정산·출금').body;
+ assert.match(six,/파트너십 계약을 맺은 크리에이터\(프로필에 인증 배지 표시\)만 신청할 수 있습니다/);assert.match(six,/정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다/);
+ assert.match(six,/인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다/);assert.match(six,/출금에는 본인 명의 정산 계좌의 확인과 별도 출금 인증이 필요합니다/);
+ for(const s of after.sections)if(!s.title.startsWith('6.'))assert.equal(s.body,before.sections.find(x=>x.title===s.title).body,s.title);
+ assert.match(after.notice,/2026년 11월 13일 개정/);assert.match(after.notice,/2026년 11월 11일 개정/);
 });
 
 test('the revision is the single version in force from its KST effective day, with no upcoming document',()=>{

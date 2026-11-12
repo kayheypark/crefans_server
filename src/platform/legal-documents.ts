@@ -140,13 +140,23 @@ const payoutEdits:Record<string,[string,string]>={
 const payoutTerms:LegalDocument={...nextTerms,version:'2026-11-11.payout.1',updatedAt:PAYOUT_TERMS_DATE,publishedAt:PAYOUT_TERMS_DATE,effectiveAt:PAYOUT_TERMS_DATE,
  notice:nextTerms.notice+' 2026년 11월 11일 개정: 제6조에 회사가 공지한 시작일부터 확인된 본인 명의 계좌로 매주 직접 이체한다는 출금 방식을 넣고, 제4조에서 출금 관련 문장을 정리했습니다. 이전 동의 사본은 보존합니다.',
  sections:nextTerms.sections.map(sec=>{const e=payoutEdits[sec.title];if(!e)return sec;if(!sec.body.includes(e[0]))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(e[0],e[1])};})};
-const payoutCatalog:LegalCatalog={...nextCatalog,documents:{...nextCatalog.documents,terms:payoutTerms}};
+const payoutOnlyCatalog:LegalCatalog={...nextCatalog,documents:{...nextCatalog.documents,terms:payoutTerms}};
+// 2026-11-12 user decision (ask-me): only creators who signed the Crefans partnership contract (verified badge) can withdraw.
+// Accounts and the withdrawal PIN stay open to every creator. The user chose to apply it from the deploy day; if the deploy
+// slips, move PARTNER_TERMS_DATE with it.
+export const PARTNER_TERMS_DATE='2026-11-13';
+const PARTNER_ANCHOR='출금에는 본인 명의 정산 계좌의 확인과 별도 출금 인증이 필요합니다.';
+const partnerTerms:LegalDocument={...payoutTerms,version:'2026-11-13.partner.1',updatedAt:PARTNER_TERMS_DATE,publishedAt:PARTNER_TERMS_DATE,effectiveAt:PARTNER_TERMS_DATE,
+ notice:payoutTerms.notice+' 2026년 11월 13일 개정: 제6조에 회사와 크리에이터 파트너십 계약을 맺은 크리에이터(인증 배지 표시)만 출금할 수 있다는 기준을 넣었습니다. 이전 동의 사본은 보존합니다.',
+ sections:payoutTerms.sections.map(sec=>{if(sec.title!=='6. 크리에이터 수수료·정산·출금')return sec;if(!sec.body.includes(PARTNER_ANCHOR))throw Error(`Legal revision anchor missing in ${sec.title}`);
+  return{...sec,body:sec.body.replace(PARTNER_ANCHOR,'멤버십 수익과 후원받은 콩의 출금은 회사와 크리에이터 파트너십 계약을 맺은 크리에이터(프로필에 인증 배지 표시)만 신청할 수 있습니다. 정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다. 파트너십 계약이 끝나 인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다. '+PARTNER_ANCHOR)};})};
+const payoutCatalog:LegalCatalog={...nextCatalog,documents:{...nextCatalog.documents,terms:partnerTerms}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=PAYOUT_TERMS_DATE?payoutCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=new Date().toISOString().slice(0,10));
