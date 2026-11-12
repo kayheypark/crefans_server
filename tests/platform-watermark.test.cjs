@@ -29,7 +29,11 @@ test('new post uses a distinct pending derivative, repeated/concurrent save reus
  const p=await studio.saveContent(owner,payload([m])),target=(await db.postingMedia.findFirstOrThrow({where:{posting_id:p.id}})).media_id;assert.notEqual(target,m.id);assert.equal((await db.media.findUniqueOrThrow({where:{id:target}})).processing_status,'PROCESSING');
  assert.deepEqual(await Promise.all([enqueue(m.id),enqueue(m.id)]),[target,target]);await studio.saveContent(owner,{...payload([{...m,id:target}]),id:p.id});assert.equal(await enqueue(target),target);assert.equal(await db.mediaWatermarkJob.count({where:{source_id:m.id}}),1);
  for(const id of[owner,fan])await assert.rejects(controller().edgeAuthorize(target,{user:{sub:id}}),e=>e.getResponse?.().code==='MEDIA_NOT_FOUND');
+ // 2026-11-13: while watermarking, the post lists the photo as processing (front shows a placeholder) instead of dropping it.
+ const shown=async()=>(await service.post(await db.posting.findUniqueOrThrow({where:{id:p.id},include:{medias:{include:{media:true},orderBy:{sort_order:'asc'}}}}),owner)).media;
+ assert.deepEqual((await shown()).map(x=>[x.type,!!x.processing]),[['image',true]]);
  assert.equal(await watermarkNextMedia(db,storage,root),1);const result=await db.media.findUniqueOrThrow({where:{id:target}});assert.equal(result.processing_status,'COMPLETED');assert.equal(result.mime_type,'image/webp');assert.equal(result.metadata.watermark.handle,handle);
+ assert.deepEqual((await shown()).map(x=>[x.type,!!x.processing]),[['image',false]]);
  assert.equal(digest(await fs.readFile(path.join(root,m.id))),digest(original));assert.notEqual(digest(await fs.readFile(path.join(root,target))),digest(original));
  await assert.rejects(controller().edgeAuthorize(target,{user:{sub:fan}}),e=>e.getResponse?.().code==='MEDIA_ACCESS_DENIED');await db.posting.update({where:{id:p.id},data:{status:'PUBLISHED',is_public:true,published_at:new Date()}});assert.deepEqual(await controller().edgeAuthorize(target,{}),{delivery:'api'});
  await db.member.update({where:{id:owner},data:{preferred_username:handle}});
