@@ -69,6 +69,14 @@ test('outfit edit sends the mask resized to the provider image',async()=>{
  const [mi,ii]=await Promise.all([sharp(edit.fields.mask.bytes).metadata(),sharp(edit.fields.image.bytes).metadata()]);assert.deepEqual([mi.width,mi.height],[ii.width,ii.height]);assert.equal(mi.hasAlpha,true);
 });
 
+test('makeup and expression edits reach the provider with their specific instructions and preserve safety rules',async()=>{
+ for(const [kind,request,instruction] of [['makeup','입술을 코랄 톤으로 바꿔줘',/Change only the makeup/],['expression','밝게 웃어줘',/Change only the facial expression/]]){
+  reset();const result=await photos.edit(creator,base({kind,prompt:request}));assert.equal(result.images.length,2);
+  const edit=calls.find(c=>c.kind==='edit');assert.match(edit.fields.prompt,instruction);assert.match(edit.fields.prompt,/facial structure, identity, age/);assert.match(edit.fields.prompt,/Do not add nudity/);assert.ok(!('mask' in edit.fields));
+  const row=await db.media.findUnique({where:{id:result.images[0].id}});assert.equal(row.metadata.aiKind,kind);
+ }
+});
+
 test('failures: provider error and unavailable moderation give the try back; blocked input/output still count',async()=>{
  const left=async()=>(await photos.quota(creator)).remaining,start=await left();
  reset();editStatus=500;await assert.rejects(photos.edit(creator,base()),code('PROVIDER_ERROR'));assert.equal(await left(),start);

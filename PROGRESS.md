@@ -1,3 +1,11 @@
+## 2026-11-13 AI 사진 편집 9안 분류 계약 확장 (로컬 검증, 미배포)
+- 사용자 선택 9안 실제 구현에 필요한 makeup/expression을 기존 outfit/pose/background에 추가. AI 공급사 요청에 메이크업·표정 전용 변경 지시, 얼굴 구조·정체성·연령·체형·피부색 보존 지시 유지. source/동의/마스크/허용 목록/한도/안전 검사/비공개 저장 로직은 변경하지 않음.
+- 기준 origin/prod b0d3e74, feat/ai-photo-categories-20261113, 전용 worktree /Users/ethan/repository/crefans_server-ai-photo-editor. 기존 dev 미커밋 자료는 보존.
+- OpenAPI enum/설명과 docs/platform-api.md를 새5종으로 동기화. 프론트 feat/ai-photo-preset-editor-20261113과 함께 반영해야 새분류 동작. 운영 배포/실공급사 AI 생성은 하지 않음.
+- 검증: npm run build 종료0; CREFANS_E2E=true node --test tests/platform-ai-photo.test.cjs 7/7; CREFANS_E2E=true node --test tests/platform-openapi.test.cjs 14/14; git diff --check 통과. 격리 E2E DB + 공급사 대역, 실제 OpenAI 호출 없음. 신규 검사는 makeup/expression이 정확한 지시·kind로 처리되고 마스크가 전송되지 않는지 검증.
+- 증거 .local/ai-photo-build.log, .local/ai-photo-unit.log, .local/ai-photo-openapi.log. 프론트의 docs:contracts 시도는 기존 라우트/스키마 계약의 오래된 누락36줄을 함께 갱신했으나 이번 범위를 벗어나 .local/ai-photo-generated-contracts.md에만 보존하고 원본 복원. 문서 전체 검사는 이 기존 계약/과거 증거 만료 때문에 미통과이며 재생성만으로 검증 완료를 주장하지 않음.
+- 다음: 프론트/서버 함께 dev 통합 후 릴리스. 실제 공급사 결과·실기기 키보드·운영 검증 미실행.
+
 ## 2026-11-13 00:5x KST 처리 중 사진 processing:true 포함 배포 (b6809d3, crefans-api:media-processing-20261113)
 - service.post()가 워터마크 처리 중 사진을 빼던 것을 영상처럼 processing:true로 포함. 프론트 '사진 처리 중' 자리 표시·자동 새로 고침과 함께 배포. 세부는 crefans_front PROGRESS 같은 날 항목.
 

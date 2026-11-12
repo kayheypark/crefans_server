@@ -1,4 +1,4 @@
-// Studio AI photo editor (2026-11-08 user request): outfit (masked), pose or background edits of the creator's own uploaded photo.
+// Studio AI photo editor (2026-11-08 user request): outfit (masked), makeup, expression, pose or background edits of the creator's own uploaded photo.
 // Order: allow-list → own completed image → text checks → daily limits → input moderation (fail closed) → OpenAI image edit
 // → output moderation → saved as the creator's private media with metadata.aiGenerated. The original photo is never changed.
 import {Body,Controller,Get,Injectable,Post,Req,UploadedFile,UseGuards,UseInterceptors} from '@nestjs/common';
@@ -24,7 +24,7 @@ import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=2,AI_PHOTO_PROMPT_MAX=300;
 const EDIT_URL='https://api.openai.com/v1/images/edits',MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
 const DAY=86400,MAX_SIDE=1536;
-const KINDS:Record<string,string>={outfit:'Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.',pose:"Change only the person's pose and body position.",background:'Change only the background and surroundings behind the person.'};
+const KINDS:Record<string,string>={outfit:'Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.',makeup:'Change only the makeup colors and finish. Preserve natural skin texture and facial structure.',expression:'Change only the facial expression as requested. Preserve facial structure and identity.',pose:"Change only the person's pose and body position.",background:'Change only the background and surroundings behind the person.'};
 const STYLES:Record<string,string>={photo:'a natural, realistic photograph',cosplay:'a realistic cosplay photo shoot with studio-quality lighting',daily:'a casual, realistic everyday snapshot'};
 
 export function aiPhotoConfig(config:ConfigService){
@@ -35,7 +35,7 @@ export function aiPhotoConfig(config:ConfigService){
 /** The prompt sent to the provider: the creator's words are framed by fixed rules (identity kept, no sexual content, no text). */
 export function aiPhotoPrompt(kind:string,style:string,request:string){
  return [`Edit this photo of a real adult person. ${KINDS[kind]}`,`Requested change: ${request}`,`Make the result look like ${STYLES[style]}.`,
-  "Keep the person's face, identity, age, body shape and skin tone exactly the same.",'Do not add nudity, sexualized content, minors, text, logos or watermarks.'].join('\n');
+  "Keep the person's facial structure, identity, age, body shape and skin tone exactly the same.",'Do not add nudity, sexualized content, minors, text, logos or watermarks.'].join('\n');
 }
 const sizeFor=(width:number,height:number)=>width>height*1.15?'1536x1024':height>width*1.15?'1024x1536':'1024x1024';
 
