@@ -134,3 +134,5 @@ v2.40(2026-11-03 사용자 지시) 변경: 계약서 글꼴을 Apple SD Gothic N
 - 서명본 재생성: build-contract-html.py → tmp/pdfs/contract-formal.html을 design-two-column-20261103/source.html로 복사 → node build.cjs. 쪽수 유지를 위해 design.css만 조정(당사자 입력칸 아래 여백 11→8.5mm, 조항 줄간격 1.5→1.47, 항 간격 1.2→0.9mm, 글자 크기 불변). 5쪽, SHA-256 은 PROGRESS 참조.
 - 검증: 이전 서명본(0d17f8e1…)과 비교해 추가 문구 4개를 빼면 나머지 글자가 같고 제1조~서명 순서 문장이 동일. 대조(다른 숫자 1개 변경 시 검출) 포함. 증거 crefans_server/.local/contract-rrn-20261112/. design-two-column-20261103/verify.py는 단색본 대비 검사라 이번 변경에는 쓰지 않았다. 흑백 7쪽 draft.pdf는 재생성하지 않았다(서명본 아님).
 - 운영: 모두싸인 서명 요청 시 '완료 문서 잠금'(PDF 비밀번호)을 반드시 켠다. 주민등록번호 입력란은 사업자등록번호가 없는 크리에이터만 채운다.
+
+2026-11-12 서명 쪽 날짜 줄: "　　　　년　　　월　　　일"을 1쪽 계약일과 같은 밑줄 빈칸(22·14·14mm)으로 변경(build-contract-html.py). 모두싸인 날짜 입력란을 놓기 위함. 1~4쪽 픽셀 동일, 5쪽은 날짜 줄만 이동, 전체 텍스트 동일. PDF SHA-256 eeefb7f3eeeef88f40586473c4458dd8d7a78f25623280302cfde52aee06677a.
