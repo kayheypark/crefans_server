@@ -427,8 +427,10 @@ test('without the partner badge a bean payout is refused at authorize, held by t
  const {BankProvider}=require('../dist/src/platform/bank-provider');const manualConfig=new ConfigService({BEAN_LEDGER_ENABLED:'true',BEAN_LIVE_PAYMENTS_APPROVED:'true',BETA_MODE:'true',MANUAL_PAYOUTS_ENABLED:'true'});
  const manual=new BeansService(service,finance,provider,new BankProvider(manualConfig,db),manualConfig);
  const o=await charge(1000);await receipt(o);await beans.tip(fan,creator,{quantity:1000,requestId:randomUUID()});const p=await payout(1000);
+ assert.equal((await beans.studio(creator)).payoutPartner,true);
  await db.creator.update({where:{user_id:creator},data:{is_verified:false}});
  try{
+  assert.equal((await beans.studio(creator)).payoutPartner,false);
   await assert.rejects(beans.authorize(creator,{quantity:1000,accountId:account.id,pin:'000000'}),code('PARTNER_CONTRACT_REQUIRED'));
   await assert.rejects(beans.requestPayout(creator,{requestId:randomUUID(),quantity:1000,accountId:account.id,authorizationId:randomUUID()}),code('PARTNER_CONTRACT_REQUIRED'));
   await manual.payout(p.id,undefined,new Date(WED));

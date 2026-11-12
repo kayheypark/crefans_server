@@ -99,6 +99,14 @@ test('2026-11-13 partner revision: article 6 limits withdrawals to partner creat
  assert.match(after.notice,/2026년 11월 13일 개정/);assert.match(after.notice,/2026년 11월 11일 개정/);
 });
 
+// 2026-11-13: the signup gate used the UTC day while catalog() uses the KST day, so a revision effective at KST midnight
+// kept signup closed until 09:00 KST. Both now use the KST day.
+test('signup stays open right after KST midnight on a revision day',t=>{
+ t.mock.timers.enable({apis:['Date'],now:new Date('2026-11-13T00:30:00+09:00')});
+ try{const s=new LegalDocumentsService().signup();assert.equal(s.documents.terms.version,'2026-11-13.partner.1');assert.equal(s.published,true);assert.equal(s.signupReady,true);}
+ finally{t.mock.timers.reset();}
+});
+
 test('the revision is the single version in force from its KST effective day, with no upcoming document',()=>{
  const legal=new LegalDocumentsService(),after=legal.catalog(new Date('2026-11-06T00:00:00+09:00'));
  assert.equal(LEGAL_NOTICE_DATE,'2026-11-06');assert.equal(NEXT_TERMS_EFFECTIVE,LEGAL_NOTICE_DATE,'in force from the deploy day, not 30 days later');

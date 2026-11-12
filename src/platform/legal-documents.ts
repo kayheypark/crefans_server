@@ -159,7 +159,7 @@ export class LegalDocumentsService {
  catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
-  const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=new Date().toISOString().slice(0,10));
+  const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)
   const versions=Object.fromEntries(Object.entries(documents).map(([kind,d])=>[kind,`${d.version}:${createHash('sha256').update(JSON.stringify({document:d,...(kind==='privacy'?{collection:c.collection}:{})})).digest('hex')}`]));
   return{published,documentsPublished:Object.values(c.documents).every(d=>d.status==='published'),signupReady:published,blockingMessage:published?null:'약관은 공개되어 있습니다. 개인정보 처리 절차와 초대 베타 준비를 마친 뒤 회원가입을 시작합니다.',documents,collection:c.collection,versions};
  }

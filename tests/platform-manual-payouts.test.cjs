@@ -124,8 +124,10 @@ test('payout list shows the transfer amount per creator without the account numb
 // 2026-11-12 user decision (ask-me): the verified badge marks a signed partnership contract and only partners withdraw.
 // Accounts and the PIN stay open; a request already accepted before the badge is removed is held, not rejected.
 test('without the partner badge: PIN check and request are refused, open requests are held, paid recording is refused, reject still works',async()=>{
+ assert.equal((await finance.finance(creator)).payoutPartner,true);
  await db.creator.update({where:{user_id:creator},data:{is_verified:false}});
  try{
+  assert.equal((await api('/studio/finance','creator')).data.payoutPartner,false,'the studio shows the contract notice');
   await assert.rejects(finance.verifyPin(creator,{amount:100000,accountId:account.id,pin:'000000'}),code('PARTNER_CONTRACT_REQUIRED'));
   await assert.rejects(finance.requestWithdrawal(creator,{requestId:randomUUID(),amount:100000,accountId:account.id,authorizationId:randomUUID()}),code('PARTNER_CONTRACT_REQUIRED'));
   const http=await api('/studio/withdraw/verify','creator',{amount:100000,accountId:account.id,pin:'000000'});assert.equal(http.status,403);assert.equal(http.errorCode,'PARTNER_CONTRACT_REQUIRED');assert.match(http.errorMessage,/파트너 계약/);
