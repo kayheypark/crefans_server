@@ -1,3 +1,6 @@
+## 2026-11-13 00:5x KST 처리 중 사진 processing:true 포함 배포 (b6809d3, crefans-api:media-processing-20261113)
+- service.post()가 워터마크 처리 중 사진을 빼던 것을 영상처럼 processing:true로 포함. 프론트 '사진 처리 중' 자리 표시·자동 새로 고침과 함께 배포. 세부는 crefans_front PROGRESS 같은 날 항목.
+
 ## 2026-11-13 00:1x~00:35 KST 인증 배지=파트너 계약, 배지 있어야 출금 + 사진 업로드 50MB 운영 배포 완료
 - 사용자 결정(/ask-me 2026-11-12): 배지(creators.is_verified)=크레팬스 파트너 계약. 출금 신청·이체 기록 모두 서버에서 차단(403 PARTNER_CONTRACT_REQUIRED), 계좌·PIN은 계약 전 허용, 배지 해제 시 미지급 신청은 보류(자동 반려 아님, 잔액 유지), 약관 6조 배포일 시행(2026-11-13.partner.1), 배지 문구 "크레팬스와 파트너 계약을 맺은 크리에이터예요", 출금 화면 안내+계약 문의 버튼, 계약 없는 기존 배지 보유자는 사용자가 콘솔에서 직접 해제.
 - 서버 prod 4929ca4: partner-policy.ts, finance/beans verifyPin·requestWithdrawal·authorize·requestPayout 게이트, payout() quiet/strict/off(worker는 보류, 수동 paid·콘솔 approve 거부, rejected 허용), 지급 목록 holdReason partner-unverified, studio 응답 payoutPartner, 회원가입 게이트 시행일 비교 UTC→KST 버그 수정(KST 자정 시행 약관이 09시까지 가입을 막던 문제), 사진 상한 5MB→50MB(IMAGE_UPLOAD_MAX_BYTES).
