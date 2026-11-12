@@ -106,3 +106,24 @@ v2.38(2026-11-02 사용자 지시) 변경: 별지 A의 “팬 수 정의·검증
 v2.39(2026-11-02 사용자 지시) 변경: 최상단 제목을 “크리에이터 파트너십 체결 계약서”로 변경(TXT 표제·HTML h1·문서 title). 기존 두 줄 배치를 유지. 원문·PDF 텍스트는 제목 외 동일, 7쪽 및 2~7쪽 렌더 픽셀 동일 확인, 1쪽 육안 확인. PDF SHA256 6f2c6349303ccc5807fd2808881525b36136a36a5f354700805e5710efef0799. 증거 .local/contract-title-20261102/verification.json. 조항 변경·계약 체결·사이트 배포 없음.
 
 v2.40(2026-11-03 사용자 지시) 변경: 계약서 글꼴을 Apple SD Gothic Neo Regular/Bold로 통일. v2.39의 제목·조항·별지 기준 팬 입력란·서명 내용과 기존 글자 크기/여백은 유지한다. 7쪽 유지, 원문 바이트/PDF 전문 동일, 실제 글꼴 사용(CDP)·Type3 글리프와 Unicode mapping 포함·전 페이지 렌더 검수 완료. 폰트 누락 시 생성 실패 및 기존 PDF 불변 대조 확인. PDF SHA256 ea07f6dc73fb5311ebd261d170132bfdc8005205eefa235b5d626599be6c71da. 증거 .local/contract-apple-gothic-20261103/verification.json. 문서 구조 검사는 통과했으나 전역 check:docs는 기존 스냅샷 만료로 실패했으며 다른 작업의 증거를 갱신하지 않았다.
+
+2026-11-03 디자인 별도본
+- output/pdf/crefans-creator-agreement-designed.pdf: v2.40 애플고딕 문구 유지, 보라·핑크 포인트/로고/표/제목 디자인 A4 7쪽. 기존 흑백 PDF는 유지.
+- docs/contracts/design-20261103/: source.html(최신승인 HTML 스냅샷), design.css, logo.svg, build.cjs, verification.json. node docs/contracts/design-20261103/build.cjs 실행 시 같은 폴더에 designed.html·PDF 생성. 검수 후 output/pdf로 복사한다.
+- 법률 문구 수정 시 먼저 원본 TXT·공식 생성기를 수정하고 HTML을 생성한 다음 이 폴더의 source.html도 갱신한다. 이 스냅샷을 최신 본문 원본으로 취급하지 않는다. 생성기는 source/designed HTML body 문자열을 대조한다. PDF 전문은 공백/머리말/꼬리말 제외 비교와 전페이지 시각검수가 추가 필요하다.
+
+2026-11-03 에디토리얼 디자인 재시안(새 요청)
+- 최신 승인 v2.40 내용을 그대로 사용. 기존 흑백본·이전 디자인본을 덮어쓰지 않았다. 별도 출력 output/pdf/crefans-creator-agreement-editorial.pdf.
+- docs/contracts/design-editorial-20261103/source.html은 승인된 tmp/pdfs/contract-formal.html 사본이다. 본문 원본은 기존 TXT/공식 생성기를 유지하며, 이후 문구 변경 시 공식 HTML 생성 후 source.html 갱신한다.
+- 외관은 design.css만 수정. node docs/contracts/design-editorial-20261103/build.cjs 실행 후 Python(PyMuPDF/Pillow 설치)으로 verify.py를 실행한다. 두 실행 모두 종료0을 확인하고 모든 page-*.png를 육안 검사한다. PDF 출력은 같은 디자인 폴더이며 검수 후 output/pdf로 복사한다.
+- build.cjs는 Playwright(형제 crefans_front, PLAYWRIGHT_MODULE 환경변수로 대체 가능)와 설치된 Apple SD Gothic Neo Regular/Bold 필요. 원본 폰트는 저장소에 포함하지 않는다. verify.py는 원본 PDF와 공백·머리말·꼬리말 제외 전문 비교/해시/페이지수/렌더를 생성한다. verification.json의 수동 검수 상태는 실제 확인 후 기록한다.
+
+2026-11-03 단색 디자인
+- 에디토리얼 레이아웃 승인 후 색상만 차콜/회색으로 변환. 출력 output/pdf/crefans-creator-agreement-monochrome.pdf. 컬러본 보존.
+- 소스 docs/contracts/design-monochrome-20261103/: source.html/디자인 CSS/단색 로고/build.cjs/verify.py/verification.json. 재생성 절차와 의존성은 에디토리얼본과 동일. verify.py는 컬러본 PDF와 페이지별 글자·좌표·폰트·크기 일치를 확인하고 렌더 픽셀 전체가 무채색인지 확인한다. 내용 수정 시 승인 원본부터 갱신하고 비교 기준도 재검토한다.
+
+2026-11-03 조항 2단본
+- output/pdf/crefans-creator-agreement-two-column.pdf: 제1~13조만 2단/9pt, 제목10pt. 첫 장/별지/서명은 단색 승인 레이아웃 유지. 총5쪽.
+- docs/contracts/design-two-column-20261103/에 승인 HTML 사본, CSS, 로고, 생성기, 검증기 저장. node build.cjs 후 PyMuPDF/Pillow 설치 Python으로 verify.py 실행. 생성된 PDF/전페이지 PNG 검수 후 output/pdf로 복사한다. 본문은 먼저 원본 TXT와 공식 생성기에서 변경하고 승인 HTML 사본을 갱신한다. 다른 세션에서 디자인만 수정 시 design.css를 편집한다.
+
+2026-11-03 기준 팬 입력 정리: 팬 수 기준(정의) 입력 줄만 원본 TXT/최신2단 source.html에서 삭제. 확인 채널/기준일/확인 팬 수 유지. 최신 배포용 파일은 output/pdf/crefans-creator-agreement-two-column.pdf(5쪽). 이전 단색/컬러 PDF와 source.html은 과거 시안이며 이 삭제를 반영하지 않음. 본문 제8조 등 계약 조항은 미변경.
