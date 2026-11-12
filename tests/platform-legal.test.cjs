@@ -15,7 +15,7 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-08');assert.equal(p.effectiveAt,'2026-11-08');assert.equal(p.version,'2026-11-08.aiphoto.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-12');assert.equal(p.effectiveAt,'2026-11-12');assert.equal(p.version,'2026-11-12.esign.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -113,4 +113,14 @@ test('guide AI privacy notice distinguishes optional requests, provider retentio
  assert.match(c.sections.find(s=>s.title.startsWith('8.')).body,/OpenAI OpCo, LLC/);
  assert.match(c.sections.find(s=>s.title.startsWith('9.')).body,/이 기능을 이용하지 않아도/);
  assert.ok(c.sections.find(s=>s.title.startsWith('10.')).body.includes('cf_post_visitor'));
+});
+test('privacy article 8 discloses Modusign as the e-contract processor (2026-11-12 ask-me)',()=>{
+ const p=new LegalDocumentsService().catalog().documents.privacy;
+ assert.equal(p.version,'2026-11-12.esign.1');assert.equal(p.effectiveAt,'2026-11-12');assert.equal(p.status,'published');
+ const s8=p.sections.find(s=>s.title==='8. 처리 위탁과 제3자 제공');
+ assert.match(s8.body,/전자계약 체결·보관을 주식회사 모두싸인에 위탁/);
+ assert.ok(s8.links.some(l=>l.href==='https://support.modusign.co.kr/ko/articles/9ae892d6'),'links to Modusign privacy policy');
+ // earlier additions stay in place
+ for(const kept of ['OpenAI OpCo, LLC에 위탁합니다','Amazon Web Services'])assert.ok(JSON.stringify(p).includes(kept),kept);
+ assert.ok(!p.sections.find(s=>s.title==='9. 국외 이전').body.includes('모두싸인'),'article 9 unchanged by user decision');
 });
