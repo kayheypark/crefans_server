@@ -1,3 +1,8 @@
+## 2026-11-13 AI 사진 편집 분류 dev→prod 머지 (운영 배포 제외)
+- 사용자 “prod까지 머지만” 지시. origin/dev b0d3e74 기반 release/ai-photo-categories-dev-20261113에 feature619b175 통합(de33dcd), 충돌 없음. 실제 dev worktree의 기존 미커밋 자료 보존.
+- 통합본은 feature와 전체 트리 동일 확인. npm run build0, CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-ai-photo.test.cjs tests/platform-openapi.test.cjs21/21, diff --check0. 격리E2E DB·대역 AI이며 실공급사 아님.
+- 일반 push의 dev→prod 순서로 승격, 최종 원격 ref/트리 일치는 .local/ai-photo-prod-merge-20261113/merge-verification.json 기록. 프론트 featureb1f4c70 대응 통합본과 함께 머지. 운영 배포/컨테이너/운영DB/설정 변경은 하지 않음. 기존 문서 계약/증거 만료는 별도 정리 대상.
+
 ## 2026-11-13 AI 사진 편집 9안 분류 계약 확장 (로컬 검증, 미배포)
 - 사용자 선택 9안 실제 구현에 필요한 makeup/expression을 기존 outfit/pose/background에 추가. AI 공급사 요청에 메이크업·표정 전용 변경 지시, 얼굴 구조·정체성·연령·체형·피부색 보존 지시 유지. source/동의/마스크/허용 목록/한도/안전 검사/비공개 저장 로직은 변경하지 않음.
 - 기준 origin/prod b0d3e74, feat/ai-photo-categories-20261113, 전용 worktree /Users/ethan/repository/crefans_server-ai-photo-editor. 기존 dev 미커밋 자료는 보존.
