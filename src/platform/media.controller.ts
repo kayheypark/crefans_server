@@ -19,6 +19,9 @@ import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 import {profilePhotoInUse} from './profile-photos';
 import {enqueueOperation} from './operations-events';
 import {ShareImageRenderer,SHARE_FALLBACK} from './share-image';
+// 2026-11-13 user decision: a generous per-photo cap (was 5MB); the front shrinks photos to a 4096px long edge first and
+// every image is re-encoded to WebP below, with sharp's 40MP input limit still guarding memory.
+export const IMAGE_UPLOAD_MAX_BYTES=50*1024*1024;
 @Controller('media')
 export class PlatformMediaController {
  private readonly shareImages=new ShareImageRenderer();
@@ -35,7 +38,7 @@ export class PlatformMediaController {
     const type:'IMAGE'|'VIDEO'=file.mimetype.startsWith('image/')?'IMAGE':'VIDEO';let mime=quicktime?QUICKTIME_MIME:file.mimetype,size=file.size;
     await mkdir(root,{recursive:true});
     if(type==='IMAGE'){
-     if(file.size>5*1024*1024)reject(400,'FILE_TOO_LARGE','이미지는 5MB 이하입니다.');
+     if(file.size>IMAGE_UPLOAD_MAX_BYTES)reject(400,'FILE_TOO_LARGE','사진은 한 장에 50MB까지 올릴 수 있습니다.');
      let bytes:Buffer;try{bytes=await sharp(await readFile(file.path),{limitInputPixels:40000000}).rotate().webp().toBuffer();mime='image/webp';}catch{reject(400,'INVALID_IMAGE','이미지 파일을 확인해주세요.');}
      size=bytes.length;await writeFile(destination,bytes,{mode:0o600});
     }else{

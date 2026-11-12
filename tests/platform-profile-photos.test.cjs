@@ -49,3 +49,13 @@ test('only the member\'s own uploaded images are accepted',async()=>{
  assert.equal((await api('/me/profile/photos','fan',{},'PUT')).errorCode,'NO_CHANGES');
  assert.equal((await api('/me/profile/photos',null,{avatar:null},'PUT')).status,401);
 });
+
+// 2026-11-13 user decision: a photo over 5MB (the first creator's case) uploads; the cap is 50MB per photo.
+test('a photo over the old 5MB limit uploads and is stored as WebP; over 50MB is refused before decoding',async()=>{
+ const noise=require('node:crypto').randomBytes(1700*1700*3);const big=await sharp(noise,{raw:{width:1700,height:1700,channels:3}}).png({compressionLevel:0}).toBuffer();
+ assert.ok(big.length>5*1024*1024,'fixture is above the old limit');
+ let form=new FormData();form.append('file',new Blob([big],{type:'image/png'}),'big.png');
+ let res=await fetch(origin+'/api/v1/media',{method:'POST',headers:headers('fan'),body:form});let json=await res.json();assert.equal(res.status,201,JSON.stringify(json));
+ form=new FormData();form.append('file',new Blob([Buffer.alloc(50*1024*1024+1)],{type:'image/png'}),'huge.png');
+ res=await fetch(origin+'/api/v1/media',{method:'POST',headers:headers('fan'),body:form});json=await res.json();assert.equal(res.status,400);assert.equal(json.errorCode,'FILE_TOO_LARGE');
+});
