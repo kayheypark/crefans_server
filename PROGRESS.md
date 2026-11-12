@@ -1,3 +1,10 @@
+## 2026-11-12 13:5x KST AI 가이드 핵심 문장 하이라이트 운영 배포 완료 (가이드→crefans.com→API 순)
+- 가이드: release/advisor-highlight-prod 117ec9c 정적 교체(107파일 해시·12경로 200·컨테이너 불변), 복구본 /Users/ethan/crefans-recovery/20261112/guide-advisor-highlight/previous.tgz. 증거 crefans_server/.local/guide-advisor-highlight-20261112/.
+- crefans.com: prod 774bf69 → crefans-front:front-advisor-highlight-20261112(레이어 일치), 이전 이미지 /Users/ethan/crefans-recovery/20261112/front-advisor-highlight-20261112 검증.
+- API: crefans-api:advisor-highlight-20261112 = payout-hardening-20261111 위에 guide-advisor.ts/.js만 덮음(prod 93a9f65, 운영 파일 diff 는 이번 변경분만, 이미지 안 js SHA 50bc4eb9… 일치). api·worker 교체, health ready, 다른 컨테이너·설정 불변. 이전 이미지·설정 /Users/ethan/crefans-recovery/20261112/advisor-highlight-api-20261112(인덱스 ID·blob 27개 SHA 검증) 후 서버 백업·임시 폴더 삭제, 이전 태그 해제. 증거 crefans_server/.local/advisor-highlight-deploy-20261112/.
+- 운영 실제 질문 2건(가이드 '구독을 해지하면 바로 못 보나요?', crefans.com '콩은 어디에서 충전하나요?'): 각 응답 201, 원문 표시 1쌍, 화면 mark 1개(핵심 문장) 확인·캡처 육안 확인. 실물 iPhone 미검증. AI가 매번 표시를 넣는지는 모델 지시 준수에 달려 있음(없으면 하이라이트 없이 그대로 표시).
+- 복구 저장소 api 이미지 묶음이 RETENTION 기준(구성요소별 최근 3개)을 넘었을 수 있음: 삭제는 목록 승인 후.
+
 ## 2026-11-12 AI 가이드 답변의 핵심 문장 하이라이트 (feat/advisor-highlight)
 - 사용자 요청: 질문에 대한 답 중 유사하거나 핵심인 부분을 하이라이트. 사용자 결정(클릭): AI가 핵심 문장 1개를 ==…==로 표시하고 화면(가이드·crefans.com)이 형광펜으로 그림, 검증 후 운영 배포.
 - 서버 `guide-advisor.ts`: 지침 1줄 추가, `oneHighlight`(표 밖 한 줄짜리 첫 표시만 유지, 앞뒤 공백 표시·나머지 `==` 제거), 못 찾음/관련 없음 답에서는 표시 제거. unsafeAnswer 영향 없음.
