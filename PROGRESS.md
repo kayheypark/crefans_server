@@ -1,3 +1,12 @@
+## 2026-11-13 00:1x~00:35 KST 인증 배지=파트너 계약, 배지 있어야 출금 + 사진 업로드 50MB 운영 배포 완료
+- 사용자 결정(/ask-me 2026-11-12): 배지(creators.is_verified)=크레팬스 파트너 계약. 출금 신청·이체 기록 모두 서버에서 차단(403 PARTNER_CONTRACT_REQUIRED), 계좌·PIN은 계약 전 허용, 배지 해제 시 미지급 신청은 보류(자동 반려 아님, 잔액 유지), 약관 6조 배포일 시행(2026-11-13.partner.1), 배지 문구 "크레팬스와 파트너 계약을 맺은 크리에이터예요", 출금 화면 안내+계약 문의 버튼, 계약 없는 기존 배지 보유자는 사용자가 콘솔에서 직접 해제.
+- 서버 prod 4929ca4: partner-policy.ts, finance/beans verifyPin·requestWithdrawal·authorize·requestPayout 게이트, payout() quiet/strict/off(worker는 보류, 수동 paid·콘솔 approve 거부, rejected 허용), 지급 목록 holdReason partner-unverified, studio 응답 payoutPartner, 회원가입 게이트 시행일 비교 UTC→KST 버그 수정(KST 자정 시행 약관이 09시까지 가입을 막던 문제), 사진 상한 5MB→50MB(IMAGE_UPLOAD_MAX_BYTES).
+- 프론트 prod ff8446d: PartnerPayoutNotice(멤버십·콩 출금 화면), 배지 설명, 정산 기준·FAQ 문구, 사진 브라우저 최적화(lib/design/image-optimize.ts 긴 변 4096px·WebP 0.9, 실패 시 원본) + 한 장 50MB. 관리자 prod fa937a6: 보류 사유 "계약 미확인 (인증 배지 없음)", 배지 부여·해제 확인창 출금 영향 안내. 가이드 feat/partner-payout-gate 766d88d(운영 릴리스 117ec9c 위 문서 커밋 1개): 출금 자격 절, 배지 의미, 50MB.
+- 검증: 서버 테스트 직렬 실행 기준선(prod 9fd2de9) 대비 새 실패 0(기준선 실패 34건은 환경 의존 동일 목록), 새 테스트(멤버십·콩 배지 없음, KST 가입 게이트, 50MB HTTP 업로드) 및 대조 검사(게이트·보류 사유·KST·상한 되돌리면 실패) 확인. 프론트 기준선 대비 새 실패 0(16건 동일), 관리자 18/18(타입 오류 14건은 공유 node_modules의 @dnd-kit 부재, 기존).
+- 배포: API 오버레이 privacy-rrn→partner-payout-20261113→photo-limit-20261113(겹친 파일이 prod 빌드와 SHA 일치 확인), 프론트 front-partner-photo-20261113(ship-image.sh), 관리자 partner-20261113, 가이드 정적 107파일. 운영 확인: 약관 페이지 2026.11.13 시행·6조 문구, 가이드 2쪽, 프론트·관리자 산출물 문구, 미인증 요청 401. 실제 배지 없는 계정으로 운영 출금 시도는 하지 않음(테스트로 대체).
+- 복구본 /Users/ethan/crefans-recovery/20261113/: partner-payout-api(privacy-rrn 이미지), photo-limit-api(partner-payout 이미지), front-partner-photo, partner-admin(payout-scope), guide-partner-photo(previous.tgz) — 모두 blob/인덱스 또는 파일 해시 검증 후 서버 사본 정리. 서버 docker 빌드 캐시 19.5GB도 정리함(요청 외, 재생성 가능).
+- 남은 일: 복구 저장소 API·프론트·관리자 묶음이 구성요소별 3개를 넘음 → 삭제 후보 승인 필요. 배지 없는 기존 크리에이터 배지 해제(사용자). 실물 휴대폰에서 큰 사진 업로드 확인(첫 크리에이터에게 재시도 요청). 맥 디스크 95%.
+
 ## 2026-11-12 13:5x KST AI 가이드 핵심 문장 하이라이트 운영 배포 완료 (가이드→crefans.com→API 순)
 - 가이드: release/advisor-highlight-prod 117ec9c 정적 교체(107파일 해시·12경로 200·컨테이너 불변), 복구본 /Users/ethan/crefans-recovery/20261112/guide-advisor-highlight/previous.tgz. 증거 crefans_server/.local/guide-advisor-highlight-20261112/.
 - crefans.com: prod 774bf69 → crefans-front:front-advisor-highlight-20261112(레이어 일치), 이전 이미지 /Users/ethan/crefans-recovery/20261112/front-advisor-highlight-20261112 검증.
