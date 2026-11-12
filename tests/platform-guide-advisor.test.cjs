@@ -2,7 +2,7 @@ require('reflect-metadata');require('dotenv').config({path:'.local/platform.env'
 // Guide AI advisor: OpenAI is always a stub (no network). Rate limits use the real auth_rate_buckets table on the local 3307 dev DB.
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),{randomUUID}=require('node:crypto');
 const {PrismaClient}=require('@prisma/client'),{ConfigService}=require('@nestjs/config'),{NestFactory}=require('@nestjs/core'),{Module}=require('@nestjs/common');
-const {GuideAdvisorService,GuideAdvisorController,retrieve,fuse,MIN_SIMILARITY,REWRITE_INSTRUCTIONS,rewrites,INSTRUCTIONS,OFF_TOPIC,containsPersonalData,legalChunks,QUESTION_MAX,looksLikeInjection,unsafeAnswer,SAFE_ANSWER}=require('../dist/src/platform/guide-advisor');
+const {GuideAdvisorService,GuideAdvisorController,retrieve,fuse,MIN_SIMILARITY,REWRITE_INSTRUCTIONS,rewrites,INSTRUCTIONS,OFF_TOPIC,containsPersonalData,legalChunks,QUESTION_MAX,looksLikeInjection,unsafeAnswer,SAFE_ANSWER,oneHighlight}=require('../dist/src/platform/guide-advisor');
 const {LocalMemberService}=require('../dist/src/auth/local/local-member.service');
 const {requestContext}=require('../dist/src/platform/request-context');
 const {corsOptions,originGuard}=require('../dist/src/platform/middleware');
@@ -188,6 +188,18 @@ test('answers may use bold and pipe tables; up to 6 sections reach the model, 3 
  const r=await asIp(()=>s.ask({question:'환불 기준'}));assert.equal(r.answer,formatted);assert.equal(r.sources.length,3);
  const body=JSON.parse(s.fetcher.calls.find(c=>c.url==='https://api.openai.com/v1/responses').init.body);
  const docs=(body.input.match(/^\[\d+\] /gm)||[]).length;assert.ok(docs>4&&docs<=6,'documents sent: '+docs);
+});
+test('the core answer sentence is marked ==once== for the highlight; extra, table and not-found marks are removed',async()=>{
+ assert.match(INSTRUCTIONS,/==와 ==로 감싸/);
+ assert.equal(oneHighlight('==환불은 7일 안에 요청해요.== 그다음 ==두 번째==도 있어요.'),'==환불은 7일 안에 요청해요.== 그다음 두 번째도 있어요.');
+ assert.equal(oneHighlight('앞 문장.\n| 구분 | ==값== |\n|---|---|\n==핵심 문장이에요.=='),'앞 문장.\n| 구분 | 값 |\n|---|---|\n==핵심 문장이에요.==');
+ assert.equal(oneHighlight('짝 없는 == 기호와 ====빈 표시'),'짝 없는  기호와 빈 표시');
+ assert.equal(oneHighlight('**굵게**만 있는 답'),'**굵게**만 있는 답');
+ assert.equal(unsafeAnswer('==해지해도 결제한 기간까지 볼 수 있어요.=='),false);
+ const s=service({},stub(async()=>new Response(JSON.stringify(reply('==해지해도 **결제한 기간**까지 볼 수 있어요.== 다음 결제부터 ==멈춰요.==')),{status:200})));
+ assert.equal((await asIp(()=>s.ask({question:'환불 기준'}))).answer,'==해지해도 **결제한 기간**까지 볼 수 있어요.== 다음 결제부터 멈춰요.');
+ const nf=service({},stub(async()=>new Response(JSON.stringify(reply('=='+SAFE_ANSWER+'==')),{status:200})));
+ assert.deepEqual(await asIp(()=>nf.ask({question:'구독 환불은 어떻게 받나요?'})),{answer:SAFE_ANSWER,sources:[],found:false});
 });
 test('fusion keeps sections found by either search, both-found first',()=>{
  const [a,b,c]=index.chunks;
