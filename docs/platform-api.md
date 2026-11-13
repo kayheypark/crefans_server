@@ -614,7 +614,7 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | GET | /studio/ai-photo/quota | 크리에이터 본인. `{allowed,limit,remaining}`. allowed = 허용 목록(ai_photo_grants) + 공급사 키 설정. |
 | POST | /studio/ai-photo/edit | multipart `sourceId,kind(outfit|makeup|expression|pose|background),style(photo|cosplay|daily),prompt(1~300),consent=true,mask(PNG, outfit 필수)`. 응답 `{images:[{id,type,url,aiGenerated}],remaining}`. |
 
-- 순서: 허용 목록(403 AI_PHOTO_NOT_ALLOWED) → 본인 완료 이미지(404) → 문구 개인정보·지시 무력화 차단 → 마스크(칠한 곳 없음 400) → 하루 `AI_PHOTO_PER_DAY`(기본 10, UTC 하루=한국 오전 9시, 429 DAILY_LIMIT)·전체 `AI_PHOTO_DAILY_TOTAL`(기본 300) → 문구+사진 Moderation(판정 불가 503, 실패 시 진행 안 함) → OpenAI `/v1/images/edits`(모델 `AI_PHOTO_MODEL` 기본 gpt-image-2, n=2, quality `AI_PHOTO_QUALITY` 기본 medium, 1536px 이하 PNG, safety_identifier=회원 ID 해시) → 결과별 Moderation(통과만 저장) → 크리에이터 비공개 미디어(webp, metadata.aiGenerated·aiSourceId·aiKind·aiModel, 워터마크 대상 기록).
+- 순서: 허용 목록(403 AI_PHOTO_NOT_ALLOWED) → 본인 완료 이미지(404) → 문구 개인정보·지시 무력화 차단 → 마스크(칠한 곳 없음 400) → 하루 `AI_PHOTO_PER_DAY`(기본 10, UTC 하루=한국 오전 9시, 429 DAILY_LIMIT)·전체 `AI_PHOTO_DAILY_TOTAL`(기본 300) → 문구+사진 Moderation(판정 불가 503, 실패 시 진행 안 함) → OpenAI `/v1/images/edits`(모델 `AI_PHOTO_MODEL` 기본 gpt-image-2, n=1, quality `AI_PHOTO_QUALITY` 기본 medium, 1536px 이하 PNG, safety_identifier=회원 ID 해시) → 결과별 Moderation(통과만 저장) → 크리에이터 비공개 미디어(webp, metadata.aiGenerated·aiSourceId·aiKind·aiModel, 워터마크 대상 기록).
 - 횟수: 공급사 오류·시간 초과·판정 불가는 되돌리고, 입력·결과 차단은 차감한다. 문구 원문은 DB에 저장하지 않는다. 키는 `AI_PHOTO_OPENAI_API_KEY`(없으면 GUIDE_ADVISOR 키).
 - 표시: 게시 시 워터마크 파생 미디어도 aiGenerated 를 이어받고, 팬 게시물·스튜디오 목록 미디어 응답에 `aiGenerated:true`를 넣는다. 처리방침 2026-11-08.aiphoto.1 의 16번 항목.
 

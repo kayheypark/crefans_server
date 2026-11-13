@@ -50,28 +50,28 @@ test('input rules are checked before the provider: consent, prompt, personal dat
  assert.equal(calls.length,0);assert.equal((await photos.quota(creator)).remaining,10);
 });
 
-test('pose edit: moderation of prompt and photo, two images requested, saved as private AI media; original untouched',async()=>{
+test('pose edit: moderation of prompt and photo, one image requested, saved as private AI media; original untouched',async()=>{
  reset();const before=fs.readFileSync(path.join(mediaRoot,sourceId));
  const r=await photos.edit(creator,base());
- assert.equal(r.images.length,2);assert.equal(r.remaining,9);assert.ok(r.images.every(i=>i.aiGenerated&&i.type==='image'&&i.url===`/api/v1/media/${i.id}/file`));
+ assert.equal(r.images.length,1);assert.equal(r.remaining,9);assert.ok(r.images.every(i=>i.aiGenerated&&i.type==='image'&&i.url===`/api/v1/media/${i.id}/file`));
  const input=calls[0];assert.equal(input.kind,'moderation');assert.equal(input.body.input[0].text,'벚꽃 아래 벤치에 앉은 포즈');assert.match(input.body.input[1].image_url.url,/^data:image\/png;base64,/);
- const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields.n,'2');assert.equal(edit.fields.model,'gpt-image-2');assert.equal(edit.fields.size,'1024x1536');assert.equal(edit.fields.moderation,'auto');assert.ok(!('mask' in edit.fields));
+ const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields.n,'1');assert.equal(edit.fields.model,'gpt-image-2');assert.equal(edit.fields.size,'1024x1536');assert.equal(edit.fields.moderation,'auto');assert.ok(!('mask' in edit.fields));
  assert.equal(edit.fields.prompt,aiPhotoPrompt('pose','photo','벚꽃 아래 벤치에 앉은 포즈'));assert.match(edit.fields.prompt,/Do not add nudity/);assert.match(edit.fields.safety_identifier,/^[a-f0-9]{64}$/);
- assert.equal(calls.filter(c=>c.kind==='moderation').length,3,'input + each output');
+ assert.equal(calls.filter(c=>c.kind==='moderation').length,2,'input + one output');
  for(const img of r.images){const row=await db.media.findUnique({where:{id:img.id}});assert.equal(row.user_sub,creator);assert.equal(row.metadata.aiGenerated,true);assert.equal(row.metadata.aiSourceId,sourceId);assert.equal(row.metadata.aiKind,'pose');assert.equal(typeof row.metadata.aiDurationMs,'number');assert.ok(row.metadata.aiDurationMs>=0);assert.equal(row.metadata.watermarkEligible!==undefined,true);assert.ok(fs.existsSync(path.join(mediaRoot,row.file_name)));}
  assert.deepEqual(fs.readFileSync(path.join(mediaRoot,sourceId)),before);
  const q=await photos.quota(creator);assert.ok(Number.isInteger(q.typicalSeconds)&&q.typicalSeconds>=1,'typical time comes from finished edits');
 });
 
 test('outfit edit sends the mask resized to the provider image',async()=>{
- reset();const r=await photos.edit(creator,base({kind:'outfit',prompt:'흰색 세일러 교복 코스튬'}),await mask());assert.equal(r.images.length,2);
+ reset();const r=await photos.edit(creator,base({kind:'outfit',prompt:'흰색 세일러 교복 코스튬'}),await mask());assert.equal(r.images.length,1);
  const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields.mask.type,'image/png');
  const [mi,ii]=await Promise.all([sharp(edit.fields.mask.bytes).metadata(),sharp(edit.fields.image.bytes).metadata()]);assert.deepEqual([mi.width,mi.height],[ii.width,ii.height]);assert.equal(mi.hasAlpha,true);
 });
 
 test('makeup and expression edits reach the provider with their specific instructions and preserve safety rules',async()=>{
  for(const [kind,request,instruction] of [['makeup','입술을 코랄 톤으로 바꿔줘',/Change only the makeup/],['expression','밝게 웃어줘',/Change only the facial expression/]]){
-  reset();const result=await photos.edit(creator,base({kind,prompt:request}));assert.equal(result.images.length,2);
+  reset();const result=await photos.edit(creator,base({kind,prompt:request}));assert.equal(result.images.length,1);
   const edit=calls.find(c=>c.kind==='edit');assert.match(edit.fields.prompt,instruction);assert.match(edit.fields.prompt,/facial structure, identity, age/);assert.match(edit.fields.prompt,/Do not add nudity/);assert.ok(!('mask' in edit.fields));
   const row=await db.media.findUnique({where:{id:result.images[0].id}});assert.equal(row.metadata.aiKind,kind);
  }
@@ -83,7 +83,7 @@ test('failures: provider error and unavailable moderation give the try back; blo
  reset();moderationDown=true;await assert.rejects(photos.edit(creator,base()),code('MODERATION_UNAVAILABLE'));assert.equal(await left(),start);assert.equal(calls.some(c=>c.kind==='edit'),false);
  reset();flags=[true];await assert.rejects(photos.edit(creator,base()),code('UNSAFE_INPUT'));assert.equal(calls.some(c=>c.kind==='edit'),false);assert.equal(await left(),start-1);
  reset();editStatus=400;await assert.rejects(photos.edit(creator,base()),code('UNSAFE_INPUT'));assert.equal(await left(),start-2);
- reset();flags=[false,true,false];const one=await photos.edit(creator,base());assert.equal(one.images.length,1,'flagged output is dropped');
+ reset();flags=[false,false,true];const one=await photos.edit(creator,base());assert.equal(one.images.length,1,'extra provider output is ignored');
  reset();flags=[false,true,true];await assert.rejects(photos.edit(creator,base()),code('UNSAFE_OUTPUT'));assert.equal(await left(),start-4);
 });
 
