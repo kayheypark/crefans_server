@@ -21,7 +21,7 @@ import {aiPhotoAllowed} from './ai-photo-grants';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 
-export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=2,AI_PHOTO_PROMPT_MAX=300;
+export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=300;
 const EDIT_URL='https://api.openai.com/v1/images/edits',MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
 const DAY=86400,MAX_SIDE=1536;
 const KINDS:Record<string,string>={outfit:'Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.',makeup:'Change only the makeup colors and finish. Preserve natural skin texture and facial structure.',expression:'Change only the facial expression as requested. Preserve facial structure and identity.',pose:"Change only the person's pose and body position.",background:'Change only the background and surroundings behind the person.'};

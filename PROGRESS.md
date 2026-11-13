@@ -1,3 +1,8 @@
+## 2026-11-13 AI 사진 생성 2장→1장 수정 진행
+- 사용자 요청. origin/prod172f7be에서 feat/ai-photo-single-flow-20261113. AI_PHOTO_IMAGES=1로 공급사n·반환/저장상한 모두1, OpenAPI/의미문서 n=1 동기화. 하루10회·동의/본인·마스크/모더레이션·실패차감복구는 유지.
+- 합격: 공급사대역 요청n=1, 결과1개저장/추가출력무시·입력+출력 모더레이션2번, 안전/한도회귀. build0, AI7+OpenAPI14=21개 통과(격리E2E DB·공급사대역). 실제 외부 AI 미호출.
+- 다음: 프론트 생성1장/본문스크롤과 함께 dev→prod 및 운영 반영, ai-photo.ts/.js만 현재colorful-comments 이미지에 덮어 다른기능 보존. 증거 .local/ai-photo-single-flow-20261113/.
+
 ## 2026-11-13 09:54 KST AI 사진 5분류·댓글 좋아요 운영 배포 완료
 - 사용자 배포 승인에 따라 prod5feb470의 ai-photo/controller/openapi-contract/service 4개 TS+JS만 media-processing-20261113 위 오버레이한 colorful-comments-20261113을 API/worker에 적용. 변경 전 운영4소스가 b6809d3과 정확히 같음 확인, 새8파일 SHA가 검사한 빌드와 일치. 기존 미디어처리·파트너정산·법률/가입·금융 동작 보존, DB스키마/마이그레이션 없음.
 - 합격: build0, 격리E2E AI7+댓글8+OpenAPI14=29/29. 이미지 모듈 로드·makeup 지시·likeComment 함수·해시 확인. 운영 health ready/API·worker running/restart0, 다른 컨테이너 동일, 설정은 API_IMAGE/APP_RELEASE만 변경. 익명 like401, 공개 댓글1/답글1 integer likes·liked=false 확인(쓰기 없음).
