@@ -146,3 +146,26 @@ test('cosplay complete look sends original plus guide and allows explicitly requ
  reset();await photos.edit(user,base({sourceId:id,kind:'outfit',style:'photo'}),await mask());
  const ordinary=calls.find(c=>c.kind==='edit');assert.ok(ordinary.fields.mask);assert.ok(!ordinary.fields['image[]']);assert.match(ordinary.fields.prompt,/Keep everything outside the mask unchanged/);assert.doesNotMatch(ordinary.fields.prompt,/Cosplay: apply/);
 });
+
+
+test('catalog reference images: real selected bytes reach both moderation and edit in order; other edits stay intact',async()=>{
+ const {AI_PHOTO_COSTUME_IDS,readCostumeReference}=require('../dist/src/platform/ai-photo-costume-references');
+ assert.equal(AI_PHOTO_COSTUME_IDS.length,32);
+ for(const id of AI_PHOTO_COSTUME_IDS){const bytes=await readCostumeReference(id),m=await sharp(bytes).metadata();assert.equal(m.format,'webp');assert.equal(m.width,512);assert.equal(m.height,512);}
+ const user=await makeCreator('airef_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
+ reset();const ids=['maid','aot-scout'],prompt='의상 참조 사진 1의 코디를 적용해줘. 흰 스튜디오';
+ await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:JSON.stringify(ids),prompt}),await mask());
+ const edit=calls.find(c=>c.kind==='edit'),input=calls[0].body.input;assert.equal(edit.fields['image[]'].length,4);assert.equal(input.length,4);
+ for(const [i,ref] of ids.entries()){const bytes=await readCostumeReference(ref);assert.deepEqual(edit.fields['image[]'][i+2].bytes,bytes);assert.equal(input[i+2].image_url.url,'data:image/webp;base64,'+bytes.toString('base64'));}
+ assert.match(edit.fields.prompt,/Images 3 through 4/);assert.match(edit.fields.prompt,/Do not copy the reference mannequin/);assert.ok(edit.fields.prompt.includes(prompt));assert.match(edit.fields.prompt,/Background:/);assert.equal(edit.fields.moderation,'auto');assert.equal(edit.fields.n,'1');assert.equal(calls.filter(c=>c.kind==='moderation').length,2);
+ reset();flags=[true];await assert.rejects(photos.edit(user,base({sourceId:id,kind:'outfit',style:'cosplay',costumeIds:['maid']}),await mask()),code('UNSAFE_INPUT'));assert.equal(calls.some(c=>c.kind==='edit'),false);
+});
+
+test('invalid reference IDs, URLs, paths, duplicates, oversized lists and incompatible edits are rejected before provider calls',async()=>{
+ const {AI_PHOTO_COSTUME_IDS,costumeReferenceIds}=require('../dist/src/platform/ai-photo-costume-references');
+ for(const value of ['{',[],['../secret'],['https://example.com/a.webp'],['maid','maid'],AI_PHOTO_COSTUME_IDS.slice(0,15),[null]])assert.throws(()=>costumeReferenceIds(value,['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));
+ assert.throws(()=>costumeReferenceIds(['maid'],['pose'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));
+ assert.throws(()=>costumeReferenceIds(['maid'],['outfit'],'photo'),code('INVALID_COSTUME_REFERENCES'));
+ assert.equal(costumeReferenceIds(AI_PHOTO_COSTUME_IDS.slice(0,14),['outfit'],'cosplay').length,14);
+ reset();await assert.rejects(photos.edit(creator,base({costumeIds:'["maid"]'})),code('INVALID_COSTUME_REFERENCES'));assert.equal(calls.length,0);
+});
