@@ -150,10 +150,10 @@ test('cosplay complete look sends original plus guide and allows explicitly requ
 
 test('catalog reference images: real selected bytes reach both moderation and edit in order; other edits stay intact',async()=>{
  const {AI_PHOTO_COSTUME_IDS,readCostumeReference}=require('../dist/src/platform/ai-photo-costume-references');
- assert.equal(AI_PHOTO_COSTUME_IDS.length,32);
+ assert.equal(AI_PHOTO_COSTUME_IDS.length,36);
  for(const id of AI_PHOTO_COSTUME_IDS){const bytes=await readCostumeReference(id),m=await sharp(bytes).metadata();assert.equal(m.format,'webp');assert.equal(m.width,512);assert.equal(m.height,512);}
  const user=await makeCreator('airef_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
- reset();const ids=['maid','aot-scout'],prompt='의상 참조 사진 1의 코디를 적용해줘. 흰 스튜디오';
+ reset();const ids=['genshin-raiden','genshin-diluc'],prompt='의상 참조 사진 1의 코디를 적용해줘. 흰 스튜디오';
  await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:JSON.stringify(ids),prompt}),await mask());
  const edit=calls.find(c=>c.kind==='edit'),inputs=calls.filter(c=>c.kind==='moderation').slice(0,3);assert.equal(edit.fields['image[]'].length,4);assert.equal(inputs.length,3);for(const c of inputs){assert.equal(c.body.input.filter(i=>i.type==='image_url').length,1);assert.equal(c.body.input[0].text,prompt);}
  for(const [i,ref] of ids.entries()){const bytes=await readCostumeReference(ref);assert.deepEqual(edit.fields['image[]'][i+2].bytes,bytes);assert.equal(inputs[i+1].body.input[1].image_url.url,'data:image/webp;base64,'+bytes.toString('base64'));}
