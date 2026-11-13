@@ -1,9 +1,10 @@
-## 2026-11-13 AI 사진 오늘 사용 횟수 초기화(인원별·전체) — feat/ai-photo-quota-reset, 커밋·미배포
+## 2026-11-13 AI 사진 오늘 사용 횟수 초기화(인원별·전체) — 운영 배포 완료(2026-11-13 16:3x KST)
 - 요청: 운영콘솔에서 AI 사진보정 남은 횟수를 인원별·전체 초기화.
 - 구현: `src/platform/ai-photo-grants.ts` — 목록에 usedToday·remaining·dailyLimit, `POST admin/ai-photo-grants/:creatorId/quota-reset`(사유 2~500자, 허용 목록 외 404, 사용 0회 409), `POST admin/ai-photo-grants/quota-reset`(사유+확인 문구 '전체 초기화'). 둘 다 members.update. 오늘 사용 버킷(auth_rate_buckets, `ai-photo:creator-day:<id>`, UTC일=09:00 KST 리셋) 삭제 + 이력(quota_reset / quota_reset_all) + 감사(사유 해시)를 한 트랜잭션.
 - 결정: 서비스 전체 일일 한도 `ai-photo:total`(비용 보호)은 초기화하지 않는다. 마이그레이션 없음(action 문자열만 추가).
 - 검증: platform-ai-photo-grants 4/4(신규 1건: 실제 limiter로 차감 후 초기화 → AiPhotoService.used 0, total 불변, 감사에 사유 원문 없음), 버킷 키를 틀리게 바꾼 대조에서 신규 테스트 실패 확인. openapi 221/콘솔 101로 갱신. 전체 665건 중 실패 34(기존 환경 실패 수와 동일).
-- 남은 일: dev·prod 통합과 운영 배포는 사용자 승인 후.
+- 배포: 사용자 승인 후 prod a954e87(서버)·f9e6ecd(콘솔). API는 ai-photo-errors-20261113 위 3개 파일 오버레이(crefans-api:ai-photo-quota-reset-20261113, 운영 컨테이너 dist가 변경 3파일 외 동일함을 해시로 사전 확인), 헬스·신규 경로 401 확인. 이전 API·콘솔 이미지는 /Users/ethan/crefans-recovery/20261113/ai-photo-quota-reset/ (아카이브 index 다이제스트=이미지 ID 확인) 후 서버 태그·임시 백업 정리. 스크립트·로그 crefans_server/.local/ai-photo-quota-reset-20261113/.
+- 미확인: 운영 콘솔에 로그인한 실제 화면 조작(운영자 계정 필요).
 
 ## 2026-11-13 15:21 KST AI 오류 분류 수정 운영 반영
 - source c490129, API/worker crefans-api:ai-photo-errors-20261113. TS/JS ai-photo2파일만현재expanded위에overlay, 이미지해시·모듈·n1/max2000·이전성별/신체/복합기능검증. dev→prod승격, 빌드0·AI/OpenAPI26/26(대역·격리DB), 수정전2재현실패→수정후통과. 실제사용자실패는재현하지않음.
