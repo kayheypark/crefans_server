@@ -1,3 +1,8 @@
+## 2026-11-13 AI 안전 기준 오류 조사·분류 수정 진행
+- 사용자: 아니스 또는 앨리스 의상 선택 후 안전기준 오류. 현재 프론트는 아니스 재킷만 있고 앨리스 없음. 당시 입력 사진/최종문구/정확한오류코드는 미확인. 최근30분운영로그303행은관련코드0건; 4xx를일괄기록하지않아 원인확정불가(위반없음의증거아님).
+- 확인한 버그: error.type=image_generation_user_error 전체를안전차단으로취급; 실제는error.code=moderation_blocked로구별해야함. output moderation 미응답도 UNSAFE_OUTPUT으로잘못표시. 공식문서 https://developers.openai.com/api/docs/guides/image-generation#handling-blocked-requests-and-other-errors 확인2026-11-13.
+- 합격: invalid_value+image_generation_user_error는일반입력오류/횟수복구; moderation_blocked는input/output구분/차감유지; 결과판정불가는503·비노출/이미생성차감유지; 로그는요청ID/단계/코드만,사진·프롬프트·키·회원정보미기록. 재현2개가수정전실패→수정후전체26/26·build0·diff검사통과. 대역/격리DB검사→API만운영수정, 기존안전검사/auto/한도/성별·신체기능유지. 당시실차단사유는별도미확정.
+
 ## 2026-11-13 15:02 KST AI 확장 편집 운영 배포 완료
 - 운영 API/worker `crefans-api:ai-photo-expanded-20261113` (기능 source2ea5cee), 프론트 `crefans-front:front-ai-expanded-v2-20261113` (source56ee755). dev→prod 일반 push, 최종 운영빌드58초·이미지revision/키·아카이브/레이어 검증. 기존 API 다른 기능은 TS+JS2개씩만overlay하여보존, DB마이그레이션없음.
 - 반영: 8탭·91사진프리셋(1,051,506bytes)·포즈24종·구도6종·캐논RF렌즈6종·서코실내·실제성별변경·가슴/힙/키 독립5단계·프롬프트2000자누적·결과 이미지편집·작품공식로고6개. 의상32종/보기5종/아이콘칠하기도구/1장생성/버튼만고정 유지. 의상탭 성별만선택 시마스크요구하던경우재현검사추가후수정.
