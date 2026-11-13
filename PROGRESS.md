@@ -1,3 +1,8 @@
+## 2026-11-14 코스어 전용 Seedream 서버 운영 완료
+- API/worker `crefans-api:seedream-cosplay-mode-20261114`,source81d4cf9. mode=cosplay만Seedream5.5, general/누락은GPT image2. 안전검사양쪽OpenAI유지. runtime.env에코스어provider·별도키0600설정,이미지/로그에키없음.
+- 빌드0·33/33·운영4파일SHA동일·운영컴파일코드3모드분기대역통과. 실제운영키/코드로합성성인샘플입력검사→Seedream→출력검사21.655초성공. DB/저장은대역으로사용자데이터/횟수변경없음. 전체사용자UI실호출은미검증. 원신진참조는제공사저작권정책거절기록.
+- 외부복구 `/Users/ethan/crefans-recovery/20261114/seedream-cosplay-mode-api-20261114` SHA·OCI61blobs·태그/설정검증후서버직전이미지/배포임시/키임시파일정리. 증거 `.local/seedream-cosplay-mode-20261114/verification.json`, runtime-routing.log, runtime-sha256.txt, runtime-live-summary.json, build/deploy/recovery-api.log,cleanup.log.
+
 ## 2026-11-14 코스어 전용 Seedream 구현 검증
 - 사용자확정: 코스어모드만Seedream5.5,일반은기존OpenAI. mode=cosplay/general 명시(누락general),style/의상잔류와독립. AI_PHOTO_COSPLAY_PROVIDER=seedream 설정, 기존전역AI_PHOTO_PROVIDER폐기. 일반모드/안전검사OpenAI키유지.
 - 합격조건: 코스어표정도Seedream,일반의상도OpenAI,원본·가이드·참조순서/1장/기존안전검사·개인정보·권한·횟수보존. 서버빌드/AI·OpenAPI33개,프론트47개·타입/계층검증. 설정예시·API계약갱신.
