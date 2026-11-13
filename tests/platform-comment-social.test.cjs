@@ -16,7 +16,7 @@ before(async()=>{release=await require('./e2e-db-lock.cjs').lockE2EDatabase(sour
  postId=(await db.posting.create({data:{user_sub:ids.creator,title:'댓글 검증 '+tag,content:'공개 본문',status:'PUBLISHED',is_public:true,allow_comments:true,published_at:new Date()}})).id;
  for(const [name,permissions]of[['moderator',{content:{view:true,update:true}}],['reader',{content:{view:true}}]]){const a=await db.admin.create({data:{user_sub:randomUUID(),name,email:randomUUID()+'@comment-social.test.invalid',role:'ADMIN',permissions}});admins.push(a.id);cookies[name]=await require('./admin-session.cjs')(db,a.id);}
  app=await NestFactory.create(PlatformModule,{logger:false});app.setGlobalPrefix('api/v1');app.use(cookieParser());app.use((req,res,next)=>requestContext.run({ip:'127.0.0.1',peerIp:'127.0.0.1',requestId:randomUUID()},next));app.useGlobalInterceptors(new EnvelopeInterceptor());app.useGlobalFilters(new PlatformExceptionFilter());await app.listen(0,'127.0.0.1');origin=await app.getUrl();});
-after(async()=>{await app?.close();const comments=(await db.comment.findMany({where:{posting_id:postId},select:{id:true}})).map(c=>c.id);await db.userReport.deleteMany({where:{reporter_id:{in:Object.values(ids)}}});await db.moderationAction.deleteMany({where:{target_id:{in:comments}}});await db.platformAuditLog.deleteMany({where:{entity_id:{in:comments}}});await db.comment.deleteMany({where:{posting_id:postId,parent_id:{not:null}}});await db.comment.deleteMany({where:{posting_id:postId}});await db.memberNotification.deleteMany({where:{member_id:{in:Object.values(ids)}}});await db.memberBlock.deleteMany({where:{member_id:{in:Object.values(ids)}}});await db.posting.deleteMany({where:{id:postId}});await db.creator.deleteMany({where:{user_id:ids.creator}});await db.memberSession.deleteMany({where:{member_id:{in:Object.values(ids)}}});await db.admin.deleteMany({where:{id:{in:admins}}});await db.member.deleteMany({where:{id:{in:Object.values(ids)}}});await db.$disconnect();await release?.();});
+after(async()=>{await app?.close();const comments=(await db.comment.findMany({where:{posting_id:postId},select:{id:true}})).map(c=>c.id);await db.userReport.deleteMany({where:{reporter_id:{in:Object.values(ids)}}});await db.moderationAction.deleteMany({where:{target_id:{in:comments}}});await db.platformAuditLog.deleteMany({where:{entity_id:{in:comments}}});await db.commentLike.deleteMany({where:{comment_id:{in:comments}}});await db.comment.deleteMany({where:{posting_id:postId,parent_id:{not:null}}});await db.comment.deleteMany({where:{posting_id:postId}});await db.memberNotification.deleteMany({where:{member_id:{in:Object.values(ids)}}});await db.memberBlock.deleteMany({where:{member_id:{in:Object.values(ids)}}});await db.posting.deleteMany({where:{id:postId}});await db.creator.deleteMany({where:{user_id:ids.creator}});await db.memberSession.deleteMany({where:{member_id:{in:Object.values(ids)}}});await db.admin.deleteMany({where:{id:{in:admins}}});await db.member.deleteMany({where:{id:{in:Object.values(ids)}}});await db.$disconnect();await release?.();});
 
 test('a comment notifies the post author and a reply notifies the parent author, never the writer, under the 댓글 filter',async()=>{
  const first=await comment('fan','첫 댓글이에요');assert.equal(first.status,201,first.errorMessage);
@@ -79,3 +79,38 @@ test('a creator reply from the studio notifies the fan the same way',async()=>{
  const parent=await find('첫 댓글이에요'),before=(await notices(ids.fan)).length;
  const r=await api(`/studio/comments/${parent.id}/reply`,'creator',{body:'스튜디오 답글'});assert.equal(r.status,201,r.errorMessage);
  assert.deepEqual((await notices(ids.fan)).slice(before).map(n=>[n.text,n.actor_id,n.path]),[['내 댓글에 답글이 달렸습니다.',ids.creator,`/post/${postId}`]]);});
+
+test('comment likes: login, strict boolean, idempotence, concurrency, replies and viewer-specific persisted state',async()=>{
+ const target=await find('첫 댓글이에요'),path=`/posts/${postId}/comments/${target.id}/like`;
+ assert.equal((await api(path,undefined,{enabled:true},'PUT')).status,401);
+ for(const enabled of ['true',1,null])assert.equal((await api(path,'fan',{enabled},'PUT')).status,400);
+ assert.equal((await api(path,'fan',{},'PUT')).status,400);
+ const results=await Promise.all(Array.from({length:6},()=>api(path,'fan',{enabled:true},'PUT')));assert.ok(results.every(r=>r.status===200&&r.data.liked&&r.data.likes===1));
+ assert.equal(await db.commentLike.count({where:{comment_id:target.id,is_deleted:false}}),1);
+ let row=(await api(`/posts/${postId}/comments`,'fan')).data.find(c=>c.id===target.id);assert.deepEqual([row.liked,row.likes],[true,1]);
+ row=(await api(`/posts/${postId}/comments`)).data.find(c=>c.id===target.id);assert.deepEqual([row.liked,row.likes],[false,1]);
+ assert.equal((await api(path,'other',{enabled:true},'PUT')).data.likes,2);
+ assert.equal((await api(path,'fan',{enabled:false},'PUT')).data.likes,1);assert.equal((await api(path,'fan',{enabled:false},'PUT')).data.likes,1);
+ assert.equal((await api(path,'other',{enabled:false},'PUT')).data.likes,0);
+ const reply=await find('저도요',target.id),replyPath=`/posts/${postId}/comments/${reply.id}/like`;
+ assert.deepEqual((await api(replyPath,'fan',{enabled:true},'PUT')).data,{liked:true,likes:1});
+ row=(await api(`/posts/${postId}/comments?parentId=${target.id}`,'fan')).data.find(c=>c.id===reply.id);assert.deepEqual([row.liked,row.likes],[true,1]);
+});
+
+test('comment likes reject inaccessible posts, hidden/deleted comments, hidden parents, wrong post ids, closed comments and blocked fans',async()=>{
+ const target=await find('첫 댓글이에요'),reply=await find('저도요',target.id),path=`/posts/${postId}/comments/${target.id}/like`;
+ const send=()=>api(path,'fan',{enabled:true},'PUT');
+ await db.comment.update({where:{id:target.id},data:{hidden:true}});
+ assert.equal((await send()).status,404);assert.equal((await api(`/posts/${postId}/comments/${reply.id}/like`,'fan',{enabled:true},'PUT')).status,404);
+ await db.comment.update({where:{id:target.id},data:{hidden:false,is_deleted:true}});assert.equal((await send()).status,404);
+ assert.equal((await api(`/posts/${postId}/comments/${reply.id}/like`,'fan',{enabled:false},'PUT')).status,200,'visible replies remain under deleted parent');
+ await db.comment.update({where:{id:target.id},data:{is_deleted:false}});
+ const otherPost=await db.posting.create({data:{user_sub:ids.creator,title:'다른 글',content:'다른 본문',status:'PUBLISHED',is_public:true,allow_comments:true}});
+ try{assert.equal((await api(`/posts/${otherPost.id}/comments/${target.id}/like`,'fan',{enabled:true},'PUT')).status,404);}finally{await db.posting.delete({where:{id:otherPost.id}});}
+ await db.posting.update({where:{id:postId},data:{is_membership:true,membership_level:1}});assert.equal((await send()).status,403);
+ await db.posting.update({where:{id:postId},data:{is_membership:false,membership_level:null,allow_comments:false}});assert.equal((await send()).errorCode,'COMMENTS_DISABLED');
+ await db.posting.update({where:{id:postId},data:{allow_comments:true,is_deleted:true}});assert.equal((await send()).status,403);
+ await db.posting.update({where:{id:postId},data:{is_deleted:false}});
+ await db.memberBlock.create({data:{member_id:ids.creator,target_id:ids.fan}});assert.equal((await send()).errorCode,'COMMENT_BLOCKED');await db.memberBlock.deleteMany({where:{member_id:ids.creator,target_id:ids.fan}});
+ assert.equal((await send()).status,200);
+});

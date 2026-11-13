@@ -1,3 +1,10 @@
+## 2026-11-13 댓글·답글 좋아요 구현 (prod 머지 대상, 운영 미배포)
+- 사용자 요청: 댓글에 좋아요 기능 추가. origin/prod8f7c7dc에서 feat/comment-likes-20261113 분기. 이전 작업 및 운영 상태 유지.
+- 기존 CommentLike 모델과(comment_id,user_id) 유일 제약 재사용, 스키마/마이그레이션 없음. PUT /posts/:id/comments/:commentId/like {enabled:boolean} → {liked,likes}. 로그인·게시물 접근·댓글 설정·작성자 차단·댓글 소속·삭제/숨김·부모숨김을 검사하고 댓글 행 잠금 뒤 멱등 upsert/활성 수를 반환한다. 삭제 부모 아래 보이는 답글은 기존 조회처럼 허용. 실제 반응은 body열람이 아니므로 access만 사용하고 유료 콘텐츠 소비 시각은 기록하지 않음. 새 알림은 추가하지 않음.
+- 댓글/답글 조회에 likes·liked 제공(비로그인 liked=false, likerID 비노출). 새 라우트 OpenAPI/문서/검사수219(사용자89) 반영. current-contracts에는 이번1라우트만 추가; 이전에 누락된 전체 생성계약 항목은 별도이며 문서 전체 통과로 확대하지 않음.
+- 검증: npm run build0, CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-comment-social.test.cjs tests/platform-openapi.test.cjs22/22, diff --check0. 격리E2E DB/실제 HTTP: 비로그인401·비boolean400·동일회원 동시6요청1개·개수/취소/재조회·답글·멤버십무권한403·삭제/숨김/부모숨김·댓글닫힘·작성자차단·다른글ID 거절 확인.
+- 증거 .local/comment-likes-20261113/{build.log,unit.log,verification.json}. 프론트 feat/comment-likes-20261113과 함께 dev→prod 머지만 진행. 실운영/실기기/배포 미실행.
+
 ## 2026-11-13 AI 사진 편집 분류 dev→prod 머지 (운영 배포 제외)
 - 사용자 “prod까지 머지만” 지시. origin/dev b0d3e74 기반 release/ai-photo-categories-dev-20261113에 feature619b175 통합(de33dcd), 충돌 없음. 실제 dev worktree의 기존 미커밋 자료 보존.
 - 통합본은 feature와 전체 트리 동일 확인. npm run build0, CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-ai-photo.test.cjs tests/platform-openapi.test.cjs21/21, diff --check0. 격리E2E DB·대역 AI이며 실공급사 아님.

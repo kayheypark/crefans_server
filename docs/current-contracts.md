@@ -171,6 +171,7 @@
 | GET | `/api/v1/posts/:id/comments-page` | `src/platform/controller.ts::commentPage` |
 | DELETE | `/api/v1/posts/:id/comments/:commentId` | `src/platform/controller.ts::deleteComment` |
 | PUT | `/api/v1/posts/:id/comments/:commentId` | `src/platform/controller.ts::editComment` |
+| PUT | `/api/v1/posts/:id/comments/:commentId/like` | `src/platform/controller.ts::likeComment` |
 | PUT | `/api/v1/posts/:id/like` | `src/platform/controller.ts::like` |
 | GET | `/api/v1/posts/:id/mention-candidates` | `src/platform/controller.ts::mentionCandidates` |
 | PUT | `/api/v1/posts/:id/save` | `src/platform/controller.ts::save` |

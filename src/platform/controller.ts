@@ -32,6 +32,7 @@ export class PlatformController {
  @Post('posts/:id/comments') @UseGuards(PlatformAuthGuard) comment(@Param('id') id:string,@Body() b:any,@Req() r:any){return this.service.addComment(r.user.sub,id,b);}
  @Put('posts/:id/comments/:commentId') @UseGuards(PlatformAuthGuard) editComment(@Param('id') id:string,@Param('commentId') commentId:string,@Body() b:any,@Req() r:any){return this.service.editComment(r.user.sub,id,commentId,b);}
  @Delete('posts/:id/comments/:commentId') @UseGuards(PlatformAuthGuard) deleteComment(@Param('id') id:string,@Param('commentId') commentId:string,@Req() r:any){return this.service.deleteComment(r.user.sub,id,commentId);}
+ @Put('posts/:id/comments/:commentId/like') @UseGuards(PlatformAuthGuard) likeComment(@Param('id') id:string,@Param('commentId') commentId:string,@Body('enabled') enabled:unknown,@Req() r:any){return this.service.likeComment(r.user.sub,id,commentId,enabled);}
  @Put('posts/:id/like') @UseGuards(PlatformAuthGuard) like(@Param('id') id:string,@Body('enabled') enabled:boolean,@Req() r:any){return this.service.reaction(r.user.sub,id,'like',enabled===true);}
  @Put('posts/:id/save') @UseGuards(PlatformAuthGuard) save(@Param('id') id:string,@Body('enabled') enabled:boolean,@Req() r:any){return this.service.reaction(r.user.sub,id,'save',enabled===true);}
  @Put('members/:id/follow') @UseGuards(PlatformAuthGuard) follow(@Param('id') id:string,@Body('enabled') enabled:boolean,@Req() r:any){return this.service.follow(r.user.sub,id,enabled===true);}
