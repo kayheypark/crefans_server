@@ -13,7 +13,7 @@ async function media(owner,w=600,h=900){const id=crypto.randomUUID();fs.writeFil
 let calls=[],flags=[],editStatus=200,outputs=2,moderationDown=false;
 async function stub(url,init){
  if(url.endsWith('/moderations')){calls.push({kind:'moderation',body:JSON.parse(init.body)});if(moderationDown)return new Response('{}',{status:503});const f=flags.length?flags.shift():false;return new Response(JSON.stringify({results:[{flagged:f}]}),{status:200});}
- if(url.endsWith('/images/edits')){const form=init.body,entry={kind:'edit',fields:{}};for(const [k,v] of form.entries())entry.fields[k]=typeof v==='string'?v:{size:v.size,type:v.type,bytes:Buffer.from(await v.arrayBuffer())};calls.push(entry);
+ if(url.endsWith('/images/edits')){const form=init.body,entry={kind:'edit',fields:{}};for(const [k,v] of form.entries()){const value=typeof v==='string'?v:{size:v.size,type:v.type,bytes:Buffer.from(await v.arrayBuffer())};if(k==='image[]')(entry.fields[k]??=[]).push(value);else entry.fields[k]=value;}calls.push(entry);
   if(editStatus!==200)return new Response(JSON.stringify({error:{code:editStatus===400?'moderation_blocked':'server_error'}}),{status:editStatus});
   const data=[];for(let i=0;i<outputs;i++)data.push({b64_json:(await png(1024,1536,{r:10*i,g:80,b:200})).toString('base64')});return new Response(JSON.stringify({data}),{status:200});}
  throw new Error('unexpected '+url);
@@ -41,7 +41,7 @@ test('input rules are checked before the provider: consent, prompt, personal dat
  reset();
  await assert.rejects(photos.edit(creator,base({consent:'false'})),code('CONSENT_REQUIRED'));
  await assert.rejects(photos.edit(creator,base({prompt:' '})),code('INVALID_PROMPT'));
- await assert.rejects(photos.edit(creator,base({prompt:'가'.repeat(301)})),code('INVALID_PROMPT'));
+ await assert.rejects(photos.edit(creator,base({prompt:'가'.repeat(2001)})),code('INVALID_PROMPT'));
  await assert.rejects(photos.edit(creator,base({prompt:'연락처 010-1234-5678 넣어줘'})),code('PERSONAL_DATA'));
  await assert.rejects(photos.edit(creator,base({kind:'hair'})),code('INVALID_KIND'));
  await assert.rejects(photos.edit(creator,base({kind:'outfit'})),code('MASK_REQUIRED'));
@@ -91,4 +91,35 @@ test('daily limit: the eleventh request of the day is refused without calling th
  reset();let r;while((r=await photos.quota(creator)).remaining>0)await photos.edit(creator,base());
  calls=[];await assert.rejects(photos.edit(creator,base()),code('DAILY_LIMIT'));assert.equal(calls.some(c=>c.kind==='edit'),false);
  assert.equal((await photos.quota(creator)).remaining,0);
+});
+
+
+test('combined edits and gender transform: actual provider instructions, two source references, chained own generated source',async()=>{
+ const user=await makeCreator('aicomb_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
+ const input=base({sourceId:id,kind:'combined',editKinds:JSON.stringify(['outfit','makeup','expression','pose','background']),prompt:'흰 셔츠, 코랄 메이크업, 웃으며 손인사, 서코 실내',targetGender:'male'});
+ reset();const result=await photos.edit(user,input,await mask());assert.equal(result.images.length,1);
+ const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields.n,'1');assert.equal(edit.fields['image[]'].length,2);assert.ok(!edit.fields.mask);assert.ok(!edit.fields.image);
+ assert.match(edit.fields.prompt,/adult man/);assert.match(edit.fields.prompt,/Allow facial features and gender presentation to change/);assert.doesNotMatch(edit.fields.prompt,/facial structure, identity, age, body shape and skin tone exactly/);assert.match(edit.fields.prompt,/Never reproduce the pink guide/);assert.match(edit.fields.prompt,/Do not add nudity/);
+ assert.notDeepEqual(edit.fields['image[]'][0].bytes,edit.fields['image[]'][1].bytes);
+ const row=await db.media.findUnique({where:{id:result.images[0].id}});assert.deepEqual(row.metadata.aiEditKinds,['outfit','makeup','expression','pose','background']);assert.equal(row.metadata.aiTargetGender,'male');
+ reset();const edited=await photos.edit(user,base({sourceId:result.images[0].id,targetGender:'female',prompt:'성인 여성으로 바꿔줘.'}));assert.equal(edited.images.length,1);assert.match(calls.find(c=>c.kind==='edit').fields.prompt,/adult woman/);
+ const next=await db.media.findUnique({where:{id:edited.images[0].id}});assert.equal(next.metadata.aiSourceId,result.images[0].id);assert.equal(next.metadata.aiTargetGender,'female');
+ reset();await assert.rejects(photos.edit(other,base({sourceId:edited.images[0].id})),e=>['AI_PHOTO_NOT_ALLOWED','MEDIA_NOT_FOUND'].includes(e.getResponse?.().code));assert.equal(calls.length,0);
+ reset();await photos.edit(user,base({sourceId:id,kind:'outfit',targetGender:'female'}),await mask());const outfit=calls.find(c=>c.kind==='edit');assert.equal(outfit.fields['image[]'].length,2);assert.ok(!outfit.fields.mask);assert.match(outfit.fields.prompt,/adult woman/);
+});
+
+test('combined/gender validation refuses malformed scopes, missing outfit mask and unsupported gender before provider',async()=>{
+ const user=await makeCreator('aival_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);reset();
+ for(const editKinds of [undefined,'not json','["pose"]','["pose","pose"]','["pose","hair"]','{}'])await assert.rejects(photos.edit(user,base({sourceId:id,kind:'combined',editKinds})),code('INVALID_EDIT_KINDS'));
+ await assert.rejects(photos.edit(user,base({sourceId:id,kind:'combined',editKinds:'["outfit","background"]'})),code('MASK_REQUIRED'));
+ await assert.rejects(photos.edit(user,base({sourceId:id,targetGender:'unknown'})),code('INVALID_TARGET_GENDER'));
+ assert.equal(calls.length,0);assert.equal((await photos.quota(user)).remaining,10);
+ reset();await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:['pose','background']}));const edit=calls.find(c=>c.kind==='edit');assert.ok(edit.fields.image);assert.ok(!edit.fields.mask);assert.ok(!edit.fields['image[]']);assert.match(edit.fields.prompt,/facial structure, identity, age/);
+});
+
+
+test('all eight aspects including camera, lens and body combine without conflicting body-preservation rules',async()=>{
+ const user=await makeCreator('aibody_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);reset();
+ const kinds=['outfit','makeup','expression','pose','background','camera','lens','body'];await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:kinds,prompt:'가슴 크기는 조금 작게, 키 비율은 조금 크게. 전신 구도, Canon RF85mm F1.2 촬영 느낌, 벤치에 앉은 포즈.'}),await mask());const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields.n,'1');assert.match(edit.fields.prompt,/Camera: adjust viewpoint/);assert.match(edit.fields.prompt,/Lens: simulate/);assert.match(edit.fields.prompt,/Body proportions:/);assert.match(edit.fields.prompt,/Only the requested body proportions may change/);assert.doesNotMatch(edit.fields.prompt,/body shape and skin tone exactly/);assert.match(edit.fields.prompt,/age and skin tone/);assert.match(edit.fields.prompt,/Do not add nudity/);
+ reset();await photos.edit(user,base({sourceId:id,kind:'body',prompt:'힙 크기를 조금 크게 자연스럽게 보정해줘.'}));const body=calls.find(c=>c.kind==='edit');assert.match(body.fields.prompt,/fully clothed/);assert.match(body.fields.prompt,/Only the requested body proportions may change/);assert.ok(!body.fields.mask);
 });
