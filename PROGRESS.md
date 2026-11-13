@@ -1,3 +1,8 @@
+## 2026-11-14 Seedream 표시 워터마크 해제 운영 완료
+- API/worker `crefans-api:seedream-no-watermark-20261114`,sourced3b02c2. 새Seedream요청watermark=false. 기존파일변경없음,aiGenerated와게시글AI표시·크리에이터워터마크유지. 프론트배포불필요.
+- 빌드0·AI/OpenAPI33/33·운영2파일SHA동일·운영코드대역요청false/aiGenerated true/모드분기통과. 새이미지실생성은미실행(공식옵션/요청계약검증). 기존헬스/권한검사통과.
+- 외부복구 `/Users/ethan/crefans-recovery/20261114/seedream-no-watermark-api-20261114` SHA/OCI63blobs/태그/설정검증후서버직전이미지·배포임시정리. 증거 `.local/seedream-no-watermark-20261114/verification.json`, build/unit/build-api/deploy-api/recovery-api/runtime-routing/cleanup.log,runtime-sha256.txt.
+
 ## 2026-11-14 워터마크 설정 검증 완료
 - npm run build 종료0, AI/OpenAPI33/33 종료0, git diff --check 종료0. 공급사대역에서watermark=false와aiGenerated메타유지확인. 실제새이미지생성미실행,배포뒤운영요청바디검증예정. 증거 .local/seedream-no-watermark-20261114/{build,unit}.log.
 
