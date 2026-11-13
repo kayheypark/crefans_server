@@ -135,3 +135,14 @@ test('provider image user errors are not safety violations: stable code controls
 test('output safety-check outage is not a confirmed unsafe image and is never returned to the user',async()=>{
  const user=await makeCreator('aiout_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);reset();flags=[false,undefined];await assert.rejects(photos.edit(user,base({sourceId:id})),code('MODERATION_UNAVAILABLE'));assert.equal((await photos.quota(user)).remaining,9,'finished provider work still counts');assert.equal(await db.media.count({where:{user_sub:user}}),1,'only original saved');assert.equal(warnings[0].stage,'output');assert.equal(warnings[0].code,'MODERATION_UNAVAILABLE');
 });
+
+
+test('cosplay complete look sends original plus guide and allows explicitly requested wig and accessories; regular outfit remains masked',async()=>{
+ const user=await makeCreator('aifull_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
+ reset();await photos.edit(user,base({sourceId:id,kind:'outfit',style:'cosplay',prompt:'검정에서 보라색으로 이어지는 올림머리 가발, 나비 머리핀, 칼집, 샌들'}),await mask());
+ const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields['image[]'].length,2);assert.ok(!edit.fields.mask);assert.match(edit.fields.prompt,/wig hair color, hairstyle, headwear, accessories, props and footwear/);assert.match(edit.fields.prompt,/may extend beyond it/);assert.match(edit.fields.prompt,/Keep the face, identity and unrequested details unchanged/);assert.match(edit.fields.prompt,/Never reproduce the pink guide/);assert.match(edit.fields.prompt,/source framing/);assert.doesNotMatch(edit.fields.prompt,/Keep everything outside the mask unchanged/);assert.equal(edit.fields.n,'1');assert.equal(edit.fields.moderation,'auto');
+ reset();await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',prompt:'같은 가발과 소품, 흰 스튜디오'}),await mask());
+ assert.match(calls.find(c=>c.kind==='edit').fields.prompt,/Cosplay: apply the requested complete costume/);
+ reset();await photos.edit(user,base({sourceId:id,kind:'outfit',style:'photo'}),await mask());
+ const ordinary=calls.find(c=>c.kind==='edit');assert.ok(ordinary.fields.mask);assert.ok(!ordinary.fields['image[]']);assert.match(ordinary.fields.prompt,/Keep everything outside the mask unchanged/);assert.doesNotMatch(ordinary.fields.prompt,/Cosplay: apply/);
+});
