@@ -1,3 +1,9 @@
+## 2026-11-13 AI 단일 생성 수정 prod 반영·운영 승인 대기
+- 기능 원본 front52a3a1e/server1b23133을 dev→prod 승격: front968eb80, server99761cf. 프론트14/14·서버21/21·타입/계층·각 빌드 통과, 공용 모달320/390/PC에서 본문426/702/648px, 고정영역72px에 버튼1개만 확인. 본문 입력·동의·횟수·원본/결과액션과 목업생성1장 확인.
+- 프론트 운영이미지 front-ai-single-flow-20261113 빌드53초·revision/카카오키/레이어·보관아카이브SHA·서버 읽기전용 preflight 통과. 서버 새이미지는 아직 만들지 않음.
+- 실제 운영 미변경: 원격 API파일 전송/이미지빌드 요청이 자동 승인 검토에서 거절됨. 사유: 이전 사용자의 prod까지만 머지 범위를 넘는 배포로 판단. 우회하지 않고 현 수정본 API+프론트 함께 배포할지 사용자 클릭형 승인 질문을 보냄. 현재 운영 front-comment-time-menu-20261113/APIcolorful-comments-20261113 유지. 사용자가 승인하면 준비된 .local/ai-photo-single-flow-20261113/의 API context·deploy-api.sh와 프론트 ship-verified.sh로 이어간다.
+- 증거 각 .local/ai-photo-single-flow-20261113/verification.json. 프론트 mobile-device-proof.png·browser.json. 실제 AI/실기기 키보드 미실행, 기존 docs Generated contracts stale 유지.
+
 ## 2026-11-13 AI 사진 생성 2장→1장 수정 진행
 - 사용자 요청. origin/prod172f7be에서 feat/ai-photo-single-flow-20261113. AI_PHOTO_IMAGES=1로 공급사n·반환/저장상한 모두1, OpenAPI/의미문서 n=1 동기화. 하루10회·동의/본인·마스크/모더레이션·실패차감복구는 유지.
 - 합격: 공급사대역 요청n=1, 결과1개저장/추가출력무시·입력+출력 모더레이션2번, 안전/한도회귀. build0, AI7+OpenAPI14=21개 통과(격리E2E DB·공급사대역). 실제 외부 AI 미호출.
