@@ -25,6 +25,7 @@ import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 
 export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=2000;
 const EDIT_URL='https://api.openai.com/v1/images/edits',MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
+const SEEDREAM_URL='https://ark.ap-southeast.bytepluses.com/api/v3/images/generations';
 const DAY=86400,MAX_SIDE=1536;
 const KINDS:Record<string,string>={camera:'Change only camera angle, framing and viewpoint as requested.',lens:'Recreate the requested photographic focal length, perspective and depth-of-field look; this is a visual simulation, not a real lens capture.',body:'Adjust only the requested adult chest, hip size or apparent height proportions naturally. Keep the person fully clothed and avoid sexualization.',outfit:'Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.',makeup:'Change only the makeup colors and finish. Preserve natural skin texture and facial structure.',expression:'Change only the facial expression as requested. Preserve facial structure and identity.',pose:"Change only the person's pose and body position.",background:'Change only the background and surroundings behind the person.'};
 const STYLES:Record<string,string>={photo:'a natural, realistic photograph',cosplay:'a realistic cosplay photo shoot with studio-quality lighting',daily:'a casual, realistic everyday snapshot'};
@@ -38,7 +39,9 @@ function editKinds(kind:string,value:unknown):string[]{
 
 export function aiPhotoConfig(config:ConfigService){
  const int=(v:unknown,d:number)=>{const n=Number(v);return Number.isSafeInteger(n)&&n>0?n:d;};
- return{apiKey:(config.get('AI_PHOTO_OPENAI_API_KEY')||config.get('GUIDE_ADVISOR_OPENAI_API_KEY')||'').trim(),model:(config.get('AI_PHOTO_MODEL')||'gpt-image-2').trim(),
+ const provider=(config.get('AI_PHOTO_PROVIDER')||'openai').trim();
+ if(!['openai','seedream'].includes(provider))throw new Error('INVALID_AI_PHOTO_PROVIDER');
+ return{provider,seedreamKey:(config.get('AI_PHOTO_BYTEPLUS_API_KEY')||'').trim(),apiKey:(config.get('AI_PHOTO_OPENAI_API_KEY')||config.get('GUIDE_ADVISOR_OPENAI_API_KEY')||'').trim(),model:(provider==='seedream'?'dola-seedream-5-5-261028':config.get('AI_PHOTO_MODEL')||'gpt-image-2').trim(),
   quality:(config.get('AI_PHOTO_QUALITY')||'medium').trim(),perDay:int(config.get('AI_PHOTO_PER_DAY'),AI_PHOTO_DAILY_LIMIT),dailyTotal:int(config.get('AI_PHOTO_DAILY_TOTAL'),300),timeoutMs:int(config.get('AI_PHOTO_TIMEOUT_MS'),120000)};
 }
 /** The prompt sent to the provider: the creator's words are framed by fixed rules (identity kept, no sexual content, no text). */
@@ -59,18 +62,19 @@ export class AiPhotoService{
  readonly settings:ReturnType<typeof aiPhotoConfig>;
  fetcher:typeof fetch=fetch;
  constructor(private configService:ConfigService,private service:PlatformService,private storage:PlatformMediaStorage,private limiter:LocalMemberService){this.settings=aiPhotoConfig(configService);}
+ private configured(){return !!this.settings.apiKey&&(this.settings.provider==='openai'||!!this.settings.seedreamKey);}
  private window(){return Math.floor(Date.now()/(DAY*1000));}
  private async used(key:string){const row=await this.service.db.authRateBucket.findUnique({where:{id:digest(`${key}:${this.window()}`)}});return row?.count??0;}
  private async giveBack(key:string){await this.service.db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${digest(`${key}:${this.window()}`)}`;}
  private creatorKey(sub:string){return 'ai-photo:creator-day:'+sub;}
  async quota(sub:string){
   await this.service.requireCreator(sub);
-  const allowed=await aiPhotoAllowed(this.service.db,sub)&&!!this.settings.apiKey;
+  const allowed=await aiPhotoAllowed(this.service.db,sub)&&this.configured();
   return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub))):0,typicalSeconds:allowed?await this.typicalSeconds():null,resetTickets:allowed?await ticketSummary(this.service.db,sub):{count:0,nextExpiresAt:null}};
  }
  /** Spend one storable reset ticket (2026-11-13): today's usage back to 0. */
  async useResetTicket(sub:string){
-  await this.service.requireCreator(sub);if(!this.settings.apiKey)reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
+  await this.service.requireCreator(sub);if(!this.configured())reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
   const r=await useAiPhotoTicket(this.service.db,sub);
   return{limit:this.settings.perDay,remaining:Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub))),resetTickets:r.tickets,message:`리셋권 1장을 사용했어요. 오늘 ${this.settings.perDay}회를 다시 만들 수 있어요.`};
  }
@@ -114,7 +118,7 @@ export class AiPhotoService{
  async edit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number}){
   const started=Date.now();await this.service.requireCreator(sub);
   if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');
-  if(!this.settings.apiKey)reject(503,'PROVIDER_NOT_CONFIGURED','AI 사진 편집을 지금 사용할 수 없어요.');
+  if(!this.configured())reject(503,'PROVIDER_NOT_CONFIGURED','AI 사진 편집을 지금 사용할 수 없어요.');
   const kind=String(input?.kind||''),style=String(input?.style||'photo'),prompt=typeof input?.prompt==='string'?input.prompt.trim():'';
   if(kind!=='combined'&&!KINDS[kind])reject(400,'INVALID_KIND','바꿀 것을 골라 주세요.');if(!STYLES[style])reject(400,'INVALID_STYLE','사진 느낌을 골라 주세요.');
   const kinds=editKinds(kind,input?.editKinds),targetGender=input?.targetGender;
@@ -140,11 +144,12 @@ export class AiPhotoService{
   // A clothing-only provider mask would prevent a combined expression/background edit.
   // Supply a marked copy as the second reference instead, keeping the original first.
   let guide:Buffer|undefined;
-  if((kind==='combined'||targetGender||style==='cosplay')&&maskPng){
+  if((this.settings.provider==='seedream'||kind==='combined'||targetGender||style==='cosplay')&&maskPng){
    const alpha=await sharp(maskPng).extractChannel('alpha').raw().toBuffer(),overlay=Buffer.alloc(width!*height!*4);
    for(let i=0;i<alpha.length;i++){overlay[i*4]=244;overlay[i*4+1]=114;overlay[i*4+2]=182;overlay[i*4+3]=Math.round((255-alpha[i])*.55);}
    guide=await sharp(image!).composite([{input:overlay,raw:{width:width!,height:height!,channels:4}}]).png().toBuffer();
   }
+  if(this.settings.provider==='seedream'&&1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상 참조는 최대 8개까지 선택해 주세요.');
   const key=this.creatorKey(sub);
   try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch{reject(429,'DAILY_LIMIT','오늘 만들 수 있는 횟수를 모두 썼어요. 매일 오전 9시에 다시 이용할 수 있어요.');}
   try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
@@ -163,7 +168,15 @@ export class AiPhotoService{
    if(guide){form.append('image[]',new Blob([image!],{type:'image/png'}),'source.png');form.append('image[]',new Blob([guide],{type:'image/png'}),'clothing-guide.png');}
    else{form.append('image',new Blob([image!],{type:'image/png'}),'source.png');if(maskPng)form.append('mask',new Blob([maskPng],{type:'image/png'}),'mask.png');}
    for(const [index,bytes] of references.entries())form.append('image[]',new Blob([bytes],{type:'image/webp'}),`costume-reference-${index+1}.webp`);
-   let res:Response;try{res=await this.fetcher(EDIT_URL,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers:{Authorization:'Bearer '+this.settings.apiKey},body:form});}
+   let url=EDIT_URL,requestBody:BodyInit=form,headers:Record<string,string>={Authorization:'Bearer '+this.settings.apiKey};
+   if(this.settings.provider==='seedream'){
+    let requestPrompt=aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length).replace('transparent masked area','pink clothing-region guide in image 2').replace('outside the mask','outside the pink guide');
+    if(guide&&!requestPrompt.includes('Image 2 is a copy'))requestPrompt+='\nImage 2 is a copy with a pink clothing-region guide. Edit clothing only in that region, keep other details unchanged, and never reproduce the pink guide.';
+    const data=(bytes:Buffer,mime:string)=>`data:${mime};base64,`+bytes.toString('base64');
+    url=SEEDREAM_URL;headers={Authorization:'Bearer '+this.settings.seedreamKey,'Content-Type':'application/json'};
+    requestBody=JSON.stringify({model:this.settings.model,prompt:requestPrompt,image:[data(image!,'image/png'),...(guide?[data(guide,'image/png')]:[]),...references.map(b=>data(b,'image/webp'))],size:sizeFor(width!,height!),output_format:'png',response_format:'b64_json',background:'opaque',watermark:true});
+   }
+   let res:Response;try{res=await this.fetcher(url,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers,body:requestBody});}
    catch{reject(504,'PROVIDER_TIMEOUT','사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.');}
    const body=await res.json().catch(()=>null);
    if(!res.ok){const code=body?.error?.code,stage=body?.error?.moderation_details?.moderation_stage;this.report(code==='moderation_blocked'&&['input','output'].includes(stage)?stage:'provider',code,res);

@@ -1,3 +1,22 @@
+## 2026-11-14 Seedream 5.5 전환 구현 — 인증 키 대기
+- 사용자 "바꿔봐". 합격조건: JSON 국제API/고정5.5모델/원본·영역가이드·의상순서/결과1장/입출력안전검사분리/10입력상한/실패횟수복구/키미설정차단. 기존OpenAI경로보존, AI_PHOTO_PROVIDER=seedream으로명시전환.
+- 로컬 .local/platform.env 및 운영API 환경변수에서 BytePlus/Seedream/ARK_API 키명없음확인(값출력안함). 사용자에게키가저장된파일경로질문전달. 키미확보로실호출/운영전환미실행. 현재운영은기존OpenAI.
+- 구현 src/platform/ai-photo.ts, 테스트 tests/platform-ai-photo.test.cjs, 설정예시 infra/platform/runtime.env.example. AI_PHOTO_BYTEPLUS_API_KEY와기존OpenAI안전검사키둘다필요. 요청은base64 JSON, 응답b64_json/PNG, background opaque, watermark true. 기존출력크기1024x1536/1536x1024/1024x1024유지. Seedream은별도mask필드가없어일반옷도영역가이드참조로전달.
+- 공식근거(확인2026-11-14): https://ai.byteplus.com/ark/region:ap-southeast-1/docs/image-generation-api.md (국제endpoint/인증/base64입출력/10장제한/크기/1장생성), https://docs.byteplus.com/en/docs/modelark/seedream-5-5 (모델ID). 공급사안전검사비활성화없음; 기존입력별/출력OpenAI검사유지.
+- 비용추정정정: 실제의상요청은원본+영역가이드+의상3입력으로현재출력크기에서0.008*3+0.020=USD0.044. 다른참조추가마다0.008. 앞선2입력0.036은가이드없는경우계산.
+- 검증: npm run build 종료0; CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-ai-photo.test.cjs tests/platform-openapi.test.cjs 32/32 종료0; git diff --check 종료0. 격리3307/e2e DB·공급사대역, 실제BytePlus호출/과금/품질미검증. 증거 .local/seedream-verification.json, seedream-build.log, seedream-unit.log.
+- 다음: 키파일경로확인→모델활성화/소량실호출검증→최신prod와통합후사용자요청범위내배포. 이전운영이미지위패치시ai-photo.ts/js만교체하여기존운영확장보존. 외부복구검증규약유지.
+
+## 2026-11-14 Seedream 5.5 API 가격 조사 (미연동)
+- 범위/합격: 공식 모델별 입력·출력 종량제, 원본+의상 참조2장/결과1장 계산, 패키지 조건과 미확정 사항 구분. 운영·코드·결제 변경 없음.
+- 공식 요금표(2026-11-13 갱신, 2026-11-14 확인): https://ai.byteplus.com/ark/region:ap-southeast-1/docs/model-pricing — dola-seedream-5-5-261028 입력 장당 USD0.008, 출력 총픽셀921600~2601123.84 USD0.020, 초과~4624220.16 USD0.035. 첫 입력 무료 규칙은5.0pro에만 명시;5.5에 적용하지 않음. 공식 일반규칙은 안전검사 등으로 성공 출력하지 않은 이미지 미과금. 실제 청구 미검증.
+- 계산(추정, 할인/세금/환율/저장·전송·별도검사비 제외): 입력2장+출력1장 USD0.036/0.051; 1000회 USD36/51; 10000회 USD360/510. 입력1장만이면 USD0.028/0.043. 추가 입력1장마다 USD0.008.
+- 공식 API 튜토리얼 https://docs.byteplus.com/en/docs/modelark/seedream-5-5 — 국제 모델 ID dola-seedream-5-5-261028, 최대10참조, 결과URL24시간. 중국 doubao 모델과 국제 dola 구분. 현재 공급자 교체하지 않음.
+- 패키지 https://ai.byteplus.com/en/product/seedream 및 https://ai.byteplus.com/en/activity/seedream : 최초구매,30일,미사용연장불가,FAQ환불불가/신규고객한플랜,ModelArk활성화필요. 상품페이지는 최대700/1800/3500장. 검색색인은6.99/24.99/49.99달러지만 열람본문가격은 Loading pricing. 따라서 현재결제가격·입력차감·해상도별소진·API할당동일성은 미확정. 이전대화 장당0.01은패키지단순나눗셈이며보정원가가아님을정정.
+- 자료차이: docs.byteplus.com의검색색인요금표에는5.5없었지만 상품페이지 Pricing and billing 링크의 ai.byteplus.com 최신요금표에는5.5행확인. 명시요금표를우선함.
+- 다음: 도입결정시계정콘솔에서모델접근/패키지차감조건확인후소량호출과실청구검증. 이번조사에서는로그인·구매·API호출미실행.
+- 증거: 기반커밋5fb29cea90ece2089345c825fdd1f0740846cdb6, 시작git status clean; web공식본문·FAQ대조, Python Decimal 계산검증, git diff --check. PROGRESS.md만미커밋기록. AGENTS.md의기존스택/PROGRESS우선/공식근거규약유지.
+
 ## 2026-11-14 블루 아카이브 서버 운영 완료
 - API/worker `crefans-api:bluearchive-costumes-20261114`, source05e49d5. build0·AI/OpenAPI30/30(대역)·참조40종·운영6파일SHA동일. 기존권한/헬스검사통과. 실제생성품질미검증.
 - 외부복구본 `/Users/ethan/crefans-recovery/20261114/bluearchive-costumes-api-20261114` SHA/OCI59blobs/설정검증후서버직전이미지와이번임시자료정리. 증거 `.local/bluearchive-costumes-20261114/verification.json`, build-api/deploy-api/recovery-api/cleanup.log, runtime-sha256.txt.
