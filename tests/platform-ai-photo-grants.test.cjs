@@ -81,3 +81,52 @@ test('quota reset: list shows today usage, per-creator and all reset need a reas
   const raw=JSON.stringify(audits);assert.ok(!raw.includes('촬영 일정')&&!raw.includes('점검 후'),'reason text must not be in the audit log');
  }finally{await db.authRateBucket.deleteMany({where:{id:{in:[creatorA,creatorB].map(id=>aiPhotoUsageId(id))}}});await db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${totalId}`;}
 });
+
+// 2026-11-13 user decisions: storable reset tickets — console grants N (30-day expiry), creator spends one any time (no daily cap)
+// to clear today's usage; oldest expiry first; expired/revoked batches do not count; total cap untouched.
+test('reset tickets: grant/revoke with reasons, creator use clears today, oldest expiry first, expired and revoked excluded',async()=>{
+ const {LocalMemberService}=require('../dist/src/auth/local/local-member.service'),{AiPhotoService}=require('../dist/src/platform/ai-photo'),{aiPhotoUsageId}=require('../dist/src/platform/ai-photo-grants'),{useAiPhotoTicket}=require('../dist/src/platform/ai-photo-tickets');
+ const limiter=app.get(LocalMemberService),photos=app.get(AiPhotoService),charge=async(id,n)=>{for(let i=0;i<n;i++)await limiter.limit('ai-photo:creator-day:'+id,1000,86400);};
+ const used=id=>photos['used']('ai-photo:creator-day:'+id),totalId=digest('ai-photo:total:'+Math.floor(Date.now()/86400000));
+ const tickets=id=>api('/admin/ai-photo-grants/'+id+'/tickets',undefined,'viewer');
+ try{
+  for(const h of ['a','b'])if(!await aiPhotoAllowed(db,h==='a'?creatorA:creatorB))assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+h,reason:'리셋권 QA'},'editor')).status,201);
+  assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/tickets',{quantity:2,reason:'권한 없음'},'viewer')).status,403);
+  for(const quantity of [0,101,1.5,'x'])assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/tickets',{quantity,reason:'수량 QA'},'editor')).errorCode,'INVALID_QUANTITY',String(quantity));
+  assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/tickets',{quantity:2,reason:''},'editor')).status,400);
+  assert.equal((await api('/admin/ai-photo-grants/'+inactive+'/tickets',{quantity:2,reason:'미허용 QA'},'editor')).errorCode,'GRANT_NOT_FOUND');
+  const g=await api('/admin/ai-photo-grants/'+creatorA+'/tickets',{quantity:2,reason:'화보 촬영 지원'},'editor');assert.equal(g.status,201,JSON.stringify(g));
+  const days=(new Date(g.data.expiresAt)-Date.now())/86400000;assert.ok(days>29.9&&days<=30,'expires 30 days after granting');
+  // an older batch expiring sooner is used first; an expired batch never counts
+  const soon=await db.aiPhotoResetTicket.create({data:{creator_user_id:creatorA,quantity:1,remaining:1,reason:'만료 임박 QA',expires_at:new Date(Date.now()+3600000)}});
+  await db.aiPhotoResetTicket.create({data:{creator_user_id:creatorA,quantity:5,remaining:5,reason:'만료 QA',expires_at:new Date(Date.now()-1000)}});
+  let t=(await tickets(creatorA)).data;assert.equal(t.summary.count,3);assert.equal(new Date(t.summary.nextExpiresAt).getTime(),soon.expires_at.getTime());
+  assert.deepEqual(t.items.map(i=>i.status).sort(),['active','active','expired']);
+  const row=(await api('/admin/ai-photo-grants?search='+prefix,undefined,'viewer')).data.items.find(r=>r.creatorId===creatorA);assert.equal(row.resetTickets,3);
+  // creator side: nothing used yet -> refused without spending
+  await assert.rejects(useAiPhotoTicket(db,creatorA),e=>e.getResponse().code==='NOTHING_TO_RESET');
+  await charge(creatorA,10);await limiter.limit('ai-photo:total',100000,86400);const totalBefore=(await db.authRateBucket.findUnique({where:{id:totalId}})).count;
+  const r1=await useAiPhotoTicket(db,creatorA);assert.equal(r1.usedBefore,10);assert.equal(r1.tickets.count,2);assert.equal(await used(creatorA),0);
+  assert.equal((await db.aiPhotoResetTicket.findUnique({where:{id:soon.id}})).remaining,0,'oldest expiry spent first');
+  // no daily cap: use again the same day after more usage; two concurrent taps spend at most what is needed
+  await charge(creatorA,3);const both=await Promise.allSettled([useAiPhotoTicket(db,creatorA),useAiPhotoTicket(db,creatorA)]);
+  assert.equal(both.filter(x=>x.status==='fulfilled').length,1,'second concurrent tap finds nothing to reset');assert.equal((await ticketCountOf(creatorA)),1);
+  assert.equal((await db.authRateBucket.findUnique({where:{id:totalId}})).count,totalBefore,'service-wide cap untouched');
+  // revoke the remaining active batch; then nothing left
+  const active=(await tickets(creatorA)).data.items.find(i=>i.status==='active');
+  assert.equal((await api('/admin/ai-photo-grants/'+creatorB+'/tickets/'+active.id+'/revoke',{reason:'다른 사람'},'editor')).errorCode,'TICKET_NOT_FOUND');
+  assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/tickets/'+active.id+'/revoke',{reason:'지원 종료'},'editor')).status,201);
+  assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/tickets/'+active.id+'/revoke',{reason:'두 번'},'editor')).errorCode,'TICKET_NOT_ACTIVE');
+  t=(await tickets(creatorA)).data;assert.equal(t.summary.count,0);assert.equal(t.items.find(i=>i.id===active.id).revokeReason,'지원 종료');
+  await charge(creatorA,1);await assert.rejects(useAiPhotoTicket(db,creatorA),e=>e.getResponse().code==='NO_TICKET');
+  // a creator who is not allow-listed cannot spend
+  await assert.rejects(useAiPhotoTicket(db,inactive),e=>e.getResponse().code==='AI_PHOTO_NOT_ALLOWED');
+  const history=(await api('/admin/ai-photo-grants/'+creatorA+'/history',undefined,'viewer')).data.items.map(i=>i.action);
+  for(const a of ['ticket_granted','ticket_used','ticket_revoked'])assert.ok(history.includes(a),a);
+  const audits=await db.platformAuditLog.findMany({where:{entity_id:creatorA,action:{in:['admin.ai_photo_tickets_granted','admin.ai_photo_tickets_revoked','studio.ai_photo_ticket_used']}}});
+  assert.deepEqual([...new Set(audits.map(a=>a.action))].sort(),['admin.ai_photo_tickets_granted','admin.ai_photo_tickets_revoked','studio.ai_photo_ticket_used']);
+  assert.ok(!JSON.stringify(audits).includes('화보 촬영 지원'),'reason text not in audit');
+ }finally{await db.authRateBucket.deleteMany({where:{id:{in:[creatorA,creatorB].map(id=>aiPhotoUsageId(id))}}});await db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${totalId}`;
+  await db.aiPhotoResetTicketUse.deleteMany({where:{creator_user_id:{in:members}}});await db.aiPhotoResetTicket.deleteMany({where:{creator_user_id:{in:members}}});}
+ async function ticketCountOf(id){return (await require('../dist/src/platform/ai-photo-tickets').ticketSummary(db,id)).count;}
+});

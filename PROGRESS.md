@@ -1,3 +1,9 @@
+## 2026-11-13 AI 사진 보관형 리셋권 — feat/ai-photo-reset-tickets, 커밋·미배포
+- 사용자 결정: 운영자가 허용 크리에이터에게 N장 지급(1~100, 사유 필수), 지급분마다 30일 뒤 만료, 크리에이터가 스튜디오에서 언제든(하루 제한 없음) 1장 써서 오늘 사용 횟수를 0으로. 오늘 0회 사용이면 쓰지 않음(409). 서비스 전체 일일 한도(ai-photo:total)는 그대로.
+- 구현: `src/platform/ai-photo-tickets.ts`, 신규 테이블 ai_photo_reset_tickets·ai_photo_reset_ticket_uses(마이그레이션 20261113170000, 기존 데이터 변경 없음). 관리자 GET/POST `admin/ai-photo-grants/:id/tickets`, POST `.../tickets/:ticketId/revoke`; 스튜디오 POST `studio/ai-photo/reset-ticket`, quota에 resetTickets{count,nextExpiresAt}. 만료가 빠른 지급분부터 차감, 크리에이터 행 잠금으로 동시 사용·회수 직렬화. 이력(ai_photo_grant_changes: ticket_granted/ticket_revoked/ticket_used)·감사(사유 해시).
+- 검증: grants 5/5(신규: 수량·권한·미허용 거부, 30일 만료, 만료분 제외·만료 임박분 우선, 동시 2회 탭 1회만, total 불변, 회수·NO_TICKET), 만료 순서를 desc로 바꾼 대조에서 실패 확인. ai-photo·openapi(225/스튜디오 52/콘솔 104) 통과, 전체 666 중 실패 34(기존 환경 실패 수).
+- 남은 일: 통합·운영 배포(DB 마이그레이션 포함)는 사용자 승인 후.
+
 ## 2026-11-13 AI 사진 오늘 사용 횟수 초기화(인원별·전체) — 운영 배포 완료(2026-11-13 16:3x KST)
 - 요청: 운영콘솔에서 AI 사진보정 남은 횟수를 인원별·전체 초기화.
 - 구현: `src/platform/ai-photo-grants.ts` — 목록에 usedToday·remaining·dailyLimit, `POST admin/ai-photo-grants/:creatorId/quota-reset`(사유 2~500자, 허용 목록 외 404, 사용 0회 409), `POST admin/ai-photo-grants/quota-reset`(사유+확인 문구 '전체 초기화'). 둘 다 members.update. 오늘 사용 버킷(auth_rate_buckets, `ai-photo:creator-day:<id>`, UTC일=09:00 KST 리셋) 삭제 + 이력(quota_reset / quota_reset_all) + 감사(사유 해시)를 한 트랜잭션.

@@ -1,6 +1,7 @@
 import {listReservedHandles,reservedHandleHistory,saveReservedHandle,deleteReservedHandle} from './reserved-handles';
 import {aiPhotoGrantHistory,grantAiPhoto,listAiPhotoGrants,resetAiPhotoQuota,resetAllAiPhotoQuota,revokeAiPhoto} from './ai-photo-grants';
 import {aiPhotoConfig} from './ai-photo';
+import {grantAiPhotoTickets,listAiPhotoTickets,revokeAiPhotoTickets} from './ai-photo-tickets';
 import {ConfigService} from '@nestjs/config';
 import {CategoriesService} from './categories.service';
 import {Res,UploadedFile,UseInterceptors} from '@nestjs/common';
@@ -74,6 +75,9 @@ export class PlatformAdminController{
  // Studio AI photo editor allow-list (2026-11-08): members.view lists, members.update grants/revokes with a reason.
  @Get('ai-photo-grants') @Permit(['members','view']) aiPhotoGrants(@Query() query:any,@Req() req:any){return listAiPhotoGrants(this.service.db,req.admin,query,aiPhotoConfig(this.config).perDay);}
  @Post('ai-photo-grants/quota-reset') @Permit(['members','update']) resetAllAiPhotoQuota(@Body() body:any,@Req() req:any){return resetAllAiPhotoQuota(this.service.db,req.admin,body);}
+ @Get('ai-photo-grants/:creatorId/tickets') @Permit(['members','view']) aiPhotoTickets(@Param('creatorId') id:string,@Req() req:any){return listAiPhotoTickets(this.service.db,req.admin,id);}
+ @Post('ai-photo-grants/:creatorId/tickets') @Permit(['members','update']) grantAiPhotoTickets(@Param('creatorId') id:string,@Body() body:any,@Req() req:any){return grantAiPhotoTickets(this.service.db,req.admin,id,body);}
+ @Post('ai-photo-grants/:creatorId/tickets/:ticketId/revoke') @Permit(['members','update']) revokeAiPhotoTickets(@Param('creatorId') id:string,@Param('ticketId') ticketId:string,@Body() body:any,@Req() req:any){return revokeAiPhotoTickets(this.service.db,req.admin,id,ticketId,body);}
  @Post('ai-photo-grants/:creatorId/quota-reset') @Permit(['members','update']) resetAiPhotoQuota(@Param('creatorId') id:string,@Body() body:any,@Req() req:any){return resetAiPhotoQuota(this.service.db,req.admin,id,body);}
  @Get('ai-photo-grants/:creatorId/history') @Permit(['members','view']) aiPhotoGrantHistory(@Param('creatorId') id:string,@Query() query:any,@Req() req:any){return aiPhotoGrantHistory(this.service.db,req.admin,id,query);}
  @Post('ai-photo-grants') @Permit(['members','update']) grantAiPhoto(@Body() body:any,@Req() req:any){return grantAiPhoto(this.service.db,req.admin,body);}

@@ -7,8 +7,9 @@ import {requirePermission} from './admin-permissions';
 import {reject,text} from './http';
 import {digest} from '../auth/local/credentials';
 import {randomUUID} from 'crypto';
+import {ticketCounts} from './ai-photo-tickets';
 
-const reasonOf=(value:unknown)=>{const reason=typeof value==='string'?value.trim():'';if(reason.length<2||reason.length>500)reject(400,'INVALID_REASON','사유를 2~500자로 입력해주세요.');return reason;};
+export const reasonOf=(value:unknown)=>{const reason=typeof value==='string'?value.trim():'';if(reason.length<2||reason.length>500)reject(400,'INVALID_REASON','사유를 2~500자로 입력해주세요.');return reason;};
 const handleOf=(value:unknown)=>{const handle=typeof value==='string'?value.trim().replace(/^@/,'').toLowerCase():'';if(!/^[a-z0-9_.]{2,30}$/.test(handle))reject(400,'INVALID_HANDLE','크리에이터 핸들을 확인해주세요.');return handle;};
 async function names(db:PrismaClient,ids:(string|null)[]){const list=[...new Set(ids.filter((id):id is string=>!!id))];return list.length?db.admin.findMany({where:{id:{in:list}},select:{id:true,name:true}}):[];}
 const nameOf=(actors:{id:string;name:string}[],id:string|null)=>id?(actors.find(a=>a.id===id)?.name||'삭제된 운영자'):null;
@@ -18,7 +19,7 @@ const nameOf=(actors:{id:string;name:string}[],id:string|null)=>id?(actors.find(
 // cap (ai-photo:total) is a cost guard and is not reset here.
 export const AI_PHOTO_RESET_ALL_PHRASE='전체 초기화';
 export const aiPhotoUsageId=(creatorId:string,now=Date.now())=>digest(`ai-photo:creator-day:${creatorId}:${Math.floor(now/86400000)}`);
-async function usedToday(db:PrismaClient|Prisma.TransactionClient,creatorIds:string[]){
+export async function usedToday(db:PrismaClient|Prisma.TransactionClient,creatorIds:string[]){
  const ids=new Map(creatorIds.map(id=>[aiPhotoUsageId(id),id]));if(!ids.size)return new Map<string,number>();
  const rows=await db.authRateBucket.findMany({where:{id:{in:[...ids.keys()]}},select:{id:true,count:true}});
  return new Map(rows.map(r=>[ids.get(r.id)!,r.count]));
@@ -33,8 +34,8 @@ export async function listAiPhotoGrants(db:PrismaClient,admin:any,query:any,dail
  const matched=search?(await db.creator.findMany({where:{OR:[{handle:{contains:search.toLowerCase()}},{display_name:{contains:search}}]},select:{user_id:true},take:500})).map(c=>c.user_id):null;
  const where:Prisma.AiPhotoGrantWhereInput=matched?{OR:[{creator_user_id:{in:matched}},{reason:{contains:search}}]}:{};
  const [rows,total]=await Promise.all([db.aiPhotoGrant.findMany({where,skip,take:size,orderBy:{created_at:'desc'}}),db.aiPhotoGrant.count({where})]);
- const [creators,actors,used]=await Promise.all([db.creator.findMany({where:{user_id:{in:rows.map(r=>r.creator_user_id)}},select:{user_id:true,handle:true,display_name:true,is_active:true}}),names(db,rows.map(r=>r.granted_by)),usedToday(db,rows.map(r=>r.creator_user_id))]);
- return{items:rows.map(r=>{const c=creators.find(x=>x.user_id===r.creator_user_id),today=used.get(r.creator_user_id)??0;return{creatorId:r.creator_user_id,handle:c?.handle??null,displayName:c?.display_name??null,creatorActive:c?.is_active??false,reason:r.reason,grantedBy:r.granted_by,grantedByName:nameOf(actors,r.granted_by),createdAt:r.created_at,usedToday:today,remaining:Math.max(0,dailyLimit-today)};}),total,page,pageSize:size,dailyLimit};
+ const [creators,actors,used]=await Promise.all([db.creator.findMany({where:{user_id:{in:rows.map(r=>r.creator_user_id)}},select:{user_id:true,handle:true,display_name:true,is_active:true}}),names(db,rows.map(r=>r.granted_by)),usedToday(db,rows.map(r=>r.creator_user_id))]),tickets=await ticketCounts(db,rows.map(r=>r.creator_user_id));
+ return{items:rows.map(r=>{const c=creators.find(x=>x.user_id===r.creator_user_id),today=used.get(r.creator_user_id)??0;return{creatorId:r.creator_user_id,handle:c?.handle??null,displayName:c?.display_name??null,creatorActive:c?.is_active??false,reason:r.reason,grantedBy:r.granted_by,grantedByName:nameOf(actors,r.granted_by),createdAt:r.created_at,usedToday:today,remaining:Math.max(0,dailyLimit-today),resetTickets:tickets.get(r.creator_user_id)??0};}),total,page,pageSize:size,dailyLimit};
 }
 
 export async function aiPhotoGrantHistory(db:PrismaClient,admin:any,creatorId:string,query:any){

@@ -18,6 +18,7 @@ import {digest} from '../auth/local/credentials';
 import {reject} from './http';
 import {contentDigest} from './audit';
 import {aiPhotoAllowed} from './ai-photo-grants';
+import {ticketSummary,useAiPhotoTicket} from './ai-photo-tickets';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 
@@ -62,7 +63,13 @@ export class AiPhotoService{
  async quota(sub:string){
   await this.service.requireCreator(sub);
   const allowed=await aiPhotoAllowed(this.service.db,sub)&&!!this.settings.apiKey;
-  return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub))):0,typicalSeconds:allowed?await this.typicalSeconds():null};
+  return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub))):0,typicalSeconds:allowed?await this.typicalSeconds():null,resetTickets:allowed?await ticketSummary(this.service.db,sub):{count:0,nextExpiresAt:null}};
+ }
+ /** Spend one storable reset ticket (2026-11-13): today's usage back to 0. */
+ async useResetTicket(sub:string){
+  await this.service.requireCreator(sub);if(!this.settings.apiKey)reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
+  const r=await useAiPhotoTicket(this.service.db,sub);
+  return{limit:this.settings.perDay,remaining:Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub))),resetTickets:r.tickets,message:`리셋권 1장을 사용했어요. 오늘 ${this.settings.perDay}회를 다시 만들 수 있어요.`};
  }
  /** Median whole-request time of the latest real edits (all creators), shown while a new one runs. null until one has finished. */
  async typicalSeconds():Promise<number|null>{
@@ -177,6 +184,7 @@ export class AiPhotoService{
 export class AiPhotoController{
  constructor(private photos:AiPhotoService){}
  @Get('quota') quota(@Req() req:any){return this.photos.quota(req.user.sub);}
+ @Post('reset-ticket') useResetTicket(@Req() req:any){return this.photos.useResetTicket(req.user.sub);}
  @Post('edit') @UseInterceptors(FileInterceptor('mask',{storage:memoryStorage(),limits:{fileSize:5*1024*1024,files:1}}))
  edit(@Req() req:any,@Body() body:any,@UploadedFile() mask:any){return this.photos.edit(req.user.sub,body,mask);}
 }
