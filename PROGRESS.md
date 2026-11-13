@@ -1,3 +1,7 @@
+## 2026-11-14 블루 아카이브 서버 운영 완료
+- API/worker `crefans-api:bluearchive-costumes-20261114`, source05e49d5. build0·AI/OpenAPI30/30(대역)·참조40종·운영6파일SHA동일. 기존권한/헬스검사통과. 실제생성품질미검증.
+- 외부복구본 `/Users/ethan/crefans-recovery/20261114/bluearchive-costumes-api-20261114` SHA/OCI59blobs/설정검증후서버직전이미지와이번임시자료정리. 증거 `.local/bluearchive-costumes-20261114/verification.json`, build-api/deploy-api/recovery-api/cleanup.log, runtime-sha256.txt.
+
 ## 2026-11-14 블루 아카이브 검증 완료
 - build 종료0, AI/OpenAPI 30/30(격리DB·공급사대역), 신규4파일 frontend/src/dist SHA동일. 실제생성품질미검증.
 
