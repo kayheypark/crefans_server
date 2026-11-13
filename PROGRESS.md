@@ -1,3 +1,10 @@
+## 2026-11-13 09:54 KST AI 사진 5분류·댓글 좋아요 운영 배포 완료
+- 사용자 배포 승인에 따라 prod5feb470의 ai-photo/controller/openapi-contract/service 4개 TS+JS만 media-processing-20261113 위 오버레이한 colorful-comments-20261113을 API/worker에 적용. 변경 전 운영4소스가 b6809d3과 정확히 같음 확인, 새8파일 SHA가 검사한 빌드와 일치. 기존 미디어처리·파트너정산·법률/가입·금융 동작 보존, DB스키마/마이그레이션 없음.
+- 합격: build0, 격리E2E AI7+댓글8+OpenAPI14=29/29. 이미지 모듈 로드·makeup 지시·likeComment 함수·해시 확인. 운영 health ready/API·worker running/restart0, 다른 컨테이너 동일, 설정은 API_IMAGE/APP_RELEASE만 변경. 익명 like401, 공개 댓글1/답글1 integer likes·liked=false 확인(쓰기 없음).
+- 첫 교체는 복사한 배포 스크립트의 이전 service SHA 상수 때문에 자동롤백됨. 검증한 새 SHA로 수정 후 재배포0, 재확인 성공. 최초 sh brace확장 해시명령도 실패하여 명시적 루프로 재실행8개 일치. 실패 로그도 보존. 운영 실계정 좋아요 쓰기·실AI 생성·실기기는 미실행, 프론트는 배포된 design-system 공용 모달에서 목업으로 확인.
+- 복구 /Users/ethan/crefans-recovery/20261113/colorful-comments-api-20261113: 직전media-processing 이미지, OCI39blobs·index/tag·SHA·설정 아카이브 검증. 이후 서버 직전태그/백업/임시context 삭제, 활성이미지·DB볼륨·현재설정·업로드 보존. 맥 이전 복구본 삭제 없음; 보관수 초과 후보 삭제는 별도 승인 필요.
+- 증거 .local/colorful-deploy-20261113/{verification.json,source-review.json,runtime-hashes.txt,deploy-api.log,deploy-api-first-attempt.log,public-comments.json,final-server.log,cleanup.log}; 검사로그 .local/comment-likes-20261113/deploy-{build,unit}.log. 프론트runtime71a6cc6/front-colorful-comments-20261113 배포 완료. 기존 문서 계약stale·소셜4실패 별도 유지.
+
 ## 2026-11-13 댓글 좋아요 dev→prod 통합 (운영 배포 제외)
 - 사용자 요청 범위: 댓글·답글 좋아요 추가, 기존 지시에 따라 prod까지만 머지. release/comment-likes-dev-20261113에서 feature를 no-ff 통합(1a396bd), 충돌 없음. 기능 커밋과 통합본 전체 트리 동일 확인으로 기존 빌드/검증 증거 유효. 실제 dev worktree는 변경하지 않음.
 - 프론트 버튼2/2·피드/상세/답글 연결1/1 재통과, 서버 관련22/22·양쪽 빌드 통과. 기존 소셜 실패4개 및 Generated contracts stale은 미해결로 유지. 상세 증거 ../crefans_server-comment-likes/.local/comment-likes-20261113/verification.json.
