@@ -104,7 +104,7 @@ test('combined edits and gender transform: actual provider instructions, two sou
  const row=await db.media.findUnique({where:{id:result.images[0].id}});assert.deepEqual(row.metadata.aiEditKinds,['outfit','makeup','expression','pose','background']);assert.equal(row.metadata.aiTargetGender,'male');
  reset();const edited=await photos.edit(user,base({sourceId:result.images[0].id,targetGender:'female',prompt:'성인 여성으로 바꿔줘.'}));assert.equal(edited.images.length,1);assert.match(calls.find(c=>c.kind==='edit').fields.prompt,/adult woman/);
  const next=await db.media.findUnique({where:{id:edited.images[0].id}});assert.equal(next.metadata.aiSourceId,result.images[0].id);assert.equal(next.metadata.aiTargetGender,'female');
- reset();await assert.rejects(photos.edit(other,base({sourceId:edited.images[0].id})),e=>['AI_PHOTO_NOT_ALLOWED','MEDIA_NOT_FOUND'].includes(e.getResponse?.().code));assert.equal(calls.length,0);
+ await db.aiPhotoGrant.create({data:{creator_user_id:other,reason:'소유권 거절 검사'}});reset();await assert.rejects(photos.edit(other,base({sourceId:edited.images[0].id})),code('MEDIA_NOT_FOUND'));assert.equal(calls.length,0);
  reset();await photos.edit(user,base({sourceId:id,kind:'outfit',targetGender:'female'}),await mask());const outfit=calls.find(c=>c.kind==='edit');assert.equal(outfit.fields['image[]'].length,2);assert.ok(!outfit.fields.mask);assert.match(outfit.fields.prompt,/adult woman/);
 });
 

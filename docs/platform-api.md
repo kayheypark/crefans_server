@@ -606,7 +606,7 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | DELETE | /admin/ai-photo-grants/:creatorId | members.update. `{reason}` 2~500자. 목록에 없으면 404 GRANT_NOT_FOUND. |
 
 - 저장: 현재 목록 `ai_photo_grants`(크리에이터당 1행, 해제 시 삭제), 전체 이력 `ai_photo_grant_changes`. 허용·해제·이력·감사(`admin.ai_photo_granted`/`admin.ai_photo_revoked`, 사유는 contentHash만)를 한 트랜잭션에 쓰고 크리에이터 행을 잠근다.
-- 사용 검사: 스튜디오 AI 사진 편집 API는 요청마다 `aiPhotoAllowed(db,creatorUserId)`(src/platform/ai-photo-grants.ts)로 허용 여부를 확인해야 한다(서버 생성 API는 아직 없음).
+- 사용 검사: 스튜디오 AI 사진 편집 API는 요청마다 `aiPhotoAllowed(db,creatorUserId)`(src/platform/ai-photo-grants.ts)로 허용 여부를 확인해야 한다.
 
 ### 스튜디오 AI 사진 편집 (2026-11-08)
 | 메서드 | 경로 | 설명 |
