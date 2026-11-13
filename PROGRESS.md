@@ -1,3 +1,11 @@
+## 2026-11-13 15:02 KST AI 확장 편집 운영 배포 완료
+- 운영 API/worker `crefans-api:ai-photo-expanded-20261113` (기능 source2ea5cee), 프론트 `crefans-front:front-ai-expanded-v2-20261113` (source56ee755). dev→prod 일반 push, 최종 운영빌드58초·이미지revision/키·아카이브/레이어 검증. 기존 API 다른 기능은 TS+JS2개씩만overlay하여보존, DB마이그레이션없음.
+- 반영: 8탭·91사진프리셋(1,051,506bytes)·포즈24종·구도6종·캐논RF렌즈6종·서코실내·실제성별변경·가슴/힙/키 독립5단계·프롬프트2000자누적·결과 이미지편집·작품공식로고6개. 의상32종/보기5종/아이콘칠하기도구/1장생성/버튼만고정 유지. 의상탭 성별만선택 시마스크요구하던경우재현검사추가후수정.
+- 검사: 프론트28/28·typecheck·계층452, 서버24/24·build0. 잘못된누적구현 대조실패, 성별단독오류 수정전실패→수정후통과, 허용된타인계정도생성결과소유권404 확인. 공급사대역·격리E2E DB. 실제AI생성품질·실기기키보드 미검증. 전체check:docs는기존 Generated contracts stale 잔존(다른과거누락); AI라우트2개/API·디자인문서동기화만완료.
+- 운영 CUA 공용Dialog:8탭31페이지91사진모두로드,320/390/1280에서가로넘침0·1장버튼만고정, 3슬라이더/남녀문구/최종누적/성별단독목업생성/생성결과이어편집확인. 실제회원생성/실공급사호출이아님. 최종91자산해시가운영빌드와일치.
+- 복구: /Users/ethan/crefans-recovery/20261113/{ai-photo-expanded-api-20261113,front-ai-expanded-20261113,front-ai-expanded-v2-20261113}에직전이미지·설정. SHA/OCI태그·ID/config/layers(API43·front각15blobs)확인후서버직전태그·이번백업/tmp만정리. 활성이미지/DB/업로드/현설정보존, 기존맥복구본삭제없음.
+- 증거 front .local/cosplay-category-logos-20261113/{verification.json,unit.log,types.log,layers.log,docs-target.log,browser-local.json,browser-production-photos.json,browser-production.json,production-device-proof.png,imagegen-prompts.json,photo-assets.json,image-content-v2.log,dry-run-v2.log,ship-v2.log}; API .local/ai-photo-final-prompt-20261113/{verification.json,unit.log,build.log,source-review.json,build-api.log,deploy-api.log,final-server-v2.log}. 현재요청완료; 실AI사진품질검증과이전문서계약누락은구분해남김.
+
 ## 2026-11-13 구현·로컬 검증 완료, 운영 반영 진행
 - 공용 UI 8탭·91개 사진(총1,051,506bytes)·의상32종 기존유지·작품6공식로고·추가아이콘3개. 남녀 실제변경/원본유지, 가슴·힙·키 독립5단계, 포즈24종(신규앉기/휴식우선), 캐논렌즈6/구도6, 단일프롬프트2000자, 결과 이미지편집.
 - 프론트27/27·typecheck·계층452, 서버24/24·build 통과. 누적을 덮어쓰기로 망가뜨린 대조검사 실패 확인 후복원. 공급사대역/격리E2E DB이며 실AI편집 미호출. CUA390 8탭31페이지91사진 전부로드,320/390/1280 가로넘침0·만들기1개, 실제슬라이더/성별문구/목업1장/생성소스연속편집/로고7좌측48px 확인.
