@@ -1,3 +1,7 @@
+## 2026-11-13 의상 참조 안전검사400 회귀 수정 진행
+- 사용자요청ID26d1b703-5fdd-4bc0-919d-23fe1e0b8996:08:52:24Z 503,1557ms;직전input MODERATION_UNAVAILABLE/status400. 직전 배포가 원본+참조를 한 moderation 호출에 넣은 오류. 실공급사 단색64px PNG 재현:2장400 too_many_images(최대1),1장200 flaggedfalse. 사용자사진/문구 미조회·생성없음. 공식 https://developers.openai.com/api/reference/resources/moderations/methods/create 확인2026-11-13;최대1 제약은 문서추측 아닌 실응답으로확인.
+- 합격:원본/참조각1장+동일문구로개별검사,모두통과후에만생성. 차단/미응답중단·횟수정책유지. 대역에도1장제약추가,수정전재현실패와수정후회귀+실공급사검사로검증. 증거 .local/moderation-single-image-20261113/. 다음API만배포.
+
 ## 2026-11-13 의상 사진 참조 편집 운영 반영 완료
 - API/worker crefans-api:costume-references-20261113(source7c8c92c),프론트 crefans-front:front-costume-references-20261113(source5a333f1). feature→dev→prod 동일 트리 검증 후 서버→프론트 순서 배포. 선택 의상32종 고정 파일을 costumeIds(1~14개)로 조회해 원본+칠하기가이드+참조사진순으로 공급사에 첨부. 장황한 카탈로그 의상설명은 참조순번 짧은 지시로 대체, 다른프리셋/커스텀/선택해제/복합순서유지. 일반모드전환 후에도 선택참조유지.
 - 검증:프론트37/37(실서비스 FormData 포함),서버/OpenAPI29/29(공급사대역+격리DB),서버build0·타입0·계층452. 의상첨부제거 대조는4장예상/2장실제실패→복원재통과. src/dist/프론트32WebP SHA일치489628bytes; 운영코드/자산70파일SHA일치. 실제AI결과품질·차단감소율은 미검증이며 안전검사우회/완화없음. 참조이미지도입력검사포함. 운영UI에서생성미실행.
