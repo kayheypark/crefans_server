@@ -1,3 +1,10 @@
+## 2026-11-13 15:21 KST AI 오류 분류 수정 운영 반영
+- source c490129, API/worker crefans-api:ai-photo-errors-20261113. TS/JS ai-photo2파일만현재expanded위에overlay, 이미지해시·모듈·n1/max2000·이전성별/신체/복합기능검증. dev→prod승격, 빌드0·AI/OpenAPI26/26(대역·격리DB), 수정전2재현실패→수정후통과. 실제사용자실패는재현하지않음.
+- 일반 image_generation_user_error를모두안전위반으로표시하던버그수정, moderation_blocked만안전차단·공급사input/output단계반영. 일반오류는 PROVIDER_INPUT_ERROR/차감복구. 결과검사무응답은503 MODERATION_UNAVAILABLE/결과비노출(이미생성차감유지). auto·입출력검사·소유권·한도불변. 로그는사진/문구/회원/키/공급사원문없이단계·코드·상태·공급사요청ID만.
+- 배포healthready·인증401·다른서비스ID/설정(API_IMAGE/APP_RELEASE외)보존. /Users/ethan/crefans-recovery/20261113/ai-photo-errors-api-20261113 에직전expanded이미지·설정보관, SHA/OCI45blobs·태그ID·설정검증후서버직전태그/이번백업/tmp만정리. 기존로컬복구본삭제없음.
+- 사용자는아니스/아리스라고응답. 현재프론트에는아니스재킷만있음. 원본/최종프롬프트/정확한오류문구없고과거4xx진단로그없어당시차단원인미확정. 위반없음·캐릭터금지로단정하지않음. 안전검사우회/자동동일재시도/실AI편집미실행. 필요시사용자오류문구/발생시각과새단계로그로추적.
+- 증거 .local/ai-photo-errors-20261113/{verification.json,research.md,before.log,unit.log,build.log,source-review.json,build-api.log,deploy-api.log,final-server.log}. OpenAI공식오류코드문서확인2026-11-13. 기존전체문서 Generated contracts stale는별도. 프론트자산/런타임변경없음.
+
 ## 2026-11-13 AI 안전 기준 오류 조사·분류 수정 진행
 - 사용자: 아니스 또는 앨리스 의상 선택 후 안전기준 오류. 현재 프론트는 아니스 재킷만 있고 앨리스 없음. 당시 입력 사진/최종문구/정확한오류코드는 미확인. 최근30분운영로그303행은관련코드0건; 4xx를일괄기록하지않아 원인확정불가(위반없음의증거아님).
 - 확인한 버그: error.type=image_generation_user_error 전체를안전차단으로취급; 실제는error.code=moderation_blocked로구별해야함. output moderation 미응답도 UNSAFE_OUTPUT으로잘못표시. 공식문서 https://developers.openai.com/api/docs/guides/image-generation#handling-blocked-requests-and-other-errors 확인2026-11-13.
