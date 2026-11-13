@@ -18,6 +18,7 @@ import {digest} from '../auth/local/credentials';
 import {reject} from './http';
 import {contentDigest} from './audit';
 import {aiPhotoAllowed} from './ai-photo-grants';
+import {costumeReferenceIds,readCostumeReference} from './ai-photo-costume-references';
 import {ticketSummary,useAiPhotoTicket} from './ai-photo-tickets';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
@@ -41,11 +42,11 @@ export function aiPhotoConfig(config:ConfigService){
   quality:(config.get('AI_PHOTO_QUALITY')||'medium').trim(),perDay:int(config.get('AI_PHOTO_PER_DAY'),AI_PHOTO_DAILY_LIMIT),dailyTotal:int(config.get('AI_PHOTO_DAILY_TOTAL'),300),timeoutMs:int(config.get('AI_PHOTO_TIMEOUT_MS'),120000)};
 }
 /** The prompt sent to the provider: the creator's words are framed by fixed rules (identity kept, no sexual content, no text). */
-export function aiPhotoPrompt(kind:string,style:string,request:string,kinds:string[]=[kind],targetGender?:string){
+export function aiPhotoPrompt(kind:string,style:string,request:string,kinds:string[]=[kind],targetGender?:string,referenceCount=0){
  const cosplay=kinds.includes('outfit')&&style==='cosplay';
  const completeLook='Cosplay: apply the requested complete costume, including wig hair color, hairstyle, headwear, accessories, props and footwear. The pink guide locates garment edits; explicitly requested wig, hair, headwear and accessory changes may extend beyond it. Keep the face, identity and unrequested details unchanged. Include only items visible in the source framing; do not crop or invent a new pose merely to reveal them unless a framing or pose change is explicitly requested.';
  const instruction=kind==='combined'||targetGender||cosplay?['Apply all requested changes together to image 1. Modify only the listed aspects and keep unrequested details unchanged.',...kinds.map(k=>k==='outfit'&&cosplay?completeLook:COMBINED[k]),...(kinds.includes('outfit')?['Image 2 is a copy with a pink clothing-region guide. Use it only to locate the clothing edits; other requested aspects may change elsewhere. Never reproduce the pink guide in the result.']:[])].join('\n'):KINDS[kind];
- return [`Edit this photo of a real adult person. ${instruction}`,`Requested change: ${request}`,'If requests conflict, the later instruction takes precedence.',`Make the result look like ${STYLES[style]}.`,
+ return [`Edit this photo of a real adult person. ${instruction}`,...(referenceCount?[`Images 3 through ${referenceCount+2} are costume references 1 through ${referenceCount}. Transfer their visible clothing design, colors, wig hairstyle, headwear, accessories, props and footwear to the person in image 1. Do not copy the reference mannequin, body, face, pose or background. Apply items only within the source framing. Follow reference order when costume details conflict.`]:[]),`Requested change: ${request}`,'If requests conflict, the later instruction takes precedence.',`Make the result look like ${STYLES[style]}.`,
   targetGender?`Also change the depicted adult person to ${targetGender==='female'?'an adult woman':'an adult man'}. Allow facial features and gender presentation to change as needed. Keep the source recognizable where compatible, and preserve age, skin tone and unrequested details. Never make the person younger.`:kinds.includes('body')?"Preserve the person's facial structure, identity, age and skin tone. Only the requested body proportions may change.":"Keep the person's facial structure, identity, age, body shape and skin tone exactly the same.",'Do not add nudity, sexualized content, minors, text, logos or watermarks.'].join('\n');
 }
 const sizeFor=(width:number,height:number)=>width>height*1.15?'1536x1024':height>width*1.15?'1024x1536':'1024x1024';
@@ -125,7 +126,9 @@ export class AiPhotoService{
   if(kinds.includes('outfit')&&!mask)reject(400,'MASK_REQUIRED','바꿀 옷 부분을 사진 위에 칠해 주세요.');
   if(kind==='combined'&&!kinds.includes('outfit')&&mask)reject(400,'INVALID_MASK','옷을 바꿀 때만 옷 영역을 칠해 주세요.');
   if(mask&&(mask.mimetype!=='image/png'||mask.size>5*1024*1024))reject(400,'INVALID_MASK','칠한 영역을 다시 만들어 주세요.');
+  const referenceIds=costumeReferenceIds(input?.costumeIds,kinds,style);
   const original=await this.source(sub,input?.sourceId);
+  const references=await Promise.all(referenceIds.map(readCostumeReference));
   // Provider input: PNG at most 1536px; the mask is resized to the same pixels and keeps its alpha channel.
   let image:Buffer,maskPng:Buffer|undefined,width:number,height:number;
   try{
@@ -147,15 +150,16 @@ export class AiPhotoService{
   try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
   let charged=true;
   try{
-   const verdict=await this.flagged([{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/png;base64,'+image!.toString('base64')}}],'input');
+   const verdict=await this.flagged([{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/png;base64,'+image!.toString('base64')}},...references.map(bytes=>({type:'image_url',image_url:{url:'data:image/webp;base64,'+bytes.toString('base64')}}))],'input');
    if(verdict===undefined)reject(503,'MODERATION_UNAVAILABLE','안전 검사를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
    if(verdict){charged=false;reject(400,'UNSAFE_INPUT','안전 기준에 맞지 않는 사진이나 요청이라 만들 수 없어요.');}
    const form=new FormData();
-   form.append('model',this.settings.model);form.append('prompt',aiPhotoPrompt(kind,style,prompt,kinds,targetGender));form.append('n',String(AI_PHOTO_IMAGES));
+   form.append('model',this.settings.model);form.append('prompt',aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length));form.append('n',String(AI_PHOTO_IMAGES));
    form.append('size',sizeFor(width!,height!));form.append('quality',this.settings.quality);form.append('output_format','png');form.append('moderation','auto');
    form.append('safety_identifier',contentDigest('ai-photo:'+sub).slice(0,64));
    if(guide){form.append('image[]',new Blob([image!],{type:'image/png'}),'source.png');form.append('image[]',new Blob([guide],{type:'image/png'}),'clothing-guide.png');}
    else{form.append('image',new Blob([image!],{type:'image/png'}),'source.png');if(maskPng)form.append('mask',new Blob([maskPng],{type:'image/png'}),'mask.png');}
+   for(const [index,bytes] of references.entries())form.append('image[]',new Blob([bytes],{type:'image/webp'}),`costume-reference-${index+1}.webp`);
    let res:Response;try{res=await this.fetcher(EDIT_URL,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers:{Authorization:'Bearer '+this.settings.apiKey},body:form});}
    catch{reject(504,'PROVIDER_TIMEOUT','사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.');}
    const body=await res.json().catch(()=>null);
