@@ -10,15 +10,15 @@ const png=(w,h,color={r:200,g:120,b:160})=>sharp({create:{width:w,height:h,chann
 async function makeCreator(handle){const id=crypto.randomUUID();members.push(id);await db.member.create({data:{id,email:id+'@ai-photo-edit.test.invalid',name:'AI 편집 QA',nickname:'AI 편집 QA',preferred_username:handle,password_hash:'unused',email_verified:true,status:'CONFIRMED'}});await db.creator.create({data:{user_id:id,handle,display_name:'AI 편집 QA'}});return id;}
 async function media(owner,w=600,h=900){const id=crypto.randomUUID();fs.writeFileSync(path.join(mediaRoot,id),await sharp(await png(w,h)).webp().toBuffer());await db.media.create({data:{id,user_sub:owner,type:'IMAGE',original_name:'s.webp',file_name:id,file_size:1,mime_type:'image/webp',original_url:`/api/v1/media/${id}/file`,s3_upload_key:`local/${id}`,processing_status:'COMPLETED',processed_at:new Date()}});return id;}
 // Provider stub: records calls; moderation verdicts come from `flags` (input first, then each output), edits return `outputs` PNGs.
-let calls=[],flags=[],editStatus=200,outputs=2,moderationDown=false;
+let calls=[],flags=[],editStatus=200,outputs=2,moderationDown=false,providerError=null,warnings=[];
 async function stub(url,init){
  if(url.endsWith('/moderations')){calls.push({kind:'moderation',body:JSON.parse(init.body)});if(moderationDown)return new Response('{}',{status:503});const f=flags.length?flags.shift():false;return new Response(JSON.stringify({results:[{flagged:f}]}),{status:200});}
  if(url.endsWith('/images/edits')){const form=init.body,entry={kind:'edit',fields:{}};for(const [k,v] of form.entries()){const value=typeof v==='string'?v:{size:v.size,type:v.type,bytes:Buffer.from(await v.arrayBuffer())};if(k==='image[]')(entry.fields[k]??=[]).push(value);else entry.fields[k]=value;}calls.push(entry);
-  if(editStatus!==200)return new Response(JSON.stringify({error:{code:editStatus===400?'moderation_blocked':'server_error'}}),{status:editStatus});
+  if(editStatus!==200)return new Response(JSON.stringify({error:providerError||{code:editStatus===400?'moderation_blocked':'server_error'}}),{status:editStatus,headers:{'x-request-id':'req_ai_photo_test'}});
   const data=[];for(let i=0;i<outputs;i++)data.push({b64_json:(await png(1024,1536,{r:10*i,g:80,b:200})).toString('base64')});return new Response(JSON.stringify({data}),{status:200});}
  throw new Error('unexpected '+url);
 }
-const reset=()=>{calls=[];flags=[];editStatus=200;outputs=2;moderationDown=false;};
+const reset=()=>{calls=[];flags=[];editStatus=200;outputs=2;moderationDown=false;providerError=null;warnings=[];};
 const base=extra=>({sourceId,kind:'pose',style:'photo',prompt:'벚꽃 아래 벤치에 앉은 포즈',consent:'true',...extra});
 const code=wanted=>e=>e.getResponse?.().code===wanted;
 async function mask(transparent=true){const img=sharp({create:{width:600,height:900,channels:4,background:{r:255,g:255,b:255,alpha:1}}});return{buffer:await(transparent?img.composite([{input:await sharp({create:{width:200,height:300,channels:4,background:{r:0,g:0,b:0,alpha:1}}}).png().toBuffer(),left:200,top:300,blend:'dest-out'}]):img).png().toBuffer(),mimetype:'image/png',size:1000};}
@@ -26,7 +26,7 @@ before(async()=>{
  release=await require('./e2e-db-lock.cjs').lockE2EDatabase(source);
  const result=require('node:child_process').spawnSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy'],{env:process.env,encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);
  creator=await makeCreator('aiedit_'+tag);other=await makeCreator('aiother_'+tag);sourceId=await media(creator);otherSourceId=await media(other);
- app=await NestFactory.create(PlatformModule,{logger:false});await app.init();photos=app.get(AiPhotoService);photos.fetcher=stub;
+ app=await NestFactory.create(PlatformModule,{logger:false});await app.init();photos=app.get(AiPhotoService);photos.fetcher=stub;photos.logger={warn:value=>warnings.push(value)};
 });
 after(async()=>{await app?.close();try{const made=await db.media.findMany({where:{user_sub:{in:members}},select:{id:true}});await db.media.deleteMany({where:{id:{in:made.map(m=>m.id)}}});await db.aiPhotoGrant.deleteMany({where:{creator_user_id:{in:members}}});await db.creator.deleteMany({where:{user_id:{in:members}}});await db.member.deleteMany({where:{id:{in:members}}});fs.rmSync(mediaRoot,{recursive:true,force:true});}finally{await db.$disconnect();await release?.();}});
 
@@ -122,4 +122,16 @@ test('all eight aspects including camera, lens and body combine without conflict
  const user=await makeCreator('aibody_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);reset();
  const kinds=['outfit','makeup','expression','pose','background','camera','lens','body'];await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:kinds,prompt:'가슴 크기는 조금 작게, 키 비율은 조금 크게. 전신 구도, Canon RF85mm F1.2 촬영 느낌, 벤치에 앉은 포즈.'}),await mask());const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields.n,'1');assert.match(edit.fields.prompt,/Camera: adjust viewpoint/);assert.match(edit.fields.prompt,/Lens: simulate/);assert.match(edit.fields.prompt,/Body proportions:/);assert.match(edit.fields.prompt,/Only the requested body proportions may change/);assert.doesNotMatch(edit.fields.prompt,/body shape and skin tone exactly/);assert.match(edit.fields.prompt,/age and skin tone/);assert.match(edit.fields.prompt,/Do not add nudity/);
  reset();await photos.edit(user,base({sourceId:id,kind:'body',prompt:'힙 크기를 조금 크게 자연스럽게 보정해줘.'}));const body=calls.find(c=>c.kind==='edit');assert.match(body.fields.prompt,/fully clothed/);assert.match(body.fields.prompt,/Only the requested body proportions may change/);assert.ok(!body.fields.mask);
+});
+
+
+test('provider image user errors are not safety violations: stable code controls classification, logs omit inputs and credentials',async()=>{
+ const user=await makeCreator('aierr_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user),request=base({sourceId:id,prompt:'배경을 흰색으로. 비밀문구MARKER'});
+ reset();editStatus=400;providerError={type:'image_generation_user_error',code:'invalid_value',message:'private-provider-message-MARKER',param:'size'};await assert.rejects(photos.edit(user,request),code('PROVIDER_INPUT_ERROR'));assert.equal((await photos.quota(user)).remaining,10);assert.equal(warnings[0].code,'invalid_value');assert.equal(warnings[0].requestId,'req_ai_photo_test');assert.doesNotMatch(JSON.stringify(warnings),/비밀문구MARKER|private-provider-message-MARKER|sk-test-|base64|sourceId/);
+ reset();editStatus=400;providerError={type:'image_generation_user_error',code:'moderation_blocked',moderation_details:{moderation_stage:'output',categories:['sexual']}};await assert.rejects(photos.edit(user,request),code('UNSAFE_OUTPUT'));assert.equal((await photos.quota(user)).remaining,9);assert.equal(warnings[0].stage,'output');
+ reset();editStatus=400;providerError={type:'image_generation_user_error',code:'moderation_blocked',moderation_details:{moderation_stage:'input'}};await assert.rejects(photos.edit(user,request),code('UNSAFE_INPUT'));assert.equal((await photos.quota(user)).remaining,8);assert.equal(warnings[0].stage,'input');
+});
+
+test('output safety-check outage is not a confirmed unsafe image and is never returned to the user',async()=>{
+ const user=await makeCreator('aiout_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);reset();flags=[false,undefined];await assert.rejects(photos.edit(user,base({sourceId:id})),code('MODERATION_UNAVAILABLE'));assert.equal((await photos.quota(user)).remaining,9,'finished provider work still counts');assert.equal(await db.media.count({where:{user_sub:user}}),1,'only original saved');assert.equal(warnings[0].stage,'output');assert.equal(warnings[0].code,'MODERATION_UNAVAILABLE');
 });

@@ -616,7 +616,7 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 
 - 순서: 허용 목록(403 AI_PHOTO_NOT_ALLOWED) → 본인 완료 이미지(404) → 문구 개인정보·지시 무력화 차단 → 마스크(칠한 곳 없음 400) → 하루 `AI_PHOTO_PER_DAY`(기본 10, UTC 하루=한국 오전 9시, 429 DAILY_LIMIT)·전체 `AI_PHOTO_DAILY_TOTAL`(기본 300) → 문구+사진 Moderation(판정 불가 503, 실패 시 진행 안 함) → OpenAI `/v1/images/edits`(모델 `AI_PHOTO_MODEL` 기본 gpt-image-2, n=1, quality `AI_PHOTO_QUALITY` 기본 medium, 1536px 이하 PNG, safety_identifier=회원 ID 해시) → 결과별 Moderation(통과만 저장) → 크리에이터 비공개 미디어(webp, metadata.aiGenerated·aiSourceId·aiKind·aiModel, 워터마크 대상 기록).
 - 2026-11-13: 단일 최종 프롬프트에 누적한 요청은 combined+editKinds로 전달한다. 의상 단일은 공급사 mask, 복합 의상 또는 성별 변경+의상은 원본 첫 이미지와 분홍 의상영역 표시 참고 이미지 두 장(image[])으로 전달한다. 요청한 다른 영역 변경을 마스크가 막지 않도록 하는 처리이며 실제 AI 품질을 보장하지 않는다. targetGender 미지정은 정체성·체형 유지, 지정 시 성인 남성/여성 얼굴 표현 변경 허용. body는 요청한 가슴/힙/키 비율만 변경하도록 체형 고정 지시를 해제한다. 나이·피부색·착의·안전검사는 보존한다. 렌즈는 촬영 느낌의 AI 재현이며 실제 렌즈 촬영/정확한 광학 성능으로 표시하지 않는다. 생성 결과는 본인 완료 미디어와 같은 소스 검사를 거쳐 다시 편집할 수 있다. metadata.aiEditKinds/aiTargetGender를 기록한다.
-- 횟수: 공급사 오류·시간 초과·판정 불가는 되돌리고, 입력·결과 차단은 차감한다. 문구 원문은 DB에 저장하지 않는다. 키는 `AI_PHOTO_OPENAI_API_KEY`(없으면 GUIDE_ADVISOR 키).
+- 횟수: 공급사 일반 오류·시간 초과·입력 안전검사 판정 불가는 되돌리고, 입력·결과 차단 및 생성 완료 뒤 결과 검사 판정 불가는 차감한다. 문구 원문은 DB에 저장하지 않는다. 키는 `AI_PHOTO_OPENAI_API_KEY`(없으면 GUIDE_ADVISOR 키).
 - 표시: 게시 시 워터마크 파생 미디어도 aiGenerated 를 이어받고, 팬 게시물·스튜디오 목록 미디어 응답에 `aiGenerated:true`를 넣는다. 처리방침 2026-11-08.aiphoto.1 의 16번 항목.
 
 ### 댓글 좋아요 (2026-11-13)
@@ -624,3 +624,5 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - 기존 CommentLike의 (comment_id,user_id) 유일 제약을 사용하며 DB 변경은 없다. 조회 댓글/답글에 likes(활성 좋아요 수), liked(조회 회원 상태, 비로그인은 false)를 제공한다. 숨김/삭제 댓글에는 반응을 노출하지 않는다.
 - 댓글 행 잠금 아래 enabled의 멱등 upsert와 개수 조회를 처리한다. 개별 좋아요 회원 목록/ID는 반환하지 않으며 새 알림을 추가하지 않는다. 좋아요 요청 자체는 유료 본문 소비 기록을 만들지 않고 access로 권한만 검사한다.
 - 근거 확인2026-11-13: https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html — 매 요청의 객체 소속/게시물 접근 권한과 숨김·삭제 상태를 서버에서 확인한다. 경로 ID가 다른 글의 댓글이면 404, 권한 없는 글은403, 비로그인은401. tests/platform-comment-social.test.cjs의 성공·거절·동시/중복 검사로 확인한다. 운영/실사용 계정 확인을 대신하지 않는다.
+
+- 2026-11-13 AI 오류 분류: 공급사 error.code=moderation_blocked만 안전 차단으로 분류하고 moderation_details.moderation_stage가 output이면 UNSAFE_OUTPUT, 나머지는 UNSAFE_INPUT으로 안내한다(단계가 없으면 입력 차단으로 확정하지 않음). 일반 image_generation_user_error는 PROVIDER_INPUT_ERROR로 표시하고 횟수를 복구한다. 결과 안전검사 판정이 없으면 MODERATION_UNAVAILABLE(503), 사진은 반환·저장하지 않는다. 진단은 ai-photo.failure 단계/코드/status/공급사 요청ID만 기록하며 원본·프롬프트·회원정보·인증키를 기록하지 않는다.

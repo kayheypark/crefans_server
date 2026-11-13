@@ -1,7 +1,7 @@
 // Studio AI photo editor (2026-11-08 user request): outfit (masked), makeup, expression, pose or background edits of the creator's own uploaded photo.
 // Order: allow-list → own completed image → text checks → daily limits → input moderation (fail closed) → OpenAI image edit
 // → output moderation → saved as the creator's private media with metadata.aiGenerated. The original photo is never changed.
-import {Body,Controller,Get,Injectable,Post,Req,UploadedFile,UseGuards,UseInterceptors} from '@nestjs/common';
+import {Body,Controller,Get,Injectable,Logger,Post,Req,UploadedFile,UseGuards,UseInterceptors} from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express';
 import {ConfigService} from '@nestjs/config';
 import {memoryStorage} from 'multer';
@@ -49,6 +49,9 @@ const sizeFor=(width:number,height:number)=>width>height*1.15?'1536x1024':height
 
 @Injectable()
 export class AiPhotoService{
+ private logger=new Logger(AiPhotoService.name);
+ private report(stage:string,code:unknown,res?:Response){const value=res?.headers.get('x-request-id');this.logger.warn({event:'ai-photo.failure',stage,code:typeof code==='string'&&/^[a-z][a-z0-9_]{0,63}$/i.test(code)?code:'unknown_provider_error',requestId:value&&/^req_[A-Za-z0-9_-]{1,120}$/.test(value)?value:null,...(res?{status:res.status}:{})});}
+
  readonly settings:ReturnType<typeof aiPhotoConfig>;
  fetcher:typeof fetch=fetch;
  constructor(private configService:ConfigService,private service:PlatformService,private storage:PlatformMediaStorage,private limiter:LocalMemberService){this.settings=aiPhotoConfig(configService);}
@@ -70,12 +73,13 @@ export class AiPhotoService{
   return Math.max(1,Math.round((values.length%2?values[mid]:(values[mid-1]+values[mid])/2)/1000));
  }
  /** undefined = no verdict (the caller fails closed). */
- private async flagged(input:unknown[]):Promise<boolean|undefined>{
+ private async flagged(input:unknown[],stage:'input'|'output'):Promise<boolean|undefined>{
   try{
    const res=await this.fetcher(MODERATION_URL,{method:'POST',signal:AbortSignal.timeout(15000),headers:{'Content-Type':'application/json',Authorization:'Bearer '+this.settings.apiKey},body:JSON.stringify({model:MODERATION_MODEL,input})});
    const verdict=res.ok?(await res.json().catch(()=>null))?.results?.[0]?.flagged:undefined;
-   return typeof verdict==='boolean'?verdict:undefined;
-  }catch{return undefined;}
+   if(typeof verdict!=='boolean'){this.report(stage,'MODERATION_UNAVAILABLE',res);return undefined;}
+   if(verdict)this.report(stage,'moderation_blocked',res);return verdict;
+  }catch{this.report(stage,'MODERATION_UNAVAILABLE');return undefined;}
  }
  private async source(sub:string,id:unknown){
   if(typeof id!=='string'||!/^[0-9a-f-]{36}$/.test(id))reject(400,'INVALID_SOURCE','바꿀 사진을 다시 골라 주세요.');
@@ -134,7 +138,7 @@ export class AiPhotoService{
   try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
   let charged=true;
   try{
-   const verdict=await this.flagged([{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/png;base64,'+image!.toString('base64')}}]);
+   const verdict=await this.flagged([{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/png;base64,'+image!.toString('base64')}}],'input');
    if(verdict===undefined)reject(503,'MODERATION_UNAVAILABLE','안전 검사를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
    if(verdict){charged=false;reject(400,'UNSAFE_INPUT','안전 기준에 맞지 않는 사진이나 요청이라 만들 수 없어요.');}
    const form=new FormData();
@@ -146,12 +150,16 @@ export class AiPhotoService{
    let res:Response;try{res=await this.fetcher(EDIT_URL,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers:{Authorization:'Bearer '+this.settings.apiKey},body:form});}
    catch{reject(504,'PROVIDER_TIMEOUT','사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.');}
    const body=await res.json().catch(()=>null);
-   if(!res.ok){const code=body?.error?.code;if(code==='moderation_blocked'||body?.error?.type==='image_generation_user_error'){charged=false;reject(400,'UNSAFE_INPUT','안전 기준에 맞지 않는 사진이나 요청이라 만들 수 없어요.');}reject(502,'PROVIDER_ERROR','사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');}
+   if(!res.ok){const code=body?.error?.code,stage=body?.error?.moderation_details?.moderation_stage;this.report(code==='moderation_blocked'&&['input','output'].includes(stage)?stage:'provider',code,res);
+    if(code==='moderation_blocked'){charged=false;if(stage==='output')reject(400,'UNSAFE_OUTPUT','생성된 사진이 AI 제공사의 안전 검사를 통과하지 못했어요. 요청 내용을 확인해 주세요.');reject(400,'UNSAFE_INPUT',stage==='input'?'사진 또는 요청이 AI 제공사의 안전 검사에서 차단됐어요. 사진과 요청 내용을 확인해 주세요.':'AI 제공사의 안전 검사로 만들지 못했어요. 사진과 요청 내용을 확인해 주세요.');}
+    if(res.status>=400&&res.status<500&&body?.error?.type==='image_generation_user_error')reject(400,'PROVIDER_INPUT_ERROR','사진 요청을 처리하지 못했어요. 선택한 옵션과 입력 사진을 확인해 주세요.');
+    reject(502,'PROVIDER_ERROR','사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');}
    const outputs:Buffer[]=(Array.isArray(body?.data)?body.data:[]).map((d:any)=>typeof d?.b64_json==='string'?Buffer.from(d.b64_json,'base64'):null).filter(Boolean).slice(0,AI_PHOTO_IMAGES);
    if(!outputs.length)reject(502,'PROVIDER_ERROR','사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
-   const safe:Buffer[]=[];
-   for(const out of outputs){const v=await this.flagged([{type:'image_url',image_url:{url:'data:image/png;base64,'+out.toString('base64')}}]);if(v===false)safe.push(out);}
+   const safe:Buffer[]=[];let unchecked=false;
+   for(const out of outputs){const v=await this.flagged([{type:'image_url',image_url:{url:'data:image/png;base64,'+out.toString('base64')}}],'output');if(v===false)safe.push(out);else if(v===undefined)unchecked=true;}
    charged=false;// The provider was paid from here on; a blocked or unchecked result still counts.
+   if(!safe.length&&unchecked)reject(503,'MODERATION_UNAVAILABLE','만든 사진의 안전 검사를 완료하지 못했어요. 사진은 표시하지 않았어요.');
    if(!safe.length)reject(400,'UNSAFE_OUTPUT','만든 사진이 안전 기준을 통과하지 못했어요. 다른 표현으로 다시 시도해 주세요.');
    const meta={aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiEditKinds:kinds,...(targetGender?{aiTargetGender:targetGender}:{}),aiModel:this.settings.model,aiCreatedAt:new Date().toISOString(),aiDurationMs:Date.now()-started};
    const images=[];for(const out of safe)images.push(await this.save(sub,out,meta));
