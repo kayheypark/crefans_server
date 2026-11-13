@@ -1,3 +1,8 @@
+## 2026-11-13 댓글 좋아요 dev→prod 통합 (운영 배포 제외)
+- 사용자 요청 범위: 댓글·답글 좋아요 추가, 기존 지시에 따라 prod까지만 머지. release/comment-likes-dev-20261113에서 feature를 no-ff 통합(1a396bd), 충돌 없음. 기능 커밋과 통합본 전체 트리 동일 확인으로 기존 빌드/검증 증거 유효. 실제 dev worktree는 변경하지 않음.
+- 프론트 버튼2/2·피드/상세/답글 연결1/1 재통과, 서버 관련22/22·양쪽 빌드 통과. 기존 소셜 실패4개 및 Generated contracts stale은 미해결로 유지. 상세 증거 ../crefans_server-comment-likes/.local/comment-likes-20261113/verification.json.
+- 일반 push dev→prod 순서, 최종 원격 ref·기능 포함·트리/작업폴더 상태를 .local/comment-likes-20261113/merge-verification.json에 기록. 운영 배포·컨테이너·운영DB·설정 변경 없음.
+
 ## 2026-11-13 댓글·답글 좋아요 구현 (prod 머지 대상, 운영 미배포)
 - 사용자 요청: 댓글에 좋아요 기능 추가. origin/prod8f7c7dc에서 feat/comment-likes-20261113 분기. 이전 작업 및 운영 상태 유지.
 - 기존 CommentLike 모델과(comment_id,user_id) 유일 제약 재사용, 스키마/마이그레이션 없음. PUT /posts/:id/comments/:commentId/like {enabled:boolean} → {liked,likes}. 로그인·게시물 접근·댓글 설정·작성자 차단·댓글 소속·삭제/숨김·부모숨김을 검사하고 댓글 행 잠금 뒤 멱등 upsert/활성 수를 반환한다. 삭제 부모 아래 보이는 답글은 기존 조회처럼 허용. 실제 반응은 body열람이 아니므로 access만 사용하고 유료 콘텐츠 소비 시각은 기록하지 않음. 새 알림은 추가하지 않음.
