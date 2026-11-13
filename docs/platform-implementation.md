@@ -351,3 +351,9 @@ BeansService.promotionEvent/claimPromotionEvent는 전체 활성·이메일 확�
 - `POST /api/v1/studio/advertising/orders/:id/use`: 활성 크리에이터 본인의 paid 주문만 사용. 동일주문 재시도는 최초기간 반환, 다른 주문 사용중이면409. creator행잠금으로 동시성 보장. 서버 사용시각부터 구매기간×24시간, 만료는 조회시 판정하며 다른 상품은 그 이후 사용 가능.
 - 기존 Creator.promoted 수동설정은 유지하고 ad_promoted_until 별도 저장. 개인정보/가격/결제/환불 정책 변경 없음. 이미 노출중인 수동홍보는 유료 주문으로 취급하지 않는다.
 - https://cheatsheetseries.owasp.org/Authorization_Cheat_Sheet.html 및 https://www.prisma.io/docs/orm/v6/prisma-client/queries/transactions (2026-11-03 확인): 요청마다 소유권/권한 검사와 트랜잭션/멱등 설계 근거. 실제 구현은 구매기간 정책을 사용자 확정대로 적용.
+
+
+### 2026-11-13 코스프레 전체 코디
+- AI 사진 편집의 outfit+cosplay는 원본과 분홍 의상 영역 가이드를 전달한다. 단일 의상 요청도 hard mask 대신 가이드를 사용하여 명시된 가발·헤어색/스타일·머리장식·소품·신발을 의상 영역 밖에서도 적용한다. 일반 outfit+photo의 hard mask는 유지한다. 얼굴·정체성·요청하지 않은 부분을 보존하며 원본 구도 안에 보이는 부분만 적용한다(별도 구도/포즈 요청은 허용).
+- 기존 마스크 필수·원본소유권·동의·8종 복합요청·성별·신체 보정·1장·2000자·입출력 안전 검사·횟수 정책은 유지. 썸네일은 스타일 예시이며 공급사에 전달되는 참조 이미지가 아니다. 프론트는 같은 코디의 가발/장식/소품/신발 명세를 내부 요청에 포함한다.
+- 근거: https://developers.openai.com/api/docs/guides/image-generation (확인2026-11-13). 공급사 마스크는 지침이며 경계나 보존을 보장하지 않으므로 실제 결과 품질 검증과 요청 대역 검사를 구분한다. 검사 tests/platform-ai-photo.test.cjs.
