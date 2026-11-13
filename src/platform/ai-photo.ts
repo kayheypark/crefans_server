@@ -176,7 +176,7 @@ export class AiPhotoService{
     if(guide&&!requestPrompt.includes('Image 2 is a copy'))requestPrompt+='\nImage 2 is a copy with a pink clothing-region guide. Edit clothing only in that region, keep other details unchanged, and never reproduce the pink guide.';
     const data=(bytes:Buffer,mime:string)=>`data:${mime};base64,`+bytes.toString('base64');
     url=SEEDREAM_URL;headers={Authorization:'Bearer '+this.settings.seedreamKey,'Content-Type':'application/json'};
-    requestBody=JSON.stringify({model,prompt:requestPrompt,image:[data(image!,'image/png'),...(guide?[data(guide,'image/png')]:[]),...references.map(b=>data(b,'image/webp'))],size:sizeFor(width!,height!),output_format:'png',response_format:'b64_json',background:'opaque',watermark:true});
+    requestBody=JSON.stringify({model,prompt:requestPrompt,image:[data(image!,'image/png'),...(guide?[data(guide,'image/png')]:[]),...references.map(b=>data(b,'image/webp'))],size:sizeFor(width!,height!),output_format:'png',response_format:'b64_json',background:'opaque',watermark:false});
    }
    let res:Response;try{res=await this.fetcher(url,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers,body:requestBody});}
    catch{reject(504,'PROVIDER_TIMEOUT','사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.');}

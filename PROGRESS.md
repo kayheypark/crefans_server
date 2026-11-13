@@ -1,3 +1,9 @@
+## 2026-11-14 워터마크 설정 검증 완료
+- npm run build 종료0, AI/OpenAPI33/33 종료0, git diff --check 종료0. 공급사대역에서watermark=false와aiGenerated메타유지확인. 실제새이미지생성미실행,배포뒤운영요청바디검증예정. 증거 .local/seedream-no-watermark-20261114/{build,unit}.log.
+
+## 2026-11-14 Seedream 표시 워터마크 끄기 진행
+- 사용자요청: 크레팬스게시글에AI표시하므로제공사이미지내표시끄기. watermark=false만변경,aiGenerated·게시글표시·기존크리에이터워터마크유지. 기존생성파일수정없음. 합격:요청false/메타유지/33회귀/운영파일일치. 공식문서 https://docs.byteplus.com/en/docs/modelark/seedream-5-5 (확인2026-11-14): false는우측하단가시표시미추가.
+
 ## 2026-11-14 코스어 전용 Seedream 서버 운영 완료
 - API/worker `crefans-api:seedream-cosplay-mode-20261114`,source81d4cf9. mode=cosplay만Seedream5.5, general/누락은GPT image2. 안전검사양쪽OpenAI유지. runtime.env에코스어provider·별도키0600설정,이미지/로그에키없음.
 - 빌드0·33/33·운영4파일SHA동일·운영컴파일코드3모드분기대역통과. 실제운영키/코드로합성성인샘플입력검사→Seedream→출력검사21.655초성공. DB/저장은대역으로사용자데이터/횟수변경없음. 전체사용자UI실호출은미검증. 원신진참조는제공사저작권정책거절기록.

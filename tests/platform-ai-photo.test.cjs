@@ -193,7 +193,7 @@ test('Seedream uses its own key, JSON reference order and one base64 output; mod
   const request=base({sourceId:id,mode:'cosplay',kind:'outfit',style:'cosplay',costumeIds:['blue-shiroko']});
   const r=await photos.edit(user,request,await mask());assert.equal(r.images.length,1);assert.equal(payload.model,'dola-seedream-5-5-261028');assert.equal(payload.image.length,3);assert.notEqual(payload.image[0],payload.image[1]);
   const ref=await require('../dist/src/platform/ai-photo-costume-references').readCostumeReference('blue-shiroko');assert.equal(payload.image[2],'data:image/webp;base64,'+ref.toString('base64'));
-  assert.equal(payload.size,'1024x1536');assert.equal(payload.response_format,'b64_json');assert.equal(payload.watermark,true);assert.equal(payload.background,'opaque');assert.match(payload.prompt,/Images 3 through 3/);
+  assert.equal(payload.size,'1024x1536');assert.equal(payload.response_format,'b64_json');assert.equal(payload.watermark,false);assert.equal(payload.background,'opaque');assert.match(payload.prompt,/Images 3 through 3/);
   for(const unsupported of ['n','mask','quality','moderation','sequential_image_generation'])assert.equal(unsupported in payload,false);
   assert.equal(calls.filter(c=>c.kind==='moderation').length,3);
   assert.equal((await db.media.findUniqueOrThrow({where:{id:r.images[0].id}})).metadata.aiModel,'dola-seedream-5-5-261028');

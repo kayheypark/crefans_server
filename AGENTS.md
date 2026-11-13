@@ -101,3 +101,5 @@
 - AI 사진 Seedream 전환은 AI_PHOTO_COSPLAY_PROVIDER=seedream 및 AI_PHOTO_BYTEPLUS_API_KEY로 명시한다. OpenAI 입력/출력 안전검사 키는 별도 유지하며 키 미설정 상태로 운영 전환하지 않는다.
 
 - 코스어/일반 모델 분기는 요청 mode로만 판단하며 style이나 의상선택으로 추정하지 않는다. mode 누락은 일반으로 처리하고 일반모드는 기존 OpenAI를 유지한다.
+
+- Seedream 생성 요청은 watermark=false로 제공사 가시 워터마크를 끈다. aiGenerated 메타데이터와 게시글 AI 표시·크리에이터 워터마크 정책은 유지한다.
