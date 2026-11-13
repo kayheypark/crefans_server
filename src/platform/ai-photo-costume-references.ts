@@ -2,7 +2,7 @@ import {readFile} from 'fs/promises';
 import {join} from 'path';
 import {reject} from './http';
 // Fixed local catalog only: never fetch a client-supplied URL or path.
-export const AI_PHOTO_COSTUME_IDS=["maid", "sailor", "gothic", "mage", "cyber", "idol", "cheer", "beach", "nikke-rapi", "nikke-anis", "nikke-helm", "nikke-noir", "overwatch-dva", "overwatch-mercy", "overwatch-widow", "overwatch-ashe", "diablo-sorcerer", "diablo-necromancer", "diablo-rogue", "diablo-barbarian", "aot-scout", "aot-captain", "aot-police", "aot-final", "demon-giyu", "demon-shinobu", "demon-rengoku", "demon-mitsuri", "jjk-gojo", "jjk-nanami", "jjk-geto", "jjk-toji", "genshin-raiden", "genshin-jean", "genshin-zhongli", "genshin-diluc"] as const;
+export const AI_PHOTO_COSTUME_IDS=["maid", "sailor", "gothic", "mage", "cyber", "idol", "cheer", "beach", "nikke-rapi", "nikke-anis", "nikke-helm", "nikke-noir", "overwatch-dva", "overwatch-mercy", "overwatch-widow", "overwatch-ashe", "diablo-sorcerer", "diablo-necromancer", "diablo-rogue", "diablo-barbarian", "aot-scout", "aot-captain", "aot-police", "aot-final", "demon-giyu", "demon-shinobu", "demon-rengoku", "demon-mitsuri", "jjk-gojo", "jjk-nanami", "jjk-geto", "jjk-toji", "genshin-raiden", "genshin-jean", "genshin-zhongli", "genshin-diluc", "blue-shiroko", "blue-hoshino", "blue-yuuka", "blue-aris"] as const;
 export function costumeReferenceIds(value:unknown,kinds:string[],style:string):string[]{
  if(value===undefined)return [];
  let ids:unknown=value;try{if(typeof ids==='string')ids=JSON.parse(ids);}catch{reject(400,'INVALID_COSTUME_REFERENCES','의상을 다시 선택해 주세요.');}
