@@ -12,7 +12,7 @@ async function media(owner,w=600,h=900){const id=crypto.randomUUID();fs.writeFil
 // Provider stub: records calls; moderation verdicts come from `flags` (input first, then each output), edits return `outputs` PNGs.
 let calls=[],flags=[],editStatus=200,outputs=2,moderationDown=false,providerError=null,warnings=[];
 async function stub(url,init){
- if(url.endsWith('/moderations')){calls.push({kind:'moderation',body:JSON.parse(init.body)});if(moderationDown)return new Response('{}',{status:503});const f=flags.length?flags.shift():false;return new Response(JSON.stringify({results:[{flagged:f}]}),{status:200});}
+ if(url.endsWith('/moderations')){const body=JSON.parse(init.body);calls.push({kind:'moderation',body});if(body.input.filter(i=>i.type==='image_url').length>1)return new Response(JSON.stringify({error:{code:'too_many_images'}}),{status:400});if(moderationDown)return new Response('{}',{status:503});const f=flags.length?flags.shift():false;return new Response(JSON.stringify({results:[{flagged:f}]}),{status:200});}
  if(url.endsWith('/images/edits')){const form=init.body,entry={kind:'edit',fields:{}};for(const [k,v] of form.entries()){const value=typeof v==='string'?v:{size:v.size,type:v.type,bytes:Buffer.from(await v.arrayBuffer())};if(k==='image[]')(entry.fields[k]??=[]).push(value);else entry.fields[k]=value;}calls.push(entry);
   if(editStatus!==200)return new Response(JSON.stringify({error:providerError||{code:editStatus===400?'moderation_blocked':'server_error'}}),{status:editStatus,headers:{'x-request-id':'req_ai_photo_test'}});
   const data=[];for(let i=0;i<outputs;i++)data.push({b64_json:(await png(1024,1536,{r:10*i,g:80,b:200})).toString('base64')});return new Response(JSON.stringify({data}),{status:200});}
@@ -155,10 +155,10 @@ test('catalog reference images: real selected bytes reach both moderation and ed
  const user=await makeCreator('airef_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
  reset();const ids=['maid','aot-scout'],prompt='의상 참조 사진 1의 코디를 적용해줘. 흰 스튜디오';
  await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:JSON.stringify(ids),prompt}),await mask());
- const edit=calls.find(c=>c.kind==='edit'),input=calls[0].body.input;assert.equal(edit.fields['image[]'].length,4);assert.equal(input.length,4);
- for(const [i,ref] of ids.entries()){const bytes=await readCostumeReference(ref);assert.deepEqual(edit.fields['image[]'][i+2].bytes,bytes);assert.equal(input[i+2].image_url.url,'data:image/webp;base64,'+bytes.toString('base64'));}
- assert.match(edit.fields.prompt,/Images 3 through 4/);assert.match(edit.fields.prompt,/Do not copy the reference mannequin/);assert.ok(edit.fields.prompt.includes(prompt));assert.match(edit.fields.prompt,/Background:/);assert.equal(edit.fields.moderation,'auto');assert.equal(edit.fields.n,'1');assert.equal(calls.filter(c=>c.kind==='moderation').length,2);
- reset();flags=[true];await assert.rejects(photos.edit(user,base({sourceId:id,kind:'outfit',style:'cosplay',costumeIds:['maid']}),await mask()),code('UNSAFE_INPUT'));assert.equal(calls.some(c=>c.kind==='edit'),false);
+ const edit=calls.find(c=>c.kind==='edit'),inputs=calls.filter(c=>c.kind==='moderation').slice(0,3);assert.equal(edit.fields['image[]'].length,4);assert.equal(inputs.length,3);for(const c of inputs){assert.equal(c.body.input.filter(i=>i.type==='image_url').length,1);assert.equal(c.body.input[0].text,prompt);}
+ for(const [i,ref] of ids.entries()){const bytes=await readCostumeReference(ref);assert.deepEqual(edit.fields['image[]'][i+2].bytes,bytes);assert.equal(inputs[i+1].body.input[1].image_url.url,'data:image/webp;base64,'+bytes.toString('base64'));}
+ assert.match(edit.fields.prompt,/Images 3 through 4/);assert.match(edit.fields.prompt,/Do not copy the reference mannequin/);assert.ok(edit.fields.prompt.includes(prompt));assert.match(edit.fields.prompt,/Background:/);assert.equal(edit.fields.moderation,'auto');assert.equal(edit.fields.n,'1');assert.equal(calls.filter(c=>c.kind==='moderation').length,4);
+ reset();flags=[false,true];await assert.rejects(photos.edit(user,base({sourceId:id,kind:'outfit',style:'cosplay',costumeIds:['maid']}),await mask()),code('UNSAFE_INPUT'));assert.equal(calls.some(c=>c.kind==='edit'),false);
 });
 
 test('invalid reference IDs, URLs, paths, duplicates, oversized lists and incompatible edits are rejected before provider calls',async()=>{
@@ -168,4 +168,13 @@ test('invalid reference IDs, URLs, paths, duplicates, oversized lists and incomp
  assert.throws(()=>costumeReferenceIds(['maid'],['outfit'],'photo'),code('INVALID_COSTUME_REFERENCES'));
  assert.equal(costumeReferenceIds(AI_PHOTO_COSTUME_IDS.slice(0,14),['outfit'],'cosplay').length,14);
  reset();await assert.rejects(photos.edit(creator,base({costumeIds:'["maid"]'})),code('INVALID_COSTUME_REFERENCES'));assert.equal(calls.length,0);
+});
+
+
+test('every reference must pass: later blocked or unavailable reference prevents generation; unavailable restores quota',async()=>{
+ const user=await makeCreator('airefgate_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
+ const request=base({sourceId:id,kind:'outfit',style:'cosplay',costumeIds:['maid','aot-scout']});
+ reset();flags=[false,false,true];await assert.rejects(photos.edit(user,request,await mask()),code('UNSAFE_INPUT'));assert.equal(calls.filter(c=>c.kind==='moderation').length,3);assert.equal(calls.some(c=>c.kind==='edit'),false);
+ const left=(await photos.quota(user)).remaining;
+ reset();flags=[false,false,undefined];await assert.rejects(photos.edit(user,request,await mask()),code('MODERATION_UNAVAILABLE'));assert.equal(calls.some(c=>c.kind==='edit'),false);assert.equal((await photos.quota(user)).remaining,left);
 });

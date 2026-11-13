@@ -150,9 +150,12 @@ export class AiPhotoService{
   try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
   let charged=true;
   try{
-   const verdict=await this.flagged([{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/png;base64,'+image!.toString('base64')}},...references.map(bytes=>({type:'image_url',image_url:{url:'data:image/webp;base64,'+bytes.toString('base64')}}))],'input');
-   if(verdict===undefined)reject(503,'MODERATION_UNAVAILABLE','안전 검사를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
-   if(verdict){charged=false;reject(400,'UNSAFE_INPUT','안전 기준에 맞지 않는 사진이나 요청이라 만들 수 없어요.');}
+   // Moderation accepts one image per request. Every source/reference must pass before generation.
+   for(const item of [{mime:'image/png',bytes:image!},...references.map(bytes=>({mime:'image/webp',bytes}))]){
+    const verdict=await this.flagged([{type:'text',text:prompt},{type:'image_url',image_url:{url:`data:${item.mime};base64,`+item.bytes.toString('base64')}}],'input');
+    if(verdict===undefined)reject(503,'MODERATION_UNAVAILABLE','안전 검사를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    if(verdict){charged=false;reject(400,'UNSAFE_INPUT','안전 기준에 맞지 않는 사진이나 요청이라 만들 수 없어요.');}
+   }
    const form=new FormData();
    form.append('model',this.settings.model);form.append('prompt',aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length));form.append('n',String(AI_PHOTO_IMAGES));
    form.append('size',sizeFor(width!,height!));form.append('quality',this.settings.quality);form.append('output_format','png');form.append('moderation','auto');
