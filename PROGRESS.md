@@ -1,3 +1,9 @@
+## 2026-11-13 의상 사진 참조 편집 운영 반영 완료
+- API/worker crefans-api:costume-references-20261113(source7c8c92c),프론트 crefans-front:front-costume-references-20261113(source5a333f1). feature→dev→prod 동일 트리 검증 후 서버→프론트 순서 배포. 선택 의상32종 고정 파일을 costumeIds(1~14개)로 조회해 원본+칠하기가이드+참조사진순으로 공급사에 첨부. 장황한 카탈로그 의상설명은 참조순번 짧은 지시로 대체, 다른프리셋/커스텀/선택해제/복합순서유지. 일반모드전환 후에도 선택참조유지.
+- 검증:프론트37/37(실서비스 FormData 포함),서버/OpenAPI29/29(공급사대역+격리DB),서버build0·타입0·계층452. 의상첨부제거 대조는4장예상/2장실제실패→복원재통과. src/dist/프론트32WebP SHA일치489628bytes; 운영코드/자산70파일SHA일치. 실제AI결과품질·차단감소율은 미검증이며 안전검사우회/완화없음. 참조이미지도입력검사포함. 운영UI에서생성미실행.
+- 서비스healthready/컨테이너running·restart0/프론트번들costumeIds·HTTP확인. DB migration없음. 이전API/프론트이미지·설정은 /Users/ethan/crefans-recovery/20261113/{costume-references-api-20261113,front-costume-references-20261113}에SHA·OCI53/15blobs·태그ID·설정검증후서버이전태그/이번백업/tmp만정리. 기존로컬복구본삭제없음.
+- 증거 각repo .local/costume-reference-images-20261113/verification.json 및 assets/테스트/대조/타입/레이어/build/deploy/runtime/recovery로그. 전체docs검사는기존리셋권·quota설명6누락+Generated contracts stale잔존;이번계약/디자인문서는갱신. 요청구현·운영반영완료; 실제사진생성평가는사용자다음시도에서확인필요.
+
 ## 2026-11-13 의상 참조 이미지 로컬 검증
 - 프론트 UI/실서비스 전송37/37, 서버 AI/OpenAPI29/29, Nest빌드0, 타입0, 계층452 통과. 대조: 공급사 image[]에서 의상 첨부 제거시 예상4장/실제2장으로 실패→복원. 프론트/서버src/서버dist 32WebP SHA 동일(489628bytes). 문서전체검사는 기존quota/ticket 설명6건 누락+Generated contracts stale 잔존.
 - 임의 참조URL/경로·중복·15개 이상·의상 아닌요청 거부. 참조파일은 서버에서만조회, 각 사진이 안전검사 및 실제multipart에 포함되는지 대역검증. 현재운영은이전코디/API+모드프론트이며 소스해시확인. 실제AI결과/차단개선률은 미검증. 다음 통합·서버→프론트배포.
