@@ -143,7 +143,7 @@ test('cosplay complete look sends original plus guide and allows explicitly requ
  const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields['image[]'].length,2);assert.ok(!edit.fields.mask);assert.match(edit.fields.prompt,/wig hair color, hairstyle, headwear, accessories, props and footwear/);assert.match(edit.fields.prompt,/may extend beyond it/);assert.match(edit.fields.prompt,/Keep the face, identity and unrequested details unchanged/);assert.match(edit.fields.prompt,/Never reproduce the pink guide/);assert.match(edit.fields.prompt,/source framing/);assert.doesNotMatch(edit.fields.prompt,/Keep everything outside the mask unchanged/);assert.equal(edit.fields.n,'1');assert.equal(edit.fields.moderation,'auto');
  reset();await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',prompt:'같은 가발과 소품, 흰 스튜디오'}),await mask());
  assert.match(calls.find(c=>c.kind==='edit').fields.prompt,/Cosplay: apply the requested complete costume/);
- reset();await photos.edit(user,base({sourceId:id,kind:'outfit',style:'photo'}),await mask());
+ reset();await photos.edit(user,base({sourceId:id,mode:'cosplay',kind:'outfit',style:'photo'}),await mask());
  const ordinary=calls.find(c=>c.kind==='edit');assert.ok(ordinary.fields.mask);assert.ok(!ordinary.fields['image[]']);assert.match(ordinary.fields.prompt,/Keep everything outside the mask unchanged/);assert.doesNotMatch(ordinary.fields.prompt,/Cosplay: apply/);
 });
 
@@ -183,33 +183,51 @@ test('Seedream uses its own key, JSON reference order and one base64 output; mod
  const saved={...photos.settings},previous=photos.fetcher;
  const user=await makeCreator('aiseed_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
  try{
-  Object.assign(photos.settings,{provider:'seedream',seedreamKey:'seedream-test-key',model:'dola-seedream-5-5-261028'});
+  Object.assign(photos.settings,{cosplayProvider:'seedream',seedreamKey:'seedream-test-key'});
   reset();let payload;
   photos.fetcher=async(url,init)=>{
    if(url.endsWith('/moderations')){assert.equal(init.headers.Authorization,'Bearer '+saved.apiKey);return stub(url,init);}
    assert.equal(url,'https://ark.ap-southeast.bytepluses.com/api/v3/images/generations');assert.equal(init.headers.Authorization,'Bearer seedream-test-key');assert.equal(init.headers['Content-Type'],'application/json');payload=JSON.parse(init.body);
    return new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));
   };
-  const request=base({sourceId:id,kind:'outfit',style:'cosplay',costumeIds:['blue-shiroko']});
+  const request=base({sourceId:id,mode:'cosplay',kind:'outfit',style:'cosplay',costumeIds:['blue-shiroko']});
   const r=await photos.edit(user,request,await mask());assert.equal(r.images.length,1);assert.equal(payload.model,'dola-seedream-5-5-261028');assert.equal(payload.image.length,3);assert.notEqual(payload.image[0],payload.image[1]);
   const ref=await require('../dist/src/platform/ai-photo-costume-references').readCostumeReference('blue-shiroko');assert.equal(payload.image[2],'data:image/webp;base64,'+ref.toString('base64'));
   assert.equal(payload.size,'1024x1536');assert.equal(payload.response_format,'b64_json');assert.equal(payload.watermark,true);assert.equal(payload.background,'opaque');assert.match(payload.prompt,/Images 3 through 3/);
   for(const unsupported of ['n','mask','quality','moderation','sequential_image_generation'])assert.equal(unsupported in payload,false);
   assert.equal(calls.filter(c=>c.kind==='moderation').length,3);
   assert.equal((await db.media.findUniqueOrThrow({where:{id:r.images[0].id}})).metadata.aiModel,'dola-seedream-5-5-261028');
-  reset();await photos.edit(user,base({sourceId:id,kind:'outfit',style:'photo'}),await mask());assert.equal(payload.image.length,2);assert.match(payload.prompt,/pink clothing-region guide/);assert.doesNotMatch(payload.prompt,/transparent masked area/);
+  reset();await photos.edit(user,base({sourceId:id,mode:'cosplay',kind:'outfit',style:'photo'}),await mask());assert.equal(payload.image.length,2);assert.match(payload.prompt,/pink clothing-region guide/);assert.doesNotMatch(payload.prompt,/transparent masked area/);
   reset();payload=null;flags=[true];await assert.rejects(photos.edit(user,request,await mask()),code('UNSAFE_INPUT'));assert.equal(payload,null);
   reset();flags=[false,false,true];await assert.rejects(photos.edit(user,request,await mask()),code('UNSAFE_OUTPUT'));
   reset();const left=(await photos.quota(user)).remaining;photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response('{}',{status:503});await assert.rejects(photos.edit(user,request,await mask()),code('PROVIDER_ERROR'));assert.equal((await photos.quota(user)).remaining,left);
+  reset();photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response(JSON.stringify({error:{code:'OutputImageSensitiveContentDetected.PolicyViolation'}}),{status:400});await assert.rejects(photos.edit(user,request,await mask()),code('UNSAFE_OUTPUT'));
   reset();const ids=require('../dist/src/platform/ai-photo-costume-references').AI_PHOTO_COSTUME_IDS.slice(0,9);await assert.rejects(photos.edit(user,{...request,costumeIds:ids},await mask()),code('INVALID_COSTUME_REFERENCES'));assert.equal(calls.length,0);
-  photos.settings.seedreamKey='';assert.equal((await photos.quota(user)).allowed,false);await assert.rejects(photos.edit(user,request,await mask()),code('PROVIDER_NOT_CONFIGURED'));
+  photos.settings.seedreamKey='';assert.equal((await photos.quota(user)).allowed,true);await assert.rejects(photos.edit(user,request,await mask()),code('PROVIDER_NOT_CONFIGURED'));
  }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;}
 });
 
 test('Seedream config pins the international model and does not reuse the OpenAI key',()=>{
  const {aiPhotoConfig}=require('../dist/src/platform/ai-photo');
  const config=values=>({get:k=>values[k]});
- const s=aiPhotoConfig(config({AI_PHOTO_PROVIDER:'seedream',AI_PHOTO_MODEL:'gpt-image-2',AI_PHOTO_OPENAI_API_KEY:'openai-only'}));
- assert.equal(s.model,'dola-seedream-5-5-261028');assert.equal(s.seedreamKey,'');assert.equal(s.apiKey,'openai-only');
- assert.throws(()=>aiPhotoConfig(config({AI_PHOTO_PROVIDER:'typo'})),/INVALID_AI_PHOTO_PROVIDER/);
+ const s=aiPhotoConfig(config({AI_PHOTO_COSPLAY_PROVIDER:'seedream',AI_PHOTO_MODEL:'gpt-image-2',AI_PHOTO_OPENAI_API_KEY:'openai-only'}));
+ assert.equal(s.model,'gpt-image-2');assert.equal(s.cosplayProvider,'seedream');assert.equal(s.seedreamKey,'');assert.equal(s.apiKey,'openai-only');
+ assert.throws(()=>aiPhotoConfig(config({AI_PHOTO_COSPLAY_PROVIDER:'typo'})),/INVALID_AI_PHOTO_PROVIDER/);
+});
+
+test('cosplay routing follows explicit mode only, not style or retained costume; missing key does not disable general mode',async()=>{
+ const saved={...photos.settings},previous=photos.fetcher;
+ const user=await makeCreator('aimode_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
+ try{
+  Object.assign(photos.settings,{cosplayProvider:'seedream',seedreamKey:''});
+  for(const mode of [undefined,'general']){
+   reset();photos.fetcher=stub;const r=await photos.edit(user,base({sourceId:id,mode,kind:'outfit',style:'cosplay',costumeIds:['maid']}),await mask());
+   assert.equal(calls.find(c=>c.kind==='edit').fields.model,'gpt-image-2');assert.equal((await db.media.findUniqueOrThrow({where:{id:r.images[0].id}})).metadata.aiMode,'general');
+  }
+  reset();await assert.rejects(photos.edit(user,base({sourceId:id,mode:'bad'})),code('INVALID_EDIT_MODE'));assert.equal(calls.length,0);
+  await assert.rejects(photos.edit(user,base({sourceId:id,mode:'cosplay'})),code('PROVIDER_NOT_CONFIGURED'));assert.equal(calls.length,0);
+  photos.settings.seedreamKey='seedream-test-key';let generated=false;
+  photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);assert.equal(url,'https://ark.ap-southeast.bytepluses.com/api/v3/images/generations');const body=JSON.parse(init.body);assert.equal(body.model,'dola-seedream-5-5-261028');assert.equal(body.image.length,1);generated=true;return new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));};
+  const r=await photos.edit(user,base({sourceId:id,mode:'cosplay',style:'photo',kind:'expression'}));assert.equal(generated,true);assert.equal((await db.media.findUniqueOrThrow({where:{id:r.images[0].id}})).metadata.aiMode,'cosplay');
+ }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;}
 });

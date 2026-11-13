@@ -1,3 +1,26 @@
+## 2026-11-14 코스어 전용 Seedream 구현 검증
+- 사용자확정: 코스어모드만Seedream5.5,일반은기존OpenAI. mode=cosplay/general 명시(누락general),style/의상잔류와독립. AI_PHOTO_COSPLAY_PROVIDER=seedream 설정, 기존전역AI_PHOTO_PROVIDER폐기. 일반모드/안전검사OpenAI키유지.
+- 합격조건: 코스어표정도Seedream,일반의상도OpenAI,원본·가이드·참조순서/1장/기존안전검사·개인정보·권한·횟수보존. 서버빌드/AI·OpenAPI33개,프론트47개·타입/계층검증. 설정예시·API계약갱신.
+- 실제공급사: 원신진의상3입력은HTTP400 OutputImageSensitiveContentDetected.PolicyViolation(저작권관련) 거절; 정책거절안내매핑추가,우회없음. 별도비브랜드성인샘플의메이크업편집은HTTP200/13.56초/입력1·출력1,이미지열람으로눈/립변경확인. 모든의상지원보장안함.
+- 증거 .local/seedream-cosplay-mode-20261114/{build.log,unit.log,result.json,costume-policy-result.json,output-1.png}. 실호출은생성API직접검증,서비스전체안전검사/DB흐름은격리DB·공급사대역검증임.
+- 운영사전점검: base crefans-api:bluearchive-costumes-20261114. 운영ai-photo.ts/openapi-contract.ts SHA는origin/prod와동일확인. 다음2파일TS/JS최소패치,키는이미지에넣지않고runtime.env비공개전달;서버후프론트배포·외부복구검증.
+
+## 2026-11-14 Seedream 성인 코스어 샘플 생성
+- 사용자 사진요청의 시댄스를 앞선사진모델 Seedream5.5로해석함을사전안내. 성인27세/검정버건디무대의상/스타킹/메이크업/흰스튜디오,실제인물참조없음.
+- 명령 python3 .local/seedream-cosplayer-20261114/test.py 종료0, 실제HTTP200/18.62초/1024x1536 PNG1장/입력0/출력토큰6144. 모델 dola-seedream-5-5-261028. 시각2026-11-13T23:29:02Z. 이미지열람으로의상·스타킹·메이크업확인.
+- 결과 .local/seedream-cosplayer-20261114/output-1.png SHA256 a8120f4c3d58bcc25c40324d07db85e1e3de55db25fef8ac11bc8d9a14c906e0, 응답 result.json, 프롬프트 test.py. watermark true유지. 운영변경없음,실제의상보정통합/배포미완료.
+
+## 2026-11-14 Seedream 재시도 성공
+- 실제 API HTTP200, 모델 dola-seedream-5-5-261028, 12.77초, 입력0장/생성1장, 1024x1024 커피잔 PNG 1164199bytes. 시각 2026-11-13T23:26:39.162976+00:00. 이미지열람확인. 명령 python3 .local/seedream-live-20261114/test.py 종료0.
+- 증거 .local/seedream-live-20261114/result.json 및 output-1.png SHA256 79cccbe03719b17903dfb7f12c3def2ab2f9d79347fe2e8cd7c7f40cc77bfadd. 이전실패응답보존. 키노출없음.
+- 인증/모델활성화/실제텍스트생성검증완료. 실제의상보정/안전검사통합/운영전환/실청구금액은아직미검증. 다음실제보정검증후운영전환.
+
+## 2026-11-14 Seedream 실제 API 호출 — 모델 활성화 필요
+- 사용자 제공키를 저장소 밖 `/Users/ethan/.crefans/byteplus.env` 권한0600에 저장. 키값은문서/테스트스크립트에없음.
+- 2026-11-13T23:16:38Z 국제API images/generations에 dola-seedream-5-5-261028,1024x1024,텍스트커피잔1장 요청. 실제HTTP404, code ModelNotOpen: 계정에서모델활성화필요. 생성이미지/usage없음,실청구미확인. 인증키오류가아닌모델미활성화응답.
+- 기반커밋4b7ead865623d85cf17f974ee81419c4fbd35bc6, 명령 python3 .local/seedream-live-20261114/test.py 종료0(HTTP응답기록성공,생성성공아님). 증거 result.json; 계정번호마스킹. 운영전환미실행,기존모델유지.
+- 다음: https://ai.byteplus.com/ark/region:ap-southeast-1/openManagement 에서 Seedream5.5 활성화 후 동일테스트재시도→실제보정확인→배포. 코드/안전검사는기존준비상태유지.
+
 ## 2026-11-14 Seedream 5.5 전환 구현 — 인증 키 대기
 - 사용자 "바꿔봐". 합격조건: JSON 국제API/고정5.5모델/원본·영역가이드·의상순서/결과1장/입출력안전검사분리/10입력상한/실패횟수복구/키미설정차단. 기존OpenAI경로보존, AI_PHOTO_PROVIDER=seedream으로명시전환.
 - 로컬 .local/platform.env 및 운영API 환경변수에서 BytePlus/Seedream/ARK_API 키명없음확인(값출력안함). 사용자에게키가저장된파일경로질문전달. 키미확보로실호출/운영전환미실행. 현재운영은기존OpenAI.

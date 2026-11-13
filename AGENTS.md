@@ -98,4 +98,6 @@
 
 - 블루 아카이브 카테고리는 시로코·호시노·유우카·아리스 기본교복4종. 프론트카드와 서버허용ID/참조파일을 함께 관리한다.
 
-- AI 사진 Seedream 전환은 AI_PHOTO_PROVIDER=seedream 및 AI_PHOTO_BYTEPLUS_API_KEY로 명시한다. OpenAI 입력/출력 안전검사 키는 별도 유지하며 키 미설정 상태로 운영 전환하지 않는다.
+- AI 사진 Seedream 전환은 AI_PHOTO_COSPLAY_PROVIDER=seedream 및 AI_PHOTO_BYTEPLUS_API_KEY로 명시한다. OpenAI 입력/출력 안전검사 키는 별도 유지하며 키 미설정 상태로 운영 전환하지 않는다.
+
+- 코스어/일반 모델 분기는 요청 mode로만 판단하며 style이나 의상선택으로 추정하지 않는다. mode 누락은 일반으로 처리하고 일반모드는 기존 OpenAI를 유지한다.

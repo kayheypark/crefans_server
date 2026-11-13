@@ -39,9 +39,9 @@ function editKinds(kind:string,value:unknown):string[]{
 
 export function aiPhotoConfig(config:ConfigService){
  const int=(v:unknown,d:number)=>{const n=Number(v);return Number.isSafeInteger(n)&&n>0?n:d;};
- const provider=(config.get('AI_PHOTO_PROVIDER')||'openai').trim();
- if(!['openai','seedream'].includes(provider))throw new Error('INVALID_AI_PHOTO_PROVIDER');
- return{provider,seedreamKey:(config.get('AI_PHOTO_BYTEPLUS_API_KEY')||'').trim(),apiKey:(config.get('AI_PHOTO_OPENAI_API_KEY')||config.get('GUIDE_ADVISOR_OPENAI_API_KEY')||'').trim(),model:(provider==='seedream'?'dola-seedream-5-5-261028':config.get('AI_PHOTO_MODEL')||'gpt-image-2').trim(),
+ const cosplayProvider=(config.get('AI_PHOTO_COSPLAY_PROVIDER')||'openai').trim();
+ if(!['openai','seedream'].includes(cosplayProvider))throw new Error('INVALID_AI_PHOTO_PROVIDER');
+ return{cosplayProvider,seedreamKey:(config.get('AI_PHOTO_BYTEPLUS_API_KEY')||'').trim(),apiKey:(config.get('AI_PHOTO_OPENAI_API_KEY')||config.get('GUIDE_ADVISOR_OPENAI_API_KEY')||'').trim(),model:(config.get('AI_PHOTO_MODEL')||'gpt-image-2').trim(),
   quality:(config.get('AI_PHOTO_QUALITY')||'medium').trim(),perDay:int(config.get('AI_PHOTO_PER_DAY'),AI_PHOTO_DAILY_LIMIT),dailyTotal:int(config.get('AI_PHOTO_DAILY_TOTAL'),300),timeoutMs:int(config.get('AI_PHOTO_TIMEOUT_MS'),120000)};
 }
 /** The prompt sent to the provider: the creator's words are framed by fixed rules (identity kept, no sexual content, no text). */
@@ -62,7 +62,7 @@ export class AiPhotoService{
  readonly settings:ReturnType<typeof aiPhotoConfig>;
  fetcher:typeof fetch=fetch;
  constructor(private configService:ConfigService,private service:PlatformService,private storage:PlatformMediaStorage,private limiter:LocalMemberService){this.settings=aiPhotoConfig(configService);}
- private configured(){return !!this.settings.apiKey&&(this.settings.provider==='openai'||!!this.settings.seedreamKey);}
+ private configured(seedream=false){return !!this.settings.apiKey&&(!seedream||!!this.settings.seedreamKey);}
  private window(){return Math.floor(Date.now()/(DAY*1000));}
  private async used(key:string){const row=await this.service.db.authRateBucket.findUnique({where:{id:digest(`${key}:${this.window()}`)}});return row?.count??0;}
  private async giveBack(key:string){await this.service.db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${digest(`${key}:${this.window()}`)}`;}
@@ -118,7 +118,9 @@ export class AiPhotoService{
  async edit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number}){
   const started=Date.now();await this.service.requireCreator(sub);
   if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');
-  if(!this.configured())reject(503,'PROVIDER_NOT_CONFIGURED','AI 사진 편집을 지금 사용할 수 없어요.');
+  const mode=input?.mode??'general';if(mode!=='general'&&mode!=='cosplay')reject(400,'INVALID_EDIT_MODE','편집 모드를 다시 골라 주세요.');
+  const seedream=mode==='cosplay'&&this.settings.cosplayProvider==='seedream',model=seedream?'dola-seedream-5-5-261028':this.settings.model;
+  if(!this.configured(seedream))reject(503,'PROVIDER_NOT_CONFIGURED','AI 사진 편집을 지금 사용할 수 없어요.');
   const kind=String(input?.kind||''),style=String(input?.style||'photo'),prompt=typeof input?.prompt==='string'?input.prompt.trim():'';
   if(kind!=='combined'&&!KINDS[kind])reject(400,'INVALID_KIND','바꿀 것을 골라 주세요.');if(!STYLES[style])reject(400,'INVALID_STYLE','사진 느낌을 골라 주세요.');
   const kinds=editKinds(kind,input?.editKinds),targetGender=input?.targetGender;
@@ -144,12 +146,12 @@ export class AiPhotoService{
   // A clothing-only provider mask would prevent a combined expression/background edit.
   // Supply a marked copy as the second reference instead, keeping the original first.
   let guide:Buffer|undefined;
-  if((this.settings.provider==='seedream'||kind==='combined'||targetGender||style==='cosplay')&&maskPng){
+  if((seedream||kind==='combined'||targetGender||style==='cosplay')&&maskPng){
    const alpha=await sharp(maskPng).extractChannel('alpha').raw().toBuffer(),overlay=Buffer.alloc(width!*height!*4);
    for(let i=0;i<alpha.length;i++){overlay[i*4]=244;overlay[i*4+1]=114;overlay[i*4+2]=182;overlay[i*4+3]=Math.round((255-alpha[i])*.55);}
    guide=await sharp(image!).composite([{input:overlay,raw:{width:width!,height:height!,channels:4}}]).png().toBuffer();
   }
-  if(this.settings.provider==='seedream'&&1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상 참조는 최대 8개까지 선택해 주세요.');
+  if(seedream&&1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상 참조는 최대 8개까지 선택해 주세요.');
   const key=this.creatorKey(sub);
   try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch{reject(429,'DAILY_LIMIT','오늘 만들 수 있는 횟수를 모두 썼어요. 매일 오전 9시에 다시 이용할 수 있어요.');}
   try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
@@ -162,24 +164,25 @@ export class AiPhotoService{
     if(verdict){charged=false;reject(400,'UNSAFE_INPUT','안전 기준에 맞지 않는 사진이나 요청이라 만들 수 없어요.');}
    }
    const form=new FormData();
-   form.append('model',this.settings.model);form.append('prompt',aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length));form.append('n',String(AI_PHOTO_IMAGES));
+   form.append('model',model);form.append('prompt',aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length));form.append('n',String(AI_PHOTO_IMAGES));
    form.append('size',sizeFor(width!,height!));form.append('quality',this.settings.quality);form.append('output_format','png');form.append('moderation','auto');
    form.append('safety_identifier',contentDigest('ai-photo:'+sub).slice(0,64));
    if(guide){form.append('image[]',new Blob([image!],{type:'image/png'}),'source.png');form.append('image[]',new Blob([guide],{type:'image/png'}),'clothing-guide.png');}
    else{form.append('image',new Blob([image!],{type:'image/png'}),'source.png');if(maskPng)form.append('mask',new Blob([maskPng],{type:'image/png'}),'mask.png');}
    for(const [index,bytes] of references.entries())form.append('image[]',new Blob([bytes],{type:'image/webp'}),`costume-reference-${index+1}.webp`);
    let url=EDIT_URL,requestBody:BodyInit=form,headers:Record<string,string>={Authorization:'Bearer '+this.settings.apiKey};
-   if(this.settings.provider==='seedream'){
+   if(seedream){
     let requestPrompt=aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length).replace('transparent masked area','pink clothing-region guide in image 2').replace('outside the mask','outside the pink guide');
     if(guide&&!requestPrompt.includes('Image 2 is a copy'))requestPrompt+='\nImage 2 is a copy with a pink clothing-region guide. Edit clothing only in that region, keep other details unchanged, and never reproduce the pink guide.';
     const data=(bytes:Buffer,mime:string)=>`data:${mime};base64,`+bytes.toString('base64');
     url=SEEDREAM_URL;headers={Authorization:'Bearer '+this.settings.seedreamKey,'Content-Type':'application/json'};
-    requestBody=JSON.stringify({model:this.settings.model,prompt:requestPrompt,image:[data(image!,'image/png'),...(guide?[data(guide,'image/png')]:[]),...references.map(b=>data(b,'image/webp'))],size:sizeFor(width!,height!),output_format:'png',response_format:'b64_json',background:'opaque',watermark:true});
+    requestBody=JSON.stringify({model,prompt:requestPrompt,image:[data(image!,'image/png'),...(guide?[data(guide,'image/png')]:[]),...references.map(b=>data(b,'image/webp'))],size:sizeFor(width!,height!),output_format:'png',response_format:'b64_json',background:'opaque',watermark:true});
    }
    let res:Response;try{res=await this.fetcher(url,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers,body:requestBody});}
    catch{reject(504,'PROVIDER_TIMEOUT','사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.');}
    const body=await res.json().catch(()=>null);
    if(!res.ok){const code=body?.error?.code,stage=body?.error?.moderation_details?.moderation_stage;this.report(code==='moderation_blocked'&&['input','output'].includes(stage)?stage:'provider',code,res);
+    if(seedream&&code==='OutputImageSensitiveContentDetected.PolicyViolation'){charged=false;reject(400,'UNSAFE_OUTPUT','생성된 사진이 AI 제공사의 콘텐츠 정책을 통과하지 못했어요. 다른 의상이나 요청을 선택해 주세요.');}
     if(code==='moderation_blocked'){charged=false;if(stage==='output')reject(400,'UNSAFE_OUTPUT','생성된 사진이 AI 제공사의 안전 검사를 통과하지 못했어요. 요청 내용을 확인해 주세요.');reject(400,'UNSAFE_INPUT',stage==='input'?'사진 또는 요청이 AI 제공사의 안전 검사에서 차단됐어요. 사진과 요청 내용을 확인해 주세요.':'AI 제공사의 안전 검사로 만들지 못했어요. 사진과 요청 내용을 확인해 주세요.');}
     if(res.status>=400&&res.status<500&&body?.error?.type==='image_generation_user_error')reject(400,'PROVIDER_INPUT_ERROR','사진 요청을 처리하지 못했어요. 선택한 옵션과 입력 사진을 확인해 주세요.');
     reject(502,'PROVIDER_ERROR','사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');}
@@ -190,7 +193,7 @@ export class AiPhotoService{
    charged=false;// The provider was paid from here on; a blocked or unchecked result still counts.
    if(!safe.length&&unchecked)reject(503,'MODERATION_UNAVAILABLE','만든 사진의 안전 검사를 완료하지 못했어요. 사진은 표시하지 않았어요.');
    if(!safe.length)reject(400,'UNSAFE_OUTPUT','만든 사진이 안전 기준을 통과하지 못했어요. 다른 표현으로 다시 시도해 주세요.');
-   const meta={aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiEditKinds:kinds,...(targetGender?{aiTargetGender:targetGender}:{}),aiModel:this.settings.model,aiCreatedAt:new Date().toISOString(),aiDurationMs:Date.now()-started};
+   const meta={aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiEditKinds:kinds,...(targetGender?{aiTargetGender:targetGender}:{}),aiModel:model,aiMode:mode,aiCreatedAt:new Date().toISOString(),aiDurationMs:Date.now()-started};
    const images=[];for(const out of safe)images.push(await this.save(sub,out,meta));
    return{images,remaining:Math.max(0,this.settings.perDay-await this.used(key))};
   }catch(error){
