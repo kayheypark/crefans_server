@@ -1,3 +1,9 @@
+## 2026-11-13 안전검사 이미지1장 제한 오류 수정 운영 완료
+- 사용자요청ID26d1b703-5fdd-4bc0-919d-23fe1e0b8996의입력검사400→503은직전참조첨부변경회귀. 실공급사단색PNG2장은400 too_many_images(최대1),1장은200. 대역이해당제약을반영하지않아이전검증이놓침. 원본과각참조를동일요청문구와함께1장씩검사하고모두통과해야생성하도록수정. 사진생성에는기존처럼모두첨부;검사우회/완화없음.
+- feature673f08b→dev/prod fe42130;API/worker crefans-api:moderation-single-image-20261113 배포. TS/JS2파일만직전이미지위에반영,프론트/의상자산/관리자/DB불변,migration없음. 빌드0·AI/OpenAPI30/30(격리DB/대역);수정전대역에1장제약추가시동일오류재현실패,후반참조차단/미응답에서도생성중단·횟수복원확인.
+- 운영2파일SHA동일·헬스ready·기존서비스보존. 배포된flagged함수로실API검사:합성64pxPNG원본과카탈로그aot-scout WebP를각각보내모두200 flaggedfalse. 사용자사진/문구조회·실제생성·해당사용자요청재실행없음. 안전차단자체를모두해결했다는의미아님.
+- 직전이미지/설정은 /Users/ethan/crefans-recovery/20261113/moderation-single-image-api-20261113 에이전,SHA·OCI55blobs·태그ID·설정검증후서버직전태그/이번백업/tmp만정리. 기존로컬복구본삭제없음. 증거 .local/moderation-single-image-20261113/{verification.json,incident.json,provider-probe.log,before.log,unit.log,build.log,build-api.log,deploy-api.log,runtime-verification.log,provider-after.log,recovery-api.log,cleanup.log}. 전체docs는기존quota/ticket설명6누락+generated stale잔존. 현재오류수정/배포완료.
+
 ## 2026-11-13 의상 참조 안전검사400 회귀 수정 진행
 - 사용자요청ID26d1b703-5fdd-4bc0-919d-23fe1e0b8996:08:52:24Z 503,1557ms;직전input MODERATION_UNAVAILABLE/status400. 직전 배포가 원본+참조를 한 moderation 호출에 넣은 오류. 실공급사 단색64px PNG 재현:2장400 too_many_images(최대1),1장200 flaggedfalse. 사용자사진/문구 미조회·생성없음. 공식 https://developers.openai.com/api/reference/resources/moderations/methods/create 확인2026-11-13;최대1 제약은 문서추측 아닌 실응답으로확인.
 - 합격:원본/참조각1장+동일문구로개별검사,모두통과후에만생성. 차단/미응답중단·횟수정책유지. 대역에도1장제약추가,수정전재현실패와수정후회귀+실공급사검사로검증. 증거 .local/moderation-single-image-20261113/. 다음API만배포.
