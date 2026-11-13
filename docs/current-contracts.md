@@ -181,10 +181,12 @@
 | GET | `/api/v1/profiles/:id/following` | `src/platform/controller.ts::profileFollowing` |
 | POST | `/api/v1/reports` | `src/platform/controller.ts::report` |
 | GET | `/api/v1/session` | `src/platform/controller.ts::session` |
+| POST | `/api/v1/studio/ai-photo/edit` | `src/platform/ai-photo.ts::edit` |
 | POST | `/api/v1/studio/accounts` | `src/platform/finance.controller.ts::account` |
 | PUT | `/api/v1/studio/accounts/:id/default` | `src/platform/finance.controller.ts::defaultAccount` |
 | POST | `/api/v1/studio/accounts/:id/verify` | `src/platform/finance.controller.ts::verifyAccount` |
 | PUT | `/api/v1/studio/activity` | `src/platform/studio.controller.ts::activity` |
+| GET | `/api/v1/studio/ai-photo/quota` | `src/platform/ai-photo.ts::quota` |
 | GET | `/api/v1/studio/advertising/orders` | `src/platform/advertising.controller.ts::orders` |
 | POST | `/api/v1/studio/advertising/orders/:id/use` | `src/platform/advertising.controller.ts::use` |
 | GET | `/api/v1/studio/advertising/products` | `src/platform/advertising.controller.ts::products` |

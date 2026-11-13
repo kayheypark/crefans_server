@@ -21,11 +21,18 @@ import {aiPhotoAllowed} from './ai-photo-grants';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 
-export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=300;
+export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=2000;
 const EDIT_URL='https://api.openai.com/v1/images/edits',MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
 const DAY=86400,MAX_SIDE=1536;
-const KINDS:Record<string,string>={outfit:'Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.',makeup:'Change only the makeup colors and finish. Preserve natural skin texture and facial structure.',expression:'Change only the facial expression as requested. Preserve facial structure and identity.',pose:"Change only the person's pose and body position.",background:'Change only the background and surroundings behind the person.'};
+const KINDS:Record<string,string>={camera:'Change only camera angle, framing and viewpoint as requested.',lens:'Recreate the requested photographic focal length, perspective and depth-of-field look; this is a visual simulation, not a real lens capture.',body:'Adjust only the requested adult chest, hip size or apparent height proportions naturally. Keep the person fully clothed and avoid sexualization.',outfit:'Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.',makeup:'Change only the makeup colors and finish. Preserve natural skin texture and facial structure.',expression:'Change only the facial expression as requested. Preserve facial structure and identity.',pose:"Change only the person's pose and body position.",background:'Change only the background and surroundings behind the person.'};
 const STYLES:Record<string,string>={photo:'a natural, realistic photograph',cosplay:'a realistic cosplay photo shoot with studio-quality lighting',daily:'a casual, realistic everyday snapshot'};
+const COMBINED:Record<string,string>={camera:'Camera: adjust viewpoint and framing as requested.',lens:'Lens: simulate the requested focal-length perspective and depth-of-field look.',body:'Body proportions: naturally adjust only the requested adult chest, hip size or apparent height proportions, fully clothed and non-sexualized.',outfit:'Clothing: replace the requested garments in the pink clothing guide area.',makeup:'Makeup: apply the requested makeup while retaining natural skin texture.',expression:'Expression: apply the requested expression without changing identity.',pose:'Pose: adjust body position as requested.',background:'Background: change the requested surroundings.'};
+function editKinds(kind:string,value:unknown):string[]{
+ if(kind!=='combined')return [kind];
+ let list:unknown=value;try{if(typeof list==='string')list=JSON.parse(list);}catch{reject(400,'INVALID_EDIT_KINDS','적용할 편집 항목을 다시 골라 주세요.');}
+ if(!Array.isArray(list)||list.length<2||list.length>8||list.some(k=>typeof k!=='string'||!KINDS[k])||new Set(list).size!==list.length)reject(400,'INVALID_EDIT_KINDS','적용할 편집 항목을 다시 골라 주세요.');
+ return list as string[];
+}
 
 export function aiPhotoConfig(config:ConfigService){
  const int=(v:unknown,d:number)=>{const n=Number(v);return Number.isSafeInteger(n)&&n>0?n:d;};
@@ -33,9 +40,10 @@ export function aiPhotoConfig(config:ConfigService){
   quality:(config.get('AI_PHOTO_QUALITY')||'medium').trim(),perDay:int(config.get('AI_PHOTO_PER_DAY'),AI_PHOTO_DAILY_LIMIT),dailyTotal:int(config.get('AI_PHOTO_DAILY_TOTAL'),300),timeoutMs:int(config.get('AI_PHOTO_TIMEOUT_MS'),120000)};
 }
 /** The prompt sent to the provider: the creator's words are framed by fixed rules (identity kept, no sexual content, no text). */
-export function aiPhotoPrompt(kind:string,style:string,request:string){
- return [`Edit this photo of a real adult person. ${KINDS[kind]}`,`Requested change: ${request}`,`Make the result look like ${STYLES[style]}.`,
-  "Keep the person's facial structure, identity, age, body shape and skin tone exactly the same.",'Do not add nudity, sexualized content, minors, text, logos or watermarks.'].join('\n');
+export function aiPhotoPrompt(kind:string,style:string,request:string,kinds:string[]=[kind],targetGender?:string){
+ const instruction=kind==='combined'||targetGender?['Apply all requested changes together to image 1. Modify only the listed aspects and keep unrequested details unchanged.',...kinds.map(k=>COMBINED[k]),...(kinds.includes('outfit')?['Image 2 is a copy with a pink clothing-region guide. Use it only to locate the clothing edits; other requested aspects may change elsewhere. Never reproduce the pink guide in the result.']:[])].join('\n'):KINDS[kind];
+ return [`Edit this photo of a real adult person. ${instruction}`,`Requested change: ${request}`,'If requests conflict, the later instruction takes precedence.',`Make the result look like ${STYLES[style]}.`,
+  targetGender?`Also change the depicted adult person to ${targetGender==='female'?'an adult woman':'an adult man'}. Allow facial features and gender presentation to change as needed. Keep the source recognizable where compatible, and preserve age, skin tone and unrequested details. Never make the person younger.`:kinds.includes('body')?"Preserve the person's facial structure, identity, age and skin tone. Only the requested body proportions may change.":"Keep the person's facial structure, identity, age, body shape and skin tone exactly the same.",'Do not add nudity, sexualized content, minors, text, logos or watermarks.'].join('\n');
 }
 const sizeFor=(width:number,height:number)=>width>height*1.15?'1536x1024':height>width*1.15?'1024x1536':'1024x1024';
 
@@ -94,12 +102,15 @@ export class AiPhotoService{
   if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');
   if(!this.settings.apiKey)reject(503,'PROVIDER_NOT_CONFIGURED','AI 사진 편집을 지금 사용할 수 없어요.');
   const kind=String(input?.kind||''),style=String(input?.style||'photo'),prompt=typeof input?.prompt==='string'?input.prompt.trim():'';
-  if(!KINDS[kind])reject(400,'INVALID_KIND','바꿀 것을 골라 주세요.');if(!STYLES[style])reject(400,'INVALID_STYLE','사진 느낌을 골라 주세요.');
+  if(kind!=='combined'&&!KINDS[kind])reject(400,'INVALID_KIND','바꿀 것을 골라 주세요.');if(!STYLES[style])reject(400,'INVALID_STYLE','사진 느낌을 골라 주세요.');
+  const kinds=editKinds(kind,input?.editKinds),targetGender=input?.targetGender;
+  if(targetGender!==undefined&&targetGender!=='female'&&targetGender!=='male')reject(400,'INVALID_TARGET_GENDER','생성 인물의 성별을 다시 골라 주세요.');
   if(input?.consent!==true&&input?.consent!=='true')reject(400,'CONSENT_REQUIRED','사진 속 인물 확인에 동의해 주세요.');
   if(!prompt||prompt.length>AI_PHOTO_PROMPT_MAX)reject(400,'INVALID_PROMPT',`원하는 모습을 1~${AI_PHOTO_PROMPT_MAX}자로 적어 주세요.`);
   if(containsPersonalData(prompt))reject(400,'PERSONAL_DATA','이메일·전화번호 같은 개인정보는 빼고 적어 주세요.');
   if(looksLikeInjection(prompt))reject(400,'OUT_OF_SCOPE','사진을 어떻게 바꿀지만 적어 주세요.');
-  if(kind==='outfit'&&!mask)reject(400,'MASK_REQUIRED','바꿀 옷 부분을 사진 위에 칠해 주세요.');
+  if(kinds.includes('outfit')&&!mask)reject(400,'MASK_REQUIRED','바꿀 옷 부분을 사진 위에 칠해 주세요.');
+  if(kind==='combined'&&!kinds.includes('outfit')&&mask)reject(400,'INVALID_MASK','옷을 바꿀 때만 옷 영역을 칠해 주세요.');
   if(mask&&(mask.mimetype!=='image/png'||mask.size>5*1024*1024))reject(400,'INVALID_MASK','칠한 영역을 다시 만들어 주세요.');
   const original=await this.source(sub,input?.sourceId);
   // Provider input: PNG at most 1536px; the mask is resized to the same pixels and keeps its alpha channel.
@@ -110,6 +121,14 @@ export class AiPhotoService{
    if(mask){const m=await sharp(mask.buffer,{limitInputPixels:40000000}).ensureAlpha().resize(width,height,{fit:'fill'}).png().toBuffer();const stats=await sharp(m).stats();
     if(stats.channels[3].min===255)reject(400,'MASK_REQUIRED','바꿀 옷 부분을 사진 위에 칠해 주세요.');maskPng=m;}
   }catch(error:any){if(error?.getStatus)throw error;reject(400,'INVALID_IMAGE','사진을 처리하지 못했어요. 다시 올려 주세요.');}
+  // A clothing-only provider mask would prevent a combined expression/background edit.
+  // Supply a marked copy as the second reference instead, keeping the original first.
+  let guide:Buffer|undefined;
+  if((kind==='combined'||targetGender)&&maskPng){
+   const alpha=await sharp(maskPng).extractChannel('alpha').raw().toBuffer(),overlay=Buffer.alloc(width!*height!*4);
+   for(let i=0;i<alpha.length;i++){overlay[i*4]=244;overlay[i*4+1]=114;overlay[i*4+2]=182;overlay[i*4+3]=Math.round((255-alpha[i])*.55);}
+   guide=await sharp(image!).composite([{input:overlay,raw:{width:width!,height:height!,channels:4}}]).png().toBuffer();
+  }
   const key=this.creatorKey(sub);
   try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch{reject(429,'DAILY_LIMIT','오늘 만들 수 있는 횟수를 모두 썼어요. 매일 오전 9시에 다시 이용할 수 있어요.');}
   try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
@@ -119,10 +138,11 @@ export class AiPhotoService{
    if(verdict===undefined)reject(503,'MODERATION_UNAVAILABLE','안전 검사를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
    if(verdict){charged=false;reject(400,'UNSAFE_INPUT','안전 기준에 맞지 않는 사진이나 요청이라 만들 수 없어요.');}
    const form=new FormData();
-   form.append('model',this.settings.model);form.append('prompt',aiPhotoPrompt(kind,style,prompt));form.append('n',String(AI_PHOTO_IMAGES));
+   form.append('model',this.settings.model);form.append('prompt',aiPhotoPrompt(kind,style,prompt,kinds,targetGender));form.append('n',String(AI_PHOTO_IMAGES));
    form.append('size',sizeFor(width!,height!));form.append('quality',this.settings.quality);form.append('output_format','png');form.append('moderation','auto');
    form.append('safety_identifier',contentDigest('ai-photo:'+sub).slice(0,64));
-   form.append('image',new Blob([image!],{type:'image/png'}),'source.png');if(maskPng)form.append('mask',new Blob([maskPng],{type:'image/png'}),'mask.png');
+   if(guide){form.append('image[]',new Blob([image!],{type:'image/png'}),'source.png');form.append('image[]',new Blob([guide],{type:'image/png'}),'clothing-guide.png');}
+   else{form.append('image',new Blob([image!],{type:'image/png'}),'source.png');if(maskPng)form.append('mask',new Blob([maskPng],{type:'image/png'}),'mask.png');}
    let res:Response;try{res=await this.fetcher(EDIT_URL,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers:{Authorization:'Bearer '+this.settings.apiKey},body:form});}
    catch{reject(504,'PROVIDER_TIMEOUT','사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.');}
    const body=await res.json().catch(()=>null);
@@ -133,7 +153,7 @@ export class AiPhotoService{
    for(const out of outputs){const v=await this.flagged([{type:'image_url',image_url:{url:'data:image/png;base64,'+out.toString('base64')}}]);if(v===false)safe.push(out);}
    charged=false;// The provider was paid from here on; a blocked or unchecked result still counts.
    if(!safe.length)reject(400,'UNSAFE_OUTPUT','만든 사진이 안전 기준을 통과하지 못했어요. 다른 표현으로 다시 시도해 주세요.');
-   const meta={aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiModel:this.settings.model,aiCreatedAt:new Date().toISOString(),aiDurationMs:Date.now()-started};
+   const meta={aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiEditKinds:kinds,...(targetGender?{aiTargetGender:targetGender}:{}),aiModel:this.settings.model,aiCreatedAt:new Date().toISOString(),aiDurationMs:Date.now()-started};
    const images=[];for(const out of safe)images.push(await this.save(sub,out,meta));
    return{images,remaining:Math.max(0,this.settings.perDay-await this.used(key))};
   }catch(error){
