@@ -1,5 +1,7 @@
 import {listReservedHandles,reservedHandleHistory,saveReservedHandle,deleteReservedHandle} from './reserved-handles';
-import {aiPhotoGrantHistory,grantAiPhoto,listAiPhotoGrants,revokeAiPhoto} from './ai-photo-grants';
+import {aiPhotoGrantHistory,grantAiPhoto,listAiPhotoGrants,resetAiPhotoQuota,resetAllAiPhotoQuota,revokeAiPhoto} from './ai-photo-grants';
+import {aiPhotoConfig} from './ai-photo';
+import {ConfigService} from '@nestjs/config';
 import {CategoriesService} from './categories.service';
 import {Res,UploadedFile,UseInterceptors} from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express';
@@ -47,7 +49,7 @@ export class PlatformAdminGuard implements CanActivate{
 }
 @Controller('admin') @UseGuards(PlatformAdminGuard)
 export class PlatformAdminController{
- constructor(private service:PlatformService,private limiter:LocalMemberService,private marketing:MarketingService,private beans:BeansService,private finance:PlatformFinanceService,private categoryManager:CategoriesService){}
+ constructor(private service:PlatformService,private limiter:LocalMemberService,private marketing:MarketingService,private beans:BeansService,private finance:PlatformFinanceService,private categoryManager:CategoriesService,private config:ConfigService){}
  @Post('marketing/campaigns') @Permit('super') campaign(@Body() body:any,@Req() req:any){return this.marketing.queue(req.admin,body);}
  @Post('client-errors') @Permit('self') clientError(@Body() body:any){return reportClientError(this.service.db,this.limiter,body,'console');}
  @Get('logs') @Permit(['logs','view']) logs(@Query() query:any,@Req() req:any){return adminLogs(this.service.db,req.admin,query);}
@@ -70,7 +72,9 @@ export class PlatformAdminController{
  @Put('reserved-handles/:id') @Permit(['reserved-handles','update']) updateReservedHandle(@Param('id') id:string,@Body() body:any,@Req() req:any){return saveReservedHandle(this.service.db,req.admin,id,body);}
  @Delete('reserved-handles/:id') @Permit(['reserved-handles','delete']) removeReservedHandle(@Param('id') id:string,@Body() body:any,@Req() req:any){return deleteReservedHandle(this.service.db,req.admin,id,body);}
  // Studio AI photo editor allow-list (2026-11-08): members.view lists, members.update grants/revokes with a reason.
- @Get('ai-photo-grants') @Permit(['members','view']) aiPhotoGrants(@Query() query:any,@Req() req:any){return listAiPhotoGrants(this.service.db,req.admin,query);}
+ @Get('ai-photo-grants') @Permit(['members','view']) aiPhotoGrants(@Query() query:any,@Req() req:any){return listAiPhotoGrants(this.service.db,req.admin,query,aiPhotoConfig(this.config).perDay);}
+ @Post('ai-photo-grants/quota-reset') @Permit(['members','update']) resetAllAiPhotoQuota(@Body() body:any,@Req() req:any){return resetAllAiPhotoQuota(this.service.db,req.admin,body);}
+ @Post('ai-photo-grants/:creatorId/quota-reset') @Permit(['members','update']) resetAiPhotoQuota(@Param('creatorId') id:string,@Body() body:any,@Req() req:any){return resetAiPhotoQuota(this.service.db,req.admin,id,body);}
  @Get('ai-photo-grants/:creatorId/history') @Permit(['members','view']) aiPhotoGrantHistory(@Param('creatorId') id:string,@Query() query:any,@Req() req:any){return aiPhotoGrantHistory(this.service.db,req.admin,id,query);}
  @Post('ai-photo-grants') @Permit(['members','update']) grantAiPhoto(@Body() body:any,@Req() req:any){return grantAiPhoto(this.service.db,req.admin,body);}
  @Delete('ai-photo-grants/:creatorId') @Permit(['members','update']) revokeAiPhoto(@Param('creatorId') id:string,@Body() body:any,@Req() req:any){return revokeAiPhoto(this.service.db,req.admin,id,body);}

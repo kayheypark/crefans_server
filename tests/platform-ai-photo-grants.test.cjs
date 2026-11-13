@@ -49,3 +49,35 @@ test('revoke: reason required, unknown 404, row removed, history and audit kept 
  assert.deepEqual(audits.map(a=>a.action),['admin.ai_photo_granted','admin.ai_photo_revoked']);
  const raw=JSON.stringify(audits);assert.ok(!raw.includes('시범 종료')&&!raw.includes('코스프레 시범'),'reason text must not be in the audit log');assert.match(raw,/"status":"revoked"/);
 });
+
+// 2026-11-13 user request: console resets today's AI photo usage per creator and for everyone. The service-wide cap stays.
+test('quota reset: list shows today usage, per-creator and all reset need a reason, keep history/audit and leave the total cap alone',async()=>{
+ const {LocalMemberService}=require('../dist/src/auth/local/local-member.service'),{AiPhotoService}=require('../dist/src/platform/ai-photo'),{aiPhotoUsageId}=require('../dist/src/platform/ai-photo-grants');
+ const limiter=app.get(LocalMemberService),photos=app.get(AiPhotoService),charge=async(id,n)=>{for(let i=0;i<n;i++)await limiter.limit('ai-photo:creator-day:'+id,1000,86400);};
+ const used=id=>photos['used']('ai-photo:creator-day:'+id),totalId=digest('ai-photo:total:'+Math.floor(Date.now()/86400000));
+ try{
+  for(const h of ['a','b'])if(!await aiPhotoAllowed(db,h==='a'?creatorA:creatorB))assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+h,reason:'횟수 초기화 QA'},'editor')).status,201);
+  await charge(creatorA,3);await limiter.limit('ai-photo:total',100000,86400);const totalBefore=(await db.authRateBucket.findUnique({where:{id:totalId}})).count;
+  assert.equal(aiPhotoUsageId(creatorA),digest('ai-photo:creator-day:'+creatorA+':'+Math.floor(Date.now()/86400000)),'same bucket the service charges');
+  const list=(await api('/admin/ai-photo-grants?search='+prefix,undefined,'viewer')).data,rowA=list.items.find(r=>r.creatorId===creatorA),rowB=list.items.find(r=>r.creatorId===creatorB);
+  assert.equal(rowA.usedToday,3);assert.equal(rowA.remaining,list.dailyLimit-3);assert.equal(rowB.usedToday,0);
+  assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/quota-reset',{reason:'권한 없음'},'viewer')).status,403);
+  assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/quota-reset',{reason:''},'editor')).status,400);
+  assert.equal((await api('/admin/ai-photo-grants/'+creatorB+'/quota-reset',{reason:'사용 없음 QA'},'editor')).errorCode,'NOTHING_TO_RESET');
+  assert.equal((await api('/admin/ai-photo-grants/'+inactive+'/quota-reset',{reason:'미허용 QA'},'editor')).errorCode,'GRANT_NOT_FOUND');
+  const one=await api('/admin/ai-photo-grants/'+creatorA+'/quota-reset',{reason:'촬영 일정 추가 사용'},'editor');assert.equal(one.status,201,JSON.stringify(one));
+  assert.equal(await used(creatorA),0,'the service sees a fresh day');
+  await charge(creatorA,2);await charge(creatorB,1);
+  for(const confirm of [undefined,'전체초기화','초기화'])assert.equal((await api('/admin/ai-photo-grants/quota-reset',{reason:'전체 QA',confirm},'editor')).errorCode,'CONFIRMATION_REQUIRED');
+  assert.equal(await used(creatorA),2,'a refused reset-all changes nothing');
+  assert.equal((await api('/admin/ai-photo-grants/quota-reset',{reason:'권한 없음',confirm:'전체 초기화'},'viewer')).status,403);
+  const all=await api('/admin/ai-photo-grants/quota-reset',{reason:'점검 후 전체 복구',confirm:'전체 초기화'},'editor');assert.equal(all.status,201,JSON.stringify(all));assert.ok(all.data.resetCount>=2);
+  assert.equal(await used(creatorA),0);assert.equal(await used(creatorB),0);
+  assert.equal((await db.authRateBucket.findUnique({where:{id:totalId}})).count,totalBefore,'service-wide daily cap is not reset');
+  const history=(await api('/admin/ai-photo-grants/'+creatorA+'/history',undefined,'viewer')).data.items.slice(0,2).map(i=>[i.action,i.reason]);
+  assert.deepEqual(history,[['quota_reset_all','점검 후 전체 복구'],['quota_reset','촬영 일정 추가 사용']]);
+  const audits=await db.platformAuditLog.findMany({where:{action:{in:['admin.ai_photo_quota_reset','admin.ai_photo_quota_reset_all']},actor_id:{in:admins.map(a=>a.user_sub)}}});
+  assert.deepEqual(audits.map(a=>a.action).sort(),['admin.ai_photo_quota_reset','admin.ai_photo_quota_reset_all']);
+  const raw=JSON.stringify(audits);assert.ok(!raw.includes('촬영 일정')&&!raw.includes('점검 후'),'reason text must not be in the audit log');
+ }finally{await db.authRateBucket.deleteMany({where:{id:{in:[creatorA,creatorB].map(id=>aiPhotoUsageId(id))}}});await db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${totalId}`;}
+});

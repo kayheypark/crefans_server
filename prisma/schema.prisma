@@ -2002,7 +2002,7 @@ model AiPhotoGrant {
 model AiPhotoGrantChange {
  id String @id @default(uuid())
  creator_user_id String @db.VarChar(191)
- /// granted | revoked
+ /// granted | revoked | quota_reset | quota_reset_all (today's usage reset, 2026-11-13)
  action String @db.VarChar(16)
  reason String @db.VarChar(500)
  changed_by String? @db.VarChar(191)
