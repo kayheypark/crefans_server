@@ -73,6 +73,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /posts/:id/comments | parentId가 있으면 2뎁스 답글; 권한·전역/게시물 댓글 설정 검증 |
 | POST | /posts/:id/comments | 회원; body, 선택 parentId. 게시물 작성자가 차단한 회원은 403 COMMENT_BLOCKED(기존 댓글은 유지). 본문의 "@이름"을 서버가 태그로 판별: 게시물 작성자(페이지 이름·닉네임)와 보이는 댓글 작성자만, 같은 이름 2명 이상·본인 제외, 최대 10명 → 목록 `mentions:[{id,name}]`(탈퇴·비활성 제외). 수정 시 다시 판별. 알림 type `comment`(목록 분류 '댓글'): 댓글→게시물 작성자, 답글→원 댓글 작성자, 태그→태그된 사람, 1인 1건·작성자 본인·차단 관계 제외. 스튜디오 답글도 원 댓글 작성자에게 알림 |
 | GET | /posts/:id/mention-candidates | 회원; 게시물 이용 권한(열람 기록 없음). 태그할 수 있는 사람 `[{name,image}]`(본인·차단 관계 제외, 회원 ID 없음) |
+| PUT | /posts/:id/comments/:commentId/like | 회원; enabled:boolean 필수. 댓글·답글 좋아요/취소 멱등 설정. 응답 {liked,likes}. 게시물 접근 권한·댓글 설정·작성자 차단·댓글 소속·숨김·삭제·부모 숨김 검사. 삭제된 부모 아래 보이는 답글은 허용. 같은 회원 중복 집계 없음. |
 | PUT | /posts/:id/comments/:commentId | 회원; body 1~1000자. 게시물 이용 권한 + 내가 쓴(삭제·숨김 아닌) 댓글·답글만, 아니면 403 NOT_COMMENT_AUTHOR. 내용이 바뀔 때만 edited_at 기록 → 목록 `edited:true`, 내 댓글·답글은 `own:true` |
 | DELETE | /posts/:id/comments/:commentId | 같은 소유권 검사; soft delete·댓글 수 1회 감소. 보이는 답글이 남은 최상위 댓글은 목록에 `deleted:true`(작성자·본문 비움) 자리표시로 남음 |
 | PUT | /posts/:id/like | 회원; enabled |
@@ -616,3 +617,9 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - 순서: 허용 목록(403 AI_PHOTO_NOT_ALLOWED) → 본인 완료 이미지(404) → 문구 개인정보·지시 무력화 차단 → 마스크(칠한 곳 없음 400) → 하루 `AI_PHOTO_PER_DAY`(기본 10, UTC 하루=한국 오전 9시, 429 DAILY_LIMIT)·전체 `AI_PHOTO_DAILY_TOTAL`(기본 300) → 문구+사진 Moderation(판정 불가 503, 실패 시 진행 안 함) → OpenAI `/v1/images/edits`(모델 `AI_PHOTO_MODEL` 기본 gpt-image-2, n=2, quality `AI_PHOTO_QUALITY` 기본 medium, 1536px 이하 PNG, safety_identifier=회원 ID 해시) → 결과별 Moderation(통과만 저장) → 크리에이터 비공개 미디어(webp, metadata.aiGenerated·aiSourceId·aiKind·aiModel, 워터마크 대상 기록).
 - 횟수: 공급사 오류·시간 초과·판정 불가는 되돌리고, 입력·결과 차단은 차감한다. 문구 원문은 DB에 저장하지 않는다. 키는 `AI_PHOTO_OPENAI_API_KEY`(없으면 GUIDE_ADVISOR 키).
 - 표시: 게시 시 워터마크 파생 미디어도 aiGenerated 를 이어받고, 팬 게시물·스튜디오 목록 미디어 응답에 `aiGenerated:true`를 넣는다. 처리방침 2026-11-08.aiphoto.1 의 16번 항목.
+
+### 댓글 좋아요 (2026-11-13)
+
+- 기존 CommentLike의 (comment_id,user_id) 유일 제약을 사용하며 DB 변경은 없다. 조회 댓글/답글에 likes(활성 좋아요 수), liked(조회 회원 상태, 비로그인은 false)를 제공한다. 숨김/삭제 댓글에는 반응을 노출하지 않는다.
+- 댓글 행 잠금 아래 enabled의 멱등 upsert와 개수 조회를 처리한다. 개별 좋아요 회원 목록/ID는 반환하지 않으며 새 알림을 추가하지 않는다. 좋아요 요청 자체는 유료 본문 소비 기록을 만들지 않고 access로 권한만 검사한다.
+- 근거 확인2026-11-13: https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html — 매 요청의 객체 소속/게시물 접근 권한과 숨김·삭제 상태를 서버에서 확인한다. 경로 ID가 다른 글의 댓글이면 404, 권한 없는 글은403, 비로그인은401. tests/platform-comment-social.test.cjs의 성공·거절·동시/중복 검사로 확인한다. 운영/실사용 계정 확인을 대신하지 않는다.
