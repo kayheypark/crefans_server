@@ -1,3 +1,9 @@
+## 2026-11-13 11:00 KST AI 사진 1장 생성 운영 배포 완료
+- 최신 사용자 “배포” 승인으로 이전 자동 검토 거절 해소. source99761cf(문서만 다른 prodd145f01과 기능 동일)의 ai-photo/openapi-contract TS+JS2개씩만 colorful-comments 이미지에 덮어 ai-photo-single-20261113 빌드. 기존 운영2소스가5feb470과 일치, 새4파일 SHA가 검증한 빌드와 일치·모듈로드/n=1 확인.
+- API/worker 교체 exit0, 양쪽 AI_PHOTO_IMAGES=1, healthready/HTTP200·인증401·다른컨테이너불변. 설정은 API_IMAGE/APP_RELEASE만 변경. DB스키마/운영데이터 변경 없음. AI7+OpenAPI14=21개 검증 기능코드 불변, 실AI 호출은 하지 않음.
+- 복구 /Users/ethan/crefans-recovery/20261113/ai-photo-single-api-20261113에 직전colorful-comments 이미지·설정 보관. SHA·OCI41blobs·index태그/ID·설정검증 후 서버직전태그/백업/tmpcontext 정리. 활성이미지/DB볼륨/설정/업로드 보존, 기존 맥복구본 삭제 없음.
+- 프론트도 front-ai-single-flow-20261113 반영완료: 운영design-system 공용모달390에서 1장 버튼만고정·원본/입력/동의/횟수 본문흐름 확인(목업). 실제회원 생성/실기기 미검증. 증거 .local/ai-photo-single-flow-20261113/{verification.json,source-review.json,build-api.log,deploy-api.log,recovery.log,final-server.log}. 다음 실AI 품질/실기기 확인 별도, 기존문서stale 유지.
+
 ## 2026-11-13 AI 단일 생성 수정 prod 반영·운영 승인 대기
 - 기능 원본 front52a3a1e/server1b23133을 dev→prod 승격: front968eb80, server99761cf. 프론트14/14·서버21/21·타입/계층·각 빌드 통과, 공용 모달320/390/PC에서 본문426/702/648px, 고정영역72px에 버튼1개만 확인. 본문 입력·동의·횟수·원본/결과액션과 목업생성1장 확인.
 - 프론트 운영이미지 front-ai-single-flow-20261113 빌드53초·revision/카카오키/레이어·보관아카이브SHA·서버 읽기전용 preflight 통과. 서버 새이미지는 아직 만들지 않음.
