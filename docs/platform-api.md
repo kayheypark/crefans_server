@@ -626,3 +626,9 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - 근거 확인2026-11-13: https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html — 매 요청의 객체 소속/게시물 접근 권한과 숨김·삭제 상태를 서버에서 확인한다. 경로 ID가 다른 글의 댓글이면 404, 권한 없는 글은403, 비로그인은401. tests/platform-comment-social.test.cjs의 성공·거절·동시/중복 검사로 확인한다. 운영/실사용 계정 확인을 대신하지 않는다.
 
 - 2026-11-13 AI 오류 분류: 공급사 error.code=moderation_blocked만 안전 차단으로 분류하고 moderation_details.moderation_stage가 output이면 UNSAFE_OUTPUT, 나머지는 UNSAFE_INPUT으로 안내한다(단계가 없으면 입력 차단으로 확정하지 않음). 일반 image_generation_user_error는 PROVIDER_INPUT_ERROR로 표시하고 횟수를 복구한다. 결과 안전검사 판정이 없으면 MODERATION_UNAVAILABLE(503), 사진은 반환·저장하지 않는다. 진단은 ai-photo.failure 단계/코드/status/공급사 요청ID만 기록하며 원본·프롬프트·회원정보·인증키를 기록하지 않는다.
+
+
+### 2026-11-13 코스프레 전체 코디
+- AI 사진 편집의 outfit+cosplay는 원본과 분홍 의상 영역 가이드를 전달한다. 단일 의상 요청도 hard mask 대신 가이드를 사용하여 명시된 가발·헤어색/스타일·머리장식·소품·신발을 의상 영역 밖에서도 적용한다. 일반 outfit+photo의 hard mask는 유지한다. 얼굴·정체성·요청하지 않은 부분을 보존하며 원본 구도 안에 보이는 부분만 적용한다(별도 구도/포즈 요청은 허용).
+- 기존 마스크 필수·원본소유권·동의·8종 복합요청·성별·신체 보정·1장·2000자·입출력 안전 검사·횟수 정책은 유지. 썸네일은 스타일 예시이며 공급사에 전달되는 참조 이미지가 아니다. 프론트는 같은 코디의 가발/장식/소품/신발 명세를 내부 요청에 포함한다.
+- 근거: https://developers.openai.com/api/docs/guides/image-generation (확인2026-11-13). 공급사 마스크는 지침이며 경계나 보존을 보장하지 않으므로 실제 결과 품질 검증과 요청 대역 검사를 구분한다. 검사 tests/platform-ai-photo.test.cjs.

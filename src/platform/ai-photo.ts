@@ -42,7 +42,9 @@ export function aiPhotoConfig(config:ConfigService){
 }
 /** The prompt sent to the provider: the creator's words are framed by fixed rules (identity kept, no sexual content, no text). */
 export function aiPhotoPrompt(kind:string,style:string,request:string,kinds:string[]=[kind],targetGender?:string){
- const instruction=kind==='combined'||targetGender?['Apply all requested changes together to image 1. Modify only the listed aspects and keep unrequested details unchanged.',...kinds.map(k=>COMBINED[k]),...(kinds.includes('outfit')?['Image 2 is a copy with a pink clothing-region guide. Use it only to locate the clothing edits; other requested aspects may change elsewhere. Never reproduce the pink guide in the result.']:[])].join('\n'):KINDS[kind];
+ const cosplay=kinds.includes('outfit')&&style==='cosplay';
+ const completeLook='Cosplay: apply the requested complete costume, including wig hair color, hairstyle, headwear, accessories, props and footwear. The pink guide locates garment edits; explicitly requested wig, hair, headwear and accessory changes may extend beyond it. Keep the face, identity and unrequested details unchanged. Include only items visible in the source framing; do not crop or invent a new pose merely to reveal them unless a framing or pose change is explicitly requested.';
+ const instruction=kind==='combined'||targetGender||cosplay?['Apply all requested changes together to image 1. Modify only the listed aspects and keep unrequested details unchanged.',...kinds.map(k=>k==='outfit'&&cosplay?completeLook:COMBINED[k]),...(kinds.includes('outfit')?['Image 2 is a copy with a pink clothing-region guide. Use it only to locate the clothing edits; other requested aspects may change elsewhere. Never reproduce the pink guide in the result.']:[])].join('\n'):KINDS[kind];
  return [`Edit this photo of a real adult person. ${instruction}`,`Requested change: ${request}`,'If requests conflict, the later instruction takes precedence.',`Make the result look like ${STYLES[style]}.`,
   targetGender?`Also change the depicted adult person to ${targetGender==='female'?'an adult woman':'an adult man'}. Allow facial features and gender presentation to change as needed. Keep the source recognizable where compatible, and preserve age, skin tone and unrequested details. Never make the person younger.`:kinds.includes('body')?"Preserve the person's facial structure, identity, age and skin tone. Only the requested body proportions may change.":"Keep the person's facial structure, identity, age, body shape and skin tone exactly the same.",'Do not add nudity, sexualized content, minors, text, logos or watermarks.'].join('\n');
 }
@@ -135,7 +137,7 @@ export class AiPhotoService{
   // A clothing-only provider mask would prevent a combined expression/background edit.
   // Supply a marked copy as the second reference instead, keeping the original first.
   let guide:Buffer|undefined;
-  if((kind==='combined'||targetGender)&&maskPng){
+  if((kind==='combined'||targetGender||style==='cosplay')&&maskPng){
    const alpha=await sharp(maskPng).extractChannel('alpha').raw().toBuffer(),overlay=Buffer.alloc(width!*height!*4);
    for(let i=0;i<alpha.length;i++){overlay[i*4]=244;overlay[i*4+1]=114;overlay[i*4+2]=182;overlay[i*4+3]=Math.round((255-alpha[i])*.55);}
    guide=await sharp(image!).composite([{input:overlay,raw:{width:width!,height:height!,channels:4}}]).png().toBuffer();

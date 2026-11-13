@@ -3,6 +3,16 @@
 - 구현: `src/platform/ai-photo-tickets.ts`, 신규 테이블 ai_photo_reset_tickets·ai_photo_reset_ticket_uses(마이그레이션 20261113170000, 기존 데이터 변경 없음). 관리자 GET/POST `admin/ai-photo-grants/:id/tickets`, POST `.../tickets/:ticketId/revoke`; 스튜디오 POST `studio/ai-photo/reset-ticket`, quota에 resetTickets{count,nextExpiresAt}. 만료가 빠른 지급분부터 차감, 크리에이터 행 잠금으로 동시 사용·회수 직렬화. 이력(ai_photo_grant_changes: ticket_granted/ticket_revoked/ticket_used)·감사(사유 해시).
 - 검증: grants 5/5(신규: 수량·권한·미허용 거부, 30일 만료, 만료분 제외·만료 임박분 우선, 동시 2회 탭 1회만, total 불변, 회수·NO_TICKET), 만료 순서를 desc로 바꾼 대조에서 실패 확인. ai-photo·openapi(225/스튜디오 52/콘솔 104) 통과, 전체 666 중 실패 34(기존 환경 실패 수).
 - 남은 일: 통합·운영 배포(DB 마이그레이션 포함)는 사용자 승인 후.
+## 2026-11-13 코스프레 전체 코디 로컬 검증 완료
+- 카탈로그32종에 wig/headwear/accessories/footwear 및 버전2 이미지 경로 추가, 동일 항목이 내부 생성문구에 포함된다. 머리 없는 기존v1은 보존. image_gen 각1회32개 생성,512px WebP489628bytes. 전신 마네킹 가발/소품/신발 육안검토·해시기록.
+- cosplay+outfit은 원본+분홍 가이드로 전달, 가발·헤어·머리장식·소품·신발의 명시적 변경을 옷 영역 밖에서도 허용. 일반 photo outfit은 hard mask 유지. 원본구도 가시범위·얼굴/정체성·미요청부분 보존 지시. 의상 선택 후 옷장 닫기/다른탭 이동에도 cosplay 유지.
+- 프론트33/33·typecheck0·계층452, 서버27/27·build0. 코스프레 스타일 유지 제거 대조와 가이드 대신hardmask 대조 모두 예상실패 후원복. 서버 최초 추가검사는 기존회원일일한도에 걸려 독립 테스트회원으로 분리후통과. 기존안전·소유권·한도·복합/성별 회귀 포함. 공급사는대역이며 실AI 결과품질검증아님.
+- CUA 로컬390:7분류32사진 모두로드,가발·나비장식·신발확인/선택; 캐러셀v2경로·320/390/1280넘침0. 기존5보기기능검사포함. 실기기/실AI호출없음. 전체docs는기존 quota-reset2설명누락+Generated contracts stale,본작업문서만갱신. 다음 dev→prod 통합 후 API/프론트만순차배포.
+
+## 2026-11-13 코스프레 전체 코디 진행
+- 사용자: 가발/머리장식·칼/벨트/가방/구두 등의 소품을 프리셋 사진과 실제 생성 요청에 포함. 기존 옷32종은 머리 없는 제품 이미지이며 서버단일outfit hard mask가 머리 변경을 막는다.
+- 합격:32코디 각각 헤어·장식·소품·신발 명세/전신 미리보기 일치, 선택문구에 전체코디 포함, cosplay+outfit은 옷 영역 가이드와 명시된 머리/소품 변경 허용, 일반 옷 교체 hard mask 유지, 복합요청/성별·안전·소유권·횟수·1장 불변. 타입/요청 대역검사·미리보기 육안/브라우저·배포검증 범위를 구분한다.
+- 증거 프론트/서버 .local/cosplay-complete-look-20261113/. 기존 조사 PROGRESS 수정 보존. OpenAI 이미지편집 공식문서 확인2026-11-13: https://developers.openai.com/api/docs/guides/image-generation (마스크는지침이며정확한경계보장아님). 다음 명세·이미지·서버프롬프트 및 검사.
 
 ## 2026-11-13 AI 사진 오늘 사용 횟수 초기화(인원별·전체) — 운영 배포 완료(2026-11-13 16:3x KST)
 - 요청: 운영콘솔에서 AI 사진보정 남은 횟수를 인원별·전체 초기화.
