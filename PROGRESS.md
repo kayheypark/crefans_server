@@ -1,3 +1,7 @@
+## 2026-11-14 원신 참조 서버 운영 완료
+- API/worker `crefans-api:genshin-costumes-20261114`,source8860f49. 기존이미지위허용목록TS/JS·원신4WebP만추가. 빌드·AI/OpenAPI30/30,운영6파일SHA일치,API헬스/기존서비스/권한경계검사통과. 실제생성품질미검증.
+- 외부복구본 `/Users/ethan/crefans-recovery/20261114/genshin-costumes-api-20261114` SHA·OCI57blobs·태그/설정검증후서버직전이미지/임시백업정리. 증거 `.local/genshin-costumes-20261114/verification.json`, `build-api.log`, `deploy-api.log`, `recovery-api.log`, `runtime-sha256.txt`, `cleanup.log`.
+
 ## 2026-11-14 원신 서버 검증 완료
 - npm run build0,AI/OpenAPI30/30(격리DB/공급사대역),참조36개디코딩 및 원신2개실제첨부바이트 검사통과. 신규4개프론트/src/dist SHA동일. 실제공급사생성품질미검증. 다음기존운영이미지위허용목록TS/JS와4자산만패치배포.
 
