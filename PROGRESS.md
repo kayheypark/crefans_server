@@ -1,3 +1,9 @@
+## 2026-11-15 처리방침 BytePlus 개정·하트 하루 상한 운영 배포 완료
+- prod 8272577(feat/privacy-byteplus + feat/ai-heart-daily-cap). API/worker=crefans-api:privacy-hearts-20261115(x-presets 위 src·dist 덮어쓰기, legal-documents.js·ai-photo-hearts.js 해시가 로컬 prod 빌드와 일치). 프론트 변경 없음. 콩 대사 수정(fix/bean-reconcile-kill-switch 95a925b)은 사용자 미선택으로 제외.
+- 운영 확인: API/worker Running·재시작0·health ready·비로그인401·다른 컨테이너 불변, /api/v1/common의 privacy version 2026-11-15.byteplus.1, 16항 BytePlus·180일·8항 "사진 생성을 Byteplus" 포함.
+- 복구: /Users/ethan/crefans-recovery/20261115/privacy-hearts-api 직전 이미지(x-presets)·설정 검증 후 서버 이전 태그·임시본 정리. 로컬 임시 api.tar.gz 삭제.
+- 통합 중 PROGRESS.md 충돌로 dev가 처리방침만 먼저 반영돼 prod가 그 상태로 빠르게 맞춰졌다가(38445dc), 충돌 해결 후 하트 상한을 dev(dacc240)→prod(8272577)로 정상 통합.
+
 ## 2026-11-15 AI 사진 하트 보상 회원당 하루 100개 상한
 - night-work 결정(/ask-me): 하트 게임 보상이 생성마다 최대 3회분을 다시 채워 무료 생성이 순환하던 문제. 회원당 한국 시간 하루 100하트(=최대 10회분) 상한.
 - settleHeartGame이 같은 날 정산된 게임의 적립 합계를 보고 남은 만큼만 적립(초과분 미적립), 정산된 게임의 score는 실제 적립량으로 기록, 감사 로그에 played·dailyCap 추가, 응답에 capped 추가.
