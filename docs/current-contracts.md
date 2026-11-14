@@ -210,6 +210,8 @@
 | POST | `/api/v1/studio/ai-photo/crop` | `src/platform/ai-photo.ts::crop` |
 | POST | `/api/v1/studio/ai-photo/edit` | `src/platform/ai-photo.ts::edit` |
 | POST | `/api/v1/studio/ai-photo/hearts` | `src/platform/ai-photo.ts::hearts` |
+| GET | `/api/v1/studio/ai-photo/library` | `src/platform/ai-photo.ts::library` |
+| POST | `/api/v1/studio/ai-photo/library` | `src/platform/ai-photo.ts::saveLibrary` |
 | GET | `/api/v1/studio/ai-photo/quota` | `src/platform/ai-photo.ts::quota` |
 | POST | `/api/v1/studio/ai-photo/reset-ticket` | `src/platform/ai-photo.ts::useResetTicket` |
 | GET | `/api/v1/studio/bean-finance` | `src/platform/beans.controller.ts::studio` |

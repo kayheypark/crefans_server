@@ -356,3 +356,31 @@ test('crop persists exact dimensions with AI metadata without provider calls or 
  await assert.rejects(photos.crop(creator,{sourceId,left:0,top:0,width:100,height:100}),code('INVALID_CROP_SOURCE'));
  for(const patch of [{left:-1},{left:.5},{left:'1'},{width:0},{width:601},{height:901},{top:899}])await assert.rejects(photos.crop(creator,{sourceId:id,left:0,top:0,width:100,height:100,...patch}),code('INVALID_CROP'));
 });
+
+test('private photo library: save, search, category edit and remove preserve media and other metadata',async()=>{
+ const who=await makeCreator('library_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'보관함 QA'}});const id=await media(who);
+ await db.media.update({where:{id},data:{metadata:{aiGenerated:true,keep:'original'}}});
+ const saved=await photos.saveLibrary(who,{id,title:'  의자에 앉기  ',category:'pose'});assert.equal(saved.title,'의자에 앉기');assert.equal(saved.category,'pose');assert.equal(saved.aiGenerated,true);
+ const cropped=await photos.crop(who,{sourceId:id,left:0,top:0,width:100,height:100});assert.equal((await db.media.findUnique({where:{id:cropped.id}})).metadata.aiLibrary,undefined);assert.equal((await photos.library(who,{})).items.length,1,'cropping does not silently duplicate a library entry');
+ assert.equal((await photos.library(who,{q:'의자',category:'pose'})).items[0].id,id);assert.equal((await photos.library(creator,{q:'의자'})).items.some(x=>x.id===id),false);
+ await photos.saveLibrary(who,{id,title:'낮은 구도',category:'camera'});assert.equal((await photos.library(who,{category:'pose'})).items.length,0);assert.equal((await photos.library(who,{category:'camera'})).items[0].id,id);
+ await assert.rejects(photos.saveLibrary(creator,{id,title:'타인',category:'pose'}),code('MEDIA_NOT_FOUND'));
+ await assert.rejects(photos.saveLibrary(who,{id,title:'x',category:'unknown'}),code('INVALID_LIBRARY_ASSET'));
+ await assert.rejects(photos.library(who,{page:-1}),code('INVALID_LIBRARY_FILTER'));
+ await photos.saveLibrary(who,{id,remove:true});assert.equal((await photos.library(who,{})).items.length,0);const row=await db.media.findUnique({where:{id}});assert.equal(row.is_deleted,false);assert.equal(row.metadata.keep,'original');assert.equal(row.metadata.aiGenerated,true);
+});
+
+test('library photos are real image references, individually moderated and numbered by category',async()=>{
+ reset();const who=await makeCreator('ref_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'참고사진 QA'}});const original=await media(who),pose=await media(who,500,700),background=await media(who,900,600);
+ await photos.saveLibrary(who,{id:pose,title:'PRIVATE_TITLE_NEVER_PROMPT',category:'pose'});await photos.saveLibrary(who,{id:background,title:'배경 예시',category:'background'});
+ await photos.edit(who,base({sourceId:original,kind:'combined',editKinds:['pose','background'],libraryIds:JSON.stringify([pose,background])}));
+ const request=calls.find(x=>x.kind==='edit');assert.equal(request.images.length,3);assert.match(request.fields.prompt,/Image 2 is a personal pose reference/);assert.match(request.fields.prompt,/Image 3 is a personal background reference/);assert.doesNotMatch(request.fields.prompt,/costume references|PRIVATE_TITLE/);
+ const expected=await sharp(fs.readFileSync(path.join(mediaRoot,pose))).rotate().resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).webp().toBuffer();assert.deepEqual(request.images[1].bytes,expected);assert.equal(calls.filter(x=>x.kind==='moderation').length,4);
+ reset();await photos.edit(who,base({sourceId:original,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:['b4bf5d'],libraryIds:[background]}),await mask());const mixed=calls.find(x=>x.kind==='edit');assert.equal(mixed.images.length,4);assert.match(mixed.fields.prompt,/Images 3 through 3 are costume references/);assert.match(mixed.fields.prompt,/Image 4 is a personal background reference/);
+ reset();await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[otherSourceId]})),code('LIBRARY_ASSET_NOT_FOUND'));assert.equal(calls.length,0);
+ await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[pose,background,sourceId,otherSourceId,original]})),code('INVALID_LIBRARY_REFERENCES'));
+ await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[background]})),code('INVALID_LIBRARY_REFERENCES'));
+ await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[pose,pose]})),code('INVALID_LIBRARY_REFERENCES'));
+ await photos.saveLibrary(who,{id:pose,remove:true});await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[pose]})),code('LIBRARY_ASSET_NOT_FOUND'));assert.equal(calls.length,0);
+ reset();flags=[false,true];const before=(await photos.quota(who)).remaining;await assert.rejects(photos.edit(who,base({sourceId:original,kind:'background',libraryIds:[background]})),code('UNSAFE_INPUT'));assert.equal(calls.filter(x=>x.kind==='edit').length,0);assert.equal((await photos.quota(who)).remaining,before-1,'existing unsafe-input charging policy is preserved');
+});

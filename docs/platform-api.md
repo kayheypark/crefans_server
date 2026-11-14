@@ -612,6 +612,8 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | GET | /studio/ai-photo/quota | 크리에이터 본인. `{allowed,limit,remaining}`. allowed = 허용 목록(ai_photo_grants) + 공급사 키 설정. |
+| GET | /studio/ai-photo/library | 본인 AI 허용 크리에이터 사진 보관함. q(60자)/category/page(0부터), 24개와 hasMore 응답. |
+| POST | /studio/ai-photo/library | 본인 완료 이미지의 id/title(1~60자)/category 저장·수정. remove=true는 보관해제만 수행. |
 | POST | /studio/ai-photo/crop | 본인 완료 AI 이미지. JSON `sourceId,left,top,width,height` 정수 픽셀 영역, 범위검사 후 새 AI 미디어 응답. 횟수 미차감·원본 보존. |
 | POST | /studio/ai-photo/edit | multipart `sourceId,kind(outfit|makeup|expression|pose|background|camera|lens|body|combined),editKinds(combined 필수 JSON 배열 2~8항목),style(photo|cosplay|daily),prompt(1~2000),targetGender(female|male, 선택),consent=true,mask(PNG, outfit 포함 시 선택; 옷 세부 지정 ON일 때 전송)`. 응답 `{images:[{id,type,url,aiGenerated}],remaining}`. |
 
@@ -693,3 +695,10 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 - `POST /studio/ai-photo/edit` 선택적 aspectRatio=original/1:1/4:5/3:4/9:16/16:9. 미지정 original은 원본 종횡비 기준 약1.5MP(허용1:16~16:1), 나머지는 1024x1024/1024x1280/960x1280/864x1536/1536x864.
 - `POST /studio/ai-photo/crop`: 인증된 크리에이터, 본인 소유 완료 AI 이미지에 `{sourceId,left,top,width,height}`. 방향보정 후 정수 픽셀 영역을 범위검사하고 Sharp extract, 새 비공개 WebP/AI메타데이터 보존. 타인404 MEDIA_NOT_FOUND, 비AI400 INVALID_CROP_SOURCE, 범위오류400 INVALID_CROP. 원본 유지, 모델 호출/횟수차감 없음.
 - 공급사 규격 확인2026-11-14: https://docs.byteplus.com/en/docs/modelark/seedream-5-5 (921600~4624220픽셀,1:16~16:1). 자르기 https://sharp.pixelplumbing.com/api-resize/ 의 정수 extract 사용. 공급자 대역 검사와 운영 생성은 구분한다.
+
+### 개인 사진 보관함과 합성 참고 이미지 (2026-11-14)
+- 데이터는 기존 medias.metadata.aiLibrary `{active,title,category}`. 파일·소유권을 복제하지 않고 metadata 갱신은 media행 잠금으로 기존 AI/워터마크 메타데이터를 보존한다. 공용 프리셋 등록 API가 아니다. 개인 보관함 조회는 user_sub=본인, IMAGE/COMPLETED/미삭제 조건을 강제한다. remove는 active=false로 보관해제(원본/기존게시물 보존).
+- `category` 허용 pose/background/camera/lens/outfit/makeup/expression. `GET` q는 이름검색60자, page0~10000, 24개/hasMore. 사용자 제목은 생성프롬프트에 포함하지 않는다. JSON 필터는 MySQL `$.aiLibrary.*` 경로(Prisma 공식 Json fields 문서 확인2026-11-14).
+- edit multipart `libraryIds`: 본인 활성 보관 이미지 UUID JSON 배열, 최대4개·중복불가·분류별1개·editKinds에 실제분류 포함. 타인/보관해제/미완료/삭제는 LIBRARY_ASSET_NOT_FOUND, 형식/분류충돌은 INVALID_LIBRARY_REFERENCES. source()로 매번 소유권 재확인 후1536px 이내WebP로정규화하여 원본/가이드/고정의상 뒤 첨부. 각 이미지의 실제번호·분류별참고역할 지정. 합계10장 제한. 개별안전검사·기존생성차감/복구정책 유지. 실패상세30일 암호화옵션에 libraryIds/aspectRatio 기록, 일반로그 원문 비노출.
+- 공용 프리셋은 별도의 검토된 정적 카탈로그만 사용한다. 사용자가 이번 대화에서 앞으로 보낼 사진은 공용으로 분류하되 현재 첨부없음, 실제등록대기. 개인 라이브러리 사진은 자동 공용전환하지 않는다.
+- 근거(2026-11-14): https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html ; https://docs.byteplus.com/en/docs/modelark/seedream-5-5 ; https://www.prisma.io/docs/orm/v6/prisma-client/special-fields-and-types/working-with-json-fields .
