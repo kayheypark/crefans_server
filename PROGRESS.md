@@ -1,3 +1,11 @@
+## 2026-11-15 처리방침 BytePlus 처리위탁·국외 이전 개정안 (사용자 확인 대기, 미배포)
+- night-work 결정(/ask-me): 개정안 작성 → 사용자 확인 → 배포. 버전 2026-11-15.byteplus.1(공개·시행 2026-11-15).
+- 8항: "사진 편집·유해성 검사를 OpenAI" → "사진 생성을 Byteplus Pte. Ltd.(BytePlus ModelArk)에, 요청 문구·사진의 유해성 검사를 OpenAI OpCo, LLC에 위탁".
+- 16항: 보내는 항목(사진·칠한 영역·문구·프리셋·의상/배경 참고·본인 보관함 참고 사진), 회원 식별값 미전송(코드 확인: ai-photo.ts는 이미지·가이드·문구·크기만 전송, 기존 "익명 식별값" 서술 정정), BytePlus 국외 이전(처리국 말레이시아·인도네시아·EU/EEA, 사전 허락 없는 학습 미사용, 필터 걸린 입출력 말레이시아 180일), OpenAI 유해성 검사 국외 이전, 거부 방법.
+- 근거(확인 2026-11-15, 공식): docs.byteplus.com/en/docs/ModelArk/BytePlus_ModelArk_Data_Processing(2026-09-10 갱신), docs.byteplus.com/en/docs/legal/docs-privacy-policy(연락처). 법 조항 근거는 .local/night-work/2026-11-14-2343/legal.md(개인정보보호법 26조②, 28조의8②).
+- 검증: build 0, legal 테스트 21/21(버전 고정 3건 갱신, BytePlus 공시 신규 테스트).
+- 미확인: BytePlus 계약 상대 법인·DPA·Data Collaboration 캠페인 참여 여부(콘솔 확인 필요).
+
 ## 2026-11-14 배경16·포즈8 운영 배포 완료
 - 사용자 지시(운영배포까지). prod front fd493b6 / server 6ade65b(기능 브랜치와 소스 동일). API/worker=crefans-api:x-presets-20261114(costume-expansion 위 src·dist 덮어쓰기, 이미지 내 배경 참조 JS 해시가 로컬 빌드와 일치), frontend=crefans-front:front-x-presets-20261114.
 - 검증: 컨테이너 Running·재시작0, health ready, API 배경 참조 38개·비로그인401·다른 컨테이너 불변, 운영 신규 에셋 24개 HTTP 바이트 SHA-256 전부 일치, 운영 도메인 /design-system WebKit390/320 신규 24종 디코드·검색·선택/해제·탭 이동 유지·JS오류/넘침 없음(실생성 없음).
