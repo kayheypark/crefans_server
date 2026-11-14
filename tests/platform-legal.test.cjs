@@ -15,7 +15,7 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-14');assert.equal(p.effectiveAt,'2026-11-14');assert.equal(p.version,'2026-11-14.ai-diagnostics.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-15');assert.equal(p.effectiveAt,'2026-11-15');assert.equal(p.version,'2026-11-15.byteplus.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -102,7 +102,7 @@ test('2026-11-13 partner revision: article 6 limits withdrawals to partner creat
 // 2026-11-13: the signup gate used the UTC day while catalog() uses the KST day, so a revision effective at KST midnight
 // kept signup closed until 09:00 KST. Both now use the KST day.
 test('signup stays open right after KST midnight on a revision day',t=>{
- t.mock.timers.enable({apis:['Date'],now:new Date('2026-11-14T00:30:00+09:00')});
+ t.mock.timers.enable({apis:['Date'],now:new Date('2026-11-15T00:30:00+09:00')});
  try{const s=new LegalDocumentsService().signup();assert.equal(s.documents.terms.version,'2026-11-13.partner.1');assert.equal(s.published,true);assert.equal(s.signupReady,true);}
  finally{t.mock.timers.reset();}
 });
@@ -137,7 +137,7 @@ test('guide AI privacy notice distinguishes optional requests, provider retentio
 });
 test('privacy article 8 discloses Modusign as the e-contract processor (2026-11-12 ask-me)',()=>{
  const p=new LegalDocumentsService().catalog().documents.privacy;
- assert.equal(p.version,'2026-11-14.ai-diagnostics.1');assert.equal(p.effectiveAt,'2026-11-14');assert.equal(p.status,'published');
+ assert.equal(p.version,'2026-11-15.byteplus.1');assert.equal(p.effectiveAt,'2026-11-15');assert.equal(p.status,'published');
  const s8=p.sections.find(s=>s.title==='8. 처리 위탁과 제3자 제공');
  assert.match(s8.body,/전자계약 체결·보관을 주식회사 모두싸인에 위탁/);
  assert.ok(s8.links.some(l=>l.href==='https://support.modusign.co.kr/ko/articles/9ae892d6'),'links to Modusign privacy policy');
@@ -155,3 +155,10 @@ test('non-business creators: RRN processing basis and 5-year retention are discl
 });
 
 test('AI failure diagnostics disclose encrypted 30-day prompt retention and operator access',()=>{const p=new LegalDocumentsService().catalog().documents.privacy;const text=p.sections.find(s=>s.title==='7. 보유기간과 파기').body;assert.match(text,/질문 내용과 선택 옵션을 암호화/);assert.match(text,/실패 시점부터 30일 보관한 뒤 파기/);assert.match(text,/권한을 가진 운영자만 조회/);});
+
+test('privacy discloses BytePlus generation and OpenAI moderation with overseas transfer details (2026-11-15 ask-me)',()=>{
+ const p=new LegalDocumentsService().catalog(new Date('2026-11-15T09:00:00+09:00')).documents.privacy,s8=p.sections.find(s=>s.title==='8. 처리 위탁과 제3자 제공'),s16=p.sections.find(s=>s.title==='16. 선택 기능: 스튜디오 AI 사진 편집');
+ assert.match(s8.body,/사진 생성을 Byteplus Pte\. Ltd\.\(BytePlus ModelArk\)에, 요청 문구·사진의 유해성 검사를 OpenAI OpCo, LLC에 위탁/);assert.doesNotMatch(s8.body,/사진 편집·유해성 검사를 OpenAI/);
+ for(const needle of ['Byteplus Pte. Ltd.','privacy@byteplus.com','말레이시아, 인도네시아 및/또는 EU·EEA','180일','모델 학습에 쓰지 않습니다','OpenAI OpCo, LLC','회원 ID·이메일·이름·결제 정보·접속 IP는 AI 공급사에 보내지 않습니다','회원 탈퇴는 필요하지 않습니다'])assert.ok(s16.body.includes(needle),needle);
+ assert.ok(s16.links.some(l=>l.href.includes('BytePlus_ModelArk_Data_Processing')));assert.doesNotMatch(s16.body,/익명 식별값/);
+});
