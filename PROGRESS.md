@@ -1,3 +1,8 @@
+## 2026-11-14 배경16·포즈8 운영 배포 완료
+- 사용자 지시(운영배포까지). prod front fd493b6 / server 6ade65b(기능 브랜치와 소스 동일). API/worker=crefans-api:x-presets-20261114(costume-expansion 위 src·dist 덮어쓰기, 이미지 내 배경 참조 JS 해시가 로컬 빌드와 일치), frontend=crefans-front:front-x-presets-20261114.
+- 검증: 컨테이너 Running·재시작0, health ready, API 배경 참조 38개·비로그인401·다른 컨테이너 불변, 운영 신규 에셋 24개 HTTP 바이트 SHA-256 전부 일치, 운영 도메인 /design-system WebKit390/320 신규 24종 디코드·검색·선택/해제·탭 이동 유지·JS오류/넘침 없음(실생성 없음).
+- 복구: /Users/ethan/crefans-recovery/20261114/{x-presets-api,front-x-presets-20261114} 직전 이미지·설정 검증 후 서버 이전 태그·임시본 정리. 맥 디스크 부족으로 Docker 빌드 캐시와 서버 적재·검증이 끝난 내 임시 api.tar.gz 2개만 삭제.
+
 ## 2026-11-14 X 좋아요 사진 기반 공용 프리셋 추가: 배경16·포즈8 (/add-preset)
 - 원본: ~/x-likes/likes 사진235장(게시물63, 영상3 제외), 전부 배경·포즈 분류. 배경 신규44장/재사용175/미확인16, 포즈 신규32/재사용175/대안19/미확인9. 성적 자세 19장은 비성적 대안으로 분류·기록. 원본·게시물ID는 .local에만.
 - 신규 배경16(실내11·아웃도어5, id ead401~ead416, 1024x1536 WebP): Seedream 텍스트만으로 사람 없는 새 공간 생성(원본 미전송). 프론트·서버 바이트 동일, 서버 IDS 추가.
