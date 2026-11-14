@@ -400,3 +400,8 @@ test('second public background batch is packaged and sends all nine reference fi
  const who=await makeCreator('bgsecond_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'추가배경 QA'}});const sourceId=await media(who);
  for(let n=1;n<=9;n++){reset();const id='c8b20'+n;await photos.edit(who,base({sourceId,kind:'background',backgroundId:id}));const sent=calls.find(x=>x.kind==='edit');assert.deepEqual(sent.images[1].bytes,fs.readFileSync(path.join(__dirname,'../dist/src/platform/ai-photo-backgrounds/'+id+'.webp')));assert.match(sent.fields.prompt,/Image 2 is a public background reference/);}
 });
+
+test('third public background batch sends all six packaged reference files',async()=>{
+ const who=await makeCreator('bgthird_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'추가배경 QA'}});const sourceId=await media(who);
+ for(let n=1;n<=6;n++){reset();const id='d9c30'+n;await photos.edit(who,base({sourceId,kind:'background',backgroundId:id}));const sent=calls.find(x=>x.kind==='edit');assert.deepEqual(sent.images[1].bytes,fs.readFileSync(path.join(__dirname,'../dist/src/platform/ai-photo-backgrounds/'+id+'.webp')));assert.match(sent.fields.prompt,/Image 2 is a public background reference/);}
+});
