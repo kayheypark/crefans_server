@@ -1,3 +1,13 @@
+## 2026-11-14 AI 시도 추적 검증 완료
+- npm run build 종료0, 격리DB·공급사대역 AI/OpenAPI38/38 종료0(.local/attempt-tracing/tests-final.log). 선택/요청/응답모델,참조별검사,대기중시작기록,완료없는unknown,정책차단시생성미호출,성공질문미수집 검증. 기존실패암호화/권한/만료/동시성/전송오류회귀포함.
+- 콘솔 타입18/18·실제Next/Chromium UI대역2/2,모바일스크린샷확인. 프론트 check:docs 종료1 기존참조문서누락지속(/tmp/crefans-ai-attempt-docs.log). 실공급사재호출미실행,운영반영전. base cdcfce9,feat/ai-attempt-tracing,2026-11-14.
+
+## 2026-11-14 AI 전체 시도 추적 진행
+- 요구: 어떤모델을시도했는지 전과정추적. origin/prod cdcfce9 기준 feat/ai-attempt-tracing. 시작/성공/실패 및 모든 공급사호출/저장 시작·종료 audit기록, 선택모델과 요청모델/응답모델 분리,각요청ID·호출ID·순번·시각·소요·원인. 원본/의상참조별안전검사 식별,성공원문저장없음(실패만기존30일).
+- 콘솔 aiAttempts=true 시작행목록/상태/모델,상세200이내연결이벤트. 10분넘어완료없는시도unknown표시(실패확정아님),서버도착전요청·기존미기록이력복원범위밖.
+- 합격: 일반GPT/코스어Seedream선택과실호출분리,모더레이션별모델·참조대상·공급사ID,성공/실패/진행중·중단추정,민감본문미포함,동시성·기존30일실패진단보존. 빌드/38관련검사1차통과,최종UI/회귀예정.
+- 근거2026-11-14: https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/ 요청모델/응답모델/제공사를구분(문서가GenAI저장소로이전안내;특정SDK구현이나정식OTel준수주장없음). https://opentelemetry.io/docs/specs/semconv/http/http-spans/ HTTP상태와전송오류분리. 기존OWASP민감로그배제유지.
+
 ## 2026-11-14 AI 실패 진단 운영 완료
 - 서버9590338/콘솔89bb2cb dev→prod 반영. API/worker crefans-api:ai-failure-details-20261114, admin crefans-admin:ai-failure-details-20261114. 신규 ai_photo_failure_details 마이그레이션 성공. 로그→AI 생성 실패→상세에서 질문/옵션/단계/공급사 코드·ID. 질문30일 암호화, logs.view+members.view, 조회감사/no-store/worker파기.
 - 관련55/55·콘솔18/18·모바일1/1, 운영18파일SHA일치·신규테이블읽기·운영키암호화/권한/만료 대역통과·비로그인상세401·세서비스재시작0. 실사용자 실패요청을 유발한 전체흐름 검사는 하지 않음. 근거 docs/ai-photo-failures-20261114.json 및 .local/deploy/{runtime-check.json,runtime-sha.log,runtime-services-final.log,deploy-api-retry.log}. 전체문서검사와기존watchdog2실패는상단검증기록참고.

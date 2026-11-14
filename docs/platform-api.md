@@ -636,3 +636,6 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 
 ### AI 사진 실패 진단
 운영 로그 `ai-photo.failed`를 요청 ID로 찾을 수 있습니다. `/admin/logs/:id`의 `aiFailure`는 available/expired/restricted/unavailable 상태를 반환하며, 로그+회원 조회 권한이 있는 운영자에게만 30일 이내 질문·선택옵션·실패단계·공급사 코드와 ID를 제공합니다. 조회 감사 및 no-store 적용. 일반 로그/목록에 질문은 포함하지 않습니다.
+
+### AI 생성 시도 이력
+`GET /admin/logs?aiAttempts=true`는 시작기록을 요청당1개와 aiAttempt 요약(status,selectedModel,selectedProvider,attemptedModels,currentStage,durationMs)으로 반환합니다. status는 in_progress/succeeded/failed/unknown이며 unknown은 시작10분후최종기록없음입니다. `/admin/logs/:id`의 aiAttempt.events는 동일요청모델호출·단계이력을 제공합니다. 실제요청model과 제공사responseModel은 별도이며 미제공값을추정하지않습니다. 성공요청의원문은기록하지않습니다.

@@ -155,6 +155,7 @@ test('catalog reference images: real selected bytes reach both moderation and ed
  const user=await makeCreator('airef_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
  reset();const ids=['blue-shiroko','blue-aris'],prompt='의상 참조 사진 1의 코디를 적용해줘. 흰 스튜디오';
  await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:JSON.stringify(ids),prompt}),await mask());
+ const tracedInputs=await db.platformAuditLog.findMany({where:{actor_id:user,action:'ai-photo.step.started',metadata:{path:'$.operation',equals:'input'}},orderBy:{occurred_at:'asc'}});assert.deepEqual(tracedInputs.map(r=>r.metadata.source),['original','costume-reference-1','costume-reference-2']);
  const edit=calls.find(c=>c.kind==='edit'),inputs=calls.filter(c=>c.kind==='moderation').slice(0,3);assert.equal(edit.fields['image[]'].length,4);assert.equal(inputs.length,3);for(const c of inputs){assert.equal(c.body.input.filter(i=>i.type==='image_url').length,1);assert.equal(c.body.input[0].text,prompt);}
  for(const [i,ref] of ids.entries()){const bytes=await readCostumeReference(ref);assert.deepEqual(edit.fields['image[]'][i+2].bytes,bytes);assert.equal(inputs[i+1].body.input[1].image_url.url,'data:image/webp;base64,'+bytes.toString('base64'));}
  assert.match(edit.fields.prompt,/Images 3 through 4/);assert.match(edit.fields.prompt,/Do not copy the reference mannequin/);assert.ok(edit.fields.prompt.includes(prompt));assert.match(edit.fields.prompt,/Background:/);assert.equal(edit.fields.moderation,'auto');assert.equal(edit.fields.n,'1');assert.equal(calls.filter(c=>c.kind==='moderation').length,4);
@@ -265,4 +266,30 @@ test('transport failure and timeout remain distinct and retain the underlying fa
   reset();const requestId=crypto.randomUUID();photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);const e=new Error('secret URL must not be logged');e.name=name;e.cause={code:cause};throw e;};
   await assert.rejects(requestContext.run({requestId,ip:'',peerIp:''},()=>photos.edit(user,base({sourceId:source}))),code(wanted));const row=await db.platformAuditLog.findFirst({where:{request_id:requestId,action:'ai-photo.failed'}});assert.equal(row.metadata.operation,'generation');assert.equal(row.metadata.providerCode,cause||wanted);assert.equal(row.metadata.errorCode,wanted);assert.equal((await photos.quota(user)).remaining,10);
  }}finally{photos.fetcher=stub;}
+});
+
+test('attempt traces distinguish planned and actually called models, responses and every provider step',async()=>{
+ const {requestContext}=require('../dist/src/platform/request-context'),{adminLogs,adminLogDetail}=require('../dist/src/platform/admin-logs'),{ConfigService}=require('@nestjs/config');
+ const user=await makeCreator('aitrace_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트'}});const id=await media(user),previous={...photos.settings},admin={id:crypto.randomUUID(),role:'SUPER_ADMIN'};
+ Object.assign(photos.settings,{cosplayProvider:'seedream',seedreamKey:'test-key'});
+ photos.fetcher=async(url,init)=>url.endsWith('/images/generations')?new Response(JSON.stringify({model:'resolved-seedream-test',data:[{b64_json:(await png(600,900)).toString('base64')}]}),{headers:{'x-tt-logid':'seedream_trace_123'}}):stub(url,init);
+ try{
+  reset();const requestId=crypto.randomUUID();const result=await requestContext.run({requestId,ip:'',peerIp:''},()=>photos.edit(user,base({sourceId:id,mode:'cosplay',prompt:'trace-private-marker'})));
+  const rows=await db.platformAuditLog.findMany({where:{request_id:requestId},orderBy:{occurred_at:'asc'}}),start=rows.find(r=>r.action==='ai-photo.started');assert.equal(start.metadata.selectedModel,'dola-seedream-5-5-261028');const starts=rows.filter(r=>r.action==='ai-photo.step.started');assert.deepEqual(starts.map(r=>r.metadata.operation),['input','generation','output','storage']);assert.equal(new Set(starts.map(r=>r.metadata.attemptId)).size,4);
+  for(const step of starts){const end=rows.find(r=>r.action==='ai-photo.step.succeeded'&&r.metadata.attemptId===step.metadata.attemptId);assert.ok(end);assert.ok(end.duration_ms>=0);}
+  const generation=rows.find(r=>r.action==='ai-photo.step.succeeded'&&r.metadata.operation==='generation');assert.equal(generation.metadata.model,'dola-seedream-5-5-261028');assert.equal(generation.metadata.responseModel,'resolved-seedream-test');assert.equal(generation.metadata.providerRequestId,'seedream_trace_123');assert.equal(rows.find(r=>r.action==='ai-photo.succeeded').metadata.targetId,result.images[0].id);
+  assert.doesNotMatch(JSON.stringify(rows),/trace-private-marker|base64|test-key/);assert.equal(await db.aiPhotoFailureDetail.findUnique({where:{request_id:requestId}}),null,'successful prompt is not stored');
+  const list=await adminLogs(db,admin,{aiAttempts:'true',requestId});assert.equal(list.total,1);assert.equal(list.items[0].aiAttempt.status,'succeeded');assert.deepEqual(list.items[0].aiAttempt.attemptedModels,['omni-moderation-latest','dola-seedream-5-5-261028']);const detail=await adminLogDetail(db,admin,start.id,new ConfigService());assert.equal(detail.aiAttempt.events.length,rows.length);assert.equal(detail.aiFailure,null);
+  reset();flags=[true];const blocked=crypto.randomUUID();await assert.rejects(requestContext.run({requestId:blocked,ip:'',peerIp:''},()=>photos.edit(user,base({sourceId:id,mode:'cosplay'}))),code('UNSAFE_INPUT'));
+  const denied=await adminLogs(db,admin,{aiAttempts:'true',requestId:blocked});assert.equal(denied.items[0].aiAttempt.status,'failed');assert.deepEqual(denied.items[0].aiAttempt.attemptedModels,['omni-moderation-latest']);assert.equal(denied.items[0].aiAttempt.selectedModel,'dola-seedream-5-5-261028');
+ }finally{Object.assign(photos.settings,previous);photos.fetcher=stub;}
+});
+
+test('attempt start is persisted while provider is pending; incomplete old attempts are unknown, not success',async()=>{
+ const {requestContext}=require('../dist/src/platform/request-context'),{adminLogs}=require('../dist/src/platform/admin-logs'),{auditRow}=require('../dist/src/platform/audit');
+ const user=await makeCreator('aipending_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트'}});const source=await media(user),requestId=crypto.randomUUID(),admin={role:'SUPER_ADMIN'};let releaseCall,enteredCall;const gate=new Promise(r=>releaseCall=r),entered=new Promise(r=>enteredCall=r);reset();
+ photos.fetcher=async(url,init)=>{if(url.endsWith('/images/edits')){enteredCall();await gate;}return stub(url,init);};
+ const pending=requestContext.run({requestId,ip:'',peerIp:''},()=>photos.edit(user,base({sourceId:source})));
+ try{await entered;const list=await adminLogs(db,admin,{aiAttempts:'true',requestId});assert.equal(list.items[0].aiAttempt.status,'in_progress');assert.ok(list.items[0].aiAttempt.attemptedModels.includes(photos.settings.model));}finally{releaseCall();await pending;photos.fetcher=stub;}
+ const old=crypto.randomUUID();await db.platformAuditLog.create({data:{...auditRow({category:'business',action:'ai-photo.started',data:{model:'gpt-image-2'}},{requestId:old,ip:'',peerIp:''}),occurred_at:new Date(Date.now()-660000)}});const result=await adminLogs(db,admin,{aiAttempts:'true',requestId:old});assert.equal(result.items[0].aiAttempt.status,'unknown');assert.deepEqual(result.items[0].aiAttempt.attemptedModels,[]);
 });

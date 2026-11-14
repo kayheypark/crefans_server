@@ -12,17 +12,29 @@ export function auditView(row:any){return{id:row.id,category:row.category,action
 export async function adminLogs(db:any,admin:any,query:any){
  logAdmin(admin);const period=revenuePeriod(query),{page,size,skip}=adminPage(query),category=filter(query,'category',24),level=filter(query,'level',8),ip=filter(query,'ip',45);
  if(category&&!auditCategories.includes(category as any)||level&&!['info','warning','error'].includes(level)||ip&&!isIP(ip))reject(400,'INVALID_LOG_FILTER','로그 필터를 확인해주세요.');
+ if(query.aiAttempts!==undefined&&!['true','false'].includes(query.aiAttempts))reject(400,'INVALID_LOG_FILTER','AI 시도 필터를 확인해주세요.');
  const where:any={occurred_at:{gte:period.start,lt:period.end},...(category?{category}:{}),...(level?{level}:{}),...(ip?{ip}:{})};
  for(const [key,column]of[['requestId','request_id'],['actorId','actor_id'],['entityId','entity_id'],['jobId','job_id'],['action','action']]){const value=filter(query,key);if(value)where[column]=value;}
+ if(query.aiAttempts==='true')where.action='ai-photo.started';
  const [rows,total]=await db.$transaction([db.platformAuditLog.findMany({where,orderBy:[{occurred_at:'desc'},{id:'desc'}],skip,take:size}),db.platformAuditLog.count({where})]);
- return{items:rows.map(auditView),total,page,pageSize:size,period:{from:period.from,to:period.to,timeZone:'Asia/Seoul'}};
+ const ids=rows.filter(r=>r.action==='ai-photo.started').map(r=>r.request_id).filter(Boolean);
+ const events=ids.length?await db.platformAuditLog.findMany({where:{request_id:{in:ids},action:{in:['ai-photo.succeeded','ai-photo.failed','ai-photo.phase.started','ai-photo.step.started']}},orderBy:[{occurred_at:'asc'},{id:'asc'}]}):[];
+ return{items:rows.map(r=>({...auditView(r),...(r.action==='ai-photo.started'?{aiAttempt:attemptView([r,...events.filter(e=>e.request_id===r.request_id)])}:{})})),total,page,pageSize:size,period:{from:period.from,to:period.to,timeZone:'Asia/Seoul'}};
 }
 export async function adminLogDetail(db:any,admin:any,id:string,config?:ConfigService){
  logAdmin(admin);if(!/^[a-f0-9-]{36}$/i.test(id))reject(400,'INVALID_LOG_ID','로그 ID를 확인해주세요.');const row=await db.platformAuditLog.findUnique({where:{id}});if(!row)reject(404,'LOG_NOT_FOUND','로그를 찾을 수 없습니다.');
  const links=[...(row.request_id?[{request_id:row.request_id}]:[]),...(row.entity_id?[{entity_id:row.entity_id}]:[]),...(row.job_id?[{job_id:row.job_id}]:[])];
  const related=links.length?await db.platformAuditLog.findMany({where:{OR:links},orderBy:[{occurred_at:'desc'},{id:'desc'}],take:101}):[row];
  const delivery=row.source_id?await db.platformOperationalEvent.findUnique({where:{id:row.source_id},select:{attempts:true,available_at:true,delivered_at:true,last_error_code:true}}):null;
+ const attemptEvents=row.request_id?await db.platformAuditLog.findMany({where:{request_id:row.request_id,action:{startsWith:'ai-photo.'}},orderBy:[{occurred_at:'asc'},{id:'asc'}],take:200}):[];
+ const aiAttempt=attemptEvents.some(r=>r.action==='ai-photo.started')?{...attemptView(attemptEvents),events:attemptEvents.map(auditView)}:null;
  const failure=related.find(r=>r.action==='ai-photo.failed');
  const aiFailure=failure?.request_id?await aiFailureDetail(db,admin,failure.request_id,config):null;
- return{aiFailure,event:auditView(row),timeline:related.slice(0,100).reverse().map(auditView),hasMore:related.length>100,delivery};
+ return{aiAttempt,aiFailure,event:auditView(row),timeline:related.slice(0,100).reverse().map(auditView),hasMore:related.length>100,delivery};
+}
+
+function attemptView(events:any[]){
+ const start=events.find(r=>r.action==='ai-photo.started'),end=events.find(r=>['ai-photo.succeeded','ai-photo.failed'].includes(r.action)),steps=events.filter(r=>r.action==='ai-photo.step.started');
+ const phases=events.filter(r=>r.action==='ai-photo.phase.started');
+ return{status:end?.action==='ai-photo.succeeded'?'succeeded':end?'failed':start&&Date.now()-new Date(start.occurred_at).getTime()>600000?'unknown':'in_progress',selectedModel:start?.metadata?.selectedModel||null,selectedProvider:start?.metadata?.selectedProvider||null,currentStage:phases[phases.length-1]?.metadata?.operation||'validation',attemptedModels:[...new Set(steps.map(r=>r.metadata?.model).filter(Boolean))],durationMs:end?.duration_ms??null};
 }
