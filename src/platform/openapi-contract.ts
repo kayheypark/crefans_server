@@ -211,13 +211,13 @@ add('post','admin/revenue/{id}/receipt','금융 정책','PG 실제 입금 수동
 
 // Bean support is independent from membership checkout and income ledgers.
 const beanQuantity={type:'integer' as const,minimum:1,maximum:100000};
-// 2026-11-06: 충전만 토스 신고 단건 최고가(10,000콩 x 110원 = 1,100,000원)로 제한한다. 후원·출금은 PG 결제가 아니라 기존 상한을 쓴다.
-const beanInput=object({quantity:{...beanQuantity,maximum:10000},requestId:maxString(100)},['quantity','requestId']);
+// 2026-11-14: 충전만 단건 900콩 x 110원 = 99,000원으로 제한한다(KG이니시스 카드사 사이버머니 기준). 후원·출금은 PG 결제가 아니라 기존 상한을 쓴다.
+const beanInput=object({quantity:{...beanQuantity,maximum:900},requestId:maxString(100)},['quantity','requestId']);
 const eventClaimResponse=object({status:enumeration('available','claimed','ineligible','unavailable'),quantity:integer,claimedAt:{type:'string',format:'date-time',nullable:true},expiresAt:{type:'string',format:'date-time',nullable:true}});
 add('get','events/promotion-beans','콩','프로모션 100콩 이벤트 수령 상태',{response:eventClaimResponse,description:'본인 상태만 조회. 활성·이메일 확인된 전체 회원에게 계정당1회100콩. 명단/인원 상한 없음. 콩 기능 중지 시 신규 지급 불가. 수령 시각과 원본 로트의 만료 시각을 반환하며 만료 후에도 재수령 불가.'});
 add('post','events/promotion-beans/claim','콩','프로모션 100콩 즉시 받기',{body:object({}),response:eventClaimResponse,description:'빈 객체만 허용. 수량·회원·멱등키는 서버 고정. 회사 지갑 잠금 안에서 계정 상태/이전 수령을 재검사하고 재고·원장·수령 시점부터30일 프로모션 로트·감사를 함께 커밋. 재시도는 기존 지급·만료 시각 반환. 본인 지급 콩은 출금 불가, 후원 수익 조건은 기존 정책 유지.'});
 add('get','beans/wallet','콩','내 콩 지갑·이동 내역',{query:[query('page',integer),query('from',date),query('to',date),query('status',enumeration('pending','processing','paid','failed','cancelled','disputed')),query('direction',enumeration('in','out'))],response:json,description:'본인 지갑만 조회. 기간은 KST 날짜 양끝 포함. 충전 주문 status/이동 delta 부호 direction 필터를 전체 목록에 적용한 뒤 각각20개씩 페이지네이션. chargesTotal/entriesTotal은 필터 적용 총수. charges[].createdAt은 주문 생성 ISO 시각으로 화면 CF-YYYYMMDDHHmmss(KST) 표시용. UUID id는 결제/권한 식별에 계속 사용. BigInt 잔액/증감은10진 문자열이며 지갑 잔액은 필터와 무관. 후원 이동은 movement.tip에 sourceType/postTitle/postTitleSource/postAvailable을 제공합니다. 기존 원장 reason은 수정하지 않습니다.'});
-add('post','beans/charges','콩','일회성 콩 충전 주문·재고 예약',{body:beanInput,response:json,description:'한 번에 10,000콩(1,100,000원)까지. 초과는 400 INVALID_BEAN_QUANTITY.'});
+add('post','beans/charges','콩','일회성 콩 충전 주문·재고 예약',{body:beanInput,response:json,description:'한 번에 900콩(99,000원)까지. 초과는 400 INVALID_BEAN_QUANTITY. 회원별 KST 하루 200,000원(beanPolicy.dailyChargeLimitKrw, 결제 대기·환불 주문 포함)을 넘으면 429 BEAN_DAILY_LIMIT. 월 한도(monthlyChargeLimitKrw)는 꺼짐.'});
 add('get','beans/charges/{id}','콩','본인 충전 주문 조회',{response:json});
 add('post','beans/charges/{id}/payment-window','콩','Toss 일회성 충전 결제창 정보',{body:object({paymentTerms:str('결제 조건 동의 버전(payment-terms.ts, 현재 2026-11-02.1)')},['paymentTerms']),response:json,description:'paymentTerms가 다르거나 없으면 400 PAYMENT_TERMS_REQUIRED, 동의는 member_consents(kind payment-terms)에 남깁니다.'});
 add('post','beans/charges/{id}/confirm','콩','서버 충전 승인·중복 방지',{body:object({paymentKey:secret('PG 결제 인증 키'),orderId:str(),amount:money},['paymentKey','orderId','amount']),response:json,description:'서버 원주문·금액·통화·승인잔액·결제키 일치 후 콩을1회 지급합니다. 결과불명은 같은 주문으로 조회합니다.'});

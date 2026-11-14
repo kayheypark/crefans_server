@@ -35,11 +35,26 @@ const EVENT_ACTOR='system:event:promotion-beans-v1',EVENT_PREFIX='event:promotio
 const quantity=(v:any)=>{if(!Number.isSafeInteger(v)||v<1||v>100000)reject(400,'INVALID_BEAN_QUANTITY','1~100,000콩 사이의 정수로 입력해주세요.');return v as number;};
 const view=(v:any):any=>JSON.parse(JSON.stringify(v,(_k,x)=>typeof x==='bigint'?x.toString():x));
 const pageOf=(v:any)=>{const p=Number(v||1);if(!Number.isSafeInteger(p)||p<1||p>10000)reject(400,'INVALID_PAGE','페이지를 확인해주세요.');return p;};
+// 2026-11-09 충전 누적 한도: KST 오늘 0시·이번 달 1일 0시부터 만든 주문의 결제 금액을 더한다.
+export const chargeWindowStarts=(now:Date)=>{const day=dateOnly(now);return{day:new Date(`${day}T00:00:00+09:00`),month:new Date(`${day.slice(0,7)}-01T00:00:00+09:00`)};};
+const chargeLimit=(v:number|null|undefined)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0?v:null;
+const won=(n:number)=>`${n.toLocaleString('ko-KR')}원`;
 const BEAN_NOTE_MAX=500,BEAN_REJECT_PREFIX='수동 이체 반려 · ';
 @Injectable()
 export class BeansService {
  constructor(private service:PlatformService,private finance:PlatformFinanceService,private provider:PaymentProvider,private bank:BankProvider,private config:ConfigService){}
  get db(){return this.service.db;}
+ // Read from beanPolicy; null or 0 disables a limit. Kept on the instance only so isolated tests can switch limits on.
+ chargeLimits={daily:beanPolicy.dailyChargeLimitKrw,monthly:beanPolicy.monthlyChargeLimitKrw};
+ // Single-charge cap from beanPolicy; on the instance for the same reason, so ledger fixtures can buy more than one payment allows.
+ maxChargeQuantity=beanPolicy.maxChargeQuantity;
+ // Counts orders that took or may still take money: paid (refunds included, gross amount), disputed, processing and unexpired pending.
+ // Failed, cancelled and expired pending orders can no longer be paid and are not counted. null when both limits are off.
+ private async chargeUsage(db:any,member:string,now=new Date()){
+  const daily=chargeLimit(this.chargeLimits.daily),monthly=chargeLimit(this.chargeLimits.monthly);if(daily===null&&monthly===null)return null;
+  const starts=chargeWindowStarts(now),sum=async(from:Date)=>(await db.beanCharge.aggregate({_sum:{amount:true},where:{member_id:member,created_at:{gte:from},OR:[{status:{in:['processing','paid','disputed']}},{status:'pending',expires_at:{gt:now}}]}}))._sum.amount||0;
+  return{dailyLimitKrw:daily,monthlyLimitKrw:monthly,dailyRemainingKrw:daily===null?null:Math.max(0,daily-await sum(starts.day)),monthlyRemainingKrw:monthly===null?null:Math.max(0,monthly-await sum(starts.month))};
+ }
  available(){return this.config.get('BEAN_LEDGER_ENABLED')==='true';}
  enabled(){if(!this.available())reject(503,'BEANS_DISABLED','콩 후원을 준비 중입니다.');}
  private admin(a:any,action:AdminAction){requirePermission(a,'beans',action);}
@@ -99,13 +114,17 @@ export class BeansService {
   const movementViews=movements.map(m=>({...m,tip:linkedTips.find(t=>t.id===m.reference_id)}));
   const charges=await this.db.beanCharge.findMany({where:chargeWhere,orderBy:[{created_at:'desc'},{id:'desc'}],take:20,skip:(p-1)*20});
   const spendable=await this.db.beanLot.groupBy({by:['bucket'],where:{member_id:member,bucket:{in:['purchased','promotion']},frozen:false,OR:[{expires_at:null},{expires_at:{gt:new Date()}}]},_sum:{available:true}}),spendableBreakdown={purchased:spendable.find(row=>row.bucket==='purchased')?._sum.available||0,promotion:spendable.find(row=>row.bucket==='promotion')?._sum.available||0},eligible=await this.eligible(this.db,member);
-  return view({walletId:w.id,status:w.status,spendableBeans:spendableBreakdown.purchased+spendableBreakdown.promotion,spendableBreakdown,withdrawableBeans:eligible.reduce((sum,lot)=>sum+lot.available,0),withdrawableBreakdown:{paid:eligible.filter(l=>l.bucket==='earned-paid').reduce((n,l)=>n+l.available,0),promotion:eligible.filter(l=>l.bucket==='earned-promotion').reduce((n,l)=>n+l.available,0)},accounts,charges:charges.map(o=>this.chargeView(o)),expiringSoon:await this.expiringSoon(member),chargesTotal:await this.db.beanCharge.count({where:chargeWhere}),entries:entries.map(e=>({...e,movement:movementViews.find(m=>m.id===e.movement_id)})),entriesTotal:await this.db.beanEntry.count({where:entryWhere}),page:p,policy:beanPolicy});
+  return view({walletId:w.id,status:w.status,spendableBeans:spendableBreakdown.purchased+spendableBreakdown.promotion,spendableBreakdown,withdrawableBeans:eligible.reduce((sum,lot)=>sum+lot.available,0),withdrawableBreakdown:{paid:eligible.filter(l=>l.bucket==='earned-paid').reduce((n,l)=>n+l.available,0),promotion:eligible.filter(l=>l.bucket==='earned-promotion').reduce((n,l)=>n+l.available,0)},accounts,charges:charges.map(o=>this.chargeView(o)),expiringSoon:await this.expiringSoon(member),chargesTotal:await this.db.beanCharge.count({where:chargeWhere}),entries:entries.map(e=>({...e,movement:movementViews.find(m=>m.id===e.movement_id)})),entriesTotal:await this.db.beanEntry.count({where:entryWhere}),page:p,policy:beanPolicy,chargeLimits:await this.chargeUsage(this.db,member)});
  }
 
- async createCharge(member:string,input:any){this.enabled();const q=quantity(input.quantity);if(q>beanPolicy.maxChargeQuantity)reject(400,'INVALID_BEAN_QUANTITY',`한 번에 ${beanPolicy.maxChargeQuantity.toLocaleString('ko-KR')}콩까지 충전할 수 있습니다.`);const key=text(input.requestId,100),environment=this.environment();return this.transaction(async tx=>{
+ async createCharge(member:string,input:any){this.enabled();const q=quantity(input.quantity);if(q>this.maxChargeQuantity)reject(400,'INVALID_BEAN_QUANTITY',`한 번에 ${this.maxChargeQuantity.toLocaleString('ko-KR')}콩까지 충전할 수 있습니다.`);const key=text(input.requestId,100),environment=this.environment();return this.transaction(async tx=>{
   await this.lock(tx,[member],true);const old=await tx.beanCharge.findUnique({where:{request_key:key}});if(old){if(old.member_id!==member||old.quantity!==q)reject(409,'BEAN_REQUEST_CONFLICT','다른 충전에 사용한 요청입니다.');return this.chargeView(old);}
   if(await tx.beanCharge.count({where:{member_id:member,status:{in:['pending','processing']}}})>=5)reject(429,'BEAN_OPEN_CHARGE_LIMIT','진행 중인 충전을 먼저 완료하거나 만료 후 다시 시도해주세요.');
-  const o=await tx.beanCharge.create({data:{member_id:member,request_key:key,quantity:q,amount:q*beanPolicy.chargeKrwPerBean,environment,expires_at:new Date(Date.now()+1800000)}});
+  // The member wallet row is locked above, so concurrent orders of one member are summed one at a time.
+  const amount=q*beanPolicy.chargeKrwPerBean,limits=await this.chargeUsage(tx,member);
+  if(limits?.dailyRemainingKrw!=null&&amount>limits.dailyRemainingKrw)reject(429,'BEAN_DAILY_LIMIT',`하루 충전 한도는 ${won(limits.dailyLimitKrw!)}입니다. 오늘 더 충전할 수 있는 금액은 ${won(limits.dailyRemainingKrw)}입니다.`);
+  if(limits?.monthlyRemainingKrw!=null&&amount>limits.monthlyRemainingKrw)reject(429,'BEAN_MONTHLY_LIMIT',`한 달 충전 한도는 ${won(limits.monthlyLimitKrw!)}입니다. 이번 달 더 충전할 수 있는 금액은 ${won(limits.monthlyRemainingKrw)}입니다.`);
+  const o=await tx.beanCharge.create({data:{member_id:member,request_key:key,quantity:q,amount,environment,expires_at:new Date(Date.now()+1800000)}});
   await this.move(tx,`charge-reserve:${o.id}`,'charge.reserve',member,'충전 주문 재고 예약',o.id,[{member:'company',bucket:'stock',delta:-q},{member:'company',bucket:'charge-reserved',delta:q}]);await this.event(tx,'beans.charge_created',o.id,member,o.amount);return this.chargeView(o);
  });}
  async charge(member:string,id:string){this.enabled();const o=await this.db.beanCharge.findFirst({where:{id,member_id:member}});if(!o)reject(404,'BEAN_CHARGE_NOT_FOUND','충전 주문이 없습니다.');return this.chargeView(o);}

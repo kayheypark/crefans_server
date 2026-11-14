@@ -373,8 +373,8 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | PUT | /me/founding-badge | {visible:boolean}만 허용. 세션 본인이 이미 수령한 배지의 표시·숨김만 변경. 미수령409 BADGE_NOT_CLAIMED, 잘못된 값400 |
 | GET | /events/promotion-beans | 회원 본인 이벤트 상태만. available/claimed/ineligible/unavailable, quantity100, claimedAt/expiresAt. 원장 변경 없음, 전체 활성·이메일 확인 회원 |
 | POST | /events/promotion-beans/claim | 회원 본인 고정100콩 즉시 수령. 빈 객체만 허용(400 INVALID_EVENT_CLAIM). 계정 상태/이전 수령 재검사, 회사/회원 잠금과 BeanPromotion 고유 키로 중복 방지. 잔액·로트·감사 원자적 반영. 재시도는 기존 지급·만료 시각 반환, 신규 지급 없이 ineligible/unavailable 반환 가능 |
-| GET | /beans/wallet | 세션 본인 지갑 멱등 생성·5원장잔액·사용가용 합/일반·프로모션 세부합·일반·프로모션 후원 출처 심사 후 출금가용 합/종류별 합·필터 후 충전/이동 각20건·총수, page/from/to/status/direction (후속 필터는 로컬 반영) |
-| POST | /beans/charges | quantity(1~10000 정수, beanPolicy.maxChargeQuantity; 2026-11-06 토스 신고 단건 최고가 1,100,000원에 맞춤. 후원 수량은 PG 결제가 아니므로 이 상한을 쓰지 않는다), requestId; 110원/콩(VAT 포함) 서버 계산, 환경 snapshot·30분 주문·회사재고 예약, 미완료 최대5건 |
+| GET | /beans/wallet | 세션 본인 지갑 멱등 생성·5원장잔액·사용가용 합/일반·프로모션 세부합·일반·프로모션 후원 출처 심사 후 출금가용 합/종류별 합·필터 후 충전/이동 각20건·총수, page/from/to/status/direction (후속 필터는 로컬 반영). chargeLimits: 충전 누적 한도가 켜졌을 때만 {dailyLimitKrw,monthlyLimitKrw,dailyRemainingKrw,monthlyRemainingKrw}(꺼진 한도는 null), 둘 다 꺼지면 null |
+| POST | /beans/charges | quantity(1~900 정수, beanPolicy.maxChargeQuantity; 2026-11-14 KG이니시스 카드사 사이버머니 기준에 맞춰 99,000원으로 낮춤(이전 11-06 토스 신고값 10,000콩·1,100,000원). 후원 수량은 PG 결제가 아니므로 이 상한을 쓰지 않는다), requestId; 110원/콩(VAT 포함) 서버 계산, 환경 snapshot·30분 주문·회사재고 예약, 미완료 최대5건. 2026-11-09 충전 누적 한도(beanPolicy.dailyChargeLimitKrw·monthlyChargeLimitKrw, 결제 금액 원 기준, null=꺼짐; 2026-11-14부터 하루 200,000원 켬, 월 한도 꺼짐): 회원 지갑 잠금 뒤 KST 오늘 0시/이번 달 1일 0시 이후 만든 주문 중 paid(환불분 포함 총액)·disputed·processing·미만료 pending 금액 합 + 새 주문 금액이 한도를 넘으면 429 BEAN_DAILY_LIMIT/BEAN_MONTHLY_LIMIT(남은 금액 안내). failed·cancelled·만료 pending 제외. 같은 requestId 재시도는 한도 검사 전에 기존 주문 반환 |
 | GET | /beans/charges/:id | 본인 충전 상태, 타인404, paymentKey 미노출 |
 | POST | /beans/charges/:id/payment-window | 본인 유효 주문, 환경 일치·개별 결제창 clientKey/customerKey/orderId/amount |
 | POST | /beans/charges/:id/confirm | paymentKey/orderId/amount 검증, PG lookup/confirm, 원주문 lease·1회 lot/원장; 불확실 결과는 재조회 |
