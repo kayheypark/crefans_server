@@ -153,7 +153,7 @@ test('catalog reference images: real selected bytes reach both moderation and ed
  assert.equal(AI_PHOTO_COSTUME_IDS.length,40);
  for(const id of AI_PHOTO_COSTUME_IDS){const bytes=await readCostumeReference(id),m=await sharp(bytes).metadata();assert.equal(m.format,'webp');assert.equal(m.width,512);assert.equal(m.height,512);}
  const user=await makeCreator('airef_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
- reset();const ids=['blue-shiroko','blue-aris'],prompt='의상 참조 사진 1의 코디를 적용해줘. 흰 스튜디오';
+ reset();const ids=['80bdd0','29581e'],prompt='의상 참조 사진 1의 코디를 적용해줘. 흰 스튜디오';
  await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:JSON.stringify(ids),prompt}),await mask());
  const tracedInputs=await db.platformAuditLog.findMany({where:{actor_id:user,action:'ai-photo.step.started',metadata:{path:'$.operation',equals:'input'}},orderBy:{occurred_at:'asc'}});assert.deepEqual(tracedInputs.map(r=>r.metadata.source),['original','costume-reference-1','costume-reference-2']);
  const edit=calls.find(c=>c.kind==='edit'),inputs=calls.filter(c=>c.kind==='moderation').slice(0,3);assert.equal(edit.images.length,4);assert.equal(inputs.length,3);for(const c of inputs){assert.equal(c.body.input.filter(i=>i.type==='image_url').length,1);assert.equal(c.body.input[0].text,prompt);}
@@ -291,4 +291,13 @@ test('attempt start is persisted while provider is pending; incomplete old attem
  const pending=requestContext.run({requestId,ip:'',peerIp:''},()=>photos.edit(user,base({sourceId:source})));
  try{await entered;const list=await adminLogs(db,admin,{aiAttempts:'true',requestId});assert.equal(list.items[0].aiAttempt.status,'in_progress');assert.ok(list.items[0].aiAttempt.attemptedModels.includes(photos.settings.model));}finally{releaseCall();await pending;photos.fetcher=stub;}
  const old=crypto.randomUUID();await db.platformAuditLog.create({data:{...auditRow({category:'business',action:'ai-photo.started',data:{model:'gpt-image-2'}},{requestId:old,ip:'',peerIp:''}),occurred_at:new Date(Date.now()-660000)}});const result=await adminLogs(db,admin,{aiAttempts:'true',requestId:old});assert.equal(result.items[0].aiAttempt.status,'unknown');assert.deepEqual(result.items[0].aiAttempt.attemptedModels,[]);
+});
+
+
+test('six-character costume IDs map to identical assets and normalize legacy aliases before duplicates',async()=>{
+ const {AI_PHOTO_COSTUME_IDS,costumeReferenceIds,readCostumeReference}=require('../dist/src/platform/ai-photo-costume-references');
+ assert.equal(AI_PHOTO_COSTUME_IDS.length,40);assert.equal(new Set(AI_PHOTO_COSTUME_IDS).size,40);for(const id of AI_PHOTO_COSTUME_IDS)assert.match(id,/^[a-f0-9]{6}$/);
+ const mapping={"maid": "773106", "sailor": "80974e", "gothic": "ffb58f", "mage": "666147", "cyber": "b4bf5d", "idol": "e614f6", "cheer": "190513", "beach": "ab36e8", "nikke-rapi": "313a28", "nikke-anis": "1947f3", "nikke-helm": "173f1e", "nikke-noir": "ce1f18", "overwatch-dva": "70219a", "overwatch-mercy": "7281fe", "overwatch-widow": "8971c9", "overwatch-ashe": "9a01b2", "diablo-sorcerer": "da6901", "diablo-necromancer": "87ad51", "diablo-rogue": "72db9a", "diablo-barbarian": "b3bfdd", "aot-scout": "1a73b4", "aot-captain": "3e20e3", "aot-police": "556b2b", "aot-final": "8f1113", "demon-giyu": "c65204", "demon-shinobu": "9e6184", "demon-rengoku": "8d3d3e", "demon-mitsuri": "6ee320", "jjk-gojo": "07c722", "jjk-nanami": "edf3b8", "jjk-geto": "6c9ecb", "jjk-toji": "a77dd5", "genshin-raiden": "b516a6", "genshin-jean": "752866", "genshin-zhongli": "2056e8", "genshin-diluc": "d69be9", "blue-shiroko": "80bdd0", "blue-hoshino": "4298dc", "blue-yuuka": "c7289e", "blue-aris": "29581e"};
+ for(const [old,id] of Object.entries(mapping)){assert.deepEqual(costumeReferenceIds([old],['outfit'],'cosplay'),[id]);assert.deepEqual(costumeReferenceIds([id],['outfit'],'cosplay'),[id]);assert.deepEqual(await readCostumeReference(id),await readCostumeReference(old));assert.throws(()=>costumeReferenceIds([old,id],['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));}
+ for(const id of ['ffffff','__proto__','constructor','../maid']){assert.throws(()=>costumeReferenceIds([id],['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));await assert.rejects(readCostumeReference(id),code('INVALID_COSTUME_REFERENCES'));}
 });

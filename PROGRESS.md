@@ -1,3 +1,34 @@
+## 2026-11-14 의상6자리해시ID 검증 완료
+- 라피ID313a28,40종모두고유6자리. 서버빌드0·격리DB/공급사대역39/39·프론트단위/전송50/50·타입0. 프론트/서버40매핑과에셋bytes일치. 이전ID/새ID동일이미지·혼합중복/미등록/경로/프로토타입키거절 검사. 증거 양리포 `.local/costume-hash/`, 서버catalog-check.json. 실제공급사재호출없음. 서버먼저배포예정.
+
+## 2026-11-14 의상6자리해시ID 전환 진행
+- 사용자요청: nikke-rapi 등 의미있는 의상ID를 고정6자리SHA256앞부분으로 교체. 40종충돌없음. 프론트새ID전송, 서버명시매핑으로기존에셋읽기. 이전ID는기존열린화면호환을위해정규화후중복검사. 화면명·이미지·프롬프트·공급사안전검사변경없음.
+- 합격:40고유6자리ID/프론트서버매핑일치/기존에셋bytes동일/이전ID정규화/혼합중복·미등록ID거절/기존회귀. 서버먼저배포후프론트반영예정.
+
+## 2026-11-14 코 없는 캐릭터와 의상 참조 방식 재확인
+- Seedream5.5 참조편집1회 HTTP200/11.890초, 코 제거 및 눈·미소·밝은 라벤더 유지 직접열람. 결과 `/Users/ethan/Downloads/crefans-squat-friendly-pastel-no-nose.png`, SHA c980415ec217bee68feb74321284f1ce4f562563ce829867adca4a9dbc784458, 증거 `.local/seedream-squat-no-nose/result.json`.
+- 운영 runtime-sha 검사4파일 일치. ai-photo.ts는 원본+분홍가이드+실제선택WebP를base64 image배열전달. 프론트 aiPhotoCostumeRequest는긴의상설명을참조사진번호지시로치환. 일반프리셋/커스텀/고정지시텍스트는함께전송. 단순픽셀붙이기가아닌참조기반재생성. 운영수정없음.
+
+## 2026-11-14 미소+밝은 라벤더 통합 시안
+- 사용자 선택2/3번을 참조하여 눈·작은 코·미소와 밝은 라벤더 옷을 결합. Seedream5.5 실API1회 HTTP200/15.646초/1024×1024. 이미지 열람으로 눈코입·밝은옷·쪼그린자세 확인. 운영교체 없음.
+- 결과 `/Users/ethan/Downloads/crefans-squat-friendly-pastel.png`, SHA256 a341116736b9806065c28c70df28b706ebe93b15d3c4fb65921b46f8d3c0cce3. 프롬프트·모델·요청ID 증거 `.local/seedream-squat-friendly-pastel/result.json`.
+
+## 2026-11-14 둥근 캐릭터 파생 시안 5종
+- 사용자가 고른 기존4번 PNG를 참조하여 Seedream5.5로5장 생성, 모두HTTP200/1024×1024. 작은체형·미소·라벤더·청록·매끈한기본형. 전체이미지 직접열람: 원본 쪼그린 자세/둥근 비애니 캐릭터 유지, 색/표정/비율 차이 확인. 운영교체 없음.
+- 결과 `/Users/ethan/Downloads/crefans-squat-rounded-{1-compact,2-friendly,3-pastel,4-balanced,5-pebble}.png`. 프롬프트·모델·요청ID·시간·SHA 증거 `.local/seedream-squat-rounded-five/*.json`, 실행 generate.py.
+
+## 2026-11-14 비애니 단순 쪼그려 앉기 시안 5종
+- Seedream5.5 실API 5회 모두HTTP200, 각1024×1024 PNG1장. 플랫·라인·실루엣·둥근캐릭터·투톤 생성. 5장 직접 열람하여 쪼그린 자세/비애니 표현 확인. 4번은 요청보다 입체 음영이 강한 둥근 캐릭터 결과로 구분. 운영교체 없음.
+- 결과 `/Users/ethan/Downloads/crefans-squat-simple-{1-flat,2-line,3-silhouette,4-rounded,5-duotone}.png`. 개별 프롬프트·모델·요청ID·시각·파일SHA 증거 `.local/seedream-squat-five/*.json`, 실행 generate.py. 재생성 없음.
+
+## 2026-11-14 쪼그려 앉기 애니 캐릭터 시안
+- 앞선 아이콘을 참조하여 Seedream5.5로 애니 스타일1장 생성(HTTP200/15.219초/1024×1024 PNG). 이미지 열람으로 쪼그린 자세·파란 옷 유지와 머리/눈/선화 변경 확인. 운영교체 없음.
+- 결과 `/Users/ethan/Downloads/crefans-squat-seedream-anime.png`, SHA256 bcde5e044697a5f1c26b2624469cf3879dba33a7c6dcf61f7a992d56727e86e3. 실제 모델·요청ID·프롬프트·시각 `.local/seedream-squat-anime/result.json`. 생성1회.
+
+## 2026-11-14 쪼그려 앉기 Seedream 아이콘 1장 생성
+- 사용자 요청한 단일 시안, 운영 UI 교체/배포 없음. Seedream5.5 실API HTTP200/14.102초, 1024×1024 PNG1장. 파란 옷의 중립 캐릭터·깊게 굽힌 무릎·낮은 엉덩이·바닥에 놓인 양발을 이미지 열람으로 확인. 약한 질감/음영이 있는 단순 일러스트.
+- 결과 `/Users/ethan/Downloads/crefans-squat-seedream.png`, SHA256 `7ce5750cd0af504a3acb9ccabf7102eb33e4e34889d199109a250c738ef8a3f1`. 프롬프트·모델·요청ID·시간 증거 `.local/seedream-squat-icon/result.json`, 실행 generate.cjs. API키 출력/저장 없음. 생성1회, 추가변형 없음.
+
 ## 2026-11-14 모든 모드 Seedream 운영 완료
 - source4c40462 dev→prod, API/worker `crefans-api:seedream-all-20261114`. 일반/코스어/누락 모두 Seedream5.5로 생성, OpenAI는 기존 안전검사만 사용. 프론트 변경/배포와 DB마이그레이션 불필요.
 - build0·격리DB/공급사대역38/38·운영4파일SHA일치·운영코드/설정 세모드 선택/요청/응답모델 추적 대역 통과. 운영 실제 이미지생성 추가호출 없음. 헬스/권한/다른컨테이너 유지·API/worker 재시작0 확인. 전체문서검사는 기존 참조누락으로 실패. 근거 `docs/seedream-all-modes-20261114.json`, `.local/seedream-all/` 로그.
