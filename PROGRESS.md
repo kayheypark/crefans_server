@@ -1,3 +1,11 @@
+## 2026-11-14 첨부9장 기반 공용 배경7종 등록 (운영 미배포)
+- 1침실,2/8/9그레이전시장,3네온스튜디오,4민트테이블,5웜톤행사장,6형광등로비,7퍼플파티션. image_gen으로 인물/UI/문자 없이 공간·가구·조명을 새로 구성하고 좌우 특징 배치 반영. 원본 스크린샷은 공용에 복사하지 않음. 반전만으로 저작권 면책된다고 판단하지 않음.
+- 실내 공용프리셋13종(기존6+신규7), 아웃도어4종 유지. 신규7종은 카드/검색/선택취소와 서버 실제참고이미지 연결. backgroundId 고정허용목록, 개인배경 중복거절, 개별안전검사·총10장한도·요청추적 유지. 서버빌드에 배경파일 포함.
+- 검증: 프론트72/72, 서버35+OpenAPI14=49/49(격리DB·공급사대역), WebKit390/320에서7종 로딩/검색/선택/해제/페이징·JS오류/가로넘침없음. 프론트/서버7파일 SHA256동일. 초기테스트의 기존384px/99개 가정과 검색결과1개 가정을 새고해상도7종/복수단어검색에 맞춰 변경 후통과.
+- 빌드/타입: 양쪽 npm run build와 프론트 npx tsc --noEmit 종료0. check:docs 통과(문서79/API243, 해시스냅샷은 제품검증과 별개).
+- 증거: front docs/audit/public-backgrounds-20261114.json, output/design/public-backgrounds-20261114/manifest.json·preview.png, 양쪽 .local/public-background*. 실Seedream합성/운영미검증·미배포. 기존미배포기능에 의존하여 동일기능브랜치에서 후속작업.
+- 조사2026-11-14: https://www.copyright.gov/eco/help-limitation.html 및 https://www.gov.uk/government/publications/copyright-notice-digital-images-photographs-and-the-internet/copyright-notice-digital-images-photographs-and-the-internet — 단순변형은 권리허가보장이 아님. 한국법적권리판정/클리어런스는 수행하지않음.
+
 ## 2026-11-14 내 보관함 구현 완료·공용 사진 수신 대기 (미배포)
 - 사용자 확정: 대화에서 제공할 사진은 공용 프리셋에만 등록. 이번 새사진 없음, 과거 UI스크린샷은 수집대상 아님. 개인 보관함은 서비스사용자가 직접 업로드한 사진 전용으로 별도구현.
 - 구조: 포즈/배경/구도/촬영컨셉(+의상·메이크업·표정) 분류·이름검색·사진카드, 기존 업로드와 비공개 미디어 소유권 재사용. 합성 시 사진바이트를 참고이미지로 첨부, 분류별 효과만 적용. 안전검사·총10장한도·차감규칙 유지.

@@ -384,3 +384,14 @@ test('library photos are real image references, individually moderated and numbe
  await photos.saveLibrary(who,{id:pose,remove:true});await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[pose]})),code('LIBRARY_ASSET_NOT_FOUND'));assert.equal(calls.length,0);
  reset();flags=[false,true];const before=(await photos.quota(who)).remaining;await assert.rejects(photos.edit(who,base({sourceId:original,kind:'background',libraryIds:[background]})),code('UNSAFE_INPUT'));assert.equal(calls.filter(x=>x.kind==='edit').length,0);assert.equal((await photos.quota(who)).remaining,before-1,'existing unsafe-input charging policy is preserved');
 });
+
+test('public backgrounds attach exact catalog bytes, moderate independently and reject invalid or conflicting choices',async()=>{
+ reset();const who=await makeCreator('publicbg_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'공용배경 QA'}});const id=await media(who);
+ await photos.edit(who,base({sourceId:id,kind:'background',backgroundId:'b7a101'}));
+ const request=calls.find(x=>x.kind==='edit');assert.equal(request.images.length,2);assert.match(request.fields.prompt,/Image 2 is a public background reference/);assert.deepEqual(request.images[1].bytes,fs.readFileSync(path.join(__dirname,'../dist/src/platform/ai-photo-backgrounds/b7a101.webp')));assert.equal(calls.filter(x=>x.kind==='moderation').length,3);
+ reset();for(const value of ['../../secret','unknown',[],null])await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundId:value})),code('INVALID_BACKGROUND_REFERENCE'));
+ await assert.rejects(photos.edit(who,base({sourceId:id,kind:'pose',backgroundId:'b7a101'})),code('INVALID_BACKGROUND_REFERENCE'));assert.equal(calls.length,0);
+ const privateId=await media(who);await photos.saveLibrary(who,{id:privateId,title:'개인 배경',category:'background'});await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundId:'b7a101',libraryIds:[privateId]})),code('INVALID_BACKGROUND_REFERENCE'));assert.equal(calls.length,0);
+ await photos.edit(who,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:['b4bf5d'],backgroundId:'b7a102'}),await mask());assert.match(calls.find(x=>x.kind==='edit').fields.prompt,/Image 4 is a public background reference/);
+ reset();flags=[false,true];await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundId:'b7a103'})),code('UNSAFE_INPUT'));assert.equal(calls.filter(x=>x.kind==='edit').length,0);
+});
