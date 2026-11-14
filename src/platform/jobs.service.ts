@@ -1,3 +1,4 @@
+import {pruneAiFailureDetails} from './ai-photo-failures';
 import {purgeWithdrawnMembers} from './member-purge';
 import {announcePost} from './post-notices';
 import {BeansService} from './beans.service';
@@ -34,6 +35,7 @@ export class PlatformJobsService {
  private async execute(now:Date,failures:Record<string,number>,activity:Record<string,number>){
   const run=async(name:string,work:()=>Promise<unknown>)=>{try{const count=await work();if(typeof count==='number'&&count>0)activity[name]=(activity[name]||0)+count;}catch(error){failures[name]=(failures[name]||0)+1;await this.operations?.error('worker.error',error,{job:name});}};
   await run('scheduled-publication',async()=>{let count=0;const active=await this.db.creator.findMany({where:{is_active:true},select:{user_id:true}});const posts=await this.db.posting.findMany({where:{user_sub:{in:active.map(c=>c.user_id)},status:'DRAFT',is_deleted:false,...(isBeta(this.config)?{is_sensitive:false}:{}),scheduled_at:{lte:now}},select:{id:true}});for(const p of posts){await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM postings WHERE id=${p.id} FOR UPDATE`;const current=await tx.posting.findUniqueOrThrow({where:{id:p.id}});if(current.status!=='DRAFT'||current.is_deleted||!current.scheduled_at||current.scheduled_at>now)return;const published=await tx.posting.update({where:{id:p.id},data:{status:'PUBLISHED',published_at:now,scheduled_at:null}});await announcePost(tx,published);await enqueueOperation(tx,'content.updated',{memberId:current.user_sub,creatorId:current.user_sub,postId:p.id,status:'PUBLISHED',previousStatus:'DRAFT'},`content.published:${p.id}`);count++;});}return count;});
+  await run('ai-photo-failure-retention',()=>pruneAiFailureDetails(this.db,now));
   await run('audit-retention',()=>pruneAuditLogs(this.db,now));
   await run('moderation-retention',()=>pruneModerationRecords(this.db,now));
   await run('post-view-retention',async()=> (await this.db.postViewWindow.deleteMany({where:{expires_at:{lte:now}}})).count);

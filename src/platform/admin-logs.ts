@@ -1,3 +1,5 @@
+import {ConfigService} from '@nestjs/config';
+import {aiFailureDetail} from './ai-photo-failures';
 import {can} from './admin-permissions';
 import {isIP} from 'node:net';
 import {auditCategories,safeAuditData} from './audit';
@@ -15,10 +17,12 @@ export async function adminLogs(db:any,admin:any,query:any){
  const [rows,total]=await db.$transaction([db.platformAuditLog.findMany({where,orderBy:[{occurred_at:'desc'},{id:'desc'}],skip,take:size}),db.platformAuditLog.count({where})]);
  return{items:rows.map(auditView),total,page,pageSize:size,period:{from:period.from,to:period.to,timeZone:'Asia/Seoul'}};
 }
-export async function adminLogDetail(db:any,admin:any,id:string){
+export async function adminLogDetail(db:any,admin:any,id:string,config?:ConfigService){
  logAdmin(admin);if(!/^[a-f0-9-]{36}$/i.test(id))reject(400,'INVALID_LOG_ID','로그 ID를 확인해주세요.');const row=await db.platformAuditLog.findUnique({where:{id}});if(!row)reject(404,'LOG_NOT_FOUND','로그를 찾을 수 없습니다.');
  const links=[...(row.request_id?[{request_id:row.request_id}]:[]),...(row.entity_id?[{entity_id:row.entity_id}]:[]),...(row.job_id?[{job_id:row.job_id}]:[])];
  const related=links.length?await db.platformAuditLog.findMany({where:{OR:links},orderBy:[{occurred_at:'desc'},{id:'desc'}],take:101}):[row];
  const delivery=row.source_id?await db.platformOperationalEvent.findUnique({where:{id:row.source_id},select:{attempts:true,available_at:true,delivered_at:true,last_error_code:true}}):null;
- return{event:auditView(row),timeline:related.slice(0,100).reverse().map(auditView),hasMore:related.length>100,delivery};
+ const failure=related.find(r=>r.action==='ai-photo.failed');
+ const aiFailure=failure?.request_id?await aiFailureDetail(db,admin,failure.request_id,config):null;
+ return{aiFailure,event:auditView(row),timeline:related.slice(0,100).reverse().map(auditView),hasMore:related.length>100,delivery};
 }

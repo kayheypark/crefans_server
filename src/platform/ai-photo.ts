@@ -17,6 +17,8 @@ import {LocalMemberService} from '../auth/local/local-member.service';
 import {digest} from '../auth/local/credentials';
 import {reject} from './http';
 import {contentDigest} from './audit';
+import {requestContext} from './request-context';
+import {aiFailureTrace,diagnosticId,recordAiFailure} from './ai-photo-failures';
 import {aiPhotoAllowed} from './ai-photo-grants';
 import {costumeReferenceIds,readCostumeReference} from './ai-photo-costume-references';
 import {ticketSummary,useAiPhotoTicket} from './ai-photo-tickets';
@@ -57,7 +59,9 @@ const sizeFor=(width:number,height:number)=>width>height*1.15?'1536x1024':height
 @Injectable()
 export class AiPhotoService{
  private logger=new Logger(AiPhotoService.name);
- private report(stage:string,code:unknown,res?:Response){const value=res?.headers.get('x-request-id');this.logger.warn({event:'ai-photo.failure',stage,code:typeof code==='string'&&/^[a-z][a-z0-9_]{0,63}$/i.test(code)?code:'unknown_provider_error',requestId:value&&/^req_[A-Za-z0-9_-]{1,120}$/.test(value)?value:null,...(res?{status:res.status}:{})});}
+ private report(stage:string,code:unknown,res?:Response){const value=diagnosticId(res?.headers.get('x-request-id')||res?.headers.get('x-tt-logid')),trace=aiFailureTrace.getStore();if(trace)Object.assign(trace,{stage,providerCode:diagnosticId(code)||'unknown_provider_error',providerRequestId:value,providerStatus:res?.status});this.logger.warn({event:'ai-photo.failure',stage,code:diagnosticId(code)||'unknown_provider_error',requestId:value||null,internalRequestId:trace?.requestId,...(res?{status:res.status}:{})});}
+ private stage(stage:string,provider?:string){const trace=aiFailureTrace.getStore();if(trace){trace.stage=stage;if(provider)trace.provider=provider;delete trace.providerCode;delete trace.providerRequestId;delete trace.providerStatus;}}
+
 
  readonly settings:ReturnType<typeof aiPhotoConfig>;
  fetcher:typeof fetch=fetch;
@@ -90,10 +94,10 @@ export class AiPhotoService{
  private async flagged(input:unknown[],stage:'input'|'output'):Promise<boolean|undefined>{
   try{
    const res=await this.fetcher(MODERATION_URL,{method:'POST',signal:AbortSignal.timeout(15000),headers:{'Content-Type':'application/json',Authorization:'Bearer '+this.settings.apiKey},body:JSON.stringify({model:MODERATION_MODEL,input})});
-   const verdict=res.ok?(await res.json().catch(()=>null))?.results?.[0]?.flagged:undefined;
-   if(typeof verdict!=='boolean'){this.report(stage,'MODERATION_UNAVAILABLE',res);return undefined;}
+   const body=await res.json().catch(()=>null),verdict=res.ok?body?.results?.[0]?.flagged:undefined;
+   if(typeof verdict!=='boolean'){this.report(stage,body?.error?.code||'MODERATION_UNAVAILABLE',res);return undefined;}
    if(verdict)this.report(stage,'moderation_blocked',res);return verdict;
-  }catch{this.report(stage,'MODERATION_UNAVAILABLE');return undefined;}
+  }catch(error){this.report(stage,diagnosticId(error?.cause?.code)||diagnosticId(error?.name)||'MODERATION_UNAVAILABLE');return undefined;}
  }
  private async source(sub:string,id:unknown){
   if(typeof id!=='string'||!/^[0-9a-f-]{36}$/.test(id))reject(400,'INVALID_SOURCE','바꿀 사진을 다시 골라 주세요.');
@@ -116,6 +120,10 @@ export class AiPhotoService{
   }finally{if(remote){try{await unlink(destination);}catch{}}}
  }
  async edit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number}){
+  const trace={requestId:requestContext.getStore()?.requestId||randomUUID(),stage:'validation',provider:'local'},started=Date.now();
+  return aiFailureTrace.run(trace,async()=>{try{return await this.performEdit(sub,input,mask);}catch(error){await recordAiFailure(this.service.db,this.configService,sub,input,error,trace,started);throw error;}});
+ }
+ private async performEdit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number}){
   const started=Date.now();await this.service.requireCreator(sub);
   if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');
   const mode=input?.mode??'general';if(mode!=='general'&&mode!=='cosplay')reject(400,'INVALID_EDIT_MODE','편집 모드를 다시 골라 주세요.');
@@ -133,6 +141,7 @@ export class AiPhotoService{
   if(kind==='combined'&&!kinds.includes('outfit')&&mask)reject(400,'INVALID_MASK','옷을 바꿀 때만 옷 영역을 칠해 주세요.');
   if(mask&&(mask.mimetype!=='image/png'||mask.size>5*1024*1024))reject(400,'INVALID_MASK','칠한 영역을 다시 만들어 주세요.');
   const referenceIds=costumeReferenceIds(input?.costumeIds,kinds,style);
+  this.stage('source');
   const original=await this.source(sub,input?.sourceId);
   const references=await Promise.all(referenceIds.map(readCostumeReference));
   // Provider input: PNG at most 1536px; the mask is resized to the same pixels and keeps its alpha channel.
@@ -152,12 +161,14 @@ export class AiPhotoService{
    guide=await sharp(image!).composite([{input:overlay,raw:{width:width!,height:height!,channels:4}}]).png().toBuffer();
   }
   if(seedream&&1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상 참조는 최대 8개까지 선택해 주세요.');
+  this.stage('quota');
   const key=this.creatorKey(sub);
   try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch{reject(429,'DAILY_LIMIT','오늘 만들 수 있는 횟수를 모두 썼어요. 매일 오전 9시에 다시 이용할 수 있어요.');}
   try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
   let charged=true;
   try{
    // Moderation accepts one image per request. Every source/reference must pass before generation.
+   this.stage('input','openai');
    for(const item of [{mime:'image/png',bytes:image!},...references.map(bytes=>({mime:'image/webp',bytes}))]){
     const verdict=await this.flagged([{type:'text',text:prompt},{type:'image_url',image_url:{url:`data:${item.mime};base64,`+item.bytes.toString('base64')}}],'input');
     if(verdict===undefined)reject(503,'MODERATION_UNAVAILABLE','안전 검사를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -178,8 +189,10 @@ export class AiPhotoService{
     url=SEEDREAM_URL;headers={Authorization:'Bearer '+this.settings.seedreamKey,'Content-Type':'application/json'};
     requestBody=JSON.stringify({model,prompt:requestPrompt,image:[data(image!,'image/png'),...(guide?[data(guide,'image/png')]:[]),...references.map(b=>data(b,'image/webp'))],size:sizeFor(width!,height!),output_format:'png',response_format:'b64_json',background:'opaque',watermark:false});
    }
+   this.stage('generation',seedream?'seedream':'openai');
    let res:Response;try{res=await this.fetcher(url,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers,body:requestBody});}
-   catch{reject(504,'PROVIDER_TIMEOUT','사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.');}
+   catch(error){const timeout=['TimeoutError','AbortError'].includes(error?.name);this.report('generation',diagnosticId(error?.cause?.code)||(timeout?'PROVIDER_TIMEOUT':'PROVIDER_CONNECTION_ERROR'));reject(timeout?504:502,timeout?'PROVIDER_TIMEOUT':'PROVIDER_CONNECTION_ERROR',timeout?'사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.':'AI 제공사에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');}
+   const trace=aiFailureTrace.getStore();if(trace){trace.providerRequestId=diagnosticId(res.headers.get('x-request-id')||res.headers.get('x-tt-logid'));trace.providerStatus=res.status;}
    const body=await res.json().catch(()=>null);
    if(!res.ok){const code=body?.error?.code,stage=body?.error?.moderation_details?.moderation_stage;this.report(code==='moderation_blocked'&&['input','output'].includes(stage)?stage:'provider',code,res);
     if(seedream&&code==='OutputImageSensitiveContentDetected.PolicyViolation'){charged=false;reject(400,'UNSAFE_OUTPUT','생성된 사진이 AI 제공사의 콘텐츠 정책을 통과하지 못했어요. 다른 의상이나 요청을 선택해 주세요.');}
@@ -188,12 +201,14 @@ export class AiPhotoService{
     reject(502,'PROVIDER_ERROR','사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');}
    const outputs:Buffer[]=(Array.isArray(body?.data)?body.data:[]).map((d:any)=>typeof d?.b64_json==='string'?Buffer.from(d.b64_json,'base64'):null).filter(Boolean).slice(0,AI_PHOTO_IMAGES);
    if(!outputs.length)reject(502,'PROVIDER_ERROR','사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+   this.stage('output','openai');
    const safe:Buffer[]=[];let unchecked=false;
    for(const out of outputs){const v=await this.flagged([{type:'image_url',image_url:{url:'data:image/png;base64,'+out.toString('base64')}}],'output');if(v===false)safe.push(out);else if(v===undefined)unchecked=true;}
    charged=false;// The provider was paid from here on; a blocked or unchecked result still counts.
    if(!safe.length&&unchecked)reject(503,'MODERATION_UNAVAILABLE','만든 사진의 안전 검사를 완료하지 못했어요. 사진은 표시하지 않았어요.');
    if(!safe.length)reject(400,'UNSAFE_OUTPUT','만든 사진이 안전 기준을 통과하지 못했어요. 다른 표현으로 다시 시도해 주세요.');
    const meta={aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiEditKinds:kinds,...(targetGender?{aiTargetGender:targetGender}:{}),aiModel:model,aiMode:mode,aiCreatedAt:new Date().toISOString(),aiDurationMs:Date.now()-started};
+   this.stage('storage','local');
    const images=[];for(const out of safe)images.push(await this.save(sub,out,meta));
    return{images,remaining:Math.max(0,this.settings.perDay-await this.used(key))};
   }catch(error){

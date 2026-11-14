@@ -1,3 +1,14 @@
+## 2026-11-14 AI 실패 진단 구현 검증
+- build 종료0, AI/OpenAPI/법률문서 관련55/55 종료0 (.local/verified-tests.log); 감사 확대검사43/45: 기존 worker watchdog 대역에 mediaWatermarkJob.count 없음으로2실패, 해당 소스 변경없음 (.local/tests-final.log). 최초 sandbox loopback 차단/공유DB busy는 승인·순차 실행으로 해결.
+- 콘솔 타입/18단위통과, 실제 Next+Chromium 모바일 UI 대역1통과. 서버 실DB·공급사대역으로401코드/ID, DNS/timeout 구분, 암호화·마스킹·동시요청·조회권한/감사·만료파기·저장장애를 확인. 실공급사 오류 유발은 미실행.
+- 프론트 npm run check:docs 종료1 (/tmp/crefans-ai-failure-docs.log): 기존 형제 서버 참조/문서인벤토리 불일치, 전체 문서 검증 통과 아님. 작업 근거/30일 사용자결정/범위는 docs/operational-logging.md. 2026-11-14, base2acf381, 현재 feat 커밋 전 변경사항 git diff로 검토. 운영 미반영.
+
+## 2026-11-14 AI 실패 진단 진행
+- 사용자 요구: 실패 요청 ID·원인 기록, 콘솔 질문 확인, 질문 30일 보관 확정. 최신 origin/prod 2acf381에서 feat/ai-failure-details 분기.
+- 구현: 요청별 AsyncLocalStorage로 동시성 분리, 감사 로그에 단계/공급사 코드·ID·상태, 질문·선택옵션 별도 AES-GCM 저장. 콘솔 로그 상세에서 로그+회원 조회 권한 확인·조회 감사·no-store. 만료 즉시 비노출/worker1000건 단위삭제. 서버 도착 전 통신 단절/인증가드 이전은 질문 기록 범위 밖.
+- 합격: 공급사401/정책차단/검증오류 기록, 요청 ID 연결, 원문 일반로그 미포함, 비권한/만료 차단, 동시요청 분리, DB 장애 시 원래 오류 보존. 빌드·실격리DB·API계약·콘솔 타입/테스트 확인 예정.
+- 공식근거(2026-11-14): https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html — 비밀값 제외, 로그 접근통제/조회감사, 보관기간, 로그실패 시험. 30일은 사용자 결정이며 법정기간으로 주장하지 않음. 기존 일반 감사 보관 정책은 유지.
+
 ## 2026-11-14 Seedream 표시 워터마크 해제 운영 완료
 - API/worker `crefans-api:seedream-no-watermark-20261114`,sourced3b02c2. 새Seedream요청watermark=false. 기존파일변경없음,aiGenerated와게시글AI표시·크리에이터워터마크유지. 프론트배포불필요.
 - 빌드0·AI/OpenAPI33/33·운영2파일SHA동일·운영코드대역요청false/aiGenerated true/모드분기통과. 새이미지실생성은미실행(공식옵션/요청계약검증). 기존헬스/권한검사통과.

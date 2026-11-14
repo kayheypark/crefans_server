@@ -3,7 +3,7 @@ require('reflect-metadata');require('dotenv').config({path:'.local/platform.env'
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 assert.equal(process.env.CREFANS_E2E,'true');const source=process.env.DATABASE_URL;assert.match(source||'',/@127\.0\.0\.1:3307\/crefans_platform_dev$/);const url=new URL(source);url.pathname='/crefans_platform_e2e';process.env.DATABASE_URL=url.toString();
 const mediaRoot=fs.mkdtempSync(path.join(os.tmpdir(),'ai-photo-'));
-Object.assign(process.env,{LOCAL_AUTH_SECRET:'r'.repeat(64),DATA_ENCRYPTION_KEY:'r'.repeat(64),TELEGRAM_OPERATIONS_BOT_TOKEN:'',TELEGRAM_OPERATIONS_CHAT_ID:'',SMTP_HOST:'',BEAN_LEDGER_ENABLED:'false',AUTH_PROVIDER:'local',MEDIA_STORAGE:'local',MEDIA_ROOT:mediaRoot,AI_PHOTO_OPENAI_API_KEY:'sk-test-'+'x'.repeat(20),AI_PHOTO_DAILY_TOTAL:'100000'});
+Object.assign(process.env,{LOCAL_AUTH_SECRET:'r'.repeat(64),DATA_ENCRYPTION_KEY:'a'.repeat(64),TELEGRAM_OPERATIONS_BOT_TOKEN:'',TELEGRAM_OPERATIONS_CHAT_ID:'',SMTP_HOST:'',BEAN_LEDGER_ENABLED:'false',AUTH_PROVIDER:'local',MEDIA_STORAGE:'local',MEDIA_ROOT:mediaRoot,AI_PHOTO_OPENAI_API_KEY:'sk-test-'+'x'.repeat(20),AI_PHOTO_DAILY_TOTAL:'100000'});
 const sharp=require('sharp'),{PrismaClient}=require('@prisma/client'),db=new PrismaClient(),{NestFactory}=require('@nestjs/core'),{PlatformModule}=require('../dist/src/platform/module'),{AiPhotoService,aiPhotoPrompt}=require('../dist/src/platform/ai-photo');
 const tag=crypto.randomBytes(3).toString('hex'),members=[];let app,photos,release,creator,other,sourceId,otherSourceId;
 const png=(w,h,color={r:200,g:120,b:160})=>sharp({create:{width:w,height:h,channels:3,background:color}}).png().toBuffer();
@@ -230,4 +230,39 @@ test('cosplay routing follows explicit mode only, not style or retained costume;
   photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);assert.equal(url,'https://ark.ap-southeast.bytepluses.com/api/v3/images/generations');const body=JSON.parse(init.body);assert.equal(body.model,'dola-seedream-5-5-261028');assert.equal(body.image.length,1);generated=true;return new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));};
   const r=await photos.edit(user,base({sourceId:id,mode:'cosplay',style:'photo',kind:'expression'}));assert.equal(generated,true);assert.equal((await db.media.findUniqueOrThrow({where:{id:r.images[0].id}})).metadata.aiMode,'cosplay');
  }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;}
+});
+
+test('failure diagnostics correlate IDs, encrypt prompts, restrict access and expire after 30 days',async()=>{
+ const {requestContext}=require('../dist/src/platform/request-context');
+ const {adminLogDetail}=require('../dist/src/platform/admin-logs');
+ const {pruneAiFailureDetails}=require('../dist/src/platform/ai-photo-failures');
+ const {ConfigService}=require('@nestjs/config');
+ const config=new ConfigService(),user=await makeCreator('aidiag_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트'}});const id=await media(user);
+ reset();editStatus=401;providerError={code:'Authentication.InvalidKey',message:'DO_NOT_STORE_PROVIDER_SECRET'};
+ const requestId=crypto.randomUUID(),prompt='진한 갈색 메이크업 진단MARKER';
+ await assert.rejects(requestContext.run({requestId,ip:'127.0.0.1',peerIp:'127.0.0.1'},()=>photos.edit(user,base({sourceId:id,prompt}))),code('PROVIDER_ERROR'));
+ const log=await db.platformAuditLog.findFirst({where:{request_id:requestId,action:'ai-photo.failed'}});assert.ok(log);assert.equal(log.metadata.providerCode,'Authentication.InvalidKey');assert.equal(log.metadata.providerRequestId,'req_ai_photo_test');assert.equal(log.metadata.httpStatus,401);assert.doesNotMatch(JSON.stringify(log),/진단MARKER|DO_NOT_STORE_PROVIDER_SECRET/);
+ const stored=await db.aiPhotoFailureDetail.findUnique({where:{request_id:requestId}});assert.ok(stored);assert.doesNotMatch(stored.payload_encrypted,/진단MARKER/);assert.ok(stored.expires_at-Date.now()>29*86400000);
+ const admin={id:crypto.randomUUID(),role:'SUPER_ADMIN'};const detail=await adminLogDetail(db,admin,log.id,config);assert.equal(detail.aiFailure.prompt,prompt);assert.equal(detail.aiFailure.stage,'provider');assert.equal(detail.aiFailure.provider,'openai');assert.ok(await db.platformAuditLog.findFirst({where:{action:'admin.ai_photo_failure_viewed',entity_id:requestId}}));
+ await assert.rejects(adminLogDetail(db,{role:'MODERATOR'},log.id,config),code('LOG_ADMIN_REQUIRED'));
+ const restricted=await adminLogDetail(db,{id:admin.id,role:'ADMIN',permissions:{logs:{view:true}}},log.id,config);assert.equal(restricted.aiFailure.state,'restricted');assert.equal(restricted.aiFailure.prompt,undefined);
+ await db.aiPhotoFailureDetail.update({where:{request_id:requestId},data:{expires_at:new Date(Date.now()-1000)}});assert.equal((await adminLogDetail(db,admin,log.id,config)).aiFailure.state,'expired');await pruneAiFailureDetails(db);assert.equal(await db.aiPhotoFailureDetail.findUnique({where:{request_id:requestId}}),null);assert.ok(await db.platformAuditLog.findUnique({where:{id:log.id}}));
+});
+
+test('diagnostic secrets are redacted and concurrent failures never exchange prompts or IDs',async()=>{
+ const {diagnosticPrompt,aiFailureTrace,recordAiFailure}=require('../dist/src/platform/ai-photo-failures');
+ assert.doesNotMatch(diagnosticPrompt('test@example.com 010-1234-5678 Bearer abcsecret sk-secretkey ark-secretkey'),/example.com|1234|abcsecret|sk-secret|ark-secret/);
+ const seen=[],fakeDb={$transaction:async fn=>fn({platformAuditLog:{create:async()=>{}},aiPhotoFailureDetail:{create:async({data})=>seen.push(data)}})},config={get:k=>k==='DATA_ENCRYPTION_KEY'?'a'.repeat(64):undefined};
+ await Promise.all(['alpha','beta'].map((prompt,i)=>aiFailureTrace.run({requestId:crypto.randomUUID(),stage:'input',provider:'openai'},async()=>{await new Promise(r=>setTimeout(r,i?1:10));await recordAiFailure(fakeDb,config,'synthetic',{prompt},{getResponse:()=>({code:'UNSAFE_INPUT'}),getStatus:()=>400},aiFailureTrace.getStore(),Date.now());})));
+ const {PaymentProvider}=require('../dist/src/platform/payment-provider'),cipher=new PaymentProvider(config);assert.equal(seen.length,2);for(const row of seen){const payload=JSON.parse(cipher.decrypt(row.payload_encrypted));assert.equal(payload.requestId,row.request_id);assert.ok(['alpha','beta'].includes(payload.prompt));}assert.equal(new Set(seen.map(r=>r.request_id)).size,2);
+ // Storage outage must not throw a second error or leak prompt text.
+ await recordAiFailure({$transaction:async()=>{throw Error('down')},platformAuditLog:{upsert:async()=>{throw Error('down')}}},config,'synthetic',{prompt:'private'},Error('original'),{requestId:crypto.randomUUID(),stage:'source',provider:'local'},Date.now());
+});
+
+test('transport failure and timeout remain distinct and retain the underlying failure code',async()=>{
+ const {requestContext}=require('../dist/src/platform/request-context');const user=await makeCreator('ainet_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트'}});const source=await media(user);
+ try{for(const [name,cause,wanted] of [['TypeError','ENOTFOUND','PROVIDER_CONNECTION_ERROR'],['TimeoutError',undefined,'PROVIDER_TIMEOUT']]){
+  reset();const requestId=crypto.randomUUID();photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);const e=new Error('secret URL must not be logged');e.name=name;e.cause={code:cause};throw e;};
+  await assert.rejects(requestContext.run({requestId,ip:'',peerIp:''},()=>photos.edit(user,base({sourceId:source}))),code(wanted));const row=await db.platformAuditLog.findFirst({where:{request_id:requestId,action:'ai-photo.failed'}});assert.equal(row.metadata.operation,'generation');assert.equal(row.metadata.providerCode,cause||wanted);assert.equal(row.metadata.errorCode,wanted);assert.equal((await photos.quota(user)).remaining,10);
+ }}finally{photos.fetcher=stub;}
 });

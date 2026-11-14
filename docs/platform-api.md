@@ -633,3 +633,6 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - 모델 분기는 `mode=general|cosplay`(누락 general)로만 결정하며 사진 `style`과 분리한다. Seedream 키는 `AI_PHOTO_BYTEPLUS_API_KEY`, OpenAI 키는 일반 생성과 양쪽 모드의 입력/출력 Moderation에 유지한다. Seedream은 원본·가이드·의상 순서의 base64 JSON, 최대10입력(의상8개), b64_json PNG1장, 현재 출력크기 유지, watermark=false(제공사 표시 워터마크 끔, 크레팬스 aiGenerated 표시 유지). 생성 미설정 시 코스어 요청만 거절하며 일반모드는 유지한다.
 - 기존 마스크 필수·원본소유권·동의·8종 복합요청·성별·신체 보정·1장·2000자·입출력 안전 검사·횟수 정책은 유지. 선택한 코디 사진은 costumeIds JSON 배열(1~14개)로 지정한 서버 고정 카탈로그에서 읽어 원본·가이드 다음에 첨부한다. 긴 의상 설명은 참조 순번의 짧은 지시로 대체하고 다른 프리셋·직접입력은 유지한다. 참조 이미지도 입력 안전검사에 포함한다. Moderation API는 요청당 이미지 1장만 받으므로 원본과 각 참조를 같은 요청 문구와 함께 개별 검사하고, 모두 통과해야 생성한다. 임의 URL/파일 경로는 받지 않는다.
 - 근거: https://developers.openai.com/api/docs/guides/image-generation (확인2026-11-13). 공급사 마스크는 지침이며 경계나 보존을 보장하지 않으므로 실제 결과 품질 검증과 요청 대역 검사를 구분한다. 검사 tests/platform-ai-photo.test.cjs.
+
+### AI 사진 실패 진단
+운영 로그 `ai-photo.failed`를 요청 ID로 찾을 수 있습니다. `/admin/logs/:id`의 `aiFailure`는 available/expired/restricted/unavailable 상태를 반환하며, 로그+회원 조회 권한이 있는 운영자에게만 30일 이내 질문·선택옵션·실패단계·공급사 코드와 ID를 제공합니다. 조회 감사 및 no-store 적용. 일반 로그/목록에 질문은 포함하지 않습니다.

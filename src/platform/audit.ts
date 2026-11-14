@@ -6,7 +6,7 @@ export const auditCategories=['request','error','auth','admin','finance','mail',
 export type AuditCategory=typeof auditCategories[number];
 export type AuditInput={category:AuditCategory;action:string;level?:'info'|'warning'|'error';entityId?:string;sourceId?:string;status?:number;durationMs?:number;data?:Record<string,unknown>};
 const identifier=(v:unknown,max=191)=>typeof v==='string'&&new RegExp(`^[a-zA-Z0-9_.:-]{1,${max}}$`).test(v)?v:null;
-const scalarKeys=new Set(['targetId','memberId','creatorId','subscriptionId','postId','orderId','planId','status','previousStatus','method','errorType','errorCode','provider','providerCode','operation','attemptId','outcome','purpose','messageId','fingerprint','rule','action','blockedUntil','job','clientRequestId','surface','changedBy','source']);
+const scalarKeys=new Set(['targetId','memberId','creatorId','subscriptionId','postId','orderId','planId','status','previousStatus','method','errorType','errorCode','provider','providerCode','providerRequestId','operation','attemptId','outcome','purpose','messageId','fingerprint','rule','action','blockedUntil','job','clientRequestId','surface','changedBy','source']);
 const numericKeys=new Set(['amount','attempt','httpStatus','smtpStatus','acceptedCount','rejectedCount','count','runs','failedRuns','processed','durationMs','version','previousVersion','platformFeeBps','settlementHoldDays','queued','skipped']);
 const safeStateKeys=new Set(['amount','comparison_amount','duration_days','visible','on_sale','sort_order','status','published','pinned','kind','is_active','is_verified','promoted','comments_enabled','show_followers','show_following','allow_comments','is_membership','membership_level','platform_fee_bps','settlement_hold_days','bean_withdrawal_fee_bps','minimum_withdrawal_krw','version','contentHash','titleHash','marketing_alert']);
 export function safeRoute(v:unknown){return typeof v==='string'&&/^\/[a-zA-Z0-9_/:.*-]{0,180}$/.test(v)?v:'unmatched';}
@@ -14,7 +14,8 @@ export function safeAuditData(data:Record<string,unknown>={}){
  const safe:Record<string,any>={};
  for(const [k,v] of Object.entries(data)){
   if(k==='messageId'){if(typeof v==='string'&&/^[a-f0-9-]{36}@mail\.crefans\.com$/.test(v))safe[k]=v;}
-  else if(['providerCode','errorCode'].includes(k)){if(typeof v==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(v))safe[k]=v;}
+  else if(k==='providerCode'){const value=identifier(v);if(value)safe[k]=value;}
+  else if(k==='errorCode'){if(typeof v==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(v))safe[k]=v;}
   else if(scalarKeys.has(k)){const value=identifier(v,k==='messageId'?160:191);if(value)safe[k]=value;}
   else if(numericKeys.has(k)&&typeof v==='number'&&Number.isSafeInteger(v)&&v>=0)safe[k]=v;
   else if(k==='route')safe.route=safeRoute(v);

@@ -2040,3 +2040,12 @@ model AiPhotoResetTicketUse {
  @@index([creator_user_id, created_at])
  @@map("ai_photo_reset_ticket_uses")
 }
+
+/// AI failure prompts are encrypted, admin-only, and expire after 30 days.
+model AiPhotoFailureDetail {
+ request_id String @id @db.VarChar(36)
+ payload_encrypted String @db.LongText
+ expires_at DateTime @db.DateTime(3)
+ @@index([expires_at])
+ @@map("ai_photo_failure_details")
+}

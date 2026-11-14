@@ -59,3 +59,8 @@ API 응답 envelope는 기존 4개 필드를 유지한다. 요청 ID는 `X-Reque
 ### 정기결제 복구 추적 (2026-10-22)
 
 `payment.failed` 감사에는 안전한 공급사 코드/실패 분류/회차를 기록하고 `subscription.payment_failed` 운영 이벤트를 시도별 중복 방지 키로 생성한다. 카드 교체 복구는 기존 `subscription.renewed`, 최종 중단은 `subscription.cancelled`로 연결된다. 이메일은 별도 `billing_notices` outbox와 `mail.attempt`/`mail.result`의 SMTP 접수 기록으로 추적한다. 카드 원문·빌링키·메일주소·SMTP 원문은 기록하지 않는다. 정상 worker에서 미복구 카드로 매분 재청구/실패 알람을 반복하지 않는다.
+
+## AI 사진 실패 진단 (2026-11-14)
+`ai-photo.failed`는 서버 AI 편집 서비스에 진입한 실패 요청의 크레팬스 요청 ID, 단계, 제공사 오류 코드·요청 ID·HTTP 상태를 기록합니다. 원본 사진·응답 본문·키는 기록하지 않습니다. 질문(최대2000자)과 선택 옵션은 `ai_photo_failure_details`에 기존 DATA_ENCRYPTION_KEY로 암호화하고 명백한 키/연락처를 숨깁니다. 사용자 결정으로 30일 보관하며 만료 즉시 상세 조회를 차단하고 worker가 정리합니다. 기존 DB 백업 보관기간은 별도로 적용됩니다.
+콘솔 운영 로그의 `AI 생성 실패` 필터 또는 요청 ID 검색 → 상세에서 확인합니다. 질문은 logs.view와 members.view를 모두 요구하며 `admin.ai_photo_failure_viewed`로 조회 이력을 남깁니다. 일반 로그·텔레그램에 질문을 넣지 않습니다. 기록 저장 장애는 코드/ID만 stderr에 남기고 원래 실패와 환불 동작을 유지합니다. 서버 도착 전 연결 단절은 질문을 수신하지 못하므로 기록할 수 없습니다. HTTP 인증/파일파서 이전 실패는 기존 요청 로그 범위입니다.
+근거: [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html), 확인2026-11-14. 구현: `src/platform/ai-photo-failures.ts`, `ai-photo.ts`, `admin-logs.ts`, `jobs.service.ts`. 검증: `tests/platform-ai-photo.test.cjs`.

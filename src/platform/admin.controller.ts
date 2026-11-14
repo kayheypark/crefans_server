@@ -54,7 +54,7 @@ export class PlatformAdminController{
  @Post('marketing/campaigns') @Permit('super') campaign(@Body() body:any,@Req() req:any){return this.marketing.queue(req.admin,body);}
  @Post('client-errors') @Permit('self') clientError(@Body() body:any){return reportClientError(this.service.db,this.limiter,body,'console');}
  @Get('logs') @Permit(['logs','view']) logs(@Query() query:any,@Req() req:any){return adminLogs(this.service.db,req.admin,query);}
- @Get('logs/:id') @Permit(['logs','view']) logDetail(@Param('id') id:string,@Req() req:any){return adminLogDetail(this.service.db,req.admin,id);}
+ @Get('logs/:id') @Header('Cache-Control','private, no-store') @Permit(['logs','view']) logDetail(@Param('id') id:string,@Req() req:any){return adminLogDetail(this.service.db,req.admin,id,this.config);}
  @Get('me') @Permit('self') me(@Req() req:any){return{id:req.admin.id,name:req.admin.name,role:req.admin.role,mustChangePassword:req.admin.must_change_password,totp:{enabled:!!req.admin.totp_enabled_at,graceUntil:req.admin.totp_enabled_at?null:req.admin.totp_grace_until,recoveryCodesLeft:Array.isArray(req.admin.totp_recovery)?req.admin.totp_recovery.length:0},permissions:effectivePermissions(req.admin),beanSupport:this.beans.available(),...this.service.paymentSwitches()};}
  @Get('me/profile') @Permit('self') profile(@Req() req:any){return myProfile(this.service.db,req.admin);}
  @Put('me/profile') @Permit('self') saveProfile(@Body() body:any,@Req() req:any){if(req.admin.must_change_password)reject(403,'PASSWORD_CHANGE_REQUIRED','임시 비밀번호를 먼저 변경해주세요.');return updateMyProfile(this.service.db,req.admin,body);}
