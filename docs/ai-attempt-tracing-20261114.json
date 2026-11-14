@@ -1,0 +1,57 @@
+{
+  "checkedAt": "2026-11-14T00:49:20.737275+00:00",
+  "serverSource": "76c1921",
+  "adminSource": "89961e8",
+  "images": {
+    "api": "crefans-api:ai-attempt-tracing-20261114",
+    "worker": "crefans-api:ai-attempt-tracing-20261114",
+    "admin": "crefans-admin:admin-ai-attempt-tracing-20261114"
+  },
+  "validation": {
+    "build": 0,
+    "serverAiOpenApi": {
+      "passed": 38,
+      "failed": 0
+    },
+    "adminTypecheck": 0,
+    "adminUnit": {
+      "passed": 18,
+      "failed": 0
+    },
+    "browser": {
+      "passed": 2,
+      "failed": 0,
+      "scope": "real Next/Chromium with mocked log responses"
+    },
+    "docsCheck": {
+      "exitCode": 1,
+      "limitation": "existing sibling-server inventory/source references missing"
+    },
+    "runtimeFilesMatched": 10,
+    "runtimeModelRouting": "real production code/config; provider and DB writes stubbed",
+    "realProviderCalls": false,
+    "productionTestWrites": false,
+    "anonymousHistoryStatus": 401,
+    "servicesRestartCount": 0
+  },
+  "evidence": {
+    "server": ".local/attempt-tracing/",
+    "admin": ".local/attempt-check.log and .local/attempt-e2e.log",
+    "mobileScreenshot": "crefans_admin-ai-failure/test-results/ai-attempt-mobile.png"
+  },
+  "recovery": {
+    "api": "/Users/ethan/crefans-recovery/20261114/ai-attempt-tracing-api-20261114",
+    "admin": "/Users/ethan/crefans-recovery/20261114/admin-ai-attempt-tracing-20261114",
+    "apiOciBlobs": 69,
+    "adminOciBlobs": 15,
+    "verified": true,
+    "oldServerCopiesRemoved": true
+  },
+  "limits": [
+    "No retrospective trace reconstruction",
+    "No trace for requests that never reach the AI service",
+    "Unknown after 10min without terminal record is not confirmed failure",
+    "No response model inferred when provider omits it",
+    "Successful prompts are not stored; failure prompts retain existing30day policy"
+  ]
+}

@@ -1,3 +1,8 @@
+## 2026-11-14 AI 전체 시도 추적 운영 완료
+- 서버76c1921/콘솔89961e8 dev→prod. API/worker crefans-api:ai-attempt-tracing-20261114, admin crefans-admin:admin-ai-attempt-tracing-20261114. DB스키마/모델설정변경없음. 운영로그→AI생성이력에서요청당상태/선택모델/실호출모델과각호출의요청·응답모델/ID/소요/오류/참조대상·저장결과ID추적.
+- 서버38/38·콘솔타입18/18·브라우저2/2,운영10파일SHA·콘솔번들·세컨테이너재시작0·비로그인목록401. 운영코드/설정으로일반gpt-image-2·코스어dola-seedream-5-5-261028 각4호출단계 및응답모델구분확인(공급사/DB쓰기대역,실생성호출없음). 증거 docs/ai-attempt-tracing-20261114.json,.local/attempt-tracing/deploy/{runtime-check.json,runtime-sha.log,runtime-services.log,deploy.log}. 전체문서검사는기존참조누락으로실패유지.
+- 이전API/콘솔이미지·설정 외부복구SHA/OCI69·15blobs/태그검증후서버직전태그·임시자료정리(.local/attempt-tracing/deploy/cleanup.log). 복구경로증거JSON. 실패질문30일유지/성공질문미수집/서버도착전과과거이력복원불가. 완료10분미기록unknown은실패확정아님. 추가요구대기.
+
 ## 2026-11-14 AI 시도 추적 검증 완료
 - npm run build 종료0, 격리DB·공급사대역 AI/OpenAPI38/38 종료0(.local/attempt-tracing/tests-final.log). 선택/요청/응답모델,참조별검사,대기중시작기록,완료없는unknown,정책차단시생성미호출,성공질문미수집 검증. 기존실패암호화/권한/만료/동시성/전송오류회귀포함.
 - 콘솔 타입18/18·실제Next/Chromium UI대역2/2,모바일스크린샷확인. 프론트 check:docs 종료1 기존참조문서누락지속(/tmp/crefans-ai-attempt-docs.log). 실공급사재호출미실행,운영반영전. base cdcfce9,feat/ai-attempt-tracing,2026-11-14.
