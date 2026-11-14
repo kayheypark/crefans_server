@@ -1,3 +1,10 @@
+## 2026-11-14 횟수권 상점 운영 배포 완료
+- 기능 소스 front 26b7aa6, server db9f91e, admin 4618585를 dev→prod 통합. 운영 API/worker/admin ai-shop-20261114, frontend front-ai-shop-routes-20261114. 새 테이블3개 적용, 기존 DB/proxy·결제 설정 보존.
+- 운영 health/feed/admin/login/console/shop 정상, 새 API 비로그인401, 4컨테이너 실행·재시작0·OOM없음. 운영 상품/주문/사용0건. 판매가·횟수·유효기간 미정으로 상품을 임의 등록하지 않음.
+- 첫 운영 점검에서 shop/pay·preview/shop 허용 경로 누락 발견→회귀 검사(정상3·거절3) 추가 후 재배포. 최종 WebKit390px 프리뷰 상점 표시·넘침/JS오류없음, 실제 상점/결제 경로 로그인 안내 확인. 실제 인증 구매/PG승인/환불은 실행하지 않음.
+- 서버53·프론트58+경로1·콘솔18 및 브라우저2, 타입/계층·문서 계약 통과. 문서 snapshot은 제품 전체 테스트 증거가 아님. PG웹훅 콘솔 등록 미실행, 기존 실결제/베타 제한 유지.
+- 복구 /Users/ethan/crefans-recovery/20261114/ai-shop: 이전API/콘솔 이미지94blob·태그/ID·SHA256, DBgzip완료·서버해시 일치, 설정tar검증 후 서버 이전이미지·덤프·설정·업로드tmp만 정리. 프론트는 ship-helper 별도복구검증. 외부보관본은 삭제하지 않음. 상세 front docs/audit/ai-ticket-shop-20261114.json.
+
 ## 2026-11-14 횟수권 상점 최종 로컬 검증
 - 서버53/53, 프론트58/58 및 계층462파일·타입, 운영콘솔18/18 및 브라우저2/2 통과. 모바일 WebKit 390px 0회 구매 진입·구매동의·실패 안내·편집 초안 유지 확인. 운영 결제는 실행하지 않음.
 - 서버 공식 Toss/OWASP 근거와 사용자 잔여 비례 환불 결정을 구현에 대조. 계약 생성/누락 문서 보완 완료. 문서 evidence 갱신은 snapshot-only-not-test-proof로 기록하며 제품 테스트 증거와 구분.
