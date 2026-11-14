@@ -1,3 +1,10 @@
+## 2026-11-14 모든 모드 Seedream 검증 완료
+- build 종료0, 격리DB/공급사대역 AI·OpenAPI38/38 종료0. general/cosplay/누락 모두 생성·메타·시작추적 Seedream, 누락키 quota false/503 및 대체호출 없음, 의상가이드·기존안전/권한/실패진단 유지. 증거 `.local/seedream-all/{build,tests}.log`. 실공급자 재생성 미실행. API/worker 최소2소스+2컴파일파일 배포 예정.
+
+## 2026-11-14 모든 모드 Seedream 전환 진행
+- 사용자 요청: 일반/코스어/누락 모두 Seedream 5.5(dola-seedream-5-5-261028) 생성. OpenAI 생성 분기 제거, OpenAI 입력/출력 안전검사 유지. 모드는 UI·미디어기록에만 사용. 키 누락 시 quota 비활성/503, 다른 생성모델 대체 없음.
+- 합격: 세 모드 요청/선택/실호출 모델 모두 Seedream, 단일 의상도 분홍 가이드 전달, 입력·결과검사/실패추적/30일보관/권한/횟수 기존회귀 유지. 격리DB·공급사대역 검사 및 운영 코드/설정 대역 검증 예정. 실제 공급사 재호출은 범위 밖.
+
 ## 2026-11-14 AI 전체 시도 추적 운영 완료
 - 서버76c1921/콘솔89961e8 dev→prod. API/worker crefans-api:ai-attempt-tracing-20261114, admin crefans-admin:admin-ai-attempt-tracing-20261114. DB스키마/모델설정변경없음. 운영로그→AI생성이력에서요청당상태/선택모델/실호출모델과각호출의요청·응답모델/ID/소요/오류/참조대상·저장결과ID추적.
 - 서버38/38·콘솔타입18/18·브라우저2/2,운영10파일SHA·콘솔번들·세컨테이너재시작0·비로그인목록401. 운영코드/설정으로일반gpt-image-2·코스어dola-seedream-5-5-261028 각4호출단계 및응답모델구분확인(공급사/DB쓰기대역,실생성호출없음). 증거 docs/ai-attempt-tracing-20261114.json,.local/attempt-tracing/deploy/{runtime-check.json,runtime-sha.log,runtime-services.log,deploy.log}. 전체문서검사는기존참조누락으로실패유지.

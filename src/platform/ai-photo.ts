@@ -1,5 +1,5 @@
 // Studio AI photo editor (2026-11-08 user request): outfit (masked), makeup, expression, pose or background edits of the creator's own uploaded photo.
-// Order: allow-list → own completed image → text checks → daily limits → input moderation (fail closed) → OpenAI image edit
+// Order: allow-list → own completed image → text checks → daily limits → input moderation (fail closed) → Seedream image edit
 // → output moderation → saved as the creator's private media with metadata.aiGenerated. The original photo is never changed.
 import {Body,Controller,Get,Injectable,Logger,Post,Req,UploadedFile,UseGuards,UseInterceptors} from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express';
@@ -26,7 +26,7 @@ import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 
 export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=2000;
-const EDIT_URL='https://api.openai.com/v1/images/edits',MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
+const MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
 const SEEDREAM_URL='https://ark.ap-southeast.bytepluses.com/api/v3/images/generations';
 const DAY=86400,MAX_SIDE=1536;
 const KINDS:Record<string,string>={camera:'Change only camera angle, framing and viewpoint as requested.',lens:'Recreate the requested photographic focal length, perspective and depth-of-field look; this is a visual simulation, not a real lens capture.',body:'Adjust only the requested adult chest, hip size or apparent height proportions naturally. Keep the person fully clothed and avoid sexualization.',outfit:'Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.',makeup:'Change only the makeup colors and finish. Preserve natural skin texture and facial structure.',expression:'Change only the facial expression as requested. Preserve facial structure and identity.',pose:"Change only the person's pose and body position.",background:'Change only the background and surroundings behind the person.'};
@@ -41,10 +41,8 @@ function editKinds(kind:string,value:unknown):string[]{
 
 export function aiPhotoConfig(config:ConfigService){
  const int=(v:unknown,d:number)=>{const n=Number(v);return Number.isSafeInteger(n)&&n>0?n:d;};
- const cosplayProvider=(config.get('AI_PHOTO_COSPLAY_PROVIDER')||'openai').trim();
- if(!['openai','seedream'].includes(cosplayProvider))throw new Error('INVALID_AI_PHOTO_PROVIDER');
- return{cosplayProvider,seedreamKey:(config.get('AI_PHOTO_BYTEPLUS_API_KEY')||'').trim(),apiKey:(config.get('AI_PHOTO_OPENAI_API_KEY')||config.get('GUIDE_ADVISOR_OPENAI_API_KEY')||'').trim(),model:(config.get('AI_PHOTO_MODEL')||'gpt-image-2').trim(),
-  quality:(config.get('AI_PHOTO_QUALITY')||'medium').trim(),perDay:int(config.get('AI_PHOTO_PER_DAY'),AI_PHOTO_DAILY_LIMIT),dailyTotal:int(config.get('AI_PHOTO_DAILY_TOTAL'),300),timeoutMs:int(config.get('AI_PHOTO_TIMEOUT_MS'),120000)};
+ return{seedreamKey:(config.get('AI_PHOTO_BYTEPLUS_API_KEY')||'').trim(),apiKey:(config.get('AI_PHOTO_OPENAI_API_KEY')||config.get('GUIDE_ADVISOR_OPENAI_API_KEY')||'').trim(),model:'dola-seedream-5-5-261028',
+  perDay:int(config.get('AI_PHOTO_PER_DAY'),AI_PHOTO_DAILY_LIMIT),dailyTotal:int(config.get('AI_PHOTO_DAILY_TOTAL'),300),timeoutMs:int(config.get('AI_PHOTO_TIMEOUT_MS'),120000)};
 }
 /** The prompt sent to the provider: the creator's words are framed by fixed rules (identity kept, no sexual content, no text). */
 export function aiPhotoPrompt(kind:string,style:string,request:string,kinds:string[]=[kind],targetGender?:string,referenceCount=0){
@@ -66,7 +64,7 @@ export class AiPhotoService{
  readonly settings:ReturnType<typeof aiPhotoConfig>;
  fetcher:typeof fetch=fetch;
  constructor(private configService:ConfigService,private service:PlatformService,private storage:PlatformMediaStorage,private limiter:LocalMemberService){this.settings=aiPhotoConfig(configService);}
- private configured(seedream=false){return !!this.settings.apiKey&&(!seedream||!!this.settings.seedreamKey);}
+ private configured(){return !!this.settings.apiKey&&!!this.settings.seedreamKey;}
  private window(){return Math.floor(Date.now()/(DAY*1000));}
  private async used(key:string){const row=await this.service.db.authRateBucket.findUnique({where:{id:digest(`${key}:${this.window()}`)}});return row?.count??0;}
  private async giveBack(key:string){await this.service.db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${digest(`${key}:${this.window()}`)}`;}
@@ -138,8 +136,8 @@ export class AiPhotoService{
   }finally{if(remote){try{await unlink(destination);}catch{}}}
  }
  async edit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number}){
-  const mode=input?.mode??'general',selectedProvider=mode==='cosplay'?this.settings.cosplayProvider:mode==='general'?'openai':undefined;
-  const trace:AiFailureTrace={requestId:requestContext.getStore()?.requestId||randomUUID(),actorId:sub,selectedProvider,selectedModel:selectedProvider==='seedream'?'dola-seedream-5-5-261028':selectedProvider==='openai'?this.settings.model:undefined,sequence:0,stage:'validation',provider:'local'},started=Date.now();
+  const mode=input?.mode??'general',selectedProvider='seedream';
+  const trace:AiFailureTrace={requestId:requestContext.getStore()?.requestId||randomUUID(),actorId:sub,selectedProvider,selectedModel:this.settings.model,sequence:0,stage:'validation',provider:'local'},started=Date.now();
   return aiFailureTrace.run(trace,async()=>{
    await traceAiEvent(this.service.db,'started',{mode:diagnosticId(mode),selectedModel:trace.selectedModel,selectedProvider});
    try{const result=await this.performEdit(sub,input,mask);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);return result;}
@@ -150,8 +148,8 @@ export class AiPhotoService{
   const started=Date.now();await this.service.requireCreator(sub);
   if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');
   const mode=input?.mode??'general';if(mode!=='general'&&mode!=='cosplay')reject(400,'INVALID_EDIT_MODE','편집 모드를 다시 골라 주세요.');
-  const seedream=mode==='cosplay'&&this.settings.cosplayProvider==='seedream',model=seedream?'dola-seedream-5-5-261028':this.settings.model;
-  if(!this.configured(seedream))reject(503,'PROVIDER_NOT_CONFIGURED','AI 사진 편집을 지금 사용할 수 없어요.');
+  const model=this.settings.model;
+  if(!this.configured())reject(503,'PROVIDER_NOT_CONFIGURED','AI 사진 편집을 지금 사용할 수 없어요.');
   const kind=String(input?.kind||''),style=String(input?.style||'photo'),prompt=typeof input?.prompt==='string'?input.prompt.trim():'';
   if(kind!=='combined'&&!KINDS[kind])reject(400,'INVALID_KIND','바꿀 것을 골라 주세요.');if(!STYLES[style])reject(400,'INVALID_STYLE','사진 느낌을 골라 주세요.');
   const kinds=editKinds(kind,input?.editKinds),targetGender=input?.targetGender;
@@ -178,12 +176,12 @@ export class AiPhotoService{
   // A clothing-only provider mask would prevent a combined expression/background edit.
   // Supply a marked copy as the second reference instead, keeping the original first.
   let guide:Buffer|undefined;
-  if((seedream||kind==='combined'||targetGender||style==='cosplay')&&maskPng){
+  if(maskPng){
    const alpha=await sharp(maskPng).extractChannel('alpha').raw().toBuffer(),overlay=Buffer.alloc(width!*height!*4);
    for(let i=0;i<alpha.length;i++){overlay[i*4]=244;overlay[i*4+1]=114;overlay[i*4+2]=182;overlay[i*4+3]=Math.round((255-alpha[i])*.55);}
    guide=await sharp(image!).composite([{input:overlay,raw:{width:width!,height:height!,channels:4}}]).png().toBuffer();
   }
-  if(seedream&&1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상 참조는 최대 8개까지 선택해 주세요.');
+  if(1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상 참조는 최대 8개까지 선택해 주세요.');
   await this.stage('quota');
   const key=this.creatorKey(sub);
   try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch{reject(429,'DAILY_LIMIT','오늘 만들 수 있는 횟수를 모두 썼어요. 매일 오전 9시에 다시 이용할 수 있어요.');}
@@ -197,27 +195,17 @@ export class AiPhotoService{
     if(verdict===undefined)reject(503,'MODERATION_UNAVAILABLE','안전 검사를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
     if(verdict){charged=false;reject(400,'UNSAFE_INPUT','안전 기준에 맞지 않는 사진이나 요청이라 만들 수 없어요.');}
    }
-   const form=new FormData();
-   form.append('model',model);form.append('prompt',aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length));form.append('n',String(AI_PHOTO_IMAGES));
-   form.append('size',sizeFor(width!,height!));form.append('quality',this.settings.quality);form.append('output_format','png');form.append('moderation','auto');
-   form.append('safety_identifier',contentDigest('ai-photo:'+sub).slice(0,64));
-   if(guide){form.append('image[]',new Blob([image!],{type:'image/png'}),'source.png');form.append('image[]',new Blob([guide],{type:'image/png'}),'clothing-guide.png');}
-   else{form.append('image',new Blob([image!],{type:'image/png'}),'source.png');if(maskPng)form.append('mask',new Blob([maskPng],{type:'image/png'}),'mask.png');}
-   for(const [index,bytes] of references.entries())form.append('image[]',new Blob([bytes],{type:'image/webp'}),`costume-reference-${index+1}.webp`);
-   let url=EDIT_URL,requestBody:BodyInit=form,headers:Record<string,string>={Authorization:'Bearer '+this.settings.apiKey};
-   if(seedream){
     let requestPrompt=aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length).replace('transparent masked area','pink clothing-region guide in image 2').replace('outside the mask','outside the pink guide');
     if(guide&&!requestPrompt.includes('Image 2 is a copy'))requestPrompt+='\nImage 2 is a copy with a pink clothing-region guide. Edit clothing only in that region, keep other details unchanged, and never reproduce the pink guide.';
     const data=(bytes:Buffer,mime:string)=>`data:${mime};base64,`+bytes.toString('base64');
-    url=SEEDREAM_URL;headers={Authorization:'Bearer '+this.settings.seedreamKey,'Content-Type':'application/json'};
-    requestBody=JSON.stringify({model,prompt:requestPrompt,image:[data(image!,'image/png'),...(guide?[data(guide,'image/png')]:[]),...references.map(b=>data(b,'image/webp'))],size:sizeFor(width!,height!),output_format:'png',response_format:'b64_json',background:'opaque',watermark:false});
-   }
-   await this.stage('generation',seedream?'seedream':'openai');
-   let res:Response,body:any;try{({res,body}=await this.providerRequest(url,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers,body:requestBody},'generation',seedream?'seedream':'openai',model));}
+    const url=SEEDREAM_URL,headers={Authorization:'Bearer '+this.settings.seedreamKey,'Content-Type':'application/json'};
+    const requestBody=JSON.stringify({model,prompt:requestPrompt,image:[data(image!,'image/png'),...(guide?[data(guide,'image/png')]:[]),...references.map(b=>data(b,'image/webp'))],size:sizeFor(width!,height!),output_format:'png',response_format:'b64_json',background:'opaque',watermark:false});
+   await this.stage('generation','seedream');
+   let res:Response,body:any;try{({res,body}=await this.providerRequest(url,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers,body:requestBody},'generation','seedream',model));}
    catch(error){const timeout=['TimeoutError','AbortError'].includes(error?.name);this.report('generation',diagnosticId(error?.cause?.code)||(timeout?'PROVIDER_TIMEOUT':'PROVIDER_CONNECTION_ERROR'));reject(timeout?504:502,timeout?'PROVIDER_TIMEOUT':'PROVIDER_CONNECTION_ERROR',timeout?'사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.':'AI 제공사에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');}
    const trace=aiFailureTrace.getStore();if(trace){trace.providerRequestId=diagnosticId(res.headers.get('x-request-id')||res.headers.get('x-tt-logid'));trace.providerStatus=res.status;}
    if(!res.ok){const code=body?.error?.code,stage=body?.error?.moderation_details?.moderation_stage;this.report(code==='moderation_blocked'&&['input','output'].includes(stage)?stage:'provider',code,res);
-    if(seedream&&code==='OutputImageSensitiveContentDetected.PolicyViolation'){charged=false;reject(400,'UNSAFE_OUTPUT','생성된 사진이 AI 제공사의 콘텐츠 정책을 통과하지 못했어요. 다른 의상이나 요청을 선택해 주세요.');}
+    if(code==='OutputImageSensitiveContentDetected.PolicyViolation'){charged=false;reject(400,'UNSAFE_OUTPUT','생성된 사진이 AI 제공사의 콘텐츠 정책을 통과하지 못했어요. 다른 의상이나 요청을 선택해 주세요.');}
     if(code==='moderation_blocked'){charged=false;if(stage==='output')reject(400,'UNSAFE_OUTPUT','생성된 사진이 AI 제공사의 안전 검사를 통과하지 못했어요. 요청 내용을 확인해 주세요.');reject(400,'UNSAFE_INPUT',stage==='input'?'사진 또는 요청이 AI 제공사의 안전 검사에서 차단됐어요. 사진과 요청 내용을 확인해 주세요.':'AI 제공사의 안전 검사로 만들지 못했어요. 사진과 요청 내용을 확인해 주세요.');}
     if(res.status>=400&&res.status<500&&body?.error?.type==='image_generation_user_error')reject(400,'PROVIDER_INPUT_ERROR','사진 요청을 처리하지 못했어요. 선택한 옵션과 입력 사진을 확인해 주세요.');
     reject(502,'PROVIDER_ERROR','사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');}
