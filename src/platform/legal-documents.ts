@@ -164,12 +164,24 @@ const partnerTerms:LegalDocument={...payoutTerms,version:'2026-11-13.partner.1',
  sections:payoutTerms.sections.map(sec=>{if(sec.title!=='6. 크리에이터 수수료·정산·출금')return sec;if(!sec.body.includes(PARTNER_ANCHOR))throw Error(`Legal revision anchor missing in ${sec.title}`);
   return{...sec,body:sec.body.replace(PARTNER_ANCHOR,'멤버십 수익과 후원받은 콩의 출금은 회사와 크리에이터 파트너십 계약을 맺은 크리에이터(프로필에 인증 배지 표시)만 신청할 수 있습니다. 정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다. 파트너십 계약이 끝나 인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다. '+PARTNER_ANCHOR)};})};
 const payoutCatalog:LegalCatalog={...nextCatalog,documents:{...nextCatalog.documents,terms:partnerTerms}};
+// 2026-11-15 user decision (/pilot-work): disclose rules already enforced in code — bean charge limits (beans.service.ts,
+// bean-policy.ts: 900 beans per charge, 200,000 KRW per KST day) and the studio AI photo usage rules (ai-photo.ts daily 10 free,
+// UTC-day window = 09:00 KST reset; ai-photo-hearts.ts 30 hearts per game, 100 hearts -> 10 uses, 100 hearts per KST day;
+// usage order free -> hearts -> paid tickets; ai-shop.ts validity and pro-rata refund of remaining uses).
+export const TERMS_SYNC_DATE='2026-11-15';
+const BEAN_LIMIT_ANCHOR='콩은 크리에이터 후원에만 쓰며 멤버십·콘텐츠 이용권이 아닙니다.';
+const BEAN_LIMIT_TEXT='콩은 한 번에 최대 900콩(99,000원), 한국 시간 하루 200,000원까지 충전할 수 있습니다(VAT 포함). 하루 한도에는 결제가 끝났거나 결제 대기 중인 충전 금액이 합산됩니다. ';
+const AI_PHOTO_TERMS_SECTION={title:'13. 스튜디오 AI 사진 편집과 횟수권',body:"운영팀이 허용한 크리에이터는 스튜디오 게시물 작성에서 'AI로 사진 만들기'로 본인이 올린 사진을 편집할 수 있습니다. 한 번에 1장을 만들며, 무료 생성은 하루 10회이고 매일 오전 9시(한국 시간)에 다시 채워집니다. 서비스 운영 상황에 따라 전체 이용량이 많으면 일시적으로 생성이 제한될 수 있습니다.\n사진을 만드는 동안 하트 게임으로 하트를 모을 수 있습니다. 게임 1회에 최대 30하트, 한국 시간 하루 최대 100하트까지 적립되며, 100하트가 모이면 생성 10회로 바뀝니다. 생성 횟수는 무료 횟수, 하트로 받은 횟수, 구매한 횟수권 순서로 사용하며, 생성에 실패하면 사용한 횟수를 되돌립니다.\n횟수권의 가격·횟수·유효기간은 구매 화면에 표시하며, 유효기간이 지나면 남은 횟수는 소멸합니다. 남은 횟수는 구매 내역에서 결제 금액에 비례한 금액으로 환불할 수 있고, 사진을 만드는 중에는 환불할 수 없습니다.\n만든 사진은 크리에이터의 비공개 미디어로 저장되며 게시물에 넣으면 'AI 생성' 표시가 붙습니다. 노출·성적인 합성, 미성년자, 다른 사람의 얼굴 합성은 만들 수 없고, 사진 속 인물은 크리에이터 본인이거나 동의를 받은 사람이어야 합니다. 사진 처리와 국외 이전은 개인정보 처리방침 16번 항목을 따릅니다."};
+const syncTerms:LegalDocument={...partnerTerms,version:'2026-11-15.sync.1',updatedAt:TERMS_SYNC_DATE,publishedAt:TERMS_SYNC_DATE,effectiveAt:TERMS_SYNC_DATE,
+ notice:partnerTerms.notice+' 2026년 11월 15일 개정: 제11조에 콩 충전 한도(한 번에 900콩·하루 200,000원)를, 제13조에 스튜디오 AI 사진 편집의 무료 횟수·하트 보상·횟수권 기준을 적었습니다. 이전 동의 사본은 보존합니다.',
+ sections:[...partnerTerms.sections.map(sec=>{if(sec.title!=='11. 콩')return sec;if(!sec.body.includes(BEAN_LIMIT_ANCHOR))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(BEAN_LIMIT_ANCHOR,BEAN_LIMIT_TEXT+BEAN_LIMIT_ANCHOR)};}),AI_PHOTO_TERMS_SECTION]};
+const syncCatalog:LegalCatalog={...payoutCatalog,documents:{...payoutCatalog.documents,terms:syncTerms}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

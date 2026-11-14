@@ -1,3 +1,9 @@
+## 2026-11-15 약관 동기화: 콩 충전 한도·AI 사진 이용 조건 (운영 미배포)
+- /pilot-work 결정: 약관·화면·가이드를 지금 맞춤. 약관 2026-11-15.sync.1(공개·시행 2026-11-15): 11조 앞에 "한 번에 최대 900콩(99,000원), 한국 시간 하루 200,000원(VAT 포함), 결제 완료·대기 합산", 13조 신설 "스튜디오 AI 사진 편집과 횟수권"(하루 무료 10회·오전 9시 초기화, 하트 게임 1회 최대 30·하루 최대 100·100하트=10회, 사용 순서 무료→하트→횟수권, 실패 시 복원, 횟수권 유효기간 소멸·잔여 비례 환불·생성 중 환불 불가, AI 생성 표시·금지 사항, 처리방침 16항 참조). 근거 코드: bean-policy.ts, ai-photo.ts(UTC 일 창=KST 09:00), ai-photo-hearts.ts, ai-shop.ts.
+- 결제 조건 버전(PAYMENT_TERMS 2026-11-02.1)은 올리지 않음: 멤버십·구독 재개·콩이 공유하고 구독 재개는 정확한 버전만 받아 열린 결제 화면이 거절될 위험(올렸을 때 결제 생애주기 테스트 17건 실패 확인). 콩 충전·이어서 결제 화면에 한도 안내로 대체 — 사용자 확인 필요.
+- AI 횟수 소진 서버 문구(ai-shop.ts DAILY_LIMIT)를 "무료 횟수를 모두 썼어요. 매일 오전 9시에 다시 채워지고, 횟수권을 구매하면 계속 만들 수 있어요."로 프론트와 통일.
+- 검증: build 0, legal 21/21(동기화 개정 테스트 추가: 약관 숫자가 bean-policy·AI 상수와 일치하는지 대조), ai-shop+legal 28/28.
+
 ## 2026-11-15 처리방침 BytePlus 개정·하트 하루 상한 운영 배포 완료
 - prod 8272577(feat/privacy-byteplus + feat/ai-heart-daily-cap). API/worker=crefans-api:privacy-hearts-20261115(x-presets 위 src·dist 덮어쓰기, legal-documents.js·ai-photo-hearts.js 해시가 로컬 prod 빌드와 일치). 프론트 변경 없음. 콩 대사 수정(fix/bean-reconcile-kill-switch 95a925b)은 사용자 미선택으로 제외.
 - 운영 확인: API/worker Running·재시작0·health ready·비로그인401·다른 컨테이너 불변, /api/v1/common의 privacy version 2026-11-15.byteplus.1, 16항 BytePlus·180일·8항 "사진 생성을 Byteplus" 포함.
