@@ -208,6 +208,7 @@
 | POST | `/api/v1/studio/advertising/orders/:id/use` | `src/platform/advertising.controller.ts::use` |
 | GET | `/api/v1/studio/advertising/products` | `src/platform/advertising.controller.ts::products` |
 | POST | `/api/v1/studio/ai-photo/edit` | `src/platform/ai-photo.ts::edit` |
+| POST | `/api/v1/studio/ai-photo/hearts` | `src/platform/ai-photo.ts::hearts` |
 | GET | `/api/v1/studio/ai-photo/quota` | `src/platform/ai-photo.ts::quota` |
 | POST | `/api/v1/studio/ai-photo/reset-ticket` | `src/platform/ai-photo.ts::useResetTicket` |
 | GET | `/api/v1/studio/bean-finance` | `src/platform/beans.controller.ts::studio` |
@@ -431,9 +432,10 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261108200000_ai_photo_grants`
 - `20261113170000_ai_photo_reset_tickets`
 - `20261114010000_ai_photo_failure_details`
+- `20261114060000_ai_heart_rewards`
 - `20261114140000_ai_shop`
 
-## Prisma 전체 정의 (100 models · 15 enums)
+## Prisma 전체 정의 (103 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -2542,5 +2544,32 @@ model AiShopUse {
  @@index([order_id,status])
  @@index([status,created_at])
  @@map("ai_shop_uses")
+}
+
+model AiHeartWallet {
+ user_id String @id @db.VarChar(191)
+ hearts Int @default(0)
+ credits Int @default(0)
+ @@map("ai_heart_wallets")
+}
+model AiHeartGame {
+ id String @id @default(uuid())
+ user_id String @db.VarChar(191)
+ kinds Json
+ clicks Json
+ score Int @default(0)
+ status String @default("ready") @db.VarChar(20)
+ created_at DateTime @default(now())
+ started_at DateTime?
+ ended_at DateTime?
+ converted Int @default(0)
+ @@index([user_id,status])
+ @@map("ai_heart_games")
+}
+model AiHeartUse {
+ id String @id
+ user_id String @db.VarChar(191)
+ status String @default("reserved") @db.VarChar(20)
+ @@map("ai_heart_uses")
 }
 ```
