@@ -28,10 +28,10 @@ before(async()=>{
  creator=await makeCreator('aiedit_'+tag);other=await makeCreator('aiother_'+tag);sourceId=await media(creator);otherSourceId=await media(other);
  app=await NestFactory.create(PlatformModule,{logger:false});await app.init();photos=app.get(AiPhotoService);photos.fetcher=stub;photos.logger={warn:value=>warnings.push(value)};
 });
-after(async()=>{await app?.close();try{await db.aiShopUse.deleteMany({where:{creator_id:{in:members}}});await db.aiShopOrder.deleteMany({where:{creator_id:{in:members}}});const made=await db.media.findMany({where:{user_sub:{in:members}},select:{id:true}});await db.media.deleteMany({where:{id:{in:made.map(m=>m.id)}}});await db.aiPhotoGrant.deleteMany({where:{creator_user_id:{in:members}}});await db.creator.deleteMany({where:{user_id:{in:members}}});await db.member.deleteMany({where:{id:{in:members}}});fs.rmSync(mediaRoot,{recursive:true,force:true});}finally{await db.$disconnect();await release?.();}});
+after(async()=>{await app?.close();try{await db.aiHeartUse.deleteMany({where:{user_id:{in:members}}});await db.aiHeartGame.deleteMany({where:{user_id:{in:members}}});await db.aiHeartWallet.deleteMany({where:{user_id:{in:members}}});await db.aiShopUse.deleteMany({where:{creator_id:{in:members}}});await db.aiShopOrder.deleteMany({where:{creator_id:{in:members}}});const made=await db.media.findMany({where:{user_sub:{in:members}},select:{id:true}});await db.media.deleteMany({where:{id:{in:made.map(m=>m.id)}}});await db.aiPhotoGrant.deleteMany({where:{creator_user_id:{in:members}}});await db.creator.deleteMany({where:{user_id:{in:members}}});await db.member.deleteMany({where:{id:{in:members}}});fs.rmSync(mediaRoot,{recursive:true,force:true});}finally{await db.$disconnect();await release?.();}});
 
 test('only allow-listed creators: quota shows not allowed and edits are refused until granted',async()=>{
- reset();assert.deepEqual(await photos.quota(creator),{allowed:false,limit:10,remaining:0,paidRemaining:0,typicalSeconds:null,resetTickets:{count:0,nextExpiresAt:null}});
+ reset();assert.deepEqual(await photos.quota(creator),{allowed:false,limit:10,remaining:0,paidRemaining:0,hearts:0,rewardRemaining:0,typicalSeconds:null,resetTickets:{count:0,nextExpiresAt:null}});
  await assert.rejects(photos.edit(creator,base()),code('AI_PHOTO_NOT_ALLOWED'));assert.equal(calls.length,0);
  await db.aiPhotoGrant.create({data:{creator_user_id:creator,reason:'테스트 허용'}});
  {const q=await photos.quota(creator);assert.deepEqual([q.allowed,q.limit,q.remaining],[true,10,10]);assert.ok(q.typicalSeconds===null||Number.isInteger(q.typicalSeconds));}
@@ -118,7 +118,7 @@ test('combined/gender validation refuses malformed scopes, missing outfit mask a
 
 test('all eight aspects including camera, lens and body combine without conflicting body-preservation rules',async()=>{
  const user=await makeCreator('aibody_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);reset();
- const kinds=['outfit','makeup','expression','pose','background','camera','lens','body'];await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:kinds,prompt:'가슴 크기는 조금 작게, 키 비율은 조금 크게. 전신 구도, Canon RF85mm F1.2 촬영 느낌, 벤치에 앉은 포즈.'}),await mask());const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields.n,undefined);assert.match(edit.fields.prompt,/Camera: adjust viewpoint/);assert.match(edit.fields.prompt,/Lens: simulate/);assert.match(edit.fields.prompt,/Body proportions:/);assert.match(edit.fields.prompt,/Only the requested body proportions may change/);assert.doesNotMatch(edit.fields.prompt,/body shape and skin tone exactly/);assert.match(edit.fields.prompt,/age and skin tone/);assert.match(edit.fields.prompt,/Do not add nudity/);
+ const kinds=['outfit','makeup','expression','pose','background','camera','lens','body'];await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:kinds,prompt:'가슴 크기는 조금 작게, 키 비율은 조금 크게. 전신 구도, Canon RF85mm F1.2 촬영 느낌, 벤치에 앉은 포즈.'}),await mask());const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.fields.n,undefined);assert.match(edit.fields.prompt,/Camera: adjust viewpoint/);assert.match(edit.fields.prompt,/Shooting concept: apply/);assert.match(edit.fields.prompt,/Body proportions:/);assert.match(edit.fields.prompt,/Only the requested body proportions may change/);assert.doesNotMatch(edit.fields.prompt,/body shape and skin tone exactly/);assert.match(edit.fields.prompt,/age and skin tone/);assert.match(edit.fields.prompt,/Do not add nudity/);
  reset();await photos.edit(user,base({sourceId:id,kind:'body',prompt:'힙 크기를 조금 크게 자연스럽게 보정해줘.'}));const body=calls.find(c=>c.kind==='edit');assert.match(body.fields.prompt,/fully clothed/);assert.match(body.fields.prompt,/Only the requested body proportions may change/);assert.ok(!body.fields.mask);
 });
 
@@ -148,7 +148,7 @@ test('cosplay complete look sends original plus guide and allows explicitly requ
 
 test('catalog reference images: real selected bytes reach both moderation and edit in order; other edits stay intact',async()=>{
  const {AI_PHOTO_COSTUME_IDS,readCostumeReference}=require('../dist/src/platform/ai-photo-costume-references');
- assert.equal(AI_PHOTO_COSTUME_IDS.length,40);
+ assert.equal(AI_PHOTO_COSTUME_IDS.length,90);
  for(const id of AI_PHOTO_COSTUME_IDS){const bytes=await readCostumeReference(id),m=await sharp(bytes).metadata();assert.equal(m.format,'webp');assert.equal(m.width,512);assert.equal(m.height,512);}
  const user=await makeCreator('airef_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
  reset();const ids=['80bdd0','29581e'],prompt='의상 참조 사진 1의 코디를 적용해줘. 흰 스튜디오';
@@ -294,7 +294,7 @@ test('attempt start is persisted while provider is pending; incomplete old attem
 
 test('six-character costume IDs map to identical assets and normalize legacy aliases before duplicates',async()=>{
  const {AI_PHOTO_COSTUME_IDS,costumeReferenceIds,readCostumeReference}=require('../dist/src/platform/ai-photo-costume-references');
- assert.equal(AI_PHOTO_COSTUME_IDS.length,40);assert.equal(new Set(AI_PHOTO_COSTUME_IDS).size,40);for(const id of AI_PHOTO_COSTUME_IDS)assert.match(id,/^[a-f0-9]{6}$/);
+ assert.equal(AI_PHOTO_COSTUME_IDS.length,90);assert.equal(new Set(AI_PHOTO_COSTUME_IDS).size,90);for(const id of AI_PHOTO_COSTUME_IDS)assert.match(id,/^[a-f0-9]{6}$/);
  const mapping={"maid": "773106", "sailor": "80974e", "gothic": "ffb58f", "mage": "666147", "cyber": "b4bf5d", "idol": "e614f6", "cheer": "190513", "beach": "ab36e8", "nikke-rapi": "313a28", "nikke-anis": "1947f3", "nikke-helm": "173f1e", "nikke-noir": "ce1f18", "overwatch-dva": "70219a", "overwatch-mercy": "7281fe", "overwatch-widow": "8971c9", "overwatch-ashe": "9a01b2", "diablo-sorcerer": "da6901", "diablo-necromancer": "87ad51", "diablo-rogue": "72db9a", "diablo-barbarian": "b3bfdd", "aot-scout": "1a73b4", "aot-captain": "3e20e3", "aot-police": "556b2b", "aot-final": "8f1113", "demon-giyu": "c65204", "demon-shinobu": "9e6184", "demon-rengoku": "8d3d3e", "demon-mitsuri": "6ee320", "jjk-gojo": "07c722", "jjk-nanami": "edf3b8", "jjk-geto": "6c9ecb", "jjk-toji": "a77dd5", "genshin-raiden": "b516a6", "genshin-jean": "752866", "genshin-zhongli": "2056e8", "genshin-diluc": "d69be9", "blue-shiroko": "80bdd0", "blue-hoshino": "4298dc", "blue-yuuka": "c7289e", "blue-aris": "29581e"};
  for(const [old,id] of Object.entries(mapping)){assert.deepEqual(costumeReferenceIds([old],['outfit'],'cosplay'),[id]);assert.deepEqual(costumeReferenceIds([id],['outfit'],'cosplay'),[id]);assert.deepEqual(await readCostumeReference(id),await readCostumeReference(old));assert.throws(()=>costumeReferenceIds([old,id],['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));}
  for(const id of ['ffffff','__proto__','constructor','../maid']){assert.throws(()=>costumeReferenceIds([id],['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));await assert.rejects(readCostumeReference(id),code('INVALID_COSTUME_REFERENCES'));}
@@ -310,3 +310,28 @@ test('outfit mask is optional: original and costume references keep correct orde
 });
 
 test('paid generation counts are used only after free quota and restored on failed generation',async()=>{const user=await makeCreator('aipaid_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'횟수권 테스트'}});const id=await media(user),order=await db.aiShopOrder.create({data:{creator_id:user,product_id:'fixture',request_key:crypto.randomUUID(),name:'격리 대역 2회',amount:200,quantity:2,validity_days:30,terms:'test',environment:'test',status:'paid',remaining:2,paid_at:new Date(),expires_at:new Date(Date.now()+86400000)}});reset();await photos.edit(user,base({sourceId:id}));assert.equal((await db.aiShopOrder.findUnique({where:{id:order.id}})).remaining,2);for(let i=1;i<10;i++)await photos.limiter.limit('ai-photo:creator-day:'+user,10,86400);reset();editStatus=500;await assert.rejects(photos.edit(user,base({sourceId:id})));assert.equal((await db.aiShopOrder.findUnique({where:{id:order.id}})).remaining,2);reset();const r=await photos.edit(user,base({sourceId:id}));assert.equal(r.remaining,1);assert.equal((await db.aiShopOrder.findUnique({where:{id:order.id}})).remaining,1);assert.equal(await db.aiShopUse.count({where:{order_id:order.id,status:'consumed'}}),1);assert.equal(await db.aiShopUse.count({where:{order_id:order.id,status:'released'}}),1);});
+
+test('shooting-concept instructions allow selfie/mirror handling in single and combined edits',()=>{const single=aiPhotoPrompt('lens','photo','거울샷');assert.match(single,/mirror selfie/);assert.match(single,/phone-holding pose and mirror reflection/);const combined=aiPhotoPrompt('combined','photo','DSLR 촬영',['pose','lens']);assert.match(combined,/Shooting concept:/);assert.match(combined,/Pose: adjust/);assert.match(combined,/identity/);});
+
+test('heart wallet: threshold, ownership, server-verified clicks, idempotent concurrent settlement and credit restoration',async()=>{
+ const h=require('../dist/src/platform/ai-photo-hearts');
+ for(const [input,hearts,credits] of [[99,99,0],[100,0,10],[109,9,10],[110,0,11],[115,5,11]])assert.deepEqual(h.heartConversion(input),{hearts,credits});
+ const game=await h.createHeartGame(db,creator);await assert.rejects(()=>h.startHeartGame(db,other,game.id));await h.startHeartGame(db,creator,game.id);await assert.rejects(()=>h.startHeartGame(db,creator,game.id));
+ await assert.rejects(()=>h.clickHeart(db,other,game.id,1,'x'));await assert.rejects(()=>h.clickHeart(db,creator,game.id,465,'future'));await assert.rejects(()=>h.clickHeart(db,creator,game.id,1.5,'fraction'));
+ assert.equal((await h.clickHeart(db,creator,game.id,1,'one')).score,1);assert.equal((await h.clickHeart(db,creator,game.id,1,'one')).score,1);await assert.rejects(()=>h.clickHeart(db,creator,game.id,1,'replay'));assert.equal((await h.clickHeart(db,creator,game.id,0,'blank')).score,0);
+ await assert.rejects(()=>h.settleHeartGame(db,creator,game.id));await db.aiHeartGame.update({where:{id:game.id},data:{score:30}});assert.equal((await h.clickHeart(db,creator,game.id,2,'cap')).score,30);
+ await db.aiHeartWallet.upsert({where:{user_id:creator},create:{user_id:creator,hearts:85},update:{hearts:85,credits:0}});await h.closeHeartGame(db,creator,game.id);await Promise.all([h.settleHeartGame(db,creator,game.id),h.settleHeartGame(db,creator,game.id)]);let wallet=await h.heartBalance(db,creator);assert.equal(wallet.hearts,5);assert.equal(wallet.credits,11);
+ const id=crypto.randomUUID();await h.reserveHeartCredit(db,creator,id);assert.equal((await h.heartBalance(db,creator)).credits,10);await Promise.all([h.finishHeartCredit(db,id,false),h.finishHeartCredit(db,id,false)]);assert.equal((await h.heartBalance(db,creator)).credits,11);
+ const id2=crypto.randomUUID();await h.reserveHeartCredit(db,creator,id2);await h.finishHeartCredit(db,id2,true);await h.finishHeartCredit(db,id2,false);assert.equal((await h.heartBalance(db,creator)).credits,10);
+ await db.aiHeartUse.deleteMany({where:{user_id:creator}});await db.aiHeartGame.deleteMany({where:{user_id:creator}});await db.aiHeartWallet.deleteMany({where:{user_id:creator}});
+});
+
+test('reward credit is usable after daily quota and provider failure restores it; game closes and settles on actual generation',async()=>{
+ reset();while((await photos.quota(creator)).remaining>0)await photos.edit(creator,base());
+ await db.aiHeartWallet.upsert({where:{user_id:creator},create:{user_id:creator,credits:1,hearts:99},update:{credits:1,hearts:99}});
+ assert.equal((await photos.quota(creator)).remaining,1);const game=await photos.hearts(creator,{action:'start'});let sawGame=false;
+ photos.fetcher=async(url,init)=>{if(url.endsWith('/images/generations')){await photos.hearts(creator,{action:'click',id:game.id,piece:1,eventId:'during-generation'});sawGame=true;}return stub(url,init)};
+ try{const result=await photos.edit(creator,base({heartGameId:game.id}));assert.equal(result.images.length,1);assert.ok(sawGame);const reward=await photos.hearts(creator,{action:'finish',id:game.id});assert.equal(reward.hearts,0);assert.equal(reward.converted,10);assert.equal(reward.credits,10);assert.equal(reward.remaining,10);
+ reset();editStatus=500;await assert.rejects(photos.edit(creator,base()),code('PROVIDER_ERROR'));assert.equal((await photos.quota(creator)).rewardRemaining,10);assert.equal((await photos.quota(creator)).paidRemaining,0);
+ }finally{photos.fetcher=stub;reset();await db.aiHeartUse.deleteMany({where:{user_id:creator}});await db.aiHeartGame.deleteMany({where:{user_id:creator}});await db.aiHeartWallet.deleteMany({where:{user_id:creator}});}
+});
