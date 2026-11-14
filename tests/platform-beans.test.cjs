@@ -373,6 +373,7 @@ test('refunds still work after live sales approval is switched off',async()=>{
  const stopped=new BeansService(service,finance,provider,bank,new ConfigService({BEAN_LEDGER_ENABLED:'true',BEAN_LIVE_PAYMENTS_APPROVED:'false',BANK_PAYOUTS_ENABLED:'true',BETA_MODE:'false'}));
  await assert.rejects(stopped.createCharge(member,{quantity:10,requestId:randomUUID()}),code('BEAN_LIVE_APPROVAL_REQUIRED'),'new sales stop');
  assert.equal((await stopped.refundCharge(member,o.id,{requestId:randomUUID()})).status,'done','but refunds owed still go through');
+ const pending=await beans.createCharge(member,{quantity:10,requestId:randomUUID()});await assert.doesNotReject(stopped.reconcileCharge(pending.id),'reconciliation of an open live charge keeps running while new sales are stopped');
  await db.beanRefund.deleteMany({where:{member_id:member}});
 });
 test('account withdrawal: purchased beans point to the wallet refund, received beans must be withdrawn, promotion beans lapse',async()=>{
