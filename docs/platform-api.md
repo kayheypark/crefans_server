@@ -612,6 +612,7 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | GET | /studio/ai-photo/quota | 크리에이터 본인. `{allowed,limit,remaining}`. allowed = 허용 목록(ai_photo_grants) + 공급사 키 설정. |
+| POST | /studio/ai-photo/crop | 본인 완료 AI 이미지. JSON `sourceId,left,top,width,height` 정수 픽셀 영역, 범위검사 후 새 AI 미디어 응답. 횟수 미차감·원본 보존. |
 | POST | /studio/ai-photo/edit | multipart `sourceId,kind(outfit|makeup|expression|pose|background|camera|lens|body|combined),editKinds(combined 필수 JSON 배열 2~8항목),style(photo|cosplay|daily),prompt(1~2000),targetGender(female|male, 선택),consent=true,mask(PNG, outfit 포함 시 선택; 옷 세부 지정 ON일 때 전송)`. 응답 `{images:[{id,type,url,aiGenerated}],remaining}`. |
 
 - 순서: 허용 목록(403 AI_PHOTO_NOT_ALLOWED) → 본인 완료 이미지(404) → 문구 개인정보·지시 무력화 차단 → 마스크(칠한 곳 없음 400) → 하루 `AI_PHOTO_PER_DAY`(기본 10, UTC 하루=한국 오전 9시, 429 DAILY_LIMIT)·전체 `AI_PHOTO_DAILY_TOTAL`(기본 300) → 문구+사진 Moderation(판정 불가 503, 실패 시 진행 안 함) → 모든 모드(general/cosplay/누락)에서 BytePlus `/api/v3/images/generations`(dola-seedream-5-5-261028, 1장, 1536px 이하 PNG, watermark=false; 원본·의상 가이드·참조 총10장 이하). 생성 키는 `AI_PHOTO_BYTEPLUS_API_KEY`, OpenAI 키는 안전검사에만 사용하며 생성 대체 모델은 없음 → 결과별 Moderation(통과만 저장) → 크리에이터 비공개 미디어(webp, metadata.aiGenerated·aiSourceId·aiKind·aiModel, 워터마크 대상 기록).
@@ -687,3 +688,8 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 게임별 최대30개를 계정에 누적. 잔여하트100개 이상이면 10개당1회 자동전환(115→11회+5개),100개 미만은 이월. 유료 구매/환불과 분리된 보상잔액이며 무료→보상→유료순 사용한다. 보상 사용실패는 멱등복구. 기존 AI 접근권한을 확대하지 않는다.
 start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameId를 받는다. 실제검증/쿼터통과 후 활성화, 생성종료시자동정산. click은piece번호(0=빈공간)와eventId만 받으며 점수입력없음. 서버시간·본인소유·활성세션·조각중복·최대30 검증; 사용자행잠금으로 지급/차감 직렬화. 자동클릭 봇 식별을 보장하지 않는다. finish는중복호출안전한잔액조회/정산재시도. 실패한 생성 중 서버가 인정한 하트도 적립된다. quota.hearts는미전환하트,rewardRemaining은보상횟수. 게임이끊기면600초후재시도가능; 정산전게임은보관하며 다음start시미정산분을복구하며finish도재시도가능.
 근거 확인2026-11-14: [OWASP Business Logic Security](https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html) — 서버재계산·트랜잭션·멱등처리. 검증: tests/platform-ai-photo.test.cjs. 운영배포 미실행.
+
+### AI 사진 비율·자르기 (2026-11-14)
+- `POST /studio/ai-photo/edit` 선택적 aspectRatio=original/1:1/4:5/3:4/9:16/16:9. 미지정 original은 원본 종횡비 기준 약1.5MP(허용1:16~16:1), 나머지는 1024x1024/1024x1280/960x1280/864x1536/1536x864.
+- `POST /studio/ai-photo/crop`: 인증된 크리에이터, 본인 소유 완료 AI 이미지에 `{sourceId,left,top,width,height}`. 방향보정 후 정수 픽셀 영역을 범위검사하고 Sharp extract, 새 비공개 WebP/AI메타데이터 보존. 타인404 MEDIA_NOT_FOUND, 비AI400 INVALID_CROP_SOURCE, 범위오류400 INVALID_CROP. 원본 유지, 모델 호출/횟수차감 없음.
+- 공급사 규격 확인2026-11-14: https://docs.byteplus.com/en/docs/modelark/seedream-5-5 (921600~4624220픽셀,1:16~16:1). 자르기 https://sharp.pixelplumbing.com/api-resize/ 의 정수 extract 사용. 공급자 대역 검사와 운영 생성은 구분한다.

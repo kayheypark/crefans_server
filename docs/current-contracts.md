@@ -207,6 +207,7 @@
 | GET | `/api/v1/studio/advertising/orders` | `src/platform/advertising.controller.ts::orders` |
 | POST | `/api/v1/studio/advertising/orders/:id/use` | `src/platform/advertising.controller.ts::use` |
 | GET | `/api/v1/studio/advertising/products` | `src/platform/advertising.controller.ts::products` |
+| POST | `/api/v1/studio/ai-photo/crop` | `src/platform/ai-photo.ts::crop` |
 | POST | `/api/v1/studio/ai-photo/edit` | `src/platform/ai-photo.ts::edit` |
 | POST | `/api/v1/studio/ai-photo/hearts` | `src/platform/ai-photo.ts::hearts` |
 | GET | `/api/v1/studio/ai-photo/quota` | `src/platform/ai-photo.ts::quota` |

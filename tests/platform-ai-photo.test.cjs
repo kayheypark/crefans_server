@@ -335,3 +335,24 @@ test('reward credit is usable after daily quota and provider failure restores it
  reset();editStatus=500;await assert.rejects(photos.edit(creator,base()),code('PROVIDER_ERROR'));assert.equal((await photos.quota(creator)).rewardRemaining,10);assert.equal((await photos.quota(creator)).paidRemaining,0);
  }finally{photos.fetcher=stub;reset();await db.aiHeartUse.deleteMany({where:{user_id:creator}});await db.aiHeartGame.deleteMany({where:{user_id:creator}});await db.aiHeartWallet.deleteMany({where:{user_id:creator}});}
 });
+
+test('aspect ratios map to explicit provider dimensions; unknown ratio rejected before provider',async()=>{
+ reset();
+ await assert.rejects(photos.edit(creator,base({aspectRatio:'bogus'})),code('INVALID_ASPECT_RATIO'));assert.equal(calls.length,0);
+ // Separate fresh allowed creator avoids interference with earlier daily-limit tests.
+ const who=await makeCreator('ratio_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'비율 QA'}});const id=await media(who);
+ for(const [aspectRatio,size] of Object.entries({'1:1':'1024x1024','4:5':'1024x1280','3:4':'960x1280','9:16':'864x1536','16:9':'1536x864'})){
+  reset();await photos.edit(who,base({sourceId:id,aspectRatio}));assert.equal(calls.find(c=>c.kind==='edit').fields.size,size);
+ }
+});
+
+test('crop persists exact dimensions with AI metadata without provider calls or quota use; rejects foreign and invalid areas',async()=>{
+ reset();const id=await media(creator,600,900);await db.media.update({where:{id},data:{metadata:{aiGenerated:true,aiSourceId:sourceId}}});
+ const before=await photos.quota(creator),bytes=fs.readFileSync(path.join(mediaRoot,id));
+ const result=await photos.crop(creator,{sourceId:id,left:100,top:200,width:400,height:500});
+ const saved=await db.media.findUnique({where:{id:result.id}}),dim=await sharp(fs.readFileSync(path.join(mediaRoot,result.id))).metadata();
+ assert.deepEqual([dim.width,dim.height],[400,500]);assert.equal(saved.metadata.aiGenerated,true);assert.equal(saved.metadata.aiSourceId,sourceId);assert.equal(saved.metadata.croppedFrom,id);assert.equal(saved.user_sub,creator);assert.equal((await photos.quota(creator)).remaining,before.remaining);assert.equal(calls.length,0);assert.deepEqual(fs.readFileSync(path.join(mediaRoot,id)),bytes);
+ await assert.rejects(photos.crop(other,{sourceId:id,left:0,top:0,width:100,height:100}),code('MEDIA_NOT_FOUND'));
+ await assert.rejects(photos.crop(creator,{sourceId,left:0,top:0,width:100,height:100}),code('INVALID_CROP_SOURCE'));
+ for(const patch of [{left:-1},{left:.5},{left:'1'},{width:0},{width:601},{height:901},{top:899}])await assert.rejects(photos.crop(creator,{sourceId:id,left:0,top:0,width:100,height:100,...patch}),code('INVALID_CROP'));
+});

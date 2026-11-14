@@ -1,3 +1,8 @@
+## 2026-11-14 비율 프리셋·결과 자르기 구현 완료 (미배포)
+- 합격: 생성 요청에 6종 비율 반영, 결과 비율/위치 조정 후 실제 저장 이미지 교체, 다운로드/계속보정/사진결정 연결, 타인·범위밖 자르기 거절, AI 횟수 미차감. 프론트69/69·서버32/32·OpenAPI14/14, 양쪽빌드·프론트타입·WebKit390 드래그/저장/다운로드 파일치수/계속보정 확인. 운영 미배포·실공급자생성 미실행. 기존 프론트 check:layers는 기존 downloadPhoto의 직접fetch 1건으로 실패(HEAD에도 존재, 이번 범위외).
+- 증거: front docs/audit/ratio-crop-20261114.json, 양쪽 .local/ratio-crop. 새프리셋선택만으로 생성하지 않고 자르기취소/실패시 기존사진 유지. 다음: 사용자 요청 시 dev→prod·운영 배포.
+- 근거(2026-11-14): https://docs.byteplus.com/en/docs/modelark/seedream-5-5 명시적 size 범위921600~4624220픽셀; https://sharp.pixelplumbing.com/api-resize/ extract 정수영역 사용.
+
 ## 2026-11-14 AI 사진 개선·하트 보상 운영 배포 완료
 - 기능 소스 front 78c5bf0 / server 26d6359(dev→prod). 운영 frontend=front-ai-hearts-v2-20261114, API/worker=ai-hearts-v2-20261114. 오버워치54종·촬영컨셉4종·배경실내/야외·다운로드/핀치줌허용·게임난이도/30상한·계정누적100하트전환 반영. 신규3테이블 migration 적용, 관리자/DB/proxy/업로드 보존.
 - 초기 API 부팅 실패: hearts OpenAPI 계약누락으로일시502. 이전정상API로복구 후계약등록·전체초기화14/14검증하여재배포. 현재API/worker/frontend Running·재시작0·OOM없음,health ready. 기존검증 서버30/프론트65, 실운영WebKit390 예시화면다운로드파일저장·pinch-zoom스타일·JS오류/넘침없음, 프리셋62개 HTTP이미지 SHA256일치.
