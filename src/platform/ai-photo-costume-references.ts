@@ -346,6 +346,17 @@ const COSTUME_ASSETS:Record<string,string>={
  "43ad6b": "jjk-higuruma",
  "532630": "jjk-reggie",
  "24a157": "genshin-alyosha",
+ "80a202": "genshin-durin",
+ "17e190": "genshin-kinich",
+ "841c2c": "genshin-lohen",
+ "319999": "genshin-mitya",
+ "2de0d6": "genshin-nicole",
+ "60e1ae": "genshin-odette",
+ "6e548b": "genshin-kokomi",
+ "60c75c": "genshin-sethos",
+ "dfc752": "genshin-valeriy",
+ "b25a15": "genshin-vesna",
+ "a1dd79": "genshin-vodyanitsa",
 };
 export const AI_PHOTO_COSTUME_IDS=Object.keys(COSTUME_ASSETS);
 function canonicalId(id:string):string|undefined{
