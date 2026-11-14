@@ -1,3 +1,4 @@
+import {heartBalance,createHeartGame,startHeartGame,closeHeartGame,clickHeart,settleHeartGame,reserveHeartCredit,finishHeartCredit} from './ai-photo-hearts';
 import {paidPhotoCount,reservePaidPhoto,finishPaidPhoto} from './ai-shop';
 // Studio AI photo editor (2026-11-08 user request): outfit (masked), makeup, expression, pose or background edits of the creator's own uploaded photo.
 // Order: allow-list → own completed image → text checks → daily limits → input moderation (fail closed) → Seedream image edit
@@ -30,9 +31,9 @@ export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=2000;
 const MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
 const SEEDREAM_URL='https://ark.ap-southeast.bytepluses.com/api/v3/images/generations';
 const DAY=86400,MAX_SIDE=1536;
-const KINDS:Record<string,string>={camera:'Change only camera angle, framing and viewpoint as requested.',lens:'Recreate the requested photographic focal length, perspective and depth-of-field look; this is a visual simulation, not a real lens capture.',body:'Adjust only the requested adult chest, hip size or apparent height proportions naturally. Keep the person fully clothed and avoid sexualization.',outfit:'Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.',makeup:'Change only the makeup colors and finish. Preserve natural skin texture and facial structure.',expression:'Change only the facial expression as requested. Preserve facial structure and identity.',pose:"Change only the person's pose and body position.",background:'Change only the background and surroundings behind the person.'};
+const KINDS:Record<string,string>={camera:'Change only camera angle, framing and viewpoint as requested.',lens:'Recreate the requested shooting concept: front-camera phone selfie, mirror selfie, DSLR portrait or distant telephoto portrait. Adjust framing, phone-holding pose and mirror reflection only as needed for the selected concept. Keep identity and other requested edits. This is a visual simulation.',body:'Adjust only the requested adult chest, hip size or apparent height proportions naturally. Keep the person fully clothed and avoid sexualization.',outfit:'Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.',makeup:'Change only the makeup colors and finish. Preserve natural skin texture and facial structure.',expression:'Change only the facial expression as requested. Preserve facial structure and identity.',pose:"Change only the person's pose and body position.",background:'Change only the background and surroundings behind the person.'};
 const STYLES:Record<string,string>={photo:'a natural, realistic photograph',cosplay:'a realistic cosplay photo shoot with studio-quality lighting',daily:'a casual, realistic everyday snapshot'};
-const COMBINED:Record<string,string>={camera:'Camera: adjust viewpoint and framing as requested.',lens:'Lens: simulate the requested focal-length perspective and depth-of-field look.',body:'Body proportions: naturally adjust only the requested adult chest, hip size or apparent height proportions, fully clothed and non-sexualized.',outfit:'Clothing: replace the requested garments in the pink clothing guide area.',makeup:'Makeup: apply the requested makeup while retaining natural skin texture.',expression:'Expression: apply the requested expression without changing identity.',pose:'Pose: adjust body position as requested.',background:'Background: change the requested surroundings.'};
+const COMBINED:Record<string,string>={camera:'Camera: adjust viewpoint and framing as requested.',lens:'Shooting concept: apply the requested phone selfie, mirror selfie, DSLR or telephoto style, including necessary framing, phone-holding pose and mirror reflection. Keep other requested edits.',body:'Body proportions: naturally adjust only the requested adult chest, hip size or apparent height proportions, fully clothed and non-sexualized.',outfit:'Clothing: replace the requested garments in the pink clothing guide area.',makeup:'Makeup: apply the requested makeup while retaining natural skin texture.',expression:'Expression: apply the requested expression without changing identity.',pose:'Pose: adjust body position as requested.',background:'Background: change the requested surroundings.'};
 function editKinds(kind:string,value:unknown):string[]{
  if(kind!=='combined')return [kind];
  let list:unknown=value;try{if(typeof list==='string')list=JSON.parse(list);}catch{reject(400,'INVALID_EDIT_KINDS','적용할 편집 항목을 다시 골라 주세요.');}
@@ -75,13 +76,20 @@ export class AiPhotoService{
  async quota(sub:string){
   await this.service.requireCreator(sub);
   const allowed=await aiPhotoAllowed(this.service.db,sub)&&this.configured();
-  return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+await paidPhotoCount(this.service.db,sub):0,paidRemaining:allowed?await paidPhotoCount(this.service.db,sub):0,typicalSeconds:allowed?await this.typicalSeconds():null,resetTickets:allowed?await ticketSummary(this.service.db,sub):{count:0,nextExpiresAt:null}};
+  return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+(await paidPhotoCount(this.service.db,sub))+(await heartBalance(this.service.db,sub)).credits:0,paidRemaining:allowed?await paidPhotoCount(this.service.db,sub):0,hearts:allowed?(await heartBalance(this.service.db,sub)).hearts:0,rewardRemaining:allowed?(await heartBalance(this.service.db,sub)).credits:0,typicalSeconds:allowed?await this.typicalSeconds():null,resetTickets:allowed?await ticketSummary(this.service.db,sub):{count:0,nextExpiresAt:null}};
+ }
+ async hearts(sub:string,input:any){await this.service.requireCreator(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');
+  if(input?.action==='start')return createHeartGame(this.service.db,sub);
+  if(typeof input?.id!=='string')reject(400,'INVALID_GAME','하트 게임을 다시 시작해 주세요.');
+  if(input.action==='click')return clickHeart(this.service.db,sub,input.id,input.piece,input.eventId);
+  if(input.action==='finish'){const reward=await settleHeartGame(this.service.db,sub,input.id);return{...reward,remaining:(await this.quota(sub)).remaining};}
+  reject(400,'INVALID_GAME','잘못된 게임 요청이에요.');
  }
  /** Spend one storable reset ticket (2026-11-13): today's usage back to 0. */
  async useResetTicket(sub:string){
   await this.service.requireCreator(sub);if(!this.configured())reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
   const r=await useAiPhotoTicket(this.service.db,sub);
-  return{limit:this.settings.perDay,remaining:Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+await paidPhotoCount(this.service.db,sub),resetTickets:r.tickets,message:`리셋권 1장을 사용했어요. 오늘 ${this.settings.perDay}회를 다시 만들 수 있어요.`};
+  return{limit:this.settings.perDay,remaining:Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+(await paidPhotoCount(this.service.db,sub))+(await heartBalance(this.service.db,sub)).credits,resetTickets:r.tickets,message:`리셋권 1장을 사용했어요. 오늘 ${this.settings.perDay}회를 다시 만들 수 있어요.`};
  }
  /** Median whole-request time of the latest real edits (all creators), shown while a new one runs. null until one has finished. */
  async typicalSeconds():Promise<number|null>{
@@ -186,11 +194,12 @@ export class AiPhotoService{
   if(1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상 참조는 최대 8개까지 선택해 주세요.');
   await this.stage('quota');
   const key=this.creatorKey(sub);
-  let paidUse:any=null;
-  try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch(error){if(error?.getStatus?.()!==429)throw error;paidUse=await reservePaidPhoto(this.service.db,sub,aiFailureTrace.getStore()?.requestId);}
-  try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);else await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
-  let charged=true;
+  let paidUse:any=null,rewardUse:any=null;
+  try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch(error){if(error?.getStatus?.()!==429)throw error;rewardUse=await reserveHeartCredit(this.service.db,sub,aiFailureTrace.getStore()?.requestId||randomUUID());if(!rewardUse)paidUse=await reservePaidPhoto(this.service.db,sub,aiFailureTrace.getStore()?.requestId);}
+  try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,false);else if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);else await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
+  let charged=true,gameStarted=false;
   try{
+   await startHeartGame(this.service.db,sub,input?.heartGameId);gameStarted=typeof input?.heartGameId==='string';
    // Moderation accepts one image per request. Every source/reference must pass before generation.
    await this.stage('input','openai');
    for(const [referenceIndex,item] of [{mime:'image/png',bytes:image!},...references.map(bytes=>({mime:'image/webp',bytes}))].entries()){
@@ -226,21 +235,24 @@ export class AiPhotoService{
    await traceAiEvent(this.service.db,'step.started',{operation:'storage',provider:'local',attemptId:storageId,attempt:storageAttempt,outcome:'started'});
    const images=[];try{for(const out of safe)images.push(await this.save(sub,out,meta));await traceAiEvent(this.service.db,'step.succeeded',{operation:'storage',provider:'local',attemptId:storageId,attempt:storageAttempt,outcome:'succeeded',count:images.length,targetId:images[0]?.id},Date.now()-storageStart);}
    catch(error){await traceAiEvent(this.service.db,'step.failed',{operation:'storage',provider:'local',attemptId:storageId,attempt:storageAttempt,outcome:'failed',errorCode:diagnosticId(error?.code)||'STORAGE_ERROR'},Date.now()-storageStart);throw error;}
+   if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,true);
    if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,true);
-   return{images,remaining:Math.max(0,this.settings.perDay-await this.used(key))+await paidPhotoCount(this.service.db,sub)};
+   return{images,remaining:Math.max(0,this.settings.perDay-await this.used(key))+(await paidPhotoCount(this.service.db,sub))+(await heartBalance(this.service.db,sub)).credits};
   }catch(error){
    // Refused without a usable answer (moderation unavailable, provider error/timeout): give the try back.
    // A blocked input or output still counts, so repeated unsafe requests use up the day.
+   if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,false);
    if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);
-   if(charged){if(!paidUse)await this.giveBack(key);await this.giveBack('ai-photo:total');}
+   if(charged){if(!paidUse&&!rewardUse)await this.giveBack(key);await this.giveBack('ai-photo:total');}
    throw error;
-  }
+  }finally{if(gameStarted){try{await closeHeartGame(this.service.db,sub,input.heartGameId);await settleHeartGame(this.service.db,sub,input.heartGameId);}catch{this.logger.warn({event:'ai-photo.heart_settlement_pending',requestId:aiFailureTrace.getStore()?.requestId});}}}
  }
 }
 
 @Controller('studio/ai-photo') @UseGuards(PlatformAuthGuard)
 export class AiPhotoController{
  constructor(private photos:AiPhotoService){}
+ @Post('hearts') hearts(@Req() req:any,@Body() body:any){return this.photos.hearts(req.user.sub,body);}
  @Get('quota') quota(@Req() req:any){return this.photos.quota(req.user.sub);}
  @Post('reset-ticket') useResetTicket(@Req() req:any){return this.photos.useResetTicket(req.user.sub);}
  @Post('edit') @UseInterceptors(FileInterceptor('mask',{storage:memoryStorage(),limits:{fileSize:5*1024*1024,files:1}}))

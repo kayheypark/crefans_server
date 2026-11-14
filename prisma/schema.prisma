@@ -2103,3 +2103,30 @@ model AiShopUse {
  @@index([status,created_at])
  @@map("ai_shop_uses")
 }
+
+model AiHeartWallet {
+ user_id String @id @db.VarChar(191)
+ hearts Int @default(0)
+ credits Int @default(0)
+ @@map("ai_heart_wallets")
+}
+model AiHeartGame {
+ id String @id @default(uuid())
+ user_id String @db.VarChar(191)
+ kinds Json
+ clicks Json
+ score Int @default(0)
+ status String @default("ready") @db.VarChar(20)
+ created_at DateTime @default(now())
+ started_at DateTime?
+ ended_at DateTime?
+ converted Int @default(0)
+ @@index([user_id,status])
+ @@map("ai_heart_games")
+}
+model AiHeartUse {
+ id String @id
+ user_id String @db.VarChar(191)
+ status String @default("reserved") @db.VarChar(20)
+ @@map("ai_heart_uses")
+}

@@ -649,7 +649,7 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - `/studio/shop/orders/:id` GET, `/payment-window` POST, `/confirm` POST(orderId,amount,paymentKey), `/refund` POST. 소유권 확인, 금액/통화/PG키 일치, 단1회 지급, 잔여 횟수 구매단가 환불. 생성 예약과 환불 직렬화.
 - `/admin/shop/products` GET/POST, `/:id` PUT/DELETE: shop view/create/update/delete. 버전 충돌409·소프트삭제. `/admin/shop/orders` GET(page,status), `/:id` GET(조건스냅샷·사용 이력100건). 키·카드정보 비노출.
 - `/shop/webhook` POST: 비인증 IP분당30회, 데이터로 지급하지 않고 worker PG조회 예약.
-- quota.remaining은 무료+유료 사용 가능 총횟수, paidRemaining은 그 중 유료. limit은 기존 무료 일일한도. 기존 리셋권과 분리. 유료 실패는 복구. 상세 `docs/ai-ticket-shop.md`, 검증 `tests/platform-ai-shop.test.cjs` 및 `platform-ai-photo.test.cjs`.
+- quota.remaining은 무료+하트보상+유료 사용 가능 총횟수, paidRemaining은 그 중 유료. limit은 기존 무료 일일한도. 기존 리셋권과 분리. 유료 실패는 복구. 상세 `docs/ai-ticket-shop.md`, 검증 `tests/platform-ai-shop.test.cjs` 및 `platform-ai-photo.test.cjs`.
 
 | Method | 경로 | 동작 |
 | --- | --- | --- |
@@ -678,3 +678,12 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | POST | /admin/ai-photo-grants/:creatorId/quota-reset | members.update: 대상 무료 일일 횟수 초기화 |
 | POST | /admin/ai-photo-grants/quota-reset | members.update: 허용 대상 무료 일일 횟수 초기화 |
 | POST | /studio/ai-photo/reset-ticket | 본인 무료 리셋권 사용, 유료 횟수권과 별도 |
+
+### AI 하트 보상 (2026-11-14)
+| Method | Path | 동작 |
+| --- | --- | --- |
+| POST | /studio/ai-photo/hearts | 로그인·AI편집허용 크리에이터 본인 게임 start/click/finish |
+
+게임별 최대30개를 계정에 누적. 잔여하트100개 이상이면 10개당1회 자동전환(115→11회+5개),100개 미만은 이월. 유료 구매/환불과 분리된 보상잔액이며 무료→보상→유료순 사용한다. 보상 사용실패는 멱등복구. 기존 AI 접근권한을 확대하지 않는다.
+start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameId를 받는다. 실제검증/쿼터통과 후 활성화, 생성종료시자동정산. click은piece번호(0=빈공간)와eventId만 받으며 점수입력없음. 서버시간·본인소유·활성세션·조각중복·최대30 검증; 사용자행잠금으로 지급/차감 직렬화. 자동클릭 봇 식별을 보장하지 않는다. finish는중복호출안전한잔액조회/정산재시도. 실패한 생성 중 서버가 인정한 하트도 적립된다. quota.hearts는미전환하트,rewardRemaining은보상횟수. 게임이끊기면600초후재시도가능; 정산전게임은보관하며 다음start시미정산분을복구하며finish도재시도가능.
+근거 확인2026-11-14: [OWASP Business Logic Security](https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html) — 서버재계산·트랜잭션·멱등처리. 검증: tests/platform-ai-photo.test.cjs. 운영배포 미실행.
