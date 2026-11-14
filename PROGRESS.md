@@ -1,3 +1,8 @@
+## 2026-11-15 AI 사진 하트 보상 회원당 하루 100개 상한
+- night-work 결정(/ask-me): 하트 게임 보상이 생성마다 최대 3회분을 다시 채워 무료 생성이 순환하던 문제. 회원당 한국 시간 하루 100하트(=최대 10회분) 상한.
+- settleHeartGame이 같은 날 정산된 게임의 적립 합계를 보고 남은 만큼만 적립(초과분 미적립), 정산된 게임의 score는 실제 적립량으로 기록, 감사 로그에 played·dailyCap 추가, 응답에 capped 추가.
+- 검증: build 0, platform-ai-photo 39/39(30·30·30·10 이후 0, 다음날 초기화 테스트 추가), 상한을 크게 바꾼 대조 실행에서 신규 테스트 실패 확인.
+
 ## 2026-11-14 배경16·포즈8 운영 배포 완료
 - 사용자 지시(운영배포까지). prod front fd493b6 / server 6ade65b(기능 브랜치와 소스 동일). API/worker=crefans-api:x-presets-20261114(costume-expansion 위 src·dist 덮어쓰기, 이미지 내 배경 참조 JS 해시가 로컬 빌드와 일치), frontend=crefans-front:front-x-presets-20261114.
 - 검증: 컨테이너 Running·재시작0, health ready, API 배경 참조 38개·비로그인401·다른 컨테이너 불변, 운영 신규 에셋 24개 HTTP 바이트 SHA-256 전부 일치, 운영 도메인 /design-system WebKit390/320 신규 24종 디코드·검색·선택/해제·탭 이동 유지·JS오류/넘침 없음(실생성 없음).
