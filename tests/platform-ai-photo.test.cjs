@@ -412,3 +412,16 @@ test('every public background reference id resolves to a 1024x1536 WebP, includi
  for(const id of ids){const m=await sharp(await readBackgroundReference(id)).metadata();assert.equal(m.format,'webp');assert.equal(m.width,1024);assert.equal(m.height,1536);}
  assert.throws(()=>backgroundReferenceId('ead417',['background']),/배경을 다시 선택/);
 });
+
+test('heart rewards stop at 100 hearts per member per KST day (2026-11-15 ask-me)',async()=>{
+ const h=require('../dist/src/platform/ai-photo-hearts');assert.equal(h.AI_HEART_DAILY_CAP,100);
+ const member=crypto.randomUUID();await db.creator.create({data:{user_id:member,is_active:true}}).catch(()=>{});
+ await db.aiHeartWallet.upsert({where:{user_id:member},create:{user_id:member,hearts:0},update:{hearts:0,credits:0}});
+ const play=async score=>{const g=await db.aiHeartGame.create({data:{id:crypto.randomUUID(),user_id:member,kinds:[],clicks:[],score,status:'ended'}});return h.settleHeartGame(db,member,g.id);};
+ const results=[];for(let i=0;i<4;i++)results.push(await play(30));
+ assert.deepEqual(results.map(r=>r.earned),[30,30,30,10],'the fourth game is cut to the remaining 10');assert.equal(results[3].capped,true);
+ const after=await play(30);assert.equal(after.earned,0);assert.equal(after.capped,true);
+ const w=await h.heartBalance(db,member);assert.equal(w.hearts+w.credits*10,100,'exactly 100 hearts credited today');
+ const yesterday=new Date(Date.now()-36*3600000);await db.aiHeartGame.updateMany({where:{user_id:member},data:{created_at:yesterday}});assert.equal((await play(30)).earned,30,'a new KST day starts fresh');
+ await db.aiHeartGame.deleteMany({where:{user_id:member}});await db.aiHeartWallet.deleteMany({where:{user_id:member}});await db.creator.deleteMany({where:{user_id:member}}).catch(()=>{});
+});
