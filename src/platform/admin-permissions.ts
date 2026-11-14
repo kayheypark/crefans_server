@@ -3,6 +3,7 @@ import {reject} from './http';
 
 // Console menus and the actions each one actually has. Anything not listed is denied.
 export const ADMIN_MENUS={
+ shop:['view','create','update','delete'],
  overview:['view'],
  advertising:['view','create','update','delete'],
  members:['view','update'],

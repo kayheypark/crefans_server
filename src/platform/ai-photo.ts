@@ -1,3 +1,4 @@
+import {paidPhotoCount,reservePaidPhoto,finishPaidPhoto} from './ai-shop';
 // Studio AI photo editor (2026-11-08 user request): outfit (masked), makeup, expression, pose or background edits of the creator's own uploaded photo.
 // Order: allow-list → own completed image → text checks → daily limits → input moderation (fail closed) → Seedream image edit
 // → output moderation → saved as the creator's private media with metadata.aiGenerated. The original photo is never changed.
@@ -74,13 +75,13 @@ export class AiPhotoService{
  async quota(sub:string){
   await this.service.requireCreator(sub);
   const allowed=await aiPhotoAllowed(this.service.db,sub)&&this.configured();
-  return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub))):0,typicalSeconds:allowed?await this.typicalSeconds():null,resetTickets:allowed?await ticketSummary(this.service.db,sub):{count:0,nextExpiresAt:null}};
+  return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+await paidPhotoCount(this.service.db,sub):0,paidRemaining:allowed?await paidPhotoCount(this.service.db,sub):0,typicalSeconds:allowed?await this.typicalSeconds():null,resetTickets:allowed?await ticketSummary(this.service.db,sub):{count:0,nextExpiresAt:null}};
  }
  /** Spend one storable reset ticket (2026-11-13): today's usage back to 0. */
  async useResetTicket(sub:string){
   await this.service.requireCreator(sub);if(!this.configured())reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
   const r=await useAiPhotoTicket(this.service.db,sub);
-  return{limit:this.settings.perDay,remaining:Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub))),resetTickets:r.tickets,message:`리셋권 1장을 사용했어요. 오늘 ${this.settings.perDay}회를 다시 만들 수 있어요.`};
+  return{limit:this.settings.perDay,remaining:Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+await paidPhotoCount(this.service.db,sub),resetTickets:r.tickets,message:`리셋권 1장을 사용했어요. 오늘 ${this.settings.perDay}회를 다시 만들 수 있어요.`};
  }
  /** Median whole-request time of the latest real edits (all creators), shown while a new one runs. null until one has finished. */
  async typicalSeconds():Promise<number|null>{
@@ -185,8 +186,9 @@ export class AiPhotoService{
   if(1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상 참조는 최대 8개까지 선택해 주세요.');
   await this.stage('quota');
   const key=this.creatorKey(sub);
-  try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch{reject(429,'DAILY_LIMIT','오늘 만들 수 있는 횟수를 모두 썼어요. 매일 오전 9시에 다시 이용할 수 있어요.');}
-  try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
+  let paidUse:any=null;
+  try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch(error){if(error?.getStatus?.()!==429)throw error;paidUse=await reservePaidPhoto(this.service.db,sub,aiFailureTrace.getStore()?.requestId);}
+  try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);else await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
   let charged=true;
   try{
    // Moderation accepts one image per request. Every source/reference must pass before generation.
@@ -224,11 +226,13 @@ export class AiPhotoService{
    await traceAiEvent(this.service.db,'step.started',{operation:'storage',provider:'local',attemptId:storageId,attempt:storageAttempt,outcome:'started'});
    const images=[];try{for(const out of safe)images.push(await this.save(sub,out,meta));await traceAiEvent(this.service.db,'step.succeeded',{operation:'storage',provider:'local',attemptId:storageId,attempt:storageAttempt,outcome:'succeeded',count:images.length,targetId:images[0]?.id},Date.now()-storageStart);}
    catch(error){await traceAiEvent(this.service.db,'step.failed',{operation:'storage',provider:'local',attemptId:storageId,attempt:storageAttempt,outcome:'failed',errorCode:diagnosticId(error?.code)||'STORAGE_ERROR'},Date.now()-storageStart);throw error;}
-   return{images,remaining:Math.max(0,this.settings.perDay-await this.used(key))};
+   if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,true);
+   return{images,remaining:Math.max(0,this.settings.perDay-await this.used(key))+await paidPhotoCount(this.service.db,sub)};
   }catch(error){
    // Refused without a usable answer (moderation unavailable, provider error/timeout): give the try back.
    // A blocked input or output still counts, so repeated unsafe requests use up the day.
-   if(charged){await this.giveBack(key);await this.giveBack('ai-photo:total');}
+   if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);
+   if(charged){if(!paidUse)await this.giveBack(key);await this.giveBack('ai-photo:total');}
    throw error;
   }
  }

@@ -10,6 +10,15 @@
 | POST | `/api/v1/admin/advertising/products` | `src/platform/advertising.controller.ts::create` |
 | DELETE | `/api/v1/admin/advertising/products/:id` | `src/platform/advertising.controller.ts::remove` |
 | PUT | `/api/v1/admin/advertising/products/:id` | `src/platform/advertising.controller.ts::update` |
+| GET | `/api/v1/admin/ai-photo-grants` | `src/platform/admin.controller.ts::aiPhotoGrants` |
+| POST | `/api/v1/admin/ai-photo-grants` | `src/platform/admin.controller.ts::grantAiPhoto` |
+| DELETE | `/api/v1/admin/ai-photo-grants/:creatorId` | `src/platform/admin.controller.ts::revokeAiPhoto` |
+| GET | `/api/v1/admin/ai-photo-grants/:creatorId/history` | `src/platform/admin.controller.ts::aiPhotoGrantHistory` |
+| POST | `/api/v1/admin/ai-photo-grants/:creatorId/quota-reset` | `src/platform/admin.controller.ts::resetAiPhotoQuota` |
+| GET | `/api/v1/admin/ai-photo-grants/:creatorId/tickets` | `src/platform/admin.controller.ts::aiPhotoTickets` |
+| POST | `/api/v1/admin/ai-photo-grants/:creatorId/tickets` | `src/platform/admin.controller.ts::grantAiPhotoTickets` |
+| POST | `/api/v1/admin/ai-photo-grants/:creatorId/tickets/:ticketId/revoke` | `src/platform/admin.controller.ts::revokeAiPhotoTickets` |
+| POST | `/api/v1/admin/ai-photo-grants/quota-reset` | `src/platform/admin.controller.ts::resetAllAiPhotoQuota` |
 | POST | `/api/v1/admin/auth/login` | `src/platform/admin-auth.ts::login` |
 | POST | `/api/v1/admin/auth/logout` | `src/platform/admin-auth.ts::logout` |
 | POST | `/api/v1/admin/auth/refresh` | `src/platform/admin-auth.ts::refresh` |
@@ -71,6 +80,7 @@
 | POST | `/api/v1/admin/operators/:id/password-reset` | `src/platform/admin.controller.ts::resetOperator` |
 | GET | `/api/v1/admin/overview` | `src/platform/admin.controller.ts::overview` |
 | GET | `/api/v1/admin/payments` | `src/platform/admin.controller.ts::payments` |
+| GET | `/api/v1/admin/payouts/due` | `src/platform/admin.controller.ts::payoutsDue` |
 | GET | `/api/v1/admin/posts` | `src/platform/admin.controller.ts::posts` |
 | GET | `/api/v1/admin/posts/:id/moderation` | `src/platform/moderation.ts::postHistory` |
 | POST | `/api/v1/admin/posts/:id/moderation` | `src/platform/moderation.ts::post` |
@@ -89,7 +99,14 @@
 | GET | `/api/v1/admin/revenue` | `src/platform/admin.controller.ts::revenue` |
 | POST | `/api/v1/admin/revenue/:id/receipt` | `src/platform/admin.controller.ts::receipt` |
 | GET | `/api/v1/admin/settlement-accounts` | `src/platform/admin.controller.ts::settlementAccounts` |
+| POST | `/api/v1/admin/settlement-accounts/:id/reveal` | `src/platform/admin.controller.ts::revealAccount` |
 | POST | `/api/v1/admin/settlement-accounts/:id/verify` | `src/platform/admin.controller.ts::verifyAccount` |
+| GET | `/api/v1/admin/shop/orders` | `src/platform/ai-shop.controller.ts::orders` |
+| GET | `/api/v1/admin/shop/orders/:id` | `src/platform/ai-shop.controller.ts::order` |
+| GET | `/api/v1/admin/shop/products` | `src/platform/ai-shop.controller.ts::products` |
+| POST | `/api/v1/admin/shop/products` | `src/platform/ai-shop.controller.ts::create` |
+| DELETE | `/api/v1/admin/shop/products/:id` | `src/platform/ai-shop.controller.ts::remove` |
+| PUT | `/api/v1/admin/shop/products/:id` | `src/platform/ai-shop.controller.ts::update` |
 | GET | `/api/v1/admin/subscriptions` | `src/platform/admin.controller.ts::subscriptions` |
 | POST | `/api/v1/admin/subscriptions/:id/cancel-now` | `src/platform/admin.controller.ts::cancelSubscriptionNow` |
 | POST | `/api/v1/admin/subscriptions/:id/refund` | `src/platform/admin.controller.ts::refundSubscription` |
@@ -176,20 +193,23 @@
 | GET | `/api/v1/posts/:id/mention-candidates` | `src/platform/controller.ts::mentionCandidates` |
 | PUT | `/api/v1/posts/:id/save` | `src/platform/controller.ts::save` |
 | POST | `/api/v1/posts/:id/views` | `src/platform/controller.ts::view` |
+| GET | `/api/v1/posts/search` | `src/platform/controller.ts::postSearch` |
 | GET | `/api/v1/profiles/:id` | `src/platform/controller.ts::profileData` |
 | GET | `/api/v1/profiles/:id/connections` | `src/platform/controller.ts::profileConnections` |
 | GET | `/api/v1/profiles/:id/following` | `src/platform/controller.ts::profileFollowing` |
 | POST | `/api/v1/reports` | `src/platform/controller.ts::report` |
 | GET | `/api/v1/session` | `src/platform/controller.ts::session` |
-| POST | `/api/v1/studio/ai-photo/edit` | `src/platform/ai-photo.ts::edit` |
+| POST | `/api/v1/shop/webhook` | `src/platform/ai-shop.controller.ts::webhook` |
 | POST | `/api/v1/studio/accounts` | `src/platform/finance.controller.ts::account` |
 | PUT | `/api/v1/studio/accounts/:id/default` | `src/platform/finance.controller.ts::defaultAccount` |
 | POST | `/api/v1/studio/accounts/:id/verify` | `src/platform/finance.controller.ts::verifyAccount` |
 | PUT | `/api/v1/studio/activity` | `src/platform/studio.controller.ts::activity` |
-| GET | `/api/v1/studio/ai-photo/quota` | `src/platform/ai-photo.ts::quota` |
 | GET | `/api/v1/studio/advertising/orders` | `src/platform/advertising.controller.ts::orders` |
 | POST | `/api/v1/studio/advertising/orders/:id/use` | `src/platform/advertising.controller.ts::use` |
 | GET | `/api/v1/studio/advertising/products` | `src/platform/advertising.controller.ts::products` |
+| POST | `/api/v1/studio/ai-photo/edit` | `src/platform/ai-photo.ts::edit` |
+| GET | `/api/v1/studio/ai-photo/quota` | `src/platform/ai-photo.ts::quota` |
+| POST | `/api/v1/studio/ai-photo/reset-ticket` | `src/platform/ai-photo.ts::useResetTicket` |
 | GET | `/api/v1/studio/bean-finance` | `src/platform/beans.controller.ts::studio` |
 | POST | `/api/v1/studio/bean-withdrawal-quotes` | `src/platform/beans.controller.ts::review` |
 | POST | `/api/v1/studio/bean-withdrawals` | `src/platform/beans.controller.ts::withdraw` |
@@ -210,6 +230,13 @@
 | POST | `/api/v1/studio/pin` | `src/platform/finance.controller.ts::pin` |
 | PUT | `/api/v1/studio/profile` | `src/platform/studio.controller.ts::profile` |
 | GET | `/api/v1/studio/reports/:id` | `src/platform/studio.controller.ts::report` |
+| GET | `/api/v1/studio/shop/orders` | `src/platform/ai-shop.controller.ts::orders` |
+| POST | `/api/v1/studio/shop/orders` | `src/platform/ai-shop.controller.ts::create` |
+| GET | `/api/v1/studio/shop/orders/:id` | `src/platform/ai-shop.controller.ts::order` |
+| POST | `/api/v1/studio/shop/orders/:id/confirm` | `src/platform/ai-shop.controller.ts::confirm` |
+| POST | `/api/v1/studio/shop/orders/:id/payment-window` | `src/platform/ai-shop.controller.ts::window` |
+| POST | `/api/v1/studio/shop/orders/:id/refund` | `src/platform/ai-shop.controller.ts::refund` |
+| GET | `/api/v1/studio/shop/products` | `src/platform/ai-shop.controller.ts::products` |
 | POST | `/api/v1/studio/start` | `src/platform/studio.controller.ts::start` |
 | GET | `/api/v1/studio/tips` | `src/platform/beans.controller.ts::received` |
 | POST | `/api/v1/studio/withdraw` | `src/platform/finance.controller.ts::withdraw` |
@@ -316,7 +343,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 ### server
 
-환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `DISK_ALERT_WARNING_PERCENT`, `DISK_ALERT_CRITICAL_PERCENT`, `DISK_ALERT_INTERVAL_MINUTES`, `DISK_ALERT_PATH`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`
+환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `DISK_ALERT_WARNING_PERCENT`, `DISK_ALERT_CRITICAL_PERCENT`, `DISK_ALERT_INTERVAL_MINUTES`, `DISK_ALERT_PATH`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`, `GUIDE_ADVISOR_OPENAI_API_KEY`, `GUIDE_ADVISOR_MODEL`, `GUIDE_ADVISOR_REASONING_EFFORT`, `GUIDE_ORIGINS`, `GUIDE_ADVISOR_INDEX_URL`, `GUIDE_ADVISOR_MIN_SIMILARITY`, `GUIDE_ADVISOR_PER_MINUTE`, `GUIDE_ADVISOR_PER_DAY`, `GUIDE_ADVISOR_PER_CLIENT_DAY`, `GUIDE_ADVISOR_DAILY_TOTAL`, `GUIDE_ADVISOR_MAX_OUTPUT_TOKENS`, `GUIDE_ADVISOR_TIMEOUT_MS`, `AI_PHOTO_BYTEPLUS_API_KEY`, `AI_PHOTO_OPENAI_API_KEY`, `AI_PHOTO_PER_DAY`, `AI_PHOTO_DAILY_TOTAL`
 
 | 명령 | package.json 실행문 |
 | --- | --- |
@@ -341,7 +368,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `npm run test:operations` | `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs tests/platform-billing-activity.test.cjs tests/platform-disk-alert.test.cjs` |
 | `npm run test:audit` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-audit.test.cjs tests/platform-audit-export.test.cjs tests/platform-external-monitor.test.cjs tests/platform-log-config.test.cjs tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs` |
 | `npm run test:openapi` | `npm run build && CREFANS_E2E=true node --test tests/platform-openapi.test.cjs` |
-| `npm run test:beans` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-beans.test.cjs tests/platform-bean-ledger.test.cjs tests/platform-openapi.test.cjs` |
+| `npm run test:beans` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-beans.test.cjs tests/platform-bean-ledger.test.cjs tests/platform-bean-charge-limit.test.cjs tests/platform-openapi.test.cjs` |
 
 ## migration 파일 목록
 
@@ -401,8 +428,12 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261103230000_ad_manual_use`
 - `20261106120000_subscription_admin_cancel`
 - `20261107120000_post_visibility`
+- `20261108200000_ai_photo_grants`
+- `20261113170000_ai_photo_reset_tickets`
+- `20261114010000_ai_photo_failure_details`
+- `20261114140000_ai_shop`
 
-## Prisma 전체 정의 (92 models · 15 enums)
+## Prisma 전체 정의 (100 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -2396,5 +2427,120 @@ model AdPurchase {
  @@index([creator_id, created_at, id])
  @@index([creator_id, status, ends_at])
  @@map("ad_purchases")
+}
+
+/// Creators allowed to use the studio AI photo editor (2026-11-08 user request: allow-list managed in the console).
+/// One row per creator while allowed; revoking deletes the row. Every grant/revoke is kept in ai_photo_grant_changes.
+model AiPhotoGrant {
+ creator_user_id String @id @db.VarChar(191)
+ reason String @db.VarChar(500)
+ granted_by String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@index([created_at])
+ @@map("ai_photo_grants")
+}
+model AiPhotoGrantChange {
+ id String @id @default(uuid())
+ creator_user_id String @db.VarChar(191)
+ /// granted | revoked | quota_reset | quota_reset_all (today's usage reset) | ticket_granted | ticket_revoked | ticket_used (2026-11-13)
+ action String @db.VarChar(16)
+ reason String @db.VarChar(500)
+ changed_by String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ @@index([creator_user_id, created_at])
+ @@map("ai_photo_grant_changes")
+}
+
+/// Storable AI photo reset tickets (2026-11-13). Operators grant a batch (30-day expiry); a creator spends one to reset today's
+/// usage. Remaining is counted at read time (unexpired, not revoked), oldest expiry used first.
+model AiPhotoResetTicket {
+ id String @id @default(uuid())
+ creator_user_id String @db.VarChar(191)
+ quantity Int
+ remaining Int
+ reason String @db.VarChar(500)
+ granted_by String? @db.VarChar(191)
+ expires_at DateTime
+ revoked_at DateTime?
+ revoked_by String? @db.VarChar(191)
+ revoke_reason String? @db.VarChar(500)
+ created_at DateTime @default(now())
+ @@index([creator_user_id, expires_at])
+ @@map("ai_photo_reset_tickets")
+}
+
+model AiPhotoResetTicketUse {
+ id String @id @default(uuid())
+ ticket_id String @db.VarChar(191)
+ creator_user_id String @db.VarChar(191)
+ /// today's used count that the ticket cleared
+ used_before Int
+ created_at DateTime @default(now())
+ @@index([ticket_id])
+ @@index([creator_user_id, created_at])
+ @@map("ai_photo_reset_ticket_uses")
+}
+
+/// AI failure prompts are encrypted, admin-only, and expire after 30 days.
+model AiPhotoFailureDetail {
+ request_id String @id @db.VarChar(36)
+ payload_encrypted String @db.LongText
+ expires_at DateTime @db.DateTime(3)
+ @@index([expires_at])
+ @@map("ai_photo_failure_details")
+}
+
+model AiShopProduct {
+ id String @id @default(uuid())
+ name String @db.VarChar(100)
+ description String @db.Text
+ amount Int
+ quantity Int
+ validity_days Int
+ visible Boolean @default(false)
+ on_sale Boolean @default(false)
+ version Int @default(1)
+ deleted_at DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@map("ai_shop_products")
+}
+model AiShopOrder {
+ id String @id @default(uuid())
+ creator_id String @db.VarChar(191)
+ product_id String @db.VarChar(191)
+ request_key String @unique @db.VarChar(100)
+ name String @db.VarChar(100)
+ amount Int
+ quantity Int
+ validity_days Int
+ terms String @db.Text
+ environment String @db.VarChar(10)
+ status String @default("pending") @db.VarChar(20)
+ remaining Int @default(0)
+ payment_key String? @db.VarChar(200)
+ locked_until DateTime?
+ paid_at DateTime?
+ expires_at DateTime?
+ refund_amount Int?
+ refund_quantity Int?
+ refunded_at DateTime?
+ failure_code String? @db.VarChar(100)
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([creator_id,status,expires_at])
+ @@index([status,locked_until])
+ @@map("ai_shop_orders")
+}
+model AiShopUse {
+ id String @id @default(uuid())
+ order_id String @db.VarChar(191)
+ creator_id String @db.VarChar(191)
+ status String @default("reserved") @db.VarChar(20)
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([order_id,status])
+ @@index([status,created_at])
+ @@map("ai_shop_uses")
 }
 ```

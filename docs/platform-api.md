@@ -643,3 +643,38 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - 2026-11-14 의상 `costumeIds`는 고정6자리 소문자16진수 카탈로그ID다. 프론트/서버 명시매핑으로 기존 참조에셋을 유지한다. 이전 클라이언트ID는 서버에서 새ID로 정규화하며, 새/이전ID를 섞어 같은 의상을 보내도 중복으로 거절한다. ID는 인증값이 아니며 소유권·안전검사는 그대로 적용한다.
 
 - 2026-11-14: 옷 세부 지정 기본 OFF는 의상 마스크 없이 원본+의상 참조를 전송한다. ON일 때만 분홍 가이드를 추가한다. 가이드 미포함 시 의상 참조는 image 2부터, 포함 시 image 3부터이며 이전 마스크 필수 설명을 대체한다.
+
+## AI 횟수권 상점 — 2026-11-14
+- `/studio/shop/products` GET: 허용 크리에이터 카탈로그. `/studio/shop/orders` GET/POST: 본인 내역/주문 생성(productId,version,termsVersion,requestId). 가격/수량은 서버 상품에서 결정.
+- `/studio/shop/orders/:id` GET, `/payment-window` POST, `/confirm` POST(orderId,amount,paymentKey), `/refund` POST. 소유권 확인, 금액/통화/PG키 일치, 단1회 지급, 잔여 횟수 구매단가 환불. 생성 예약과 환불 직렬화.
+- `/admin/shop/products` GET/POST, `/:id` PUT/DELETE: shop view/create/update/delete. 버전 충돌409·소프트삭제. `/admin/shop/orders` GET(page,status), `/:id` GET(조건스냅샷·사용 이력100건). 키·카드정보 비노출.
+- `/shop/webhook` POST: 비인증 IP분당30회, 데이터로 지급하지 않고 worker PG조회 예약.
+- quota.remaining은 무료+유료 사용 가능 총횟수, paidRemaining은 그 중 유료. limit은 기존 무료 일일한도. 기존 리셋권과 분리. 유료 실패는 복구. 상세 `docs/ai-ticket-shop.md`, 검증 `tests/platform-ai-shop.test.cjs` 및 `platform-ai-photo.test.cjs`.
+
+| Method | 경로 | 동작 |
+| --- | --- | --- |
+| GET | /studio/shop/products | 허용 크리에이터 상품 조회 |
+| GET | /studio/shop/orders | 본인 주문 목록 |
+| POST | /studio/shop/orders | 서버 가격으로 멱등 주문 생성 |
+| GET | /studio/shop/orders/:id | 본인 주문 상태 |
+| POST | /studio/shop/orders/:id/payment-window | 본인 미결제 주문의 결제창 설정 |
+| POST | /studio/shop/orders/:id/confirm | 금액·PG 결과 검증 후 한 번만 지급 |
+| POST | /studio/shop/orders/:id/refund | 잔여 횟수 잠금 및 비례 환불 |
+| GET | /admin/shop/products | shop 조회 권한 |
+| POST | /admin/shop/products | shop 생성 권한 |
+| PUT | /admin/shop/products/:id | shop 수정 권한 및 버전 확인 |
+| DELETE | /admin/shop/products/:id | shop 삭제 권한 및 소프트 삭제 |
+| GET | /admin/shop/orders | shop 조회 권한 주문 페이지 |
+| GET | /admin/shop/orders/:id | shop 조회 권한 주문·사용 이력 |
+| POST | /shop/webhook | PG 재조회 예약, 콜백 자체로 지급하지 않음 |
+
+### 기존 AI 리셋권 API 문서 누락 보완 (2026-11-14)
+
+| Method | 경로 | 동작 |
+| --- | --- | --- |
+| GET | /admin/ai-photo-grants/:creatorId/tickets | members.view: 기존 무료 리셋권 조회 |
+| POST | /admin/ai-photo-grants/:creatorId/tickets | members.update: 기존 무료 리셋권 지급 |
+| POST | /admin/ai-photo-grants/:creatorId/tickets/:ticketId/revoke | members.update: 기존 무료 리셋권 회수 |
+| POST | /admin/ai-photo-grants/:creatorId/quota-reset | members.update: 대상 무료 일일 횟수 초기화 |
+| POST | /admin/ai-photo-grants/quota-reset | members.update: 허용 대상 무료 일일 횟수 초기화 |
+| POST | /studio/ai-photo/reset-ticket | 본인 무료 리셋권 사용, 유료 횟수권과 별도 |

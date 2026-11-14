@@ -1,3 +1,4 @@
+import {AiShopService} from './ai-shop';
 import {pruneAiFailureDetails} from './ai-photo-failures';
 import {purgeWithdrawnMembers} from './member-purge';
 import {announcePost} from './post-notices';
@@ -25,7 +26,7 @@ import {grantDueReferralRewards} from './referrals';
 const PAID_RECHECK_DAYS=120;
 @Injectable()
 export class PlatformJobsService {
- constructor(private service:PlatformService,private finance:PlatformFinanceService,private config:ConfigService,private operations?:PlatformOperationsService,@Optional() private billingNotices?:BillingNoticesService,@Optional() private mediaStorage?:PlatformMediaStorage,@Optional() private marketing?:MarketingService,@Optional() private beans?:BeansService,@Optional() private memberNotices?:MemberNoticesService){}
+ constructor(private service:PlatformService,private finance:PlatformFinanceService,private config:ConfigService,private operations?:PlatformOperationsService,@Optional() private billingNotices?:BillingNoticesService,@Optional() private mediaStorage?:PlatformMediaStorage,@Optional() private marketing?:MarketingService,@Optional() private beans?:BeansService,@Optional() private memberNotices?:MemberNoticesService,@Optional() private aiShop?:AiShopService){}
  get db(){return this.service.db;}
  async tick(now=new Date()){return requestContext.run({ip:'unknown',peerIp:'unknown',requestId:randomUUID(),jobId:randomUUID()},()=>this.tracedTick(now));}
  private async tracedTick(now:Date){
@@ -52,6 +53,7 @@ export class PlatformJobsService {
   await run('billing-notices',async()=>this.billingNotices?.deliver());
   await run('marketing-mail',async()=>this.marketing?.deliver(now));
   await run('member-notices',async()=>this.memberNotices?.deliver());
+  await run('ai-shop-reconciliation',async()=>this.aiShop?.reconcile());
   await run('bean-expiry',async()=>this.beans?.expireLots(now));
   await run('receivables',async()=>this.finance.settleReceivables());
   await run('beans-ledger',()=>this.reconcileBeanLedger(now));
