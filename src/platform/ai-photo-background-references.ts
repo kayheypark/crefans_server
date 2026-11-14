@@ -1,7 +1,7 @@
 import {readFile} from 'fs/promises';
 import {join} from 'path';
 import {reject} from './http';
-const IDS=new Set(['b7a101','b7a102','b7a103','b7a104','b7a105','b7a106','b7a107','c8b201','c8b202','c8b203','c8b204','c8b205','c8b206','c8b207','c8b208','c8b209','d9c301','d9c302','d9c303','d9c304','d9c305','d9c306']);
+const IDS=new Set(['b7a101','b7a102','b7a103','b7a104','b7a105','b7a106','b7a107','c8b201','c8b202','c8b203','c8b204','c8b205','c8b206','c8b207','c8b208','c8b209','d9c301','d9c302','d9c303','d9c304','d9c305','d9c306','ead401','ead402','ead403','ead404','ead405','ead406','ead407','ead408','ead409','ead410','ead411','ead412','ead413','ead414','ead415','ead416']);
 export function backgroundReferenceId(value:unknown,kinds:string[]):string|undefined{
  if(value===undefined)return;
  if(typeof value!=='string'||!IDS.has(value)||!kinds.includes('background'))reject(400,'INVALID_BACKGROUND_REFERENCE','배경을 다시 선택해 주세요.');

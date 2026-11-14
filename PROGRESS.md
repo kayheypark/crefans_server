@@ -1,3 +1,11 @@
+## 2026-11-14 X 좋아요 사진 기반 공용 프리셋 추가: 배경16·포즈8 (/add-preset)
+- 원본: ~/x-likes/likes 사진235장(게시물63, 영상3 제외), 전부 배경·포즈 분류. 배경 신규44장/재사용175/미확인16, 포즈 신규32/재사용175/대안19/미확인9. 성적 자세 19장은 비성적 대안으로 분류·기록. 원본·게시물ID는 .local에만.
+- 신규 배경16(실내11·아웃도어5, id ead401~ead416, 1024x1536 WebP): Seedream 텍스트만으로 사람 없는 새 공간 생성(원본 미전송). 프론트·서버 바이트 동일, 서버 IDS 추가.
+- 신규 포즈8(서기6·앉기2, index39~46, pose-40~47-v1.webp 384): 기존 pose-07 마스코트 참고. 앉기 index45·46. 런지는 생성 그림에 맞춰 요청문 수정. 포즈 그림은 UI 전용, 요청에는 자세 텍스트(전송 방식 변경 없음).
+- 생성 24/24 성공, 추정 $0.544(실청구는 BytePlus에서 별도 확인).
+- 검증: 프론트 AI 사진 테스트 73/73(포즈47·배경 실내35/아웃도어13·이미지154 고정값 갱신), 타입0. 서버 build0, platform-ai-photo 38/38(신규 배경 전체 ID 1024x1536 판독 테스트 추가, 파일 제거 대조 실패 확인). WebKit390/320 16배경+8포즈 디코드·검색·선택/해제·탭 이동 유지·넘침/JS오류 없음(미리보기 픽스처, 실생성 없음).
+- 증거 front docs/audit/x-likes-presets-20261114.json, .local/x-presets(classification·items·ledger·originals·review·mobile.png).
+
 ## 2026-11-14 의상 확장·메타 설명·PNG 다운로드 운영 배포 완료
 - 사용자 결정(/ask-me) 운영 배포. prod front 8b0d0a1 / server 9eaa463(기능 브랜치와 소스 동일). API/worker=crefans-api:costume-expansion-20261114(기존 ai-presets 위 src·dist 덮어쓰기, 이미지 내 해시 로컬 빌드와 일치), frontend=crefans-front:front-costume-expansion-20261114.
 - 검증: API/worker healthy·재시작0·353 의상 참조·AI 엔드포인트 비로그인401·다른 컨테이너 불변, 운영 의상 WebP 4종 HTTP200·3종 바이트 일치, 홈/피드 description "코스어와 팬의 연결고리", health ready.
