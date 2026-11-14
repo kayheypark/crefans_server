@@ -1,0 +1,60 @@
+{
+  "checkedAt": "2026-11-14T01:16:05.131712+00:00",
+  "repository": "/Users/ethan/repository/crefans_server-ai-failure",
+  "sourceCommit": "4c40462",
+  "image": "crefans-api:seedream-all-20261114",
+  "validation": {
+    "buildExit": 0,
+    "aiOpenapi": {
+      "passed": 38,
+      "failed": 0
+    },
+    "runtimeSourceHashesMatched": 4,
+    "routing": {
+      "checks": [
+        {
+          "mode": "general",
+          "selectedModel": "dola-seedream-5-5-261028",
+          "requestModel": "dola-seedream-5-5-261028",
+          "responseModel": "dola-seedream-5-5-261028-snapshot",
+          "steps": 4
+        },
+        {
+          "mode": "cosplay",
+          "selectedModel": "dola-seedream-5-5-261028",
+          "requestModel": "dola-seedream-5-5-261028",
+          "responseModel": "dola-seedream-5-5-261028-snapshot",
+          "steps": 4
+        },
+        {
+          "selectedModel": "dola-seedream-5-5-261028",
+          "requestModel": "dola-seedream-5-5-261028",
+          "responseModel": "dola-seedream-5-5-261028-snapshot",
+          "steps": 4
+        }
+      ],
+      "privatePromptAbsent": true,
+      "productionWrites": false,
+      "realProviderCalls": false
+    },
+    "docsCheck": {
+      "exit": 1,
+      "limitation": "existing sibling server document/source references missing"
+    },
+    "realProviderCalls": false,
+    "productionTestWrites": false
+  },
+  "recovery": {
+    "path": "/Users/ethan/crefans-recovery/20261114/seedream-all-api-20261114",
+    "ociBlobs": 71,
+    "serverPreviousImageAndTemporaryFilesRemoved": true
+  },
+  "evidenceDirectory": ".local/seedream-all",
+  "sha256": {
+    "src/platform/ai-photo.ts": "ce2da587e678fbd9c5e3a8278789dc4934320dd0145d98714827933247ce8bb4",
+    "src/platform/openapi-contract.ts": "b98db200663fe81fee2bf593278eb34ddc23aaf86902df8f42b714e007ce07ad",
+    ".local/seedream-all/tests.log": "dd77bfd392ba59614f086bd75694c6cf150f3585fe0da4746e73af2c92750775",
+    ".local/seedream-all/deploy/runtime-check.json": "403fcae767b64838be09bad36e13bc68d71b7d58c1f9ccc5c005e1df22ac2267",
+    ".local/seedream-all/deploy/cleanup.log": "0747d9f24234ea547ebe0e01c7fd5d08a40392efc89eaf79ed260a517e896f14"
+  }
+}

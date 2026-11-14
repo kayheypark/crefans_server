@@ -1,3 +1,8 @@
+## 2026-11-14 모든 모드 Seedream 운영 완료
+- source4c40462 dev→prod, API/worker `crefans-api:seedream-all-20261114`. 일반/코스어/누락 모두 Seedream5.5로 생성, OpenAI는 기존 안전검사만 사용. 프론트 변경/배포와 DB마이그레이션 불필요.
+- build0·격리DB/공급사대역38/38·운영4파일SHA일치·운영코드/설정 세모드 선택/요청/응답모델 추적 대역 통과. 운영 실제 이미지생성 추가호출 없음. 헬스/권한/다른컨테이너 유지·API/worker 재시작0 확인. 전체문서검사는 기존 참조누락으로 실패. 근거 `docs/seedream-all-modes-20261114.json`, `.local/seedream-all/` 로그.
+- 복구본 `/Users/ethan/crefans-recovery/20261114/seedream-all-api-20261114` SHA/OCI71blobs/설정검증 후 서버 직전태그·배포임시자료 정리. 기존 runtime의 폐기된 모델옵션은 코드에서 무시하며 키·안전검사·요청기록·실패질문30일보관 유지. 추가요구대기.
+
 ## 2026-11-14 모든 모드 Seedream 검증 완료
 - build 종료0, 격리DB/공급사대역 AI·OpenAPI38/38 종료0. general/cosplay/누락 모두 생성·메타·시작추적 Seedream, 누락키 quota false/503 및 대체호출 없음, 의상가이드·기존안전/권한/실패진단 유지. 증거 `.local/seedream-all/{build,tests}.log`. 실공급자 재생성 미실행. API/worker 최소2소스+2컴파일파일 배포 예정.
 
