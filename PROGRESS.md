@@ -1,3 +1,14 @@
+## 2026-11-14 오버워치 전체54명 코스튬 준비·검증 완료 (미배포)
+- 공식 한국어 영웅 목록54명(2026-11-14 조회)과 일대일: 기존4종 보존 + 신규50종. 로드호그 방독면·갈고리·체인·가발 포함. 전체 의상카탈로그90종, 오버워치54종/6장×9페이지. 프론트와 서버 참조512×512 WebP54개 SHA256 동일, ID6자리 유지.
+- 신규49종 Seedream dola-seedream-5-5-261028, 트레이서1종은 Seedream 일반 의상/배치형 출력3회거절 후 사용자 기존 필요시 이미지젠 허용에 따라 built-in image_gen으로 보완. 솜브라/아나 각1회거절 후 완성. 공식 참고 이미지는 .local에만, 공개 에셋은 생성본.
+- 검증: 프론트60/60·타입·계층462파일, 서버build 및 AI27/27(격리DB/대역), WebKit390px54개 이미지 로딩·9페이지·검색/선택유지·가로넘침/JS오류없음. 누락 서버참조를 넣은 대조검사 예상대로 실패1. 새50종 시각검수, 모든스킨/실제사용자사진합성 품질 보장은 아님.
+- 서버 기존 ai-shop reservePaidPhoto 요청ID의 crypto.randomUUID 템플릿 추론이 string 요청ID와 충돌해 build실패: 명시적 string 타입 한곳 보완, 런타임 동작 불변.
+- 증거 front docs/audit/overwatch-costumes-20261114.json, 각리포 .local/overwatch-all. 다운로드 /Users/ethan/Downloads/crefans-overwatch-costumes-54-20261114.{jpg,zip}. 작업 feat/overwatch-all-costumes. 운영 배포는 이번 요청 범위 밖으로 실행하지 않음; 다음 배포는 프론트+서버 매핑·에셋을 함께 반영.
+
+## 2026-11-14 오버워치 전체 기본 코스튬 준비
+- 프론트와 feat/overwatch-all-costumes 분기. 공식 명단54명 중 기존4·신규50. 로드호그 우선 시드림 생성, 앞단 썸네일과 서버 참조를 같은 webp로 연결. 고정6자리해시 매핑·입력권한·안전검사는 유지.
+- 검증 목표: 참조카탈로그 전체존재/크기/해시/불명ID거절, 프론트전체54명 일대일, 기존AI회귀. 아직 생성·검수 중이며 운영 배포 미요청.
+
 ## 2026-11-14 횟수권 상점 운영 배포 완료
 - 기능 소스 front 26b7aa6, server db9f91e, admin 4618585를 dev→prod 통합. 운영 API/worker/admin ai-shop-20261114, frontend front-ai-shop-routes-20261114. 새 테이블3개 적용, 기존 DB/proxy·결제 설정 보존.
 - 운영 health/feed/admin/login/console/shop 정상, 새 API 비로그인401, 4컨테이너 실행·재시작0·OOM없음. 운영 상품/주문/사용0건. 판매가·횟수·유효기간 미정으로 상품을 임의 등록하지 않음.
