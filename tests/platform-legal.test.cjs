@@ -91,7 +91,7 @@ test('2026-11-11 payout revision: article 6 states the company transfer from the
 test('2026-11-13 partner revision: article 6 limits withdrawals to partner creators and keeps the account/PIN and hold rules',()=>{
  const legal=new LegalDocumentsService(),{PARTNER_TERMS_DATE}=require('../dist/src/platform/legal-documents');assert.equal(PARTNER_TERMS_DATE,'2026-11-13');
  const before=legal.catalog(new Date('2026-11-12T23:59:00+09:00')).documents.terms,after=legal.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;
- assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');
+ assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-15.sync.1');
  const six=after.sections.find(s=>s.title==='6. 크리에이터 수수료·정산·출금').body;
  assert.match(six,/파트너십 계약을 맺은 크리에이터\(프로필에 인증 배지 표시\)만 신청할 수 있습니다/);assert.match(six,/정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다/);
  assert.match(six,/인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다/);assert.match(six,/출금에는 본인 명의 정산 계좌의 확인과 별도 출금 인증이 필요합니다/);
@@ -103,7 +103,7 @@ test('2026-11-13 partner revision: article 6 limits withdrawals to partner creat
 // kept signup closed until 09:00 KST. Both now use the KST day.
 test('signup stays open right after KST midnight on a revision day',t=>{
  t.mock.timers.enable({apis:['Date'],now:new Date('2026-11-15T00:30:00+09:00')});
- try{const s=new LegalDocumentsService().signup();assert.equal(s.documents.terms.version,'2026-11-13.partner.1');assert.equal(s.published,true);assert.equal(s.signupReady,true);}
+ try{const s=new LegalDocumentsService().signup();assert.equal(s.documents.terms.version,'2026-11-15.sync.1');assert.equal(s.published,true);assert.equal(s.signupReady,true);}
  finally{t.mock.timers.reset();}
 });
 
@@ -161,4 +161,18 @@ test('privacy discloses BytePlus generation and OpenAI moderation with overseas 
  assert.match(s8.body,/사진 생성을 Byteplus Pte\. Ltd\.\(BytePlus ModelArk\)에, 요청 문구·사진의 유해성 검사를 OpenAI OpCo, LLC에 위탁/);assert.doesNotMatch(s8.body,/사진 편집·유해성 검사를 OpenAI/);
  for(const needle of ['Byteplus Pte. Ltd.','privacy@byteplus.com','말레이시아, 인도네시아 및/또는 EU·EEA','180일','모델 학습에 쓰지 않습니다','OpenAI OpCo, LLC','회원 ID·이메일·이름·결제 정보·접속 IP는 AI 공급사에 보내지 않습니다','회원 탈퇴는 필요하지 않습니다'])assert.ok(s16.body.includes(needle),needle);
  assert.ok(s16.links.some(l=>l.href.includes('BytePlus_ModelArk_Data_Processing')));assert.doesNotMatch(s16.body,/익명 식별값/);
+});
+
+test('2026-11-15 sync revision: article 11 states bean charge limits and article 13 states AI photo usage rules',()=>{
+ const legal=new LegalDocumentsService(),t=legal.catalog(new Date('2026-11-15T00:00:00+09:00')).documents.terms;
+ assert.equal(t.version,'2026-11-15.sync.1');assert.equal(t.effectiveAt,'2026-11-15');assert.equal(legal.catalog(new Date('2026-11-14T23:59:00+09:00')).documents.terms.version,'2026-11-13.partner.1');
+ const bean=t.sections.find(s=>s.title==='11. 콩').body;assert.match(bean,/한 번에 최대 900콩\(99,000원\), 한국 시간 하루 200,000원/);
+ const {beanPolicy}=require('../dist/src/platform/bean-policy');assert.equal(beanPolicy.maxChargeQuantity,900);assert.equal(beanPolicy.dailyChargeLimitKrw,200000);
+ const ai=t.sections.find(s=>s.title==='13. 스튜디오 AI 사진 편집과 횟수권').body;
+ const {AI_PHOTO_DAILY_LIMIT}=require('../dist/src/platform/ai-photo');const {AI_HEART_DAILY_CAP}=require('../dist/src/platform/ai-photo-hearts');
+ assert.equal(AI_PHOTO_DAILY_LIMIT,10);assert.equal(AI_HEART_DAILY_CAP,100);
+ for(const needle of ['무료 생성은 하루 10회','오전 9시','최대 30하트','하루 최대 100하트','10하트마다 생성 1회','무료 횟수, 하트로 받은 횟수, 구매한 횟수권 순서','안전 기준에 걸려 거절되면 무료 횟수는 사용한 것','구매 당시 1회 단가','16번 항목'])assert.ok(ai.includes(needle),needle);
+ assert.doesNotMatch(ai,/소멸/);
+ for(const needle of [])assert.ok(ai.includes(needle),needle);
+ assert.deepEqual(t.sections.slice(0,12).map(s=>s.title),legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.sections.map(s=>s.title));
 });
