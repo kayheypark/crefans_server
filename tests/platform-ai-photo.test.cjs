@@ -335,3 +335,73 @@ test('reward credit is usable after daily quota and provider failure restores it
  reset();editStatus=500;await assert.rejects(photos.edit(creator,base()),code('PROVIDER_ERROR'));assert.equal((await photos.quota(creator)).rewardRemaining,10);assert.equal((await photos.quota(creator)).paidRemaining,0);
  }finally{photos.fetcher=stub;reset();await db.aiHeartUse.deleteMany({where:{user_id:creator}});await db.aiHeartGame.deleteMany({where:{user_id:creator}});await db.aiHeartWallet.deleteMany({where:{user_id:creator}});}
 });
+
+test('aspect ratios map to explicit provider dimensions; unknown ratio rejected before provider',async()=>{
+ reset();
+ await assert.rejects(photos.edit(creator,base({aspectRatio:'bogus'})),code('INVALID_ASPECT_RATIO'));assert.equal(calls.length,0);
+ // Separate fresh allowed creator avoids interference with earlier daily-limit tests.
+ const who=await makeCreator('ratio_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'비율 QA'}});const id=await media(who);
+ for(const [aspectRatio,size] of Object.entries({'1:1':'1024x1024','4:5':'1024x1280','3:4':'960x1280','9:16':'864x1536','16:9':'1536x864'})){
+  reset();await photos.edit(who,base({sourceId:id,aspectRatio}));assert.equal(calls.find(c=>c.kind==='edit').fields.size,size);
+ }
+});
+
+test('crop persists exact dimensions with AI metadata without provider calls or quota use; rejects foreign and invalid areas',async()=>{
+ reset();const id=await media(creator,600,900);await db.media.update({where:{id},data:{metadata:{aiGenerated:true,aiSourceId:sourceId}}});
+ const before=await photos.quota(creator),bytes=fs.readFileSync(path.join(mediaRoot,id));
+ const result=await photos.crop(creator,{sourceId:id,left:100,top:200,width:400,height:500});
+ const saved=await db.media.findUnique({where:{id:result.id}}),dim=await sharp(fs.readFileSync(path.join(mediaRoot,result.id))).metadata();
+ assert.deepEqual([dim.width,dim.height],[400,500]);assert.equal(saved.metadata.aiGenerated,true);assert.equal(saved.metadata.aiSourceId,sourceId);assert.equal(saved.metadata.croppedFrom,id);assert.equal(saved.user_sub,creator);assert.equal((await photos.quota(creator)).remaining,before.remaining);assert.equal(calls.length,0);assert.deepEqual(fs.readFileSync(path.join(mediaRoot,id)),bytes);
+ await assert.rejects(photos.crop(other,{sourceId:id,left:0,top:0,width:100,height:100}),code('MEDIA_NOT_FOUND'));
+ await assert.rejects(photos.crop(creator,{sourceId,left:0,top:0,width:100,height:100}),code('INVALID_CROP_SOURCE'));
+ for(const patch of [{left:-1},{left:.5},{left:'1'},{width:0},{width:601},{height:901},{top:899}])await assert.rejects(photos.crop(creator,{sourceId:id,left:0,top:0,width:100,height:100,...patch}),code('INVALID_CROP'));
+});
+
+test('private photo library: save, search, category edit and remove preserve media and other metadata',async()=>{
+ const who=await makeCreator('library_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'보관함 QA'}});const id=await media(who);
+ await db.media.update({where:{id},data:{metadata:{aiGenerated:true,keep:'original'}}});
+ const saved=await photos.saveLibrary(who,{id,title:'  의자에 앉기  ',category:'pose'});assert.equal(saved.title,'의자에 앉기');assert.equal(saved.category,'pose');assert.equal(saved.aiGenerated,true);
+ const cropped=await photos.crop(who,{sourceId:id,left:0,top:0,width:100,height:100});assert.equal((await db.media.findUnique({where:{id:cropped.id}})).metadata.aiLibrary,undefined);assert.equal((await photos.library(who,{})).items.length,1,'cropping does not silently duplicate a library entry');
+ assert.equal((await photos.library(who,{q:'의자',category:'pose'})).items[0].id,id);assert.equal((await photos.library(creator,{q:'의자'})).items.some(x=>x.id===id),false);
+ await photos.saveLibrary(who,{id,title:'낮은 구도',category:'camera'});assert.equal((await photos.library(who,{category:'pose'})).items.length,0);assert.equal((await photos.library(who,{category:'camera'})).items[0].id,id);
+ await assert.rejects(photos.saveLibrary(creator,{id,title:'타인',category:'pose'}),code('MEDIA_NOT_FOUND'));
+ await assert.rejects(photos.saveLibrary(who,{id,title:'x',category:'unknown'}),code('INVALID_LIBRARY_ASSET'));
+ await assert.rejects(photos.library(who,{page:-1}),code('INVALID_LIBRARY_FILTER'));
+ await photos.saveLibrary(who,{id,remove:true});assert.equal((await photos.library(who,{})).items.length,0);const row=await db.media.findUnique({where:{id}});assert.equal(row.is_deleted,false);assert.equal(row.metadata.keep,'original');assert.equal(row.metadata.aiGenerated,true);
+});
+
+test('library photos are real image references, individually moderated and numbered by category',async()=>{
+ reset();const who=await makeCreator('ref_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'참고사진 QA'}});const original=await media(who),pose=await media(who,500,700),background=await media(who,900,600);
+ await photos.saveLibrary(who,{id:pose,title:'PRIVATE_TITLE_NEVER_PROMPT',category:'pose'});await photos.saveLibrary(who,{id:background,title:'배경 예시',category:'background'});
+ await photos.edit(who,base({sourceId:original,kind:'combined',editKinds:['pose','background'],libraryIds:JSON.stringify([pose,background])}));
+ const request=calls.find(x=>x.kind==='edit');assert.equal(request.images.length,3);assert.match(request.fields.prompt,/Image 2 is a personal pose reference/);assert.match(request.fields.prompt,/Image 3 is a personal background reference/);assert.doesNotMatch(request.fields.prompt,/costume references|PRIVATE_TITLE/);
+ const expected=await sharp(fs.readFileSync(path.join(mediaRoot,pose))).rotate().resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).webp().toBuffer();assert.deepEqual(request.images[1].bytes,expected);assert.equal(calls.filter(x=>x.kind==='moderation').length,4);
+ reset();await photos.edit(who,base({sourceId:original,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:['b4bf5d'],libraryIds:[background]}),await mask());const mixed=calls.find(x=>x.kind==='edit');assert.equal(mixed.images.length,4);assert.match(mixed.fields.prompt,/Images 3 through 3 are costume references/);assert.match(mixed.fields.prompt,/Image 4 is a personal background reference/);
+ reset();await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[otherSourceId]})),code('LIBRARY_ASSET_NOT_FOUND'));assert.equal(calls.length,0);
+ await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[pose,background,sourceId,otherSourceId,original]})),code('INVALID_LIBRARY_REFERENCES'));
+ await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[background]})),code('INVALID_LIBRARY_REFERENCES'));
+ await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[pose,pose]})),code('INVALID_LIBRARY_REFERENCES'));
+ await photos.saveLibrary(who,{id:pose,remove:true});await assert.rejects(photos.edit(who,base({sourceId:original,libraryIds:[pose]})),code('LIBRARY_ASSET_NOT_FOUND'));assert.equal(calls.length,0);
+ reset();flags=[false,true];const before=(await photos.quota(who)).remaining;await assert.rejects(photos.edit(who,base({sourceId:original,kind:'background',libraryIds:[background]})),code('UNSAFE_INPUT'));assert.equal(calls.filter(x=>x.kind==='edit').length,0);assert.equal((await photos.quota(who)).remaining,before-1,'existing unsafe-input charging policy is preserved');
+});
+
+test('public backgrounds attach exact catalog bytes, moderate independently and reject invalid or conflicting choices',async()=>{
+ reset();const who=await makeCreator('publicbg_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'공용배경 QA'}});const id=await media(who);
+ await photos.edit(who,base({sourceId:id,kind:'background',backgroundId:'b7a101'}));
+ const request=calls.find(x=>x.kind==='edit');assert.equal(request.images.length,2);assert.match(request.fields.prompt,/Image 2 is a public background reference/);assert.deepEqual(request.images[1].bytes,fs.readFileSync(path.join(__dirname,'../dist/src/platform/ai-photo-backgrounds/b7a101.webp')));assert.equal(calls.filter(x=>x.kind==='moderation').length,3);
+ reset();for(const value of ['../../secret','unknown',[],null])await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundId:value})),code('INVALID_BACKGROUND_REFERENCE'));
+ await assert.rejects(photos.edit(who,base({sourceId:id,kind:'pose',backgroundId:'b7a101'})),code('INVALID_BACKGROUND_REFERENCE'));assert.equal(calls.length,0);
+ const privateId=await media(who);await photos.saveLibrary(who,{id:privateId,title:'개인 배경',category:'background'});await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundId:'b7a101',libraryIds:[privateId]})),code('INVALID_BACKGROUND_REFERENCE'));assert.equal(calls.length,0);
+ await photos.edit(who,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:['b4bf5d'],backgroundId:'b7a102'}),await mask());assert.match(calls.find(x=>x.kind==='edit').fields.prompt,/Image 4 is a public background reference/);
+ reset();flags=[false,true];await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundId:'b7a103'})),code('UNSAFE_INPUT'));assert.equal(calls.filter(x=>x.kind==='edit').length,0);
+});
+
+test('second public background batch is packaged and sends all nine reference files',async()=>{
+ const who=await makeCreator('bgsecond_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'추가배경 QA'}});const sourceId=await media(who);
+ for(let n=1;n<=9;n++){reset();const id='c8b20'+n;await photos.edit(who,base({sourceId,kind:'background',backgroundId:id}));const sent=calls.find(x=>x.kind==='edit');assert.deepEqual(sent.images[1].bytes,fs.readFileSync(path.join(__dirname,'../dist/src/platform/ai-photo-backgrounds/'+id+'.webp')));assert.match(sent.fields.prompt,/Image 2 is a public background reference/);}
+});
+
+test('third public background batch sends all six packaged reference files',async()=>{
+ const who=await makeCreator('bgthird_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'추가배경 QA'}});const sourceId=await media(who);
+ for(let n=1;n<=6;n++){reset();const id='d9c30'+n;await photos.edit(who,base({sourceId,kind:'background',backgroundId:id}));const sent=calls.find(x=>x.kind==='edit');assert.deepEqual(sent.images[1].bytes,fs.readFileSync(path.join(__dirname,'../dist/src/platform/ai-photo-backgrounds/'+id+'.webp')));assert.match(sent.fields.prompt,/Image 2 is a public background reference/);}
+});

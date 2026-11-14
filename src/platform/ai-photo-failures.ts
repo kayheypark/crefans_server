@@ -20,7 +20,7 @@ export async function recordAiFailure(db:any,config:ConfigService,sub:string,inp
  // The general log contains only identifiers/codes; never prompt text or raw provider errors.
  console.warn(JSON.stringify({event:'audit',...row}));
  try{
-  const options:Record<string,unknown>={};for(const k of ['mode','style','kind','editKinds','targetGender','costumeIds']){const v=input?.[k];if(typeof v==='string')options[k]=diagnosticPrompt(v).slice(0,300);else if(Array.isArray(v))options[k]=v.filter(x=>typeof x==='string').map(x=>diagnosticPrompt(x).slice(0,80)).slice(0,14);}
+  const options:Record<string,unknown>={};for(const k of ['mode','style','kind','editKinds','targetGender','costumeIds','libraryIds','backgroundId','aspectRatio']){const v=input?.[k];if(typeof v==='string')options[k]=diagnosticPrompt(v).slice(0,300);else if(Array.isArray(v))options[k]=v.filter(x=>typeof x==='string').map(x=>diagnosticPrompt(x).slice(0,80)).slice(0,14);}
   const payload={...trace,errorCode:code,prompt:diagnosticPrompt(input?.prompt),options};
   const encrypted=new PaymentProvider(config).encrypt(JSON.stringify(payload));
   await db.$transaction(async(tx:any)=>{await tx.platformAuditLog.create({data:row});await tx.aiPhotoFailureDetail.create({data:{request_id:trace.requestId,payload_encrypted:encrypted,expires_at:new Date(Date.now()+30*86400000)}});});

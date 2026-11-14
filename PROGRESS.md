@@ -1,3 +1,35 @@
+## 2026-11-14 추가14장 배경6종 신규·2종 재사용 (운영 미배포)
+- 원본1~4 기존c8b209 야경난간,7~9 기존b7a102 전시장. 신규5/6소프트블루스튜디오,10햇살석조테라스,11내추럴거울방,12다크이벤트홀,13노을자갈해변,14웜베이지호텔룸. 전체14장누락없이매핑, 인물/UI/로고없는 새공간·좌우배치재구성. 공용배경만등록, 원본비공개.
+- 신규실내4/아웃도어2, 전체실내24/아웃도어8. 고정참고ID6개추가, 기존보안/첨부/추적동작유지.
+- 검증: 프론트72/72, 서버37+OpenAPI14=51/51(격리DB·공급사대역) 신규6장 전송바이트대조. WebKit390/320 6종분류/검색/선택/해제/이미지로딩·JS오류/넘침없음. 6파일1024x1536 WebP 앞뒤SHA256동일, 육안검수완료. 프론트타입·양쪽빌드통과. 문서검증별도로그참조.
+- 증거 front docs/audit/public-backgrounds-batch3-20261114.json, output/design/public-backgrounds-batch3-20261114/preview.png·manifest.json, 양쪽 .local/public-backgrounds-batch3*. 실Seedream합성·운영미검증, 배포요청대기. 기존후속기능브랜치유지.
+
+## 2026-11-14 추가 첨부10장 배경9종 등록 (운영 미배포)
+- 이전요청 연속으로 배경만공용등록. 1햇살거울룸/2화이트벤치룸/3세이지스파룸/4버건디벨벳/5핑크오간자/6옐로팝업/7쿨톤복도/8·9도심광장야경/10야경테라스난간. 인물/UI/브랜드/입간판 제외, 새공간·좌우배치재구성. 원본공개안함.
+- 신규실내7/아웃도어2, 전체실내20/아웃도어6. 카탈로그 category 명시하여 야경2종이실내로분류되지않도록수정. 서버고정ID9개추가, 기존첨부·안전검사·추적동작유지.
+- 검증: 프론트72/72, 서버36+OpenAPI14=50/50(격리DB·공급사대역) 신규9장 실제전송바이트비교. WebKit390/320에서9종분류/검색/선택/해제/로딩·오류/넘침없음. 9종1024x1536 WebP 프론트/서버SHA256동일, 이미지육안검수완료. 프론트타입·양쪽빌드통과. 문서검증은별도로그참조.
+- 증거 front docs/audit/public-backgrounds-batch2-20261114.json, output/design/public-backgrounds-batch2-20261114/preview.png·manifest.json, 양쪽 .local/public-backgrounds-batch2*. 실Seedream합성/운영미검증, 배포요청대기. 기존후속기능브랜치유지.
+
+## 2026-11-14 첨부9장 기반 공용 배경7종 등록 (운영 미배포)
+- 1침실,2/8/9그레이전시장,3네온스튜디오,4민트테이블,5웜톤행사장,6형광등로비,7퍼플파티션. image_gen으로 인물/UI/문자 없이 공간·가구·조명을 새로 구성하고 좌우 특징 배치 반영. 원본 스크린샷은 공용에 복사하지 않음. 반전만으로 저작권 면책된다고 판단하지 않음.
+- 실내 공용프리셋13종(기존6+신규7), 아웃도어4종 유지. 신규7종은 카드/검색/선택취소와 서버 실제참고이미지 연결. backgroundId 고정허용목록, 개인배경 중복거절, 개별안전검사·총10장한도·요청추적 유지. 서버빌드에 배경파일 포함.
+- 검증: 프론트72/72, 서버35+OpenAPI14=49/49(격리DB·공급사대역), WebKit390/320에서7종 로딩/검색/선택/해제/페이징·JS오류/가로넘침없음. 프론트/서버7파일 SHA256동일. 초기테스트의 기존384px/99개 가정과 검색결과1개 가정을 새고해상도7종/복수단어검색에 맞춰 변경 후통과.
+- 빌드/타입: 양쪽 npm run build와 프론트 npx tsc --noEmit 종료0. check:docs 통과(문서79/API243, 해시스냅샷은 제품검증과 별개).
+- 증거: front docs/audit/public-backgrounds-20261114.json, output/design/public-backgrounds-20261114/manifest.json·preview.png, 양쪽 .local/public-background*. 실Seedream합성/운영미검증·미배포. 기존미배포기능에 의존하여 동일기능브랜치에서 후속작업.
+- 조사2026-11-14: https://www.copyright.gov/eco/help-limitation.html 및 https://www.gov.uk/government/publications/copyright-notice-digital-images-photographs-and-the-internet/copyright-notice-digital-images-photographs-and-the-internet — 단순변형은 권리허가보장이 아님. 한국법적권리판정/클리어런스는 수행하지않음.
+
+## 2026-11-14 내 보관함 구현 완료·공용 사진 수신 대기 (미배포)
+- 사용자 확정: 대화에서 제공할 사진은 공용 프리셋에만 등록. 이번 새사진 없음, 과거 UI스크린샷은 수집대상 아님. 개인 보관함은 서비스사용자가 직접 업로드한 사진 전용으로 별도구현.
+- 구조: 포즈/배경/구도/촬영컨셉(+의상·메이크업·표정) 분류·이름검색·사진카드, 기존 업로드와 비공개 미디어 소유권 재사용. 합성 시 사진바이트를 참고이미지로 첨부, 분류별 효과만 적용. 안전검사·총10장한도·차감규칙 유지.
+- 검증: 프론트71/71·서버34/34·OpenAPI14/14(243경로), 양쪽빌드·프론트타입 통과. WebKit390/320 사진업로드·분류·저장·검색·선택·수정·보관해제·넘침/JS오류없음. 서버 타인차단·보관해제거절·개별안전검사·실제바이트대조·의상/가이드와참고번호 일치. 사진없어 공용등록은 대기, 실Seedream/S3/운영검증미실행. 다음: 사용자가 사진첨부하면 공용프리셋 분류·에셋화; 배포는 요청시 진행.
+- 증거: front docs/audit/photo-library-20261114.json, 양쪽 .local/photo-library. 개인보관함 metadata만추가하여 DB스키마변경없음. 초기에 MySQL JSON path를 배열로사용한조회오류 수정; 안전차단차감 테스트는 기존정책(차감)에맞추어 수정, 최종재검사통과.
+- 조사2026-11-14: OWASP File Upload Cheat Sheet(본인권한·파일검증·비공개저장) https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html ; Seedream 다중참고이미지 https://docs.byteplus.com/en/docs/modelark/seedream-5-5 . 기존미배포비율/자르기/1안 보존하여 같은기능브랜치에 후속작업.
+
+## 2026-11-14 비율 프리셋·결과 자르기 구현 완료 (미배포)
+- 합격: 생성 요청에 6종 비율 반영, 결과 비율/위치 조정 후 실제 저장 이미지 교체, 다운로드/계속보정/사진결정 연결, 타인·범위밖 자르기 거절, AI 횟수 미차감. 프론트69/69·서버32/32·OpenAPI14/14, 양쪽빌드·프론트타입·WebKit390 드래그/저장/다운로드 파일치수/계속보정 확인. 운영 미배포·실공급자생성 미실행. 기존 프론트 check:layers는 기존 downloadPhoto의 직접fetch 1건으로 실패(HEAD에도 존재, 이번 범위외).
+- 증거: front docs/audit/ratio-crop-20261114.json, 양쪽 .local/ratio-crop. 새프리셋선택만으로 생성하지 않고 자르기취소/실패시 기존사진 유지. 다음: 사용자 요청 시 dev→prod·운영 배포.
+- 근거(2026-11-14): https://docs.byteplus.com/en/docs/modelark/seedream-5-5 명시적 size 범위921600~4624220픽셀; https://sharp.pixelplumbing.com/api-resize/ extract 정수영역 사용.
+
 ## 2026-11-14 AI 사진 개선·하트 보상 운영 배포 완료
 - 기능 소스 front 78c5bf0 / server 26d6359(dev→prod). 운영 frontend=front-ai-hearts-v2-20261114, API/worker=ai-hearts-v2-20261114. 오버워치54종·촬영컨셉4종·배경실내/야외·다운로드/핀치줌허용·게임난이도/30상한·계정누적100하트전환 반영. 신규3테이블 migration 적용, 관리자/DB/proxy/업로드 보존.
 - 초기 API 부팅 실패: hearts OpenAPI 계약누락으로일시502. 이전정상API로복구 후계약등록·전체초기화14/14검증하여재배포. 현재API/worker/frontend Running·재시작0·OOM없음,health ready. 기존검증 서버30/프론트65, 실운영WebKit390 예시화면다운로드파일저장·pinch-zoom스타일·JS오류/넘침없음, 프리셋62개 HTTP이미지 SHA256일치.

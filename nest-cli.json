@@ -8,6 +8,10 @@
       {
         "include": "platform/ai-photo-costumes/*.webp",
         "outDir": "dist/src"
+      },
+      {
+        "include": "platform/ai-photo-backgrounds/*.webp",
+        "outDir": "dist/src"
       }
     ]
   }
