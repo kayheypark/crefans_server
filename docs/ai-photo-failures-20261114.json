@@ -1,0 +1,50 @@
+{
+  "checkedAt": "2026-11-14T00:35:41.946350+00:00",
+  "serverCommit": "9590338848107e0d40a52c93858d64d9b9ae8e19",
+  "adminCommit": "89bb2cb74e63fff2abd13a9e60368b20b315ec11",
+  "apiImage": "crefans-api:ai-failure-details-20261114",
+  "adminImage": "crefans-admin:ai-failure-details-20261114",
+  "tests": {
+    "serverRelated": {
+      "passed": 55,
+      "failed": 0,
+      "log": ".local/verified-tests.log"
+    },
+    "adminUnit": {
+      "passed": 18,
+      "failed": 0
+    },
+    "adminBrowser": {
+      "passed": 1,
+      "failed": 0,
+      "scope": "real Next/Chromium; mocked log responses"
+    },
+    "expandedAudit": {
+      "passed": 43,
+      "failed": 2,
+      "reason": "existing watchdog mock lacks mediaWatermarkJob.count"
+    },
+    "documentationCheck": {
+      "exitCode": 1,
+      "reason": "existing sibling server document/source inventory missing"
+    }
+  },
+  "production": {
+    "runtimeFilesMatched": 18,
+    "schemaReadable": true,
+    "diagnosticCryptoPermissionsExpiry": "production code and key; memory database stub",
+    "operationalTestWrites": false,
+    "anonymousDetailStatus": 401,
+    "apiWorkerAdminRunning": true,
+    "restarts": 0,
+    "supplierFailureLiveTest": false
+  },
+  "recovery": {
+    "api": "/Users/ethan/crefans-recovery/20261114/ai-failure-details-api-20261114",
+    "admin": "/Users/ethan/crefans-recovery/20261114/admin-ai-failure-details-20261114",
+    "database": "/Users/ethan/crefans-recovery/20261114/ai-failure-db-20261114",
+    "verified": true,
+    "productionOldCopiesRemoved": true
+  },
+  "scope": "Server AI service failures; prompt encrypted and retained30days; pre-server disconnect and guard/parser failures have no diagnostic prompt; no retrospective recovery"
+}

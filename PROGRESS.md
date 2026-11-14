@@ -1,3 +1,9 @@
+## 2026-11-14 AI 실패 진단 운영 완료
+- 서버9590338/콘솔89bb2cb dev→prod 반영. API/worker crefans-api:ai-failure-details-20261114, admin crefans-admin:ai-failure-details-20261114. 신규 ai_photo_failure_details 마이그레이션 성공. 로그→AI 생성 실패→상세에서 질문/옵션/단계/공급사 코드·ID. 질문30일 암호화, logs.view+members.view, 조회감사/no-store/worker파기.
+- 관련55/55·콘솔18/18·모바일1/1, 운영18파일SHA일치·신규테이블읽기·운영키암호화/권한/만료 대역통과·비로그인상세401·세서비스재시작0. 실사용자 실패요청을 유발한 전체흐름 검사는 하지 않음. 근거 docs/ai-photo-failures-20261114.json 및 .local/deploy/{runtime-check.json,runtime-sha.log,runtime-services-final.log,deploy-api-retry.log}. 전체문서검사와기존watchdog2실패는상단검증기록참고.
+- 초기 직접docker마이그레이션의DB환경누락은 변경없이복귀후Compose실행으로해결; 콘솔복구경로충돌은 교체전중단후admin별도경로로해결. API/콘솔외다른컨테이너 유지.
+- DB복구본 외부7일보관,직전API/콘솔이미지·설정 외부SHA/OCI65·15blobs/태그검증후서버직전태그·임시자료정리. 외부복구경로는증거JSON. 이전미기록질문복원불가,서버도착전끊김질문수집불가. 추가요구대기.
+
 ## 2026-11-14 AI 실패 진단 구현 검증
 - build 종료0, AI/OpenAPI/법률문서 관련55/55 종료0 (.local/verified-tests.log); 감사 확대검사43/45: 기존 worker watchdog 대역에 mediaWatermarkJob.count 없음으로2실패, 해당 소스 변경없음 (.local/tests-final.log). 최초 sandbox loopback 차단/공유DB busy는 승인·순차 실행으로 해결.
 - 콘솔 타입/18단위통과, 실제 Next+Chromium 모바일 UI 대역1통과. 서버 실DB·공급사대역으로401코드/ID, DNS/timeout 구분, 암호화·마스킹·동시요청·조회권한/감사·만료파기·저장장애를 확인. 실공급사 오류 유발은 미실행.
