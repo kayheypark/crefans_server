@@ -44,7 +44,6 @@ test('input rules are checked before the provider: consent, prompt, personal dat
  await assert.rejects(photos.edit(creator,base({prompt:'가'.repeat(2001)})),code('INVALID_PROMPT'));
  await assert.rejects(photos.edit(creator,base({prompt:'연락처 010-1234-5678 넣어줘'})),code('PERSONAL_DATA'));
  await assert.rejects(photos.edit(creator,base({kind:'hair'})),code('INVALID_KIND'));
- await assert.rejects(photos.edit(creator,base({kind:'outfit'})),code('MASK_REQUIRED'));
  await assert.rejects(photos.edit(creator,base({kind:'outfit'}),await mask(false)),code('MASK_REQUIRED'));
  await assert.rejects(photos.edit(creator,base({sourceId:otherSourceId})),code('MEDIA_NOT_FOUND'));
  assert.equal(calls.length,0);assert.equal((await photos.quota(creator)).remaining,10);
@@ -111,7 +110,6 @@ test('combined edits and gender transform: actual provider instructions, two sou
 test('combined/gender validation refuses malformed scopes, missing outfit mask and unsupported gender before provider',async()=>{
  const user=await makeCreator('aival_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);reset();
  for(const editKinds of [undefined,'not json','["pose"]','["pose","pose"]','["pose","hair"]','{}'])await assert.rejects(photos.edit(user,base({sourceId:id,kind:'combined',editKinds})),code('INVALID_EDIT_KINDS'));
- await assert.rejects(photos.edit(user,base({sourceId:id,kind:'combined',editKinds:'["outfit","background"]'})),code('MASK_REQUIRED'));
  await assert.rejects(photos.edit(user,base({sourceId:id,targetGender:'unknown'})),code('INVALID_TARGET_GENDER'));
  assert.equal(calls.length,0);assert.equal((await photos.quota(user)).remaining,10);
  reset();await photos.edit(user,base({sourceId:id,kind:'combined',editKinds:['pose','background']}));const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.images.length,1);assert.ok(!edit.fields.mask);assert.match(edit.fields.prompt,/facial structure, identity, age/);
@@ -300,4 +298,13 @@ test('six-character costume IDs map to identical assets and normalize legacy ali
  const mapping={"maid": "773106", "sailor": "80974e", "gothic": "ffb58f", "mage": "666147", "cyber": "b4bf5d", "idol": "e614f6", "cheer": "190513", "beach": "ab36e8", "nikke-rapi": "313a28", "nikke-anis": "1947f3", "nikke-helm": "173f1e", "nikke-noir": "ce1f18", "overwatch-dva": "70219a", "overwatch-mercy": "7281fe", "overwatch-widow": "8971c9", "overwatch-ashe": "9a01b2", "diablo-sorcerer": "da6901", "diablo-necromancer": "87ad51", "diablo-rogue": "72db9a", "diablo-barbarian": "b3bfdd", "aot-scout": "1a73b4", "aot-captain": "3e20e3", "aot-police": "556b2b", "aot-final": "8f1113", "demon-giyu": "c65204", "demon-shinobu": "9e6184", "demon-rengoku": "8d3d3e", "demon-mitsuri": "6ee320", "jjk-gojo": "07c722", "jjk-nanami": "edf3b8", "jjk-geto": "6c9ecb", "jjk-toji": "a77dd5", "genshin-raiden": "b516a6", "genshin-jean": "752866", "genshin-zhongli": "2056e8", "genshin-diluc": "d69be9", "blue-shiroko": "80bdd0", "blue-hoshino": "4298dc", "blue-yuuka": "c7289e", "blue-aris": "29581e"};
  for(const [old,id] of Object.entries(mapping)){assert.deepEqual(costumeReferenceIds([old],['outfit'],'cosplay'),[id]);assert.deepEqual(costumeReferenceIds([id],['outfit'],'cosplay'),[id]);assert.deepEqual(await readCostumeReference(id),await readCostumeReference(old));assert.throws(()=>costumeReferenceIds([old,id],['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));}
  for(const id of ['ffffff','__proto__','constructor','../maid']){assert.throws(()=>costumeReferenceIds([id],['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));await assert.rejects(readCostumeReference(id),code('INVALID_COSTUME_REFERENCES'));}
+});
+
+test('outfit mask is optional: original and costume references keep correct order without a guide',async()=>{
+ const user=await makeCreator('ainoguide_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:user,reason:'테스트 허용'}});const id=await media(user);
+ for(const combined of [false,true]){
+ reset();await photos.edit(user,base({sourceId:id,kind:combined?'combined':'outfit',...(combined?{editKinds:['outfit','background']}:{}),style:'cosplay',costumeIds:['313a28']}));
+ const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.images.length,2);assert.match(edit.fields.prompt,/Images 2 through 2/);assert.doesNotMatch(edit.fields.prompt,/pink|masked area|outside the mask/);assert.equal(edit.images[1].type,'image/webp');assert.equal(calls.filter(c=>c.kind==='moderation').length,3);
+ }
+ reset();await photos.edit(user,base({sourceId:id,kind:'outfit'}));const edit=calls.find(c=>c.kind==='edit');assert.equal(edit.images.length,1);assert.doesNotMatch(edit.fields.prompt,/pink|masked area|outside the mask/);
 });

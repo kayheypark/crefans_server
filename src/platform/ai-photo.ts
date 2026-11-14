@@ -45,11 +45,13 @@ export function aiPhotoConfig(config:ConfigService){
   perDay:int(config.get('AI_PHOTO_PER_DAY'),AI_PHOTO_DAILY_LIMIT),dailyTotal:int(config.get('AI_PHOTO_DAILY_TOTAL'),300),timeoutMs:int(config.get('AI_PHOTO_TIMEOUT_MS'),120000)};
 }
 /** The prompt sent to the provider: the creator's words are framed by fixed rules (identity kept, no sexual content, no text). */
-export function aiPhotoPrompt(kind:string,style:string,request:string,kinds:string[]=[kind],targetGender?:string,referenceCount=0){
+export function aiPhotoPrompt(kind:string,style:string,request:string,kinds:string[]=[kind],targetGender?:string,referenceCount=0,hasGuide=true){
  const cosplay=kinds.includes('outfit')&&style==='cosplay';
  const completeLook='Cosplay: apply the requested complete costume, including wig hair color, hairstyle, headwear, accessories, props and footwear. The pink guide locates garment edits; explicitly requested wig, hair, headwear and accessory changes may extend beyond it. Keep the face, identity and unrequested details unchanged. Include only items visible in the source framing; do not crop or invent a new pose merely to reveal them unless a framing or pose change is explicitly requested.';
- const instruction=kind==='combined'||targetGender||cosplay?['Apply all requested changes together to image 1. Modify only the listed aspects and keep unrequested details unchanged.',...kinds.map(k=>k==='outfit'&&cosplay?completeLook:COMBINED[k]),...(kinds.includes('outfit')?['Image 2 is a copy with a pink clothing-region guide. Use it only to locate the clothing edits; other requested aspects may change elsewhere. Never reproduce the pink guide in the result.']:[])].join('\n'):KINDS[kind];
- return [`Edit this photo of a real adult person. ${instruction}`,...(referenceCount?[`Images 3 through ${referenceCount+2} are costume references 1 through ${referenceCount}. Transfer their visible clothing design, colors, wig hairstyle, headwear, accessories, props and footwear to the person in image 1. Do not copy the reference mannequin, body, face, pose or background. Apply items only within the source framing. Follow reference order when costume details conflict.`]:[]),`Requested change: ${request}`,'If requests conflict, the later instruction takes precedence.',`Make the result look like ${STYLES[style]}.`,
+ let instruction=kind==='combined'||targetGender||cosplay?['Apply all requested changes together to image 1. Modify only the listed aspects and keep unrequested details unchanged.',...kinds.map(k=>k==='outfit'&&cosplay?completeLook:COMBINED[k]),...(kinds.includes('outfit')?['Image 2 is a copy with a pink clothing-region guide. Use it only to locate the clothing edits; other requested aspects may change elsewhere. Never reproduce the pink guide in the result.']:[])].join('\n'):KINDS[kind];
+ if(!hasGuide)instruction=instruction.replace('Change only the clothing inside the transparent masked area. Keep everything outside the mask unchanged.','Change the requested clothing. Keep unrequested details unchanged.').replace(' in the pink clothing guide area','').replace('The pink guide locates garment edits; explicitly requested wig, hair, headwear and accessory changes may extend beyond it.','Apply explicitly requested wig, hair, headwear and accessory changes.').replace('Image 2 is a copy with a pink clothing-region guide. Use it only to locate the clothing edits; other requested aspects may change elsewhere. Never reproduce the pink guide in the result.','');
+ const firstReference=hasGuide?3:2;
+ return [`Edit this photo of a real adult person. ${instruction}`,...(referenceCount?[`Images ${firstReference} through ${referenceCount+firstReference-1} are costume references 1 through ${referenceCount}. Transfer their visible clothing design, colors, wig hairstyle, headwear, accessories, props and footwear to the person in image 1. Do not copy the reference mannequin, body, face, pose or background. Apply items only within the source framing. Follow reference order when costume details conflict.`]:[]),`Requested change: ${request}`,'If requests conflict, the later instruction takes precedence.',`Make the result look like ${STYLES[style]}.`,
   targetGender?`Also change the depicted adult person to ${targetGender==='female'?'an adult woman':'an adult man'}. Allow facial features and gender presentation to change as needed. Keep the source recognizable where compatible, and preserve age, skin tone and unrequested details. Never make the person younger.`:kinds.includes('body')?"Preserve the person's facial structure, identity, age and skin tone. Only the requested body proportions may change.":"Keep the person's facial structure, identity, age, body shape and skin tone exactly the same.",'Do not add nudity, sexualized content, minors, text, logos or watermarks.'].join('\n');
 }
 const sizeFor=(width:number,height:number)=>width>height*1.15?'1536x1024':height>width*1.15?'1024x1536':'1024x1024';
@@ -158,8 +160,7 @@ export class AiPhotoService{
   if(!prompt||prompt.length>AI_PHOTO_PROMPT_MAX)reject(400,'INVALID_PROMPT',`원하는 모습을 1~${AI_PHOTO_PROMPT_MAX}자로 적어 주세요.`);
   if(containsPersonalData(prompt))reject(400,'PERSONAL_DATA','이메일·전화번호 같은 개인정보는 빼고 적어 주세요.');
   if(looksLikeInjection(prompt))reject(400,'OUT_OF_SCOPE','사진을 어떻게 바꿀지만 적어 주세요.');
-  if(kinds.includes('outfit')&&!mask)reject(400,'MASK_REQUIRED','바꿀 옷 부분을 사진 위에 칠해 주세요.');
-  if(kind==='combined'&&!kinds.includes('outfit')&&mask)reject(400,'INVALID_MASK','옷을 바꿀 때만 옷 영역을 칠해 주세요.');
+  if(!kinds.includes('outfit')&&mask)reject(400,'INVALID_MASK','옷을 바꿀 때만 옷 영역을 칠해 주세요.');
   if(mask&&(mask.mimetype!=='image/png'||mask.size>5*1024*1024))reject(400,'INVALID_MASK','칠한 영역을 다시 만들어 주세요.');
   const referenceIds=costumeReferenceIds(input?.costumeIds,kinds,style);
   await this.stage('source');
@@ -195,7 +196,7 @@ export class AiPhotoService{
     if(verdict===undefined)reject(503,'MODERATION_UNAVAILABLE','안전 검사를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
     if(verdict){charged=false;reject(400,'UNSAFE_INPUT','안전 기준에 맞지 않는 사진이나 요청이라 만들 수 없어요.');}
    }
-    let requestPrompt=aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length).replace('transparent masked area','pink clothing-region guide in image 2').replace('outside the mask','outside the pink guide');
+    let requestPrompt=aiPhotoPrompt(kind,style,prompt,kinds,targetGender,references.length,Boolean(guide)).replace('transparent masked area','pink clothing-region guide in image 2').replace('outside the mask','outside the pink guide');
     if(guide&&!requestPrompt.includes('Image 2 is a copy'))requestPrompt+='\nImage 2 is a copy with a pink clothing-region guide. Edit clothing only in that region, keep other details unchanged, and never reproduce the pink guide.';
     const data=(bytes:Buffer,mime:string)=>`data:${mime};base64,`+bytes.toString('base64');
     const url=SEEDREAM_URL,headers={Authorization:'Bearer '+this.settings.seedreamKey,'Content-Type':'application/json'};

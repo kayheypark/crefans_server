@@ -612,7 +612,7 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | GET | /studio/ai-photo/quota | 크리에이터 본인. `{allowed,limit,remaining}`. allowed = 허용 목록(ai_photo_grants) + 공급사 키 설정. |
-| POST | /studio/ai-photo/edit | multipart `sourceId,kind(outfit|makeup|expression|pose|background|camera|lens|body|combined),editKinds(combined 필수 JSON 배열 2~8항목),style(photo|cosplay|daily),prompt(1~2000),targetGender(female|male, 선택),consent=true,mask(PNG, outfit 포함 시 필수)`. 응답 `{images:[{id,type,url,aiGenerated}],remaining}`. |
+| POST | /studio/ai-photo/edit | multipart `sourceId,kind(outfit|makeup|expression|pose|background|camera|lens|body|combined),editKinds(combined 필수 JSON 배열 2~8항목),style(photo|cosplay|daily),prompt(1~2000),targetGender(female|male, 선택),consent=true,mask(PNG, outfit 포함 시 선택; 옷 세부 지정 ON일 때 전송)`. 응답 `{images:[{id,type,url,aiGenerated}],remaining}`. |
 
 - 순서: 허용 목록(403 AI_PHOTO_NOT_ALLOWED) → 본인 완료 이미지(404) → 문구 개인정보·지시 무력화 차단 → 마스크(칠한 곳 없음 400) → 하루 `AI_PHOTO_PER_DAY`(기본 10, UTC 하루=한국 오전 9시, 429 DAILY_LIMIT)·전체 `AI_PHOTO_DAILY_TOTAL`(기본 300) → 문구+사진 Moderation(판정 불가 503, 실패 시 진행 안 함) → 모든 모드(general/cosplay/누락)에서 BytePlus `/api/v3/images/generations`(dola-seedream-5-5-261028, 1장, 1536px 이하 PNG, watermark=false; 원본·의상 가이드·참조 총10장 이하). 생성 키는 `AI_PHOTO_BYTEPLUS_API_KEY`, OpenAI 키는 안전검사에만 사용하며 생성 대체 모델은 없음 → 결과별 Moderation(통과만 저장) → 크리에이터 비공개 미디어(webp, metadata.aiGenerated·aiSourceId·aiKind·aiModel, 워터마크 대상 기록).
 - 2026-11-13: 단일 최종 프롬프트에 누적한 요청은 combined+editKinds로 전달한다. 의상 단일은 공급사 mask, 복합 의상 또는 성별 변경+의상은 원본 첫 이미지와 분홍 의상영역 표시 참고 이미지 두 장(image[])으로 전달한다. 요청한 다른 영역 변경을 마스크가 막지 않도록 하는 처리이며 실제 AI 품질을 보장하지 않는다. targetGender 미지정은 정체성·체형 유지, 지정 시 성인 남성/여성 얼굴 표현 변경 허용. body는 요청한 가슴/힙/키 비율만 변경하도록 체형 고정 지시를 해제한다. 나이·피부색·착의·안전검사는 보존한다. 렌즈는 촬영 느낌의 AI 재현이며 실제 렌즈 촬영/정확한 광학 성능으로 표시하지 않는다. 생성 결과는 본인 완료 미디어와 같은 소스 검사를 거쳐 다시 편집할 수 있다. metadata.aiEditKinds/aiTargetGender를 기록한다.
@@ -641,3 +641,5 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 `GET /admin/logs?aiAttempts=true`는 시작기록을 요청당1개와 aiAttempt 요약(status,selectedModel,selectedProvider,attemptedModels,currentStage,durationMs)으로 반환합니다. status는 in_progress/succeeded/failed/unknown이며 unknown은 시작10분후최종기록없음입니다. `/admin/logs/:id`의 aiAttempt.events는 동일요청모델호출·단계이력을 제공합니다. 실제요청model과 제공사responseModel은 별도이며 미제공값을추정하지않습니다. 성공요청의원문은기록하지않습니다.
 
 - 2026-11-14 의상 `costumeIds`는 고정6자리 소문자16진수 카탈로그ID다. 프론트/서버 명시매핑으로 기존 참조에셋을 유지한다. 이전 클라이언트ID는 서버에서 새ID로 정규화하며, 새/이전ID를 섞어 같은 의상을 보내도 중복으로 거절한다. ID는 인증값이 아니며 소유권·안전검사는 그대로 적용한다.
+
+- 2026-11-14: 옷 세부 지정 기본 OFF는 의상 마스크 없이 원본+의상 참조를 전송한다. ON일 때만 분홍 가이드를 추가한다. 가이드 미포함 시 의상 참조는 image 2부터, 포함 시 image 3부터이며 이전 마스크 필수 설명을 대체한다.
