@@ -1,3 +1,9 @@
+## 2026-11-14 의상 확장·메타 설명·PNG 다운로드 운영 배포 완료
+- 사용자 결정(/ask-me) 운영 배포. prod front 8b0d0a1 / server 9eaa463(기능 브랜치와 소스 동일). API/worker=crefans-api:costume-expansion-20261114(기존 ai-presets 위 src·dist 덮어쓰기, 이미지 내 해시 로컬 빌드와 일치), frontend=crefans-front:front-costume-expansion-20261114.
+- 검증: API/worker healthy·재시작0·353 의상 참조·AI 엔드포인트 비로그인401·다른 컨테이너 불변, 운영 의상 WebP 4종 HTTP200·3종 바이트 일치, 홈/피드 description "코스어와 팬의 연결고리", health ready.
+- 복구: /Users/ethan/crefans-recovery/20261114/{costume-expansion-api,front-costume-expansion-20261114} 직전 이미지·설정 보관·SHA256/태그/ID 검증 후 서버 이전 태그·임시본 정리. 맥 Docker 빌드캐시(1시간 이상 미사용)만 정리해 사전검사 통과.
+- 남은 일: 실제 생성 결과·이름 피드백 반영, OG 이미지 글자·llms.txt 문구 변경 여부(사용자 확인 대기).
+
 ## 2026-11-14 게임·애니 의상 프리셋 확장 263종
 - 사용자 요청: 오버워치·디아블로 제외 6분류 후보(.local/costume-roster-20261114, 617행)를 공식 외형과 대조해 Seedream으로 캐릭터당 기본 의상 1종 제작·등록. 운영 배포는 별도 요청. 미성년 캐릭터는 제외하지 않되 노출 강화 금지(사용자 지시).
 - 작업: front/server feat/costume-catalog-expansion(origin/prod 8c5074e / 53b1983). 결과 등록263 = 블루 아카이브112·니케99·귀멸27·주술회전12·원신12·진격1. 카탈로그 90→353, 분류 [일반8,블루116,원신16,니케103,오버워치54,디아블로4,진격5,귀멸31,주술16].
