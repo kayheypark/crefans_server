@@ -1,3 +1,10 @@
+## 2026-11-14 AI 사진 개선·하트 보상 운영 배포 완료
+- 기능 소스 front 78c5bf0 / server 26d6359(dev→prod). 운영 frontend=front-ai-hearts-v2-20261114, API/worker=ai-hearts-v2-20261114. 오버워치54종·촬영컨셉4종·배경실내/야외·다운로드/핀치줌허용·게임난이도/30상한·계정누적100하트전환 반영. 신규3테이블 migration 적용, 관리자/DB/proxy/업로드 보존.
+- 초기 API 부팅 실패: hearts OpenAPI 계약누락으로일시502. 이전정상API로복구 후계약등록·전체초기화14/14검증하여재배포. 현재API/worker/frontend Running·재시작0·OOM없음,health ready. 기존검증 서버30/프론트65, 실운영WebKit390 예시화면다운로드파일저장·pinch-zoom스타일·JS오류/넘침없음, 프리셋62개 HTTP이미지 SHA256일치.
+- 실제로그인사용자의유료AI생성/물리iPhone핀치제스처는미실행. 공급자대역검증과구분. 보상API 비로그인401. 배포중로컬빌드환경의카카오키불일치는운영번들키로복원후빌드해기존값유지. 맥공간부족은이번중복전송파일/재생성가능캐시정리로해결.
+- 복구: /Users/ethan/crefans-recovery/20261114/ai-hearts (이전API이미지·DB덤프2개·설정, SHA256/이미지ID/태그/덤프완결검증), /Users/ethan/crefans-recovery/20261114/front-ai-hearts-v2-20261114. 검증후운영백업/임시파일/비활성이미지사본만정리; 로컬복구보관본삭제없음.
+- 증거: front docs/audit/heart-release-20261114.json, 양쪽 .local/heart-release. 문서후속커밋은런타임변경없음. 다음: 실제이용피드백에따른난이도/모바일줌확인.
+
 ## 2026-11-14 배포 기동 오류 복구
 - 신규hearts 라우트의 openapi-contract 등록이 누락되어 installPlatformOpenApi가 부팅을 중단. DB3테이블적용완료, 이전API로즉시롤백. 프론트미교체. 계약추가 후OpenAPI기동검증·재빌드·재배포진행.
 
