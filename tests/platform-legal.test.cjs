@@ -171,6 +171,8 @@ test('2026-11-15 sync revision: article 11 states bean charge limits and article
  const ai=t.sections.find(s=>s.title==='13. 스튜디오 AI 사진 편집과 횟수권').body;
  const {AI_PHOTO_DAILY_LIMIT}=require('../dist/src/platform/ai-photo');const {AI_HEART_DAILY_CAP}=require('../dist/src/platform/ai-photo-hearts');
  assert.equal(AI_PHOTO_DAILY_LIMIT,10);assert.equal(AI_HEART_DAILY_CAP,100);
- for(const needle of ['무료 생성은 하루 10회','오전 9시','최대 30하트','하루 최대 100하트','100하트가 모이면 생성 10회','무료 횟수, 하트로 받은 횟수, 구매한 횟수권 순서','결제 금액에 비례','16번 항목'])assert.ok(ai.includes(needle),needle);
+ for(const needle of ['무료 생성은 하루 10회','오전 9시','최대 30하트','하루 최대 100하트','10하트마다 생성 1회','무료 횟수, 하트로 받은 횟수, 구매한 횟수권 순서','안전 기준에 걸려 거절되면 무료 횟수는 사용한 것','구매 당시 1회 단가','16번 항목'])assert.ok(ai.includes(needle),needle);
+ assert.doesNotMatch(ai,/소멸/);
+ for(const needle of [])assert.ok(ai.includes(needle),needle);
  assert.deepEqual(t.sections.slice(0,12).map(s=>s.title),legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.sections.map(s=>s.title));
 });
