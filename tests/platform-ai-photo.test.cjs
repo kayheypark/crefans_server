@@ -395,3 +395,8 @@ test('public backgrounds attach exact catalog bytes, moderate independently and 
  await photos.edit(who,base({sourceId:id,kind:'combined',editKinds:['outfit','background'],style:'cosplay',costumeIds:['b4bf5d'],backgroundId:'b7a102'}),await mask());assert.match(calls.find(x=>x.kind==='edit').fields.prompt,/Image 4 is a public background reference/);
  reset();flags=[false,true];await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundId:'b7a103'})),code('UNSAFE_INPUT'));assert.equal(calls.filter(x=>x.kind==='edit').length,0);
 });
+
+test('second public background batch is packaged and sends all nine reference files',async()=>{
+ const who=await makeCreator('bgsecond_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'추가배경 QA'}});const sourceId=await media(who);
+ for(let n=1;n<=9;n++){reset();const id='c8b20'+n;await photos.edit(who,base({sourceId,kind:'background',backgroundId:id}));const sent=calls.find(x=>x.kind==='edit');assert.deepEqual(sent.images[1].bytes,fs.readFileSync(path.join(__dirname,'../dist/src/platform/ai-photo-backgrounds/'+id+'.webp')));assert.match(sent.fields.prompt,/Image 2 is a public background reference/);}
+});
