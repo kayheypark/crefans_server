@@ -1,0 +1,37 @@
+{
+  "at": "2026-11-14T02:10:03.138259+00:00",
+  "sources": {
+    "server": "3821e07",
+    "front": "5419698"
+  },
+  "images": {
+    "api": "crefans-api:costume-hash-20261114",
+    "front": "crefans-front:front-costume-hash-20261114"
+  },
+  "checks": {
+    "serverTestsPassed": 39,
+    "frontTestsPassed": 50,
+    "serverBuildExit": 0,
+    "frontTypesExit": 0,
+    "catalogAssetsMatched": 40,
+    "runtime": {
+      "canonicalIds": 40,
+      "legacyAliases": 40,
+      "assetBytesMatched": 40,
+      "mixedDuplicatesRejected": 40,
+      "invalidIdsRejected": 3,
+      "providerCalls": 0,
+      "productionWrites": 0
+    },
+    "frontBundleCanonicalIds": 40,
+    "docsExit": 1,
+    "docsLimitation": "existing sibling server document/source references missing",
+    "realProviderCalls": false
+  },
+  "recovery": {
+    "api": "/Users/ethan/crefans-recovery/20261114/costume-hash-api-20261114",
+    "front": "/Users/ethan/crefans-recovery/20261114/front-costume-hash-20261114",
+    "serverPreviousImagesAndTemporaryFilesRemoved": true
+  },
+  "evidence": ".local/costume-hash/"
+}
