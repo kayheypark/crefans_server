@@ -5,6 +5,8 @@
 - 문서: docs/platform-api.md 비회원 체험·파트너 요청 API 7건 설명(오늘 낮 배포분 누락 보완), current-contracts 재생성.
 - 테스트: package.json test:launch(guest·signup-mode·signup-invites·partner-request·ai-photo·manual-payouts·legal). 추가: 비회원 결과물만·24시간 내 검색 제외·200회 상한 시 회원 total 불변·IP 시간 5회·전체 상한+알림·발송 실패 쿨다운 환원·open 개정 문구. 실행 2026-11-15 22:3x KST 95/95 통과, 인접(auth·referrals·operations·ai-photo-grants·beta-policy) 44/44, openapi 포함 22/22. 대조: 결과물 검사·예산 분리·메일 가드를 각각 dist에서 제거 시 해당 테스트 실패 확인 후 원복.
 - 계약 초안 v2.39(docs/contract-partnership, v2.38 위): 표제 '크리에이터 파트너십 계약서'·서문. 조문 변경 없음, 7조④는 v2.37에 이미 반영. 서명·발송 안 함.
+- 운영 배포(2026-11-15 22:4x KST, 사용자 '검증 통과 시 배포까지'): prod 71f668c → crefans-api:launch-hardening-20261115(오버레이, dist JS 214개 해시 로컬 빌드와 일치). ship-api.sh exit 0: API/worker healthy·재시작0, 다른 컨테이너 불변, env 차이 없음(API_IMAGE·APP_RELEASE만), partner-request 401, bootstrap inviteOnly false, guest/session consentVersion 2026-11-15.guest.2, /common 약관 open.1·'만 19세 이상이면 누구나'. 복구 보관 crefans-recovery/20261115/launch-hardening-api(open-signup 이미지·설정, SHA256SUMS OK), 서버 임시본·직전 이미지 정리. 릴리스 폴더 crefans_server-nightfix/.local/release-launch-20261115.
+- 프론트 front-launch-20261115(prod 8df42b4)·가이드(prod 9aea39f, 109파일, 복구 crefans-recovery/20261115/guide-launch) 같이 배포. 운영 JS 묶음에서 새 동의·FAQ·출금 문구 확인(읽기만). 실제 가입 메일 상한·IP 제한 발동, 비회원 결과물만 거절은 운영에서 직접 실행하지 않음(테스트로만 확인).
 - 미결·주의: 체험 연결(공용 PC) 현행 유지(사용자 결정). 비회원 결과 화면 하트 0/100 안내 노출(프론트, 미결). 본문 텍스트 검사·IPv6 /64 묶기·업로드 300MB 선저장은 미착수.
 
 ## 2026-11-15 회원가입 전체 개방·파트너 계약 요청 (서버)
