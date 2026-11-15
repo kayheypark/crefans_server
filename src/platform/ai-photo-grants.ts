@@ -31,11 +31,13 @@ export async function aiPhotoAllowed(db:PrismaClient|Prisma.TransactionClient,cr
 export async function listAiPhotoGrants(db:PrismaClient,admin:any,query:any,dailyLimit:number){
  requirePermission(admin,'members','view');
  const {page,size,skip}=adminPage(query),search=text(query.search??'',100,false).replace(/^@/,'');
- const matched=search?(await db.creator.findMany({where:{OR:[{handle:{contains:search.toLowerCase()}},{display_name:{contains:search}}]},select:{user_id:true},take:500})).map(c=>c.user_id):null;
+ const matched=search?[...(await db.creator.findMany({where:{OR:[{handle:{contains:search.toLowerCase()}},{display_name:{contains:search}}]},select:{user_id:true},take:500})).map(c=>c.user_id),...(await db.member.findMany({where:{OR:[{preferred_username:{contains:search.toLowerCase()}},{nickname:{contains:search}}]},select:{id:true},take:500})).map(m=>m.id)]:null;
  const where:Prisma.AiPhotoGrantWhereInput=matched?{OR:[{creator_user_id:{in:matched}},{reason:{contains:search}}]}:{};
  const [rows,total]=await Promise.all([db.aiPhotoGrant.findMany({where,skip,take:size,orderBy:{created_at:'desc'}}),db.aiPhotoGrant.count({where})]);
  const [creators,actors,used]=await Promise.all([db.creator.findMany({where:{user_id:{in:rows.map(r=>r.creator_user_id)}},select:{user_id:true,handle:true,display_name:true,is_active:true}}),names(db,rows.map(r=>r.granted_by)),usedToday(db,rows.map(r=>r.creator_user_id))]),tickets=await ticketCounts(db,rows.map(r=>r.creator_user_id));
- return{items:rows.map(r=>{const c=creators.find(x=>x.user_id===r.creator_user_id),today=used.get(r.creator_user_id)??0;return{creatorId:r.creator_user_id,handle:c?.handle??null,displayName:c?.display_name??null,creatorActive:c?.is_active??false,reason:r.reason,grantedBy:r.granted_by,grantedByName:nameOf(actors,r.granted_by),createdAt:r.created_at,usedToday:today,remaining:Math.max(0,dailyLimit-today),resetTickets:tickets.get(r.creator_user_id)??0};}),total,page,pageSize:size,dailyLimit};
+ // Grants for members who are not creators (2026-11-15) show the member handle/nickname; creatorActive stays false for them.
+ const members=await db.member.findMany({where:{id:{in:rows.filter(r=>!creators.some(c=>c.user_id===r.creator_user_id)).map(r=>r.creator_user_id)}},select:{id:true,preferred_username:true,nickname:true}});
+ return{items:rows.map(r=>{const c=creators.find(x=>x.user_id===r.creator_user_id),m=members.find(x=>x.id===r.creator_user_id),today=used.get(r.creator_user_id)??0;return{creatorId:r.creator_user_id,handle:c?.handle??m?.preferred_username??null,displayName:c?.display_name??m?.nickname??null,creatorActive:c?.is_active??false,isCreator:!!c,reason:r.reason,grantedBy:r.granted_by,grantedByName:nameOf(actors,r.granted_by),createdAt:r.created_at,usedToday:today,remaining:Math.max(0,dailyLimit-today),resetTickets:tickets.get(r.creator_user_id)??0};}),total,page,pageSize:size,dailyLimit};
 }
 
 export async function aiPhotoGrantHistory(db:PrismaClient,admin:any,creatorId:string,query:any){
@@ -48,10 +50,13 @@ export async function aiPhotoGrantHistory(db:PrismaClient,admin:any,creatorId:st
 export async function grantAiPhoto(db:PrismaClient,admin:any,input:any){
  requirePermission(admin,'members','update');const handle=handleOf(input?.handle),reason=reasonOf(input?.reason);
  const creatorId=await db.$transaction(async tx=>{
-  const creator=await tx.creator.findUnique({where:{handle},select:{user_id:true,is_active:true}});
-  if(!creator||!creator.is_active)reject(404,'CREATOR_NOT_FOUND','활성 크리에이터를 찾을 수 없습니다. 핸들을 확인해주세요.');
-  await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${creator.user_id} FOR UPDATE`;
-  if(await tx.aiPhotoGrant.findUnique({where:{creator_user_id:creator.user_id}}))reject(409,'ALREADY_GRANTED','이미 허용된 크리에이터입니다.');
+  // 2026-11-15 user decision: members who are not creators may use AI photos too, so a grant accepts an active creator handle or an enabled member's handle.
+  const found=await tx.creator.findUnique({where:{handle},select:{user_id:true,is_active:true}});
+  const member=found?null:await tx.member.findFirst({where:{preferred_username:handle,enabled:true},select:{id:true}});
+  if(found?!found.is_active:!member)reject(404,'CREATOR_NOT_FOUND','활성 크리에이터나 회원을 찾을 수 없습니다. 핸들을 확인해주세요.');
+  const creator={user_id:found?.user_id??member!.id};
+  if(found)await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${creator.user_id} FOR UPDATE`;else await tx.$queryRaw`SELECT id FROM members WHERE id=${creator.user_id} FOR UPDATE`;
+  if(await tx.aiPhotoGrant.findUnique({where:{creator_user_id:creator.user_id}}))reject(409,'ALREADY_GRANTED','이미 허용된 회원입니다.');
   await tx.aiPhotoGrant.create({data:{creator_user_id:creator.user_id,reason,granted_by:admin.id}});
   await tx.aiPhotoGrantChange.create({data:{creator_user_id:creator.user_id,action:'granted',reason,changed_by:admin.id}});
   await appendAudit(tx,{category:'admin',action:'admin.ai_photo_granted',entityId:creator.user_id,data:{changedBy:admin.id,before:{status:'none'},after:{status:'granted',contentHash:contentDigest(reason)}}});

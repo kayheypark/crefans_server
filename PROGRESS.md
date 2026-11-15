@@ -1,3 +1,13 @@
+## 2026-11-15 크리에이터가 아닌 회원도 글쓰기 (서버, 운영 미배포)
+- 사용자 지시: "크리에이터가 아닌 사람들도 글을 작성할 수 있게… 어떠한 형태로든 후원은 못받는다 멤버십도못하고". 결정(AskUserQuestion): 전체 피드에도 노출 / 스튜디오 작성 화면 재사용 / AI 사진 편집 일반 회원도 허용(허용 목록 방식 유지) / 약관·처리방침은 나중에(현재 약관 7조 "크리에이터는 게시물…", 처리방침 표식 "활성 크리에이터 게시물" 문구와 어긋남 — 미결).
+- saveContent: 크리에이터가 아니면 회원 활성만 확인, 상품·레벨 지정은 MEMBER_POST_PUBLIC_ONLY, tipsEnabled true는 MEMBER_POST_NO_TIPS, 저장 시 allow_tips=false·is_membership=false 강제.
+- access(): 크리에이터 행이 없으면 작성자 회원이 enabled이고 멤버십이 아닌 공개 글만 열람. post() DTO tipsEnabled는 크리에이터 글만, 댓글은 회원 글이면 게시물 설정만 따름.
+- postPage: 전체 피드(분류 없음)는 비활성 크리에이터·정지 회원 글만 제외(hiddenAuthors), 분류 피드는 기존처럼 그 분류 크리에이터만. 프로필 목록은 postAuthor()로 회원 id/핸들도 허용. postSearch도 회원 글 포함(검색 거부·정지 제외).
+- 후원: beans.tip이 받는 사람이 활성 크리에이터가 아니면 TIP_CREATOR_REQUIRED(기존에는 받는 사람 검사가 없어 API로 일반 회원에게 후원이 가능했던 구멍도 함께 막음).
+- AI 사진: ai-photo·ai-shop의 requireCreator→service.member(허용 목록 aiPhotoAllowed는 그대로). 콘솔 허용(grantAiPhoto)은 크리에이터 핸들이 없으면 활성 회원 핸들(preferred_username)도 받음, 목록은 회원 핸들·닉네임과 isCreator 표시. 관리자 화면 문구는 admin 저장소 확인 필요.
+- 워터마크: 처리방침 문구대로 기존 eligibility(업로드 시 회원 핸들 기록) 유지, 별도 변경 없음.
+- 검증: build 0, 새 tests/platform-member-posts.test.cjs 5/5(저장 규칙·피드/프로필/검색/분류 제외·정지 회원 제외·후원 차단·회원 AI 허용), 대조: prod 코드로 되돌리면 5/5 fail. platform-beans 43/43, ai-photo 39/39, beta-policy 11/11, watermark-followups 6/6, referrals 15/15, event-claim 12/12, payment-lifecycle 69/69, post-search 3/3, post-visibility 5/5. platform-feed-category·post-view-metrics·platform(.access).integration은 prod 기준선에서도 같은 방식으로 실패(실행 환경 필요)라 미검증.
+
 ## 2026-11-15 내 보관함 목록 total 추가 (운영 배포 완료)
 - 운영 배포(2026-11-15 13:3x KST, 사용자 지시 "ㅂㅍ"): prod 5baa56a → API/worker=crefans-api:library-total-20261115(bean-reconcile 위 src·dist 덮어쓰기, ai-photo-library.js 해시 로컬 prod 빌드와 일치). 배포 스크립트 PASS(API/worker healthy·재시작0, 다른 컨테이너 불변, .env/runtime.env는 API_IMAGE·APP_RELEASE만, 비로그인 401). 복구 /Users/ethan/crefans-recovery/20261115/library-total-api 검증 후 서버 이전 태그·임시본 정리, 로컬 api.tar.gz 삭제. 프론트 front-library-album-20261115와 함께.
 - 사용자 선택(프론트 B안): 보관함을 분류별 줄 "{분류} {전체 수} 전체보기"로 보여 줌. 전체 수가 필요해 GET studio/ai-photo/library 응답에 total(같은 조건의 db.media.count) 추가. items·hasMore·24개 페이지는 그대로라 이전 클라이언트와 호환. OpenAPI 설명 갱신.

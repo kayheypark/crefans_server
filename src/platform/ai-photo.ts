@@ -77,11 +77,11 @@ export class AiPhotoService{
  private async giveBack(key:string){await this.service.db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${digest(`${key}:${this.window()}`)}`;}
  private creatorKey(sub:string){return 'ai-photo:creator-day:'+sub;}
  async quota(sub:string){
-  await this.service.requireCreator(sub);
+  await this.service.member(sub);
   const allowed=await aiPhotoAllowed(this.service.db,sub)&&this.configured();
   return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+(await paidPhotoCount(this.service.db,sub))+(await heartBalance(this.service.db,sub)).credits:0,paidRemaining:allowed?await paidPhotoCount(this.service.db,sub):0,hearts:allowed?(await heartBalance(this.service.db,sub)).hearts:0,rewardRemaining:allowed?(await heartBalance(this.service.db,sub)).credits:0,typicalSeconds:allowed?await this.typicalSeconds():null,resetTickets:allowed?await ticketSummary(this.service.db,sub):{count:0,nextExpiresAt:null}};
  }
- async hearts(sub:string,input:any){await this.service.requireCreator(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');
+ async hearts(sub:string,input:any){await this.service.member(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');
   if(input?.action==='start')return createHeartGame(this.service.db,sub);
   if(typeof input?.id!=='string')reject(400,'INVALID_GAME','하트 게임을 다시 시작해 주세요.');
   if(input.action==='click')return clickHeart(this.service.db,sub,input.id,input.piece,input.eventId);
@@ -90,7 +90,7 @@ export class AiPhotoService{
  }
  /** Spend one storable reset ticket (2026-11-13): today's usage back to 0. */
  async useResetTicket(sub:string){
-  await this.service.requireCreator(sub);if(!this.configured())reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
+  await this.service.member(sub);if(!this.configured())reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
   const r=await useAiPhotoTicket(this.service.db,sub);
   return{limit:this.settings.perDay,remaining:Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+(await paidPhotoCount(this.service.db,sub))+(await heartBalance(this.service.db,sub)).credits,resetTickets:r.tickets,message:`리셋권 1장을 사용했어요. 오늘 ${this.settings.perDay}회를 다시 만들 수 있어요.`};
  }
@@ -149,10 +149,10 @@ export class AiPhotoService{
    return{id:row.id,type:'image' as const,url:row.original_url,aiGenerated:true};
   }finally{if(remote){try{await unlink(destination);}catch{}}}
  }
- async library(sub:string,query:any){await this.service.requireCreator(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return listPhotoLibrary(this.service.db,sub,query);}
- async saveLibrary(sub:string,input:any){await this.service.requireCreator(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return savePhotoLibrary(this.service.db,sub,input);}
+ async library(sub:string,query:any){await this.service.member(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return listPhotoLibrary(this.service.db,sub,query);}
+ async saveLibrary(sub:string,input:any){await this.service.member(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return savePhotoLibrary(this.service.db,sub,input);}
  async crop(sub:string,input:any){
-  await this.service.requireCreator(sub);
+  await this.service.member(sub);
   const bytes=await this.source(sub,input?.sourceId);
   const row=await this.service.db.media.findUnique({where:{id:input.sourceId}}),meta=row?.metadata as Record<string,unknown>|null;
   if(meta?.aiGenerated!==true)reject(400,'INVALID_CROP_SOURCE','AI로 만든 결과 사진만 자를 수 있어요.');
@@ -174,7 +174,7 @@ export class AiPhotoService{
   });
  }
  private async performEdit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number}){
-  const started=Date.now();await this.service.requireCreator(sub);
+  const started=Date.now();await this.service.member(sub);
   if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');
   const mode=input?.mode??'general';if(mode!=='general'&&mode!=='cosplay')reject(400,'INVALID_EDIT_MODE','편집 모드를 다시 골라 주세요.');
   const aspectRatio=input?.aspectRatio??'original';if(aspectRatio!=='original'&&!Object.prototype.hasOwnProperty.call(RATIO_SIZES,aspectRatio))reject(400,'INVALID_ASPECT_RATIO','비율을 다시 골라 주세요.');
