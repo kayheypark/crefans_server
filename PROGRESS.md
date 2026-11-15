@@ -1,3 +1,8 @@
+## 2026-11-15 23:3x 계약 서명본 정정: v2.41(2단 5쪽) — 사용자 지적 "계약서 최종 레이아웃 그거 아닌데"
+- 원인: 11-15 v2.37·v2.38(docs/contract-payout-after-term)과 v2.39(명칭)를 옛 흑백 7쪽 계보에 적용해 dev/prod에 병합했음. 최종 서명본은 feat/contract-apple-gothic(2dc8647, 미병합)의 2단 5쪽(design-two-column-20261103, Apple SD Gothic Neo, '크리에이터 파트너십 체결 계약서', 주민등록번호 칸, 서명 날짜 밑줄).
+- 조치: docs/contract-final-v241(2dc8647 위)에 같은 3개 조항(7조④·9조④·12조②)을 옮기고 재생성. 6쪽→간격만 조정해 5쪽, 직전 서명본 대비 글자 차이는 3개 조항뿐, PDF SHA-256 4585ae33…279a. dev/prod의 docs/contracts는 이 계보로 교체(옛 계보 v2.39 명칭 변경은 무효, 이미 '파트너십 체결 계약서'). AGENTS.md 계약서 글꼴 규칙 함께 병합.
+- 미실행: 서명·발송, 모두싸인 템플릿 교체.
+
 ## 2026-11-15 공개 가입·비회원 체험 보강 (night-work 후속 /ask-me 결정, feat/launch-hardening)
 - 결정: 비회원 게시 첨부는 AI 결과물만 · 가입 인증 메일 IP 제한+전체 상한 · 비회원 AI 예산 분리 · IP 문구 수정+키 필수 · 약관·처리방침·FAQ·가이드 지금 개정 · 테스트 연결 · 계약서 '파트너십 계약' 명칭 · 검증 통과 시 배포.
 - 코드: studio.service.ts 비회원 첨부는 본인 metadata.aiGenerated만(GUEST_AI_RESULT_ONLY) / ai-photo.ts 비회원은 ai-photo:total 미사용 / auth.service.ts signupMailGuard(IP HMAC 시간 5·하루 20 SIGNUP_RATE_LIMITED, 전체 하루 SIGNUP_MAIL_DAILY_TOTAL 기본 500 SIGNUP_MAIL_BUSY+운영 알림 auth.signup_mail_closed, 발송 실패 시 3분 쿨다운 환원) / guest-policy.ts IP 키 필수(고정 대체값 제거), 체험 동의 버전 2026-11-15.guest.2.
@@ -1023,6 +1028,13 @@
 - 최초 실패는 OpenAPI 경로 수 기대값(186→191, 콘솔82→87)과 팬 API 테스트 Origin을 수정하여 재검증. 콘솔 PC Chromium2/모바일 WebKit2=4/4 통과, 등록·새로고침 지속·예약·동시 수정 충돌·삭제 직접 입력·삭제 필터/이력/복구·권한/빈 결과 확인. API 대역은 읽기 전용·무권한 UI 검사2건뿐이며 변경 생애주기2건은 실제 격리 DB 사용.
 - 증거: [검증 기록](docs/reserved-handles-20261103.json), 상세 .local/reserved-handles-20261103/. 문서 계약·manifest를 짝 프론트에서 갱신·검증한다. 운영/물리 iPhone/부하·외부 공급사는 미실행이며 출시 전체 검증을 뜻하지 않는다.
 - 다음: 배포 요청 시 feature→dev 검증→prod 승격. DB 백업 후 migration→API/worker→콘솔 순서로 함께 적용하고 초기103개·기존 보유자·운영 차단을 재검증한다. 현재 미푸시·미통합·미배포. 회원 핸들 강제 변경 없음.
+## 2026-11-03 계약서 v2.40 — 애플 고딕 PDF 완료
+- 요청: 계약서 폰트 애플 고딕. 기존 명함과 같은 Apple SD Gothic Neo Regular/Bold를 제목·본문·표·쪽번호에 적용. 글자 크기·여백·계약 문구·별지 입력란은 유지한다.
+- 최신origin/prod d4238d9에서 feat/contract-apple-gothic 생성. 이전 계약서2d187de(v2.39)의 승인된 제목/별지/통지 제한 수정4파일을 먼저 보존했다. 원래feat/contract-notice-limits 브랜치와 기본 체크아웃의 미커밋 자료는 유지.
+- 합격 조건: 사용 글꼴의 PDF 포함, v2.39 대비 전체 텍스트 동일,13조·별지A·서명/페이지 경계,전 페이지 렌더에서 잘림/겹침/깨진 한글 없음. 이전PDF는 .local/contract-apple-gothic-20261103/before-v2.39.pdf 보존. 운영 코드/현행 약관/DB/배포 변경 없음.
+- 검증: HTML/PDF 생성 종료0, PDF 구조 검사 종료0(7쪽·13조·별지A·서명·페이지 경계), 원문TXT 바이트와 쪽번호/공백을 제외한 PDF 전문이 v2.39와 동일. 7쪽 렌더 전부 육안 검수 완료. Chromium CDP에서 실제 Apple SD Gothic Neo Regular/Bold 사용 확인, PDF Type3 글리프91개 묶음·312579바이트 및 Unicode mapping 포함 확인. 첫 검사는 TTF 프로그램 추출을 잘못 기대하여 실패했으며 원본 로그를 보존하고 실제 Type3 글리프 포함 검사로 정정했다.
+- 글꼴 누락 대조: 생성 HTML의 Regular 이름만 존재하지 않는 값으로 바꾼 경우 renderer 종료1, 기존 PDF 해시 불변 확인 후 HTML 복원. PDF SHA256 ea07f6dc73fb5311ebd261d170132bfdc8005205eefa235b5d626599be6c71da. 결과 output/pdf/crefans-creator-agreement-draft.pdf, 상세 .local/contract-apple-gothic-20261103/verification.json.
+- 문서 검사: inventory/계약/링크 구조76문서·186라우트·57화면·450로컬링크 통과. 프론트 check:docs 전체는 이번 변경7파일의 기존 스냅샷 만료로 종료1. 다른 프론트 작업의 전역 증거를 덮어쓰지 않았으며 전체 검사를 통과했다고 주장하지 않는다. 서버 기능 테스트/운영 배포는 문서 글꼴 변경 범위에 포함하지 않았다.
 
 ## 2026-11-03 멤버십 삭제 확인·적용 공제율 — 운영 배포 완료
 - 사용자 배포 승인에 따라 feat/membership-confirmation→dev fefc3ee(통합 build·6건 통과)→prod d99e010 순서로 반영. 프론트 prod73fbc85와 `membership-20261103`으로 API·worker·front 함께 배포. 이후 배포 증거 커밋은 문서만 변경한다.
