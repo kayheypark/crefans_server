@@ -6,8 +6,10 @@ export async function listPhotoLibrary(db:any,sub:string,query:any){
  const category=query?.category||'',q=typeof query?.q==='string'?query.q.trim():'';const page=Number(query?.page??0);
  if((category&&!PHOTO_LIBRARY_CATEGORIES.includes(category))||q.length>60||!Number.isSafeInteger(page)||page<0||page>10000)reject(400,'INVALID_LIBRARY_FILTER','검색 조건을 다시 확인해 주세요.');
  const AND:any[]=[{metadata:{path:'$.aiLibrary.active',equals:true}}];if(category)AND.push({metadata:{path:'$.aiLibrary.category',equals:category}});if(q)AND.push({metadata:{path:'$.aiLibrary.title',string_contains:q}});
- const rows=await db.media.findMany({where:{user_sub:sub,type:'IMAGE',is_deleted:false,processing_status:'COMPLETED',AND},orderBy:[{created_at:'desc'},{id:'desc'}],skip:page*24,take:25});
- return {items:rows.slice(0,24).map(libraryAsset),hasMore:rows.length>24};
+ const where={user_sub:sub,type:'IMAGE',is_deleted:false,processing_status:'COMPLETED',AND};
+ // total (2026-11-15): the studio library shows "{category} {total}" per row; older clients ignore it.
+ const [rows,total]=await Promise.all([db.media.findMany({where,orderBy:[{created_at:'desc'},{id:'desc'}],skip:page*24,take:25}),db.media.count({where})]);
+ return {items:rows.slice(0,24).map(libraryAsset),hasMore:rows.length>24,total};
 }
 export async function savePhotoLibrary(db:any,sub:string,input:any){
  const id=input?.id,title=typeof input?.title==='string'?input.title.trim():'',category=input?.category,remove=input?.remove===true;
