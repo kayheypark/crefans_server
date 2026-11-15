@@ -4,6 +4,7 @@
 - 크리에이터 전환(studio/start)과 출금 차단(인증 배지 없으면 PARTNER_CONTRACT_REQUIRED, 콩·멤버십 모두 요청 시점)은 기존 그대로 확인.
 - 계약 요청: POST studio/partner-request(partner-policy.requestPartnerContract) — 크리에이터만, 하루 1회, 감사 기록 business/creator.partner_requested(entityId=회원), 운영 텔레그램 'creator.partner_requested'(회원 식별자 없음, 콘솔 로그에서 확인). 이미 배지면 requested:false. 출금 차단 문구를 "출금 화면에서 파트너 계약을 요청해주세요."로.
 - 검증: build 0, 새 platform-partner-request 2/2, signup-mode 4/4(새 개방 테스트; 스위치를 빼면 1 fail 대조), openapi 14/14(250 경로, studio 64; 지난 커밋에서 주석에 묻혀 있던 studio·console 개수 검사를 다시 살림), beans 43, manual-payouts 10, beta-policy 11, referrals 15, reserved-handles 8.
+- 운영 배포(2026-11-15 15:07 KST): prod 2988ba6 → API/worker crefans-api:open-signup-20261115, runtime.env SIGNUP_OPEN=true 추가(배포 스크립트가 이 키 외 설정 불변 확인). ship-api PASS, 재시작 0, 운영 bootstrap inviteOnly:false·베타 초대 안내 없음, POST studio/partner-request 비로그인 401. 복구 crefans-recovery/20261115/open-signup-api. 가입 오픈 공지·홍보는 하지 않음(사용자 지시). 실제 가입·계약 요청 텔레그램은 운영에서 미실행.
 
 ## 2026-11-15 비로그인 AI 사진 체험·체험 게시물 (서버, 운영 배포 완료)
 - 사용자 지시: 비로그인도 글 작성(핵심 목적: AI 생성 체험 + 홈·피드에 보여 사이트가 활발해 보이게), 하루 지나면 접근 불가 비공개, 같은 브라우저로 회원가입·로그인하면 본인 게시물로 연결, 고지 문구, 브라우저·IP로 비식별 사용자 인식, 비회원 AI 10회·하트 없음, 배포.
