@@ -22,6 +22,7 @@ import {enqueueOperation} from './operations-events';
 import {dateOnly} from './http';
 import {PlatformMediaStorage,managedMediaKey} from './media-storage';
 import {grantDueReferralRewards} from './referrals';
+import {GUEST_PREFIX,GUEST_RETENTION_DAYS} from './guest-policy';
 // Card cancellations and chargebacks are normally raised within months; older orders need manual review.
 const PAID_RECHECK_DAYS=120;
 @Injectable()
@@ -61,6 +62,9 @@ export class PlatformJobsService {
   if((this.config.get('BANK_PAYOUTS_ENABLED')==='true'&&!isBeta(this.config))||manualPayouts(this.config)){const payouts=await this.db.withdrawalRequest.findMany({where:payoutQueue(now),select:{id:true},orderBy:{updated_at:'asc'},take:20});for(const p of payouts)await run('payout',async()=>{try{await this.finance.payout(p.id,now);return 1;}finally{await this.db.withdrawalRequest.updateMany({where:{id:p.id,status:{in:['requested','processing']}},data:{updated_at:now}});}});}
   const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',hour:'2-digit',hourCycle:'h23'}).format(now));
   if(hour>=19)await run('media-cleanup',()=>this.cleanup(now));
+  // Guest trial posts not linked to an account are deleted 30 days after posting (privacy policy, 2026-11-15); their photos then
+  // become unused and the media cleanup above removes them after the orphan grace period.
+  await run('guest-expiry',async()=>{const posts=await this.db.posting.findMany({where:{user_sub:{startsWith:GUEST_PREFIX},is_deleted:false,created_at:{lt:new Date(now.getTime()-GUEST_RETENTION_DAYS*86400000)}},select:{id:true},take:500});if(!posts.length)return;const ids=posts.map(p=>p.id);await this.db.$transaction([this.db.postingMedia.updateMany({where:{posting_id:{in:ids},is_deleted:false},data:{is_deleted:true,deleted_at:now}}),this.db.posting.updateMany({where:{id:{in:ids}},data:{is_deleted:true,deleted_at:now}})]);activity['guest-expired']=ids.length;});
   const expired=await this.db.subscription.updateMany({where:{auto_renew:false,status:'CANCELLED',ended_at:{lte:now}},data:{status:'EXPIRED'}});if(expired.count)activity['subscription-expired']=expired.count;
   const note=JSON.stringify({failures}),id='worker-health';await this.db.platformJob.upsert({where:{id},create:{id,locked_until:now,completed_at:now,note},update:{completed_at:now,note}});return{failures};
  }

@@ -15,7 +15,7 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-15');assert.equal(p.effectiveAt,'2026-11-15');assert.equal(p.version,'2026-11-15.byteplus.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-15');assert.equal(p.effectiveAt,'2026-11-15');assert.equal(p.version,'2026-11-15.guest.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -137,7 +137,7 @@ test('guide AI privacy notice distinguishes optional requests, provider retentio
 });
 test('privacy article 8 discloses Modusign as the e-contract processor (2026-11-12 ask-me)',()=>{
  const p=new LegalDocumentsService().catalog().documents.privacy;
- assert.equal(p.version,'2026-11-15.byteplus.1');assert.equal(p.effectiveAt,'2026-11-15');assert.equal(p.status,'published');
+ assert.equal(p.version,'2026-11-15.guest.1');assert.equal(p.effectiveAt,'2026-11-15');assert.equal(p.status,'published');
  const s8=p.sections.find(s=>s.title==='8. 처리 위탁과 제3자 제공');
  assert.match(s8.body,/전자계약 체결·보관을 주식회사 모두싸인에 위탁/);
  assert.ok(s8.links.some(l=>l.href==='https://support.modusign.co.kr/ko/articles/9ae892d6'),'links to Modusign privacy policy');
@@ -175,4 +175,14 @@ test('2026-11-15 sync revision: article 11 states bean charge limits and article
  assert.doesNotMatch(ai,/소멸/);
  for(const needle of [])assert.ok(ai.includes(needle),needle);
  assert.deepEqual(t.sections.slice(0,12).map(s=>s.title),legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.sections.map(s=>s.title));
+});
+
+// 2026-11-15 user decision: signed-out AI photo trial is disclosed before it ships (section 17 + cookie note in section 10).
+test('privacy 2026-11-15.guest.1 discloses the signed-out AI photo trial: cookie, IP hash, limits, 24h public, claim, retention, transfer',async()=>{
+ const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-15.guest.1');
+ const guest=p.sections.find(s=>s.title==='17. 선택 기능: 비회원 AI 사진 체험');assert.ok(guest);
+ for(const phrase of ['cf_guest','최대 30일','되돌릴 수 없게 변환','브라우저당 10회','하루 10회','하루 200회','24시간','비공개','같은 브라우저','게시 후 30일','16항과 같습니다','동의'])assert.ok(guest.body.includes(phrase),phrase);
+ assert.match(p.sections.find(s=>s.title==='10. 쿠키와 자동 수집').body,/cf_guest를 최대 30일/);
+ const {GUEST_AI_LIMIT,GUEST_IP_DAILY,GUEST_DAILY_TOTAL,GUEST_POST_HOURS,GUEST_RETENTION_DAYS}=require('../dist/src/platform/guest');
+ assert.deepEqual([GUEST_AI_LIMIT,GUEST_IP_DAILY,GUEST_DAILY_TOTAL,GUEST_POST_HOURS,GUEST_RETENTION_DAYS],[10,10,200,24,30],'policy numbers match the code');
 });
