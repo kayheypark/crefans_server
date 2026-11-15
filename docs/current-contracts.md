@@ -152,6 +152,11 @@
 | POST | `/api/v1/events/founding-badge/claim` | `src/platform/controller.ts::claimBadge` |
 | GET | `/api/v1/events/promotion-beans` | `src/platform/beans.controller.ts::promotionEvent` |
 | POST | `/api/v1/events/promotion-beans/claim` | `src/platform/beans.controller.ts::claimPromotionEvent` |
+| POST | `/api/v1/guest/ai-photo/edit` | `src/platform/guest.ts::edit` |
+| POST | `/api/v1/guest/claim` | `src/platform/guest.ts::claim` |
+| POST | `/api/v1/guest/content` | `src/platform/guest.ts::content` |
+| GET | `/api/v1/guest/session` | `src/platform/guest.ts::session` |
+| POST | `/api/v1/guest/session` | `src/platform/guest.ts::start` |
 | POST | `/api/v1/guide/advisor` | `src/platform/guide-advisor.ts::ask` |
 | GET | `/api/v1/health` | `src/platform/controller.ts::health` |
 | POST | `/api/v1/identity/callback` | `src/platform/identity.controller.ts::callback` |
@@ -175,6 +180,7 @@
 | GET | `/api/v1/media/:id/file` | `src/platform/media.controller.ts::download` |
 | GET | `/api/v1/media/:id/origin-file` | `src/platform/media.controller.ts::originDownload` |
 | GET | `/api/v1/media/:id/status` | `src/platform/media.controller.ts::status` |
+| POST | `/api/v1/media/guest` | `src/platform/media.controller.ts::guestUpload` |
 | GET | `/api/v1/media/posts/:id/share-image` | `src/platform/media.controller.ts::shareImage` |
 | PUT | `/api/v1/members/:id/block` | `src/platform/controller.ts::block` |
 | PUT | `/api/v1/members/:id/follow` | `src/platform/controller.ts::follow` |
@@ -231,6 +237,7 @@
 | POST | `/api/v1/studio/memberships` | `src/platform/studio.controller.ts::membership` |
 | PUT | `/api/v1/studio/memberships/:id` | `src/platform/studio.controller.ts::state` |
 | GET | `/api/v1/studio/overview` | `src/platform/studio.controller.ts::overview` |
+| POST | `/api/v1/studio/partner-request` | `src/platform/studio.controller.ts::partnerRequest` |
 | POST | `/api/v1/studio/pin` | `src/platform/finance.controller.ts::pin` |
 | PUT | `/api/v1/studio/profile` | `src/platform/studio.controller.ts::profile` |
 | GET | `/api/v1/studio/reports/:id` | `src/platform/studio.controller.ts::report` |
@@ -347,7 +354,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 ### server
 
-환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `DISK_ALERT_WARNING_PERCENT`, `DISK_ALERT_CRITICAL_PERCENT`, `DISK_ALERT_INTERVAL_MINUTES`, `DISK_ALERT_PATH`, `BETA_MODE`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`, `GUIDE_ADVISOR_OPENAI_API_KEY`, `GUIDE_ADVISOR_MODEL`, `GUIDE_ADVISOR_REASONING_EFFORT`, `GUIDE_ORIGINS`, `GUIDE_ADVISOR_INDEX_URL`, `GUIDE_ADVISOR_MIN_SIMILARITY`, `GUIDE_ADVISOR_PER_MINUTE`, `GUIDE_ADVISOR_PER_DAY`, `GUIDE_ADVISOR_PER_CLIENT_DAY`, `GUIDE_ADVISOR_DAILY_TOTAL`, `GUIDE_ADVISOR_MAX_OUTPUT_TOKENS`, `GUIDE_ADVISOR_TIMEOUT_MS`, `AI_PHOTO_BYTEPLUS_API_KEY`, `AI_PHOTO_OPENAI_API_KEY`, `AI_PHOTO_PER_DAY`, `AI_PHOTO_DAILY_TOTAL`
+환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `DISK_ALERT_WARNING_PERCENT`, `DISK_ALERT_CRITICAL_PERCENT`, `DISK_ALERT_INTERVAL_MINUTES`, `DISK_ALERT_PATH`, `BETA_MODE`, `SIGNUP_OPEN`, `SIGNUP_MAIL_DAILY_TOTAL`, `MARKETING_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`, `GUIDE_ADVISOR_OPENAI_API_KEY`, `GUIDE_ADVISOR_MODEL`, `GUIDE_ADVISOR_REASONING_EFFORT`, `GUIDE_ORIGINS`, `GUIDE_ADVISOR_INDEX_URL`, `GUIDE_ADVISOR_MIN_SIMILARITY`, `GUIDE_ADVISOR_PER_MINUTE`, `GUIDE_ADVISOR_PER_DAY`, `GUIDE_ADVISOR_PER_CLIENT_DAY`, `GUIDE_ADVISOR_DAILY_TOTAL`, `GUIDE_ADVISOR_MAX_OUTPUT_TOKENS`, `GUIDE_ADVISOR_TIMEOUT_MS`, `AI_PHOTO_BYTEPLUS_API_KEY`, `AI_PHOTO_OPENAI_API_KEY`, `AI_PHOTO_PER_DAY`, `AI_PHOTO_DAILY_TOTAL`
 
 | 명령 | package.json 실행문 |
 | --- | --- |
@@ -372,6 +379,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `npm run test:operations` | `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs tests/platform-billing-activity.test.cjs tests/platform-disk-alert.test.cjs` |
 | `npm run test:audit` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-audit.test.cjs tests/platform-audit-export.test.cjs tests/platform-external-monitor.test.cjs tests/platform-log-config.test.cjs tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs` |
 | `npm run test:openapi` | `npm run build && CREFANS_E2E=true node --test tests/platform-openapi.test.cjs` |
+| `npm run test:launch` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-guest.test.cjs tests/platform-signup-mode.test.cjs tests/platform-signup-invites.test.cjs tests/platform-partner-request.test.cjs tests/platform-ai-photo.test.cjs tests/platform-manual-payouts.test.cjs tests/platform-legal.test.cjs` |
 | `npm run test:beans` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-beans.test.cjs tests/platform-bean-ledger.test.cjs tests/platform-bean-charge-limit.test.cjs tests/platform-openapi.test.cjs` |
 
 ## migration 파일 목록
