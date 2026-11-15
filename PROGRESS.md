@@ -52,6 +52,17 @@
 - AI 횟수 소진 서버 문구(ai-shop.ts DAILY_LIMIT)를 "무료 횟수를 모두 썼어요. 매일 오전 9시에 다시 채워지고, 횟수권을 구매하면 계속 만들 수 있어요."로 프론트와 통일.
 - 검증: build 0, legal 21/21(동기화 개정 테스트 추가: 약관 숫자가 bean-policy·AI 상수와 일치하는지 대조), ai-shop+legal 28/28.
 
+## 2026-11-15 크리에이터 계약 초안 v2.38: 종료 후 30일 협의·미합의 시 전액 지급 (미서명·미발송)
+- 사용자 결정: 제12조② 종료일부터 30일 안에 처리 방법·일정 협의, 미합의 시 종료 시점까지 확정된 미정산 수익 전액을 등록 정산 계좌로 지급(분쟁 보류분은 제9조④), 일방 소멸 금지. 지급은 운영자 수동 지급(계약 본문 밖 운영 절차).
+- 검증: html(0)·pdf(0)·verify PASS(7쪽), 새 문장3 존재/옛 문장2 부재, 전 7쪽 PNG 육안 확인. PDF sha256 3881af05…9c0b. 세부·검토 필요는 docs/contracts/README.txt v2.38.
+- 코드 주의: 배지 해제 후에는 payout()·manualResult가 지급을 막으므로 30일 후 수동 지급 절차는 별도 정리 필요.
+
+## 2026-11-15 크리에이터 계약 초안 v2.37: 종료 후 출금 불가·잔액 별도 협의 (미서명·미발송)
+- /pilot-work 사용자 결정 "계약 초안을 코드에 맞춘다": 출금은 파트너 계약(인증 배지) 유효 기간에만(partner-policy.ts requirePartnerCreator). 제7조④ 유효기간 중 출금·배지 표시 추가, 제9조④ 종료 후 잔액은 제12조② 참조, 제12조② "미정산금 권리 유지"→종료 후 출금 신청 불가·미지급 신청 보류·남은 수익/미수금은 별도 협의·일방 소멸 금지. 세부·검토 필요는 docs/contracts/README.txt v2.37.
+- 검증: build-contract-html(0)·build-contract-pdf(0)·verify-contract-pdf PASS(7쪽·13조·별지1), 새 문장5 존재/옛 문장2 부재, 전 7쪽 PNG 육안 확인. PDF sha256 5ceaa92b…5cf1.
+- 프론트 check:docs(CREFANS_SERVER_DIR=작업 폴더) exit1: 기존 미검토 문서 3건·Generated contracts stale(계약서와 무관, origin/prod 기준에서도 stale 재현). docs:record는 프론트 evidence.json에 다른 세션의 미커밋 변경이 있어 미실행.
+- 검토 필요: 약관규제법 제6조·제9조 및 제9조④ 무기한 보류 금지와의 관계(협의 기한·결렬 처리 없음), 배지 없는 크리에이터의 탈퇴 전 출금·탈퇴 차단 운영 절차.
+
 ## 2026-11-15 처리방침 BytePlus 개정·하트 하루 상한 운영 배포 완료
 - prod 8272577(feat/privacy-byteplus + feat/ai-heart-daily-cap). API/worker=crefans-api:privacy-hearts-20261115(x-presets 위 src·dist 덮어쓰기, legal-documents.js·ai-photo-hearts.js 해시가 로컬 prod 빌드와 일치). 프론트 변경 없음. 콩 대사 수정(fix/bean-reconcile-kill-switch 95a925b)은 사용자 미선택으로 제외.
 - 운영 확인: API/worker Running·재시작0·health ready·비로그인401·다른 컨테이너 불변, /api/v1/common의 privacy version 2026-11-15.byteplus.1, 16항 BytePlus·180일·8항 "사진 생성을 Byteplus" 포함.
