@@ -1,3 +1,7 @@
+## 2026-11-15 콩 판매 중지 스위치가 결제 대사를 막는 버그 수정 (운영 미배포)
+- night-work(.local/night-work/2026-11-14-2343) 결정(/ask-me): 처리방침 BytePlus 개정안 작성 후 확인·배포, 미성년·학생 캐릭터 의상 프리셋 현행 유지, 하트 보상 회원당 하루 상한 추가(기본값 제안 후 확인), 콩 대사 버그 수정(배포는 미선택).
+- reconcileCharge가 판매 승인(BEAN_LIVE_PAYMENTS_APPROVED)까지 검사하는 environment() 대신 keyEnvironment()를 쓰도록 변경. 환불과 같은 원칙(판매 중지가 이미 진행된 결제의 대사·환불을 막지 않음). 원장 전체 비활성(BEAN_LEDGER_ENABLED)은 기존대로 막음.
+- 검증: build 0, platform-beans 43/43(판매 중지 상태에서 진행 중 충전 대사 회귀 테스트 추가), environment()로 되돌린 대조 실행에서 해당 테스트 실패 확인.
 ## 2026-11-15 약관·화면·가이드 동기화 운영 배포 완료 (/pilot-work)
 - 결정: 콩 한도·AI 사진 이용조건을 약관·화면·가이드에 지금 반영(배포 승인), 결제 조건 버전 유지, 계약 초안은 코드에 맞춤(종료 후 출금 불가·30일 협의·미합의 시 전액 지급), 서명 완료 계약 없음.
 - 배포: server prod 85523e9 → crefans-api:terms-sync-20261115(legal-documents.js 해시 로컬 prod 빌드와 일치), front prod 1f8606a → crefans-front:front-terms-sync-20261115, 가이드 docs/sync-20261115(3cab2db, 운영 소스 2daf72b 기반) 정적 109파일 교체.
