@@ -1,3 +1,5 @@
+import {guestFromRequest} from './guest-policy';
+import {GuestService} from './guest';
 import {Controller,Get,Logger,Param,Post,Req,Res,UploadedFile,UseGuards,UseInterceptors} from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express';
 import {ConfigService} from '@nestjs/config';
@@ -26,15 +28,17 @@ export const IMAGE_UPLOAD_MAX_BYTES=50*1024*1024;
 export class PlatformMediaController {
  private readonly shareImages=new ShareImageRenderer();
  private readonly logger=new Logger(PlatformMediaController.name);
- constructor(private service:PlatformService,private config:ConfigService,private storage:PlatformMediaStorage){}
+ constructor(private service:PlatformService,private config:ConfigService,private storage:PlatformMediaStorage,private guests:GuestService){}
  @Post() @UseGuards(PlatformAuthGuard) @UseInterceptors(FileInterceptor('file',{storage:diskStorage({destination:(_req,_file,done)=>{const directory=join(resolve(process.env.MEDIA_ROOT||'.local/media'),'.uploads');mkdirSync(directory,{recursive:true});done(null,directory);},filename:(_req,_file,done)=>done(null,randomUUID())}),limits:{fileSize:300*1024*1024}}))
  async upload(@UploadedFile() file:any,@Req() req:any){
+   const owner:string=req.guestOwner??req.user.sub;
    if(!file)reject(400,'INVALID_MEDIA','파일을 선택해주세요.');
    const root=resolve(this.config.get('MEDIA_ROOT')||'.local/media'),id=randomUUID(),destination=join(root,id);let saved=false,tracked=false,source='';
    try{
     // iPhone videos come as QuickTime (.mov); they are converted to MP4 by the worker (video-transcode.ts, 2026-11-01).
     const quicktime=file.mimetype===QUICKTIME_MIME||(file.mimetype==='application/octet-stream'&&/\.mov$/i.test(file.originalname||''));
     if(!quicktime&&!['image/jpeg','image/png','image/webp','video/mp4','video/webm'].includes(file.mimetype))reject(400,'INVALID_MEDIA','JPG·PNG·WebP 이미지 또는 MP4·WebM·MOV 동영상만 지원합니다.');
+    if(req.guestOwner&&!file.mimetype.startsWith('image/'))reject(400,'GUEST_IMAGE_ONLY','체험에서는 사진만 올릴 수 있어요.');
     const type:'IMAGE'|'VIDEO'=file.mimetype.startsWith('image/')?'IMAGE':'VIDEO';let mime=quicktime?QUICKTIME_MIME:file.mimetype,size=file.size;
     await mkdir(root,{recursive:true});
     if(type==='IMAGE'){
@@ -55,13 +59,13 @@ export class PlatformMediaController {
     }
     const remote=this.storage.enabled;
     // Eligibility is recorded at upload, not inferred from a later post edit. Profile/plan references remain untouched.
-    const creator=await this.service.db.creator.findUnique({where:{user_id:req.user.sub}});let watermarkMetadata:any=undefined;
-    if(creator?.is_active){const member=await this.service.member(req.user.sub);
+    const creator=await this.service.db.creator.findUnique({where:{user_id:owner}});let watermarkMetadata:any=undefined;
+    if(creator?.is_active){const member=await this.service.member(owner);
      // A handle outside the watermark format (older or operator-made accounts) skips the watermark instead of failing every upload;
      // operators hear of it once per member (2026-11-02 user decision: code-only defense, no production query).
      try{watermarkText(member.preferred_username);watermarkMetadata={watermarkEligible:WATERMARK_VERSION,watermarkHandle:member.preferred_username};}
-     catch{await enqueueOperation(this.service.db as any,'media.watermark_skipped',{memberId:req.user.sub,status:'invalid_handle'},`watermark-skipped:${req.user.sub}`);}}
-    const row=await this.service.db.media.create({data:{id,user_sub:req.user.sub,type,...(watermarkMetadata?{metadata:watermarkMetadata}:{}),original_name:file.originalname.slice(0,200),file_name:id,file_size:size,mime_type:mime,original_url:`/api/v1/media/${id}/file`,s3_upload_key:remote?`platform/${id}`:`local/${id}`,processing_status:quicktime?'PROCESSING':remote?'UPLOADING':'COMPLETED',processed_at:remote||quicktime?null:new Date()}});tracked=true;
+     catch{await enqueueOperation(this.service.db as any,'media.watermark_skipped',{memberId:owner,status:'invalid_handle'},`watermark-skipped:${owner}`);}}
+    const row=await this.service.db.media.create({data:{id,user_sub:owner,type,...(watermarkMetadata?{metadata:watermarkMetadata}:{}),original_name:file.originalname.slice(0,200),file_name:id,file_size:size,mime_type:mime,original_url:`/api/v1/media/${id}/file`,s3_upload_key:remote?`platform/${id}`:`local/${id}`,processing_status:quicktime?'PROCESSING':remote?'UPLOADING':'COMPLETED',processed_at:remote||quicktime?null:new Date()}});tracked=true;
     if(quicktime)return{id:row.id,type:'video',url:row.original_url,processing:true};
     if(remote){await this.storage.put(id,destination,mime,size);await this.service.db.media.update({where:{id},data:{processing_status:'COMPLETED',processed_at:new Date()}});}saved=true;
     return{id:row.id,type:type==='IMAGE'?'image':'video',url:row.original_url};
@@ -71,7 +75,9 @@ export class PlatformMediaController {
     throw error;
    }finally{for(const path of[file.path,...(!saved||this.storage.enabled?[destination]:[]),...(source&&!tracked?[source]:[])]){try{await unlink(path);}catch(e:any){if(e.code!=='ENOENT')throw e;}}}
  }
- private async authorize(id:string,req:any){const m=await this.service.db.media.findUnique({where:{id},include:{postings:{include:{posting:true}}}});if(!m||m.is_deleted||m.processing_status!=='COMPLETED')reject(404,'MEDIA_NOT_FOUND','파일을 찾을 수 없습니다.');let allowed=req.user?.sub===m.user_sub;
+ private async authorize(id:string,req:any){const m=await this.service.db.media.findUnique({where:{id},include:{postings:{include:{posting:true}}}});if(!m||m.is_deleted||m.processing_status!=='COMPLETED')reject(404,'MEDIA_NOT_FOUND','파일을 찾을 수 없습니다.');
+   // A guest (signed-out trial) sees its own uploads and AI results through its cookie (2026-11-15).
+   const guest=req.user?.sub?undefined:guestFromRequest(req);let allowed=req.user?.sub===m.user_sub||(!!guest&&guest===m.user_sub);
    const links=m.postings.filter(link=>!link.is_deleted&&!link.posting.is_deleted);
    // Public references must never weaken a shared file's paid, private or adult restrictions.
    const restricted=links.filter(link=>link.posting.is_membership||link.posting.is_sensitive||!link.posting.is_public||link.posting.hidden_at);
@@ -82,6 +88,9 @@ export class PlatformMediaController {
    for(const link of restricted){if(!await this.service.consumeContent(link.posting,req.user?.sub))reject(403,'MEDIA_ACCESS_DENIED','파일 이용 권한이 없습니다.');}
    return m;
  }
+ // Guest trial upload (2026-11-15): photos only, owned by the cookie's guest id; no watermark (not an active creator).
+ @Post('guest') @UseInterceptors(FileInterceptor('file',{storage:diskStorage({destination:(_req,_file,done)=>{const directory=join(resolve(process.env.MEDIA_ROOT||'.local/media'),'.uploads');mkdirSync(directory,{recursive:true});done(null,directory);},filename:(_req,_file,done)=>done(null,randomUUID())}),limits:{fileSize:300*1024*1024}}))
+ async guestUpload(@UploadedFile() file:any,@Req() req:any){const owner=guestFromRequest(req);if(!owner){if(file?.path)void unlink(file.path).catch(()=>undefined);reject(401,'GUEST_SESSION_REQUIRED','체험을 시작하려면 안내에 동의해 주세요.');}req.guestOwner=owner;try{await this.guests.guard('upload',owner);}catch(error){if(file?.path)void unlink(file.path).catch(()=>undefined);throw error;}return this.upload(file,req);}
  /** Public sharing deliberately ignores all sender cookies and checks permissions again after rendering. */
  @Get('posts/:id/share-image')
  async shareImage(@Param('id') id:string,@Res() res:any){
