@@ -702,3 +702,19 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 - edit multipart `libraryIds`: 본인 활성 보관 이미지 UUID JSON 배열, 최대4개·중복불가·분류별1개·editKinds에 실제분류 포함. 타인/보관해제/미완료/삭제는 LIBRARY_ASSET_NOT_FOUND, 형식/분류충돌은 INVALID_LIBRARY_REFERENCES. source()로 매번 소유권 재확인 후1536px 이내WebP로정규화하여 원본/가이드/고정의상 뒤 첨부. 각 이미지의 실제번호·분류별참고역할 지정. 합계10장 제한. 개별안전검사·기존생성차감/복구정책 유지. 실패상세30일 암호화옵션에 libraryIds/aspectRatio 기록, 일반로그 원문 비노출.
 - 공용 프리셋은 별도의 검토된 정적 카탈로그만 사용한다. 사용자가 이번 대화에서 앞으로 보낼 사진은 공용으로 분류하되 현재 첨부없음, 실제등록대기. 개인 라이브러리 사진은 자동 공용전환하지 않는다.
 - 근거(2026-11-14): https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html ; https://docs.byteplus.com/en/docs/modelark/seedream-5-5 ; https://www.prisma.io/docs/orm/v6/prisma-client/special-fields-and-types/working-with-json-fields .
+
+## 비회원 AI 사진 체험·파트너 계약 요청 — 2026-11-15
+- 비회원 체험은 `cf_guest`(httpOnly, 30일) 쿠키로 방문자를 구분한다. 동의 버전은 `GUEST_CONSENT_VERSION`(현재 2026-11-15.guest.2)과 같아야 한다. 접속 IP는 서버 보안키 HMAC 값으로만 횟수를 센다.
+- AI 한도: 브라우저당 10회(GUEST_AI_LIMIT), 같은 IP 하루 10회(GUEST_IP_LIMIT), 비회원 전체 하루 200회(GUEST_DAILY_CLOSED). 비회원 생성은 회원의 서비스 전체 상한(`ai-photo:total`)을 쓰지 않는다.
+- 체험 게시물은 바로 게시만 되고(댓글·후원 없음) 24시간 공개 후 비공개, 검색 제외. 첨부는 본인의 AI 결과물만(GUEST_AI_RESULT_ONLY). 같은 브라우저로 로그인하면 `/guest/claim`이 게시물·사진을 회원으로 옮긴다.
+- `/studio/partner-request`는 인증 배지 없는 크리에이터의 파트너 계약 요청이다. 하루 1회, 감사 기록 `creator.partner_requested`와 운영 텔레그램 알림(회원 식별자 없음). 출금은 인증 배지가 있어야 한다(PARTNER_CONTRACT_REQUIRED).
+
+| Method | 경로 | 동작 |
+| --- | --- | --- |
+| GET | /guest/session | 체험 상태(동의 여부, 남은 횟수, 한도) |
+| POST | /guest/session | 체험 동의(consent, version) 후 cf_guest 발급 |
+| POST | /media/guest | 체험 사진 업로드(이미지만, IP당 하루 60회) |
+| POST | /guest/ai-photo/edit | 체험 AI 사진 편집(보관함·하트 불가) |
+| POST | /guest/content | 체험 게시물 바로 게시(본인 AI 결과물만) |
+| POST | /guest/claim | 로그인 회원에게 같은 브라우저의 체험 게시물·사진 연결 |
+| POST | /studio/partner-request | 파트너 계약 요청(하루 1회, 운영 알림) |

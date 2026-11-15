@@ -15,7 +15,7 @@ const png=(w,h)=>sharp({create:{width:w,height:h,channels:3,background:{r:200,g:
 async function stub(url,init){if(url.endsWith('/moderations'))return new Response(JSON.stringify({results:[{flagged:false}]}),{status:200});if(url.endsWith('/images/generations'))return new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}),{status:200});throw new Error('unexpected '+url);}
 function browser(){const jar={};return{req:{get cookies(){return jar;}},res:{cookie(name,value){jar[name]=value;},clearCookie(name){delete jar[name];}}};}
 async function startGuest(){const b=browser();await guestsService.start(b.req,b.res,{consent:true,version:GUEST_CONSENT_VERSION});const id=guestFromRequest(b.req);guests.push(id);return{...b,id};}
-async function upload(owner){const id=crypto.randomUUID();fs.writeFileSync(path.join(mediaRoot,id),await sharp(await png(600,900)).webp().toBuffer());await db.media.create({data:{id,user_sub:owner,type:'IMAGE',original_name:'s.webp',file_name:id,file_size:1,mime_type:'image/webp',original_url:`/api/v1/media/${id}/file`,s3_upload_key:`local/${id}`,processing_status:'COMPLETED',processed_at:new Date()}});return id;}
+async function upload(owner,metadata){const id=crypto.randomUUID();fs.writeFileSync(path.join(mediaRoot,id),await sharp(await png(600,900)).webp().toBuffer());await db.media.create({data:{id,user_sub:owner,type:'IMAGE',original_name:'s.webp',file_name:id,file_size:1,mime_type:'image/webp',original_url:`/api/v1/media/${id}/file`,s3_upload_key:`local/${id}`,processing_status:'COMPLETED',processed_at:new Date(),...(metadata?{metadata}:{})}});return id;}
 const post=extra=>({title:'체험 글 '+tag,body:'비로그인 체험',status:'published',commentsEnabled:true,media:[],...extra});
 const edit=(sourceId,extra)=>({sourceId,kind:'pose',style:'photo',prompt:'벤치에 앉은 포즈',consent:'true',...extra});
 before(async()=>{
@@ -48,7 +48,7 @@ test('a guest publishes only, without comments or tips; the post is in the feed 
 });
 
 test('signing in on the same browser moves guest posts and photos to the account; posts past 24 hours stay private',async()=>{
- const g=await startGuest();const photo=await upload(g.id);
+ const g=await startGuest();const photo=await upload(g.id,{aiGenerated:true});
  await studio.saveContent(g.id,post({title:'최근 체험 '+tag,media:[{id:photo}]}),{guest:true});await studio.saveContent(g.id,post({title:'지난 체험 '+tag}),{guest:true});
  await db.posting.updateMany({where:{user_sub:g.id,title:'지난 체험 '+tag},data:{published_at:new Date(Date.now()-48*3600000)}});
  const other=browser();assert.deepEqual(await guestsService.claim(member,other.req,other.res),{claimed:0},'a browser without the cookie claims nothing');
@@ -72,4 +72,40 @@ test('guest AI: no allow-list needed, no library or hearts, 10 per visitor and t
 
 test('spam guard: 10 trial posts per visitor a day',async()=>{
  const g=await startGuest();await requestContext.run({ip:'203.0.113.'+(Math.floor(Math.random()*200)+1),peerIp:'x',requestId:crypto.randomUUID()},async()=>{for(let i=0;i<10;i++)await guestsService.guard('post',g.id);await assert.rejects(guestsService.guard('post',g.id),code('GUEST_RATE_LIMITED'));});
+});
+
+// 2026-11-15 user decisions (night-work /ask-me): a guest post carries only the guest's own AI results; guests have their own daily
+// AI budget and never use the members' service-wide cap; a public trial post (within 24 hours) still stays out of search.
+test("a guest post accepts only the guest's own AI results, never an uploaded original or someone else's result",async()=>{
+ const g=await startGuest(),h=await startGuest(),original=await upload(g.id),result=await upload(g.id,{aiGenerated:true}),other=await upload(h.id,{aiGenerated:true});
+ await assert.rejects(studio.saveContent(g.id,post({media:[{id:original}]}),{guest:true}),code('GUEST_AI_RESULT_ONLY'));
+ await assert.rejects(studio.saveContent(g.id,post({media:[{id:result},{id:original}]}),{guest:true}),code('GUEST_AI_RESULT_ONLY'));
+ await assert.rejects(studio.saveContent(g.id,post({media:[{id:other}]}),{guest:true}),code('INVALID_MEDIA'));
+ await studio.saveContent(g.id,post({title:'결과만 '+tag,media:[{id:result}]}),{guest:true});
+ assert.equal(await db.posting.count({where:{user_sub:g.id,title:'결과만 '+tag}}),1);
+});
+
+test('a public trial post (within 24 hours) is in the feed but not in search',async()=>{
+ const g=await startGuest(),title='검색 제외 '+tag;
+ await studio.saveContent(g.id,post({title}),{guest:true});const row=await db.posting.findFirst({where:{user_sub:g.id,title}});
+ assert.ok((await service.postPage(undefined)).posts.some(p=>p.id===row.id),'public in the feed now');
+ assert.ok(!(await service.postSearch(undefined,title)).posts.some(p=>p.id===row.id),'still not searchable');
+});
+
+test("guest AI: the 200-a-day guest budget closes trials without touching the members' service-wide cap",async()=>{
+ const {digest}=require('../dist/src/auth/local/credentials');const DAY=86400,windowId=key=>digest(`${key}:${Math.floor(Date.now()/(DAY*1000))}`);
+ const read=async key=>(await db.authRateBucket.findUnique({where:{id:windowId(key)}}))?.count||0;
+ const g=await startGuest(),photo=await upload(g.id),ip={ipHash:'budget'+tag};
+ const memberTotal=await read('ai-photo:total');
+ await photos.edit(g.id,edit(photo),undefined,ip);
+ assert.equal(await read('ai-photo:total'),memberTotal,'a guest generation does not count against ai-photo:total');
+ const guestTotal=await read('ai-photo:guest-total');assert.ok(guestTotal>=1);
+ const id=windowId('ai-photo:guest-total'),expires=new Date((Math.floor(Date.now()/(DAY*1000))+1)*DAY*1000);
+ await db.authRateBucket.upsert({where:{id},create:{id,count:200,expires_at:expires},update:{count:200}});
+ try{
+  const before=await photos.guestRemaining(g.id);
+  await assert.rejects(photos.edit(g.id,edit(photo),undefined,{ipHash:'budget2'+tag}),code('GUEST_DAILY_CLOSED'));
+  assert.equal(await photos.guestRemaining(g.id),before,'the visitor keeps the refused try');
+  assert.equal(await read('ai-photo:total'),memberTotal,'still untouched');
+ }finally{await db.authRateBucket.update({where:{id},data:{count:guestTotal}});}
 });

@@ -51,3 +51,30 @@ test('SIGNUP_OPEN opens signup during the beta; an explicit allowlist still rest
  await open.signup({email,emailProof:proof,password:'Open-test-123!',nickname:'가입 개방',terms:true,privacy:true,marketing:false,ageAcknowledged:true,policyVersions:legal.signup().versions});
  const member=await db.member.findUniqueOrThrow({where:{email}});members.push(member.id);
 });
+
+// 2026-11-15 user decision (open signup, night-work): verification mail is limited per connecting IP (5 an hour, 20 a day) and
+// service-wide per day (SIGNUP_MAIL_DAILY_TOTAL), and a failed send gives the 3-minute cooldown back.
+test('signup verification mail: 5 per IP an hour, service-wide daily ceiling with an operations alert, cooldown returned on send failure',async()=>{
+ const {requestContext}=require('../dist/src/platform/request-context');const {SIGNUP_IP_HOURLY}=require('../dist/src/platform/auth.service');
+ const tag=randomUUID().slice(0,8),buckets=new Map();
+ const limiter={limit:async(key,max)=>{const n=(buckets.get(key)||0)+1;buckets.set(key,n);if(n>max){const e=new Error('busy');e.getStatus=()=>429;throw e;}}};
+ const make=(settings={},sendCode=async(email,value)=>messages.push({email,code:value}))=>new PlatformAuthService(db,limiter,{sendCode},new ConfigService({LOCAL_AUTH_SECRET:'test-only-'.repeat(8),SIGNUP_IDENTITY_MODE:'email-only',SIGNUP_OPEN:'true',...settings}),legal);
+ const fresh=()=>{const email=`rate-${tag}-${randomUUID()}@example.invalid`;emails.push(email);return email;};
+ const from=(ip,fn)=>requestContext.run({ip,peerIp:ip,requestId:randomUUID()},fn);
+ const client=make({SIGNUP_MAIL_DAILY_TOTAL:'1000'});
+ assert.equal(SIGNUP_IP_HOURLY,5);
+ for(let i=0;i<5;i++)await from('198.51.100.'+(tag.charCodeAt(0)%200+1),()=>client.requestCode(fresh()));
+ await assert.rejects(from('198.51.100.'+(tag.charCodeAt(0)%200+1),()=>client.requestCode(fresh())),code('SIGNUP_RATE_LIMITED'),'6th request from the same IP within an hour');
+ await from('203.0.113.'+(tag.charCodeAt(1)%200+1),()=>client.requestCode(fresh()));
+ // service-wide ceiling: a fresh limiter with a ceiling of 2
+ buckets.clear();const capped=make({SIGNUP_MAIL_DAILY_TOTAL:'2'});
+ await capped.requestCode(fresh());await capped.requestCode(fresh());
+ await assert.rejects(capped.requestCode(fresh()),code('SIGNUP_MAIL_BUSY'));
+ const day=new Date().toISOString().slice(0,10);
+ assert.ok(await db.platformOperationalEvent.findFirst({where:{type:'auth.signup_mail_closed',dedupe_key:'signup-mail-closed:'+day}}),'operators are alerted once a day');
+ await db.platformOperationalEvent.deleteMany({where:{type:'auth.signup_mail_closed',dedupe_key:'signup-mail-closed:'+day}});
+ // a failed send does not leave the visitor waiting 3 minutes
+ buckets.clear();let fail=true;const flaky=make({},async(email,value)=>{if(fail)throw new Error('smtp down');messages.push({email,code:value});});
+ const email=fresh();await assert.rejects(flaky.requestCode(email),code('MAIL_UNAVAILABLE'));
+ fail=false;await flaky.requestCode(email);assert.ok(messages.some(m=>m.email===email),'retry right after a failed send is accepted');
+});
