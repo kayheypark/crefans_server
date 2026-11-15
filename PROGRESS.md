@@ -1,4 +1,5 @@
-## 2026-11-15 콩 판매 중지 스위치가 결제 대사를 막는 버그 수정 (운영 미배포)
+## 2026-11-15 콩 판매 중지 스위치가 결제 대사를 막는 버그 수정 (운영 배포 완료)
+- 운영 배포(2026-11-15 12:4x KST, 사용자 지시 "콩 관련도 이때 같이 운영배포"): prod 2a3054c → API/worker=crefans-api:bean-reconcile-20261115(terms-sync 위 src·dist 덮어쓰기, beans.service.js 해시가 로컬 prod 빌드와 일치, 이미지 안 reconcileCharge가 keyEnvironment() 사용 확인). 배포 스크립트 검사 PASS: API/worker healthy·재시작0, 다른 컨테이너 불변, .env/runtime.env는 API_IMAGE·APP_RELEASE만 변경, 비로그인 401. health ready. 복구: /Users/ethan/crefans-recovery/20261115/bean-reconcile-api(직전 terms-sync 이미지·설정, SHA256 OK) 후 서버 이전 태그·임시본 정리, 로컬 api.tar.gz 삭제. 실제 판매 중지 상태의 운영 대사는 해당 건이 없어 미검증.
 - night-work(.local/night-work/2026-11-14-2343) 결정(/ask-me): 처리방침 BytePlus 개정안 작성 후 확인·배포, 미성년·학생 캐릭터 의상 프리셋 현행 유지, 하트 보상 회원당 하루 상한 추가(기본값 제안 후 확인), 콩 대사 버그 수정(배포는 미선택).
 - reconcileCharge가 판매 승인(BEAN_LIVE_PAYMENTS_APPROVED)까지 검사하는 environment() 대신 keyEnvironment()를 쓰도록 변경. 환불과 같은 원칙(판매 중지가 이미 진행된 결제의 대사·환불을 막지 않음). 원장 전체 비활성(BEAN_LEDGER_ENABLED)은 기존대로 막음.
 - 검증: build 0, platform-beans 43/43(판매 중지 상태에서 진행 중 충전 대사 회귀 테스트 추가), environment()로 되돌린 대조 실행에서 해당 테스트 실패 확인.
