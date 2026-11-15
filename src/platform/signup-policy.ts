@@ -9,10 +9,12 @@ export const INVITE_REQUIRED_MESSAGE='현재 기간(~26년 11월)에는 사전 �
 
 // Only an explicit server setting can defer identity verification. It never grants adult access.
 // Invited emails come from SIGNUP_EMAIL_ALLOWLIST or an active console invite (signup_invites); either one passes.
+// 2026-11-15 user decision: signup opens to everyone with SIGNUP_OPEN=true while BETA_MODE keeps its payment rules.
+// An allowlist still restricts signup (it is an explicit operator setting).
 export function signupPolicy(config:ConfigService){
  const identityRequired=config.get('SIGNUP_IDENTITY_MODE')!=='email-only';
  const allowedEmails=String(config.get('SIGNUP_EMAIL_ALLOWLIST')||'').split(',').map(normalizeEmail).filter(Boolean);
- const inviteOnly=isBeta(config)||allowedEmails.length>0,listed=(email:string)=>allowedEmails.includes(normalizeEmail(email));
+ const inviteOnly=(isBeta(config)&&config.get('SIGNUP_OPEN')!=='true')||allowedEmails.length>0,listed=(email:string)=>allowedEmails.includes(normalizeEmail(email));
  return{identityRequired,inviteOnly,listed,assertEmail(email:string){
   if(inviteOnly&&!listed(email))reject(403,'SIGNUP_INVITE_REQUIRED',INVITE_REQUIRED_MESSAGE);
  },async assertInvited(email:string,db:any){

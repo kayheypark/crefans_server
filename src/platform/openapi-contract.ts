@@ -120,6 +120,7 @@ const creatorInput=object({name:maxString(40),handle:{type:'string',pattern:'^[a
 add('get','studio/overview','스튜디오','내 스튜디오 초기 데이터',{response:ref('StudioOverview')});
 add('get','studio/community','스튜디오','내 댓글·대화·구독자 연락처',{response:ref('Community')});
 add('post','studio/start','스튜디오','크리에이터 시작하기',{body:creatorInput});
+add('post','studio/partner-request','스튜디오','파트너 계약(모두싸인) 요청',{response:object({requested:bool,message:str()}),description:'크리에이터만. 하루 1회. 운영 텔레그램 알림(회원 식별자 없음)과 감사 기록(business/creator.partner_requested). 인증 배지(파트너)는 운영자가 서명 확인 후 부여. 이미 파트너면 requested:false.'});
 add('put','studio/profile','스튜디오','크리에이터 프로필·소개·SNS 수정',{body:creatorInput});
 add('put','studio/activity','스튜디오','크리에이터 활동 상태 변경',{body:object({active:bool},['active'])});
 add('put','studio/comments-setting','스튜디오','전체 게시물 댓글 허용 설정',{body:enabled,description:'게시물 개별 댓글 설정보다 우선합니다.'});

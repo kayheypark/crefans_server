@@ -1,3 +1,10 @@
+## 2026-11-15 회원가입 전체 개방·파트너 계약 요청 (서버)
+- 사용자 지시: 지금부터 회원가입 모두 받기(오픈 공지·홍보는 하지 않음), 크리에이터 전환은 즉시, 실제 출금은 모두싸인 전자계약 후. 계약 시작 방식은 "요청 버튼+텔레그램"(AskUserQuestion).
+- 가입: signup-policy inviteOnly=(BETA_MODE && SIGNUP_OPEN!=='true')||허용목록. BETA_MODE의 결제 규칙은 그대로. 베타 초대 안내 문구(guidance.signup)는 inviteOnly일 때만. runtime.env.example에 SIGNUP_OPEN.
+- 크리에이터 전환(studio/start)과 출금 차단(인증 배지 없으면 PARTNER_CONTRACT_REQUIRED, 콩·멤버십 모두 요청 시점)은 기존 그대로 확인.
+- 계약 요청: POST studio/partner-request(partner-policy.requestPartnerContract) — 크리에이터만, 하루 1회, 감사 기록 business/creator.partner_requested(entityId=회원), 운영 텔레그램 'creator.partner_requested'(회원 식별자 없음, 콘솔 로그에서 확인). 이미 배지면 requested:false. 출금 차단 문구를 "출금 화면에서 파트너 계약을 요청해주세요."로.
+- 검증: build 0, 새 platform-partner-request 2/2, signup-mode 4/4(새 개방 테스트; 스위치를 빼면 1 fail 대조), openapi 14/14(250 경로, studio 64; 지난 커밋에서 주석에 묻혀 있던 studio·console 개수 검사를 다시 살림), beans 43, manual-payouts 10, beta-policy 11, referrals 15, reserved-handles 8.
+
 ## 2026-11-15 비로그인 AI 사진 체험·체험 게시물 (서버, 운영 배포 완료)
 - 사용자 지시: 비로그인도 글 작성(핵심 목적: AI 생성 체험 + 홈·피드에 보여 사이트가 활발해 보이게), 하루 지나면 접근 불가 비공개, 같은 브라우저로 회원가입·로그인하면 본인 게시물로 연결, 고지 문구, 브라우저·IP로 비식별 사용자 인식, 비회원 AI 10회·하트 없음, 배포.
 - 결정(AskUserQuestion): 노출은 "제한 없이 즉시"(사용자 선택; 나이 확인 없음·미성년/타인 얼굴 합성 위험을 안내했고 기존 AI 유해성 검사·AI 생성 표시는 유지), 처리방침 개정안+체험 전 동의 함께 배포(개정안 확인 후), 비회원 전체 하루 200회+텔레그램 사용량 알림, PD=피드.
