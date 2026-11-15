@@ -362,12 +362,12 @@ test('private photo library: save, search, category edit and remove preserve med
  await db.media.update({where:{id},data:{metadata:{aiGenerated:true,keep:'original'}}});
  const saved=await photos.saveLibrary(who,{id,title:'  의자에 앉기  ',category:'pose'});assert.equal(saved.title,'의자에 앉기');assert.equal(saved.category,'pose');assert.equal(saved.aiGenerated,true);
  const cropped=await photos.crop(who,{sourceId:id,left:0,top:0,width:100,height:100});assert.equal((await db.media.findUnique({where:{id:cropped.id}})).metadata.aiLibrary,undefined);assert.equal((await photos.library(who,{})).items.length,1,'cropping does not silently duplicate a library entry');
- assert.equal((await photos.library(who,{q:'의자',category:'pose'})).items[0].id,id);assert.equal((await photos.library(creator,{q:'의자'})).items.some(x=>x.id===id),false);
+ assert.equal((await photos.library(who,{q:'의자',category:'pose'})).items[0].id,id);assert.equal((await photos.library(who,{category:'pose'})).total,1,'2026-11-15: total counts the filter');assert.equal((await photos.library(who,{category:'background'})).total,0);assert.equal((await photos.library(creator,{q:'의자'})).items.some(x=>x.id===id),false);
  await photos.saveLibrary(who,{id,title:'낮은 구도',category:'camera'});assert.equal((await photos.library(who,{category:'pose'})).items.length,0);assert.equal((await photos.library(who,{category:'camera'})).items[0].id,id);
  await assert.rejects(photos.saveLibrary(creator,{id,title:'타인',category:'pose'}),code('MEDIA_NOT_FOUND'));
  await assert.rejects(photos.saveLibrary(who,{id,title:'x',category:'unknown'}),code('INVALID_LIBRARY_ASSET'));
  await assert.rejects(photos.library(who,{page:-1}),code('INVALID_LIBRARY_FILTER'));
- await photos.saveLibrary(who,{id,remove:true});assert.equal((await photos.library(who,{})).items.length,0);const row=await db.media.findUnique({where:{id}});assert.equal(row.is_deleted,false);assert.equal(row.metadata.keep,'original');assert.equal(row.metadata.aiGenerated,true);
+ await photos.saveLibrary(who,{id,remove:true});assert.equal((await photos.library(who,{})).items.length,0);assert.equal((await photos.library(who,{})).total,0);const row=await db.media.findUnique({where:{id}});assert.equal(row.is_deleted,false);assert.equal(row.metadata.keep,'original');assert.equal(row.metadata.aiGenerated,true);
 });
 
 test('library photos are real image references, individually moderated and numbered by category',async()=>{
