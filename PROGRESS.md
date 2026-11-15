@@ -3,6 +3,7 @@
 - 변경: 변경한 기기 세션(access_token 해시)만 남기고 나머지 철회 / 같은 비밀번호 거절 PASSWORD_UNCHANGED / 회원당 10분 5회(controller, LocalMemberService.limit 'password-change:') / 앱 알림+메일(member-notices 'password-changed', 계정 보안) / 감사 security 'member.password_changed' / 응답 '비밀번호를 변경했어요. 다른 기기에서는 다시 로그인해야 해요.'
 - 테스트: tests/platform-password-change.test.cjs 3건 통과(현재 기기 유지·다른 세션 철회·알림·감사 / 오답·같은 비번·약한 비번 거절 시 변화 없음 / 10분 5회·다른 섹션 무제한·토큰 전달). 대조: 세션 예외 제거·같은 비번 검사 제거·횟수 제한 제거 시 각 테스트 실패 확인 후 원복. 인접 openapi·mail-templates·auth 포함 49/49.
 - 메일 문구 렌더 확인(로컬 템플릿, 실제 발송 아님). 알림 링크 /service/settings 운영 200.
+- 운영 배포(2026-11-16 00:0x KST, 사용자 선택지 '테스트 추가 후 배포'): prod a0c2cb7 → crefans-api:password-change-20261116(dist JS 해시 일치). ship-api exit 0: API/worker healthy·재시작0, 다른 컨테이너 불변, env는 이미지·릴리스만 변경, me/settings 비로그인 401, 약관 open.1 유지. 복구 crefans-recovery/20261116/password-change-api(launch-hardening 이미지·설정, SHA256SUMS OK). 실제 계정으로 비밀번호 변경은 운영에서 실행하지 않음(테스트로만 확인).
 
 ## 2026-11-15 23:3x 계약 서명본 정정: v2.41(2단 5쪽) — 사용자 지적 "계약서 최종 레이아웃 그거 아닌데"
 - 원인: 11-15 v2.37·v2.38(docs/contract-payout-after-term)과 v2.39(명칭)를 옛 흑백 7쪽 계보에 적용해 dev/prod에 병합했음. 최종 서명본은 feat/contract-apple-gothic(2dc8647, 미병합)의 2단 5쪽(design-two-column-20261103, Apple SD Gothic Neo, '크리에이터 파트너십 체결 계약서', 주민등록번호 칸, 서명 날짜 밑줄).
