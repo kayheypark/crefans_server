@@ -21,6 +21,9 @@ import {digest} from '../auth/local/credentials';
 import {reject} from './http';
 import {contentDigest} from './audit';
 import {requestContext} from './request-context';
+import {PlatformOperationsService} from './operations.service';
+import {GUEST_AI_LIMIT,GUEST_DAILY_TOTAL,GUEST_IP_DAILY} from './guest-policy';
+const GUEST_LIFETIME=3650*86400;
 import {aiFailureTrace,diagnosticId,recordAiFailure,traceAiEvent,AiFailureTrace} from './ai-photo-failures';
 import {aiPhotoAllowed} from './ai-photo-grants';
 import {backgroundReferenceId,readBackgroundReference} from './ai-photo-background-references';
@@ -70,18 +73,26 @@ export class AiPhotoService{
 
  readonly settings:ReturnType<typeof aiPhotoConfig>;
  fetcher:typeof fetch=fetch;
- constructor(private configService:ConfigService,private service:PlatformService,private storage:PlatformMediaStorage,private limiter:LocalMemberService){this.settings=aiPhotoConfig(configService);}
+ constructor(private configService:ConfigService,private service:PlatformService,private storage:PlatformMediaStorage,private limiter:LocalMemberService,private operations:PlatformOperationsService){this.settings=aiPhotoConfig(configService);}
+ // Guest trial (2026-11-15): 10 per visitor for good, 10 per IP per day, 200 for all visitors per day. No hearts, tickets or library.
+ private guestKeys(sub:string,guest:{ipHash:string}){return[{key:'ai-photo:guest:'+sub,max:GUEST_AI_LIMIT,seconds:GUEST_LIFETIME,code:'GUEST_AI_LIMIT',message:'체험 AI 사진 10회를 모두 썼어요. 회원가입하면 계속 이용할 수 있어요.'},{key:'ai-photo:guest-ip:'+guest.ipHash,max:GUEST_IP_DAILY,seconds:DAY,code:'GUEST_IP_LIMIT',message:'이 네트워크에서는 오늘 체험 횟수를 모두 썼어요. 회원가입하면 계속 이용할 수 있어요.'},{key:'ai-photo:guest-total',max:GUEST_DAILY_TOTAL,seconds:DAY,code:'GUEST_DAILY_CLOSED',message:'오늘 비회원 체험이 마감됐어요. 회원가입 후 이용해 주세요.'}];}
+ private bucket(key:string,seconds:number){return digest(`${key}:${Math.floor(Date.now()/(seconds*1000))}`);}
+ private async usedIn(key:string,seconds:number){const row=await this.service.db.authRateBucket.findUnique({where:{id:this.bucket(key,seconds)}});return row?.count??0;}
+ private async giveBackIn(key:string,seconds:number){await this.service.db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${this.bucket(key,seconds)}`;}
+ async guestRemaining(id:string){return Math.max(0,GUEST_AI_LIMIT-await this.usedIn('ai-photo:guest:'+id,GUEST_LIFETIME));}
+ // Telegram: every 50 guest generations a day and when the daily cap closes (operations alert queue, one message per milestone).
+ private async guestUsageAlert(closed=false){try{const used=await this.usedIn('ai-photo:guest-total',DAY);if(closed)await this.operations.record('guest.ai_closed',{used:Math.min(used,GUEST_DAILY_TOTAL),limit:GUEST_DAILY_TOTAL},`guest-ai-closed:${this.window()}`);else if(used>0&&(used%50===0||used===GUEST_DAILY_TOTAL))await this.operations.record('guest.ai_usage',{used,limit:GUEST_DAILY_TOTAL},`guest-ai:${this.window()}:${used}`);}catch{}}
  private configured(){return !!this.settings.apiKey&&!!this.settings.seedreamKey;}
  private window(){return Math.floor(Date.now()/(DAY*1000));}
  private async used(key:string){const row=await this.service.db.authRateBucket.findUnique({where:{id:digest(`${key}:${this.window()}`)}});return row?.count??0;}
  private async giveBack(key:string){await this.service.db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${digest(`${key}:${this.window()}`)}`;}
  private creatorKey(sub:string){return 'ai-photo:creator-day:'+sub;}
  async quota(sub:string){
-  await this.service.requireCreator(sub);
+  await this.service.member(sub);
   const allowed=await aiPhotoAllowed(this.service.db,sub)&&this.configured();
   return{allowed,limit:this.settings.perDay,remaining:allowed?Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+(await paidPhotoCount(this.service.db,sub))+(await heartBalance(this.service.db,sub)).credits:0,paidRemaining:allowed?await paidPhotoCount(this.service.db,sub):0,hearts:allowed?(await heartBalance(this.service.db,sub)).hearts:0,rewardRemaining:allowed?(await heartBalance(this.service.db,sub)).credits:0,typicalSeconds:allowed?await this.typicalSeconds():null,resetTickets:allowed?await ticketSummary(this.service.db,sub):{count:0,nextExpiresAt:null}};
  }
- async hearts(sub:string,input:any){await this.service.requireCreator(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');
+ async hearts(sub:string,input:any){await this.service.member(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');
   if(input?.action==='start')return createHeartGame(this.service.db,sub);
   if(typeof input?.id!=='string')reject(400,'INVALID_GAME','하트 게임을 다시 시작해 주세요.');
   if(input.action==='click')return clickHeart(this.service.db,sub,input.id,input.piece,input.eventId);
@@ -90,7 +101,7 @@ export class AiPhotoService{
  }
  /** Spend one storable reset ticket (2026-11-13): today's usage back to 0. */
  async useResetTicket(sub:string){
-  await this.service.requireCreator(sub);if(!this.configured())reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
+  await this.service.member(sub);if(!this.configured())reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
   const r=await useAiPhotoTicket(this.service.db,sub);
   return{limit:this.settings.perDay,remaining:Math.max(0,this.settings.perDay-await this.used(this.creatorKey(sub)))+(await paidPhotoCount(this.service.db,sub))+(await heartBalance(this.service.db,sub)).credits,resetTickets:r.tickets,message:`리셋권 1장을 사용했어요. 오늘 ${this.settings.perDay}회를 다시 만들 수 있어요.`};
  }
@@ -149,10 +160,10 @@ export class AiPhotoService{
    return{id:row.id,type:'image' as const,url:row.original_url,aiGenerated:true};
   }finally{if(remote){try{await unlink(destination);}catch{}}}
  }
- async library(sub:string,query:any){await this.service.requireCreator(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return listPhotoLibrary(this.service.db,sub,query);}
- async saveLibrary(sub:string,input:any){await this.service.requireCreator(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return savePhotoLibrary(this.service.db,sub,input);}
+ async library(sub:string,query:any){await this.service.member(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return listPhotoLibrary(this.service.db,sub,query);}
+ async saveLibrary(sub:string,input:any){await this.service.member(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return savePhotoLibrary(this.service.db,sub,input);}
  async crop(sub:string,input:any){
-  await this.service.requireCreator(sub);
+  await this.service.member(sub);
   const bytes=await this.source(sub,input?.sourceId);
   const row=await this.service.db.media.findUnique({where:{id:input.sourceId}}),meta=row?.metadata as Record<string,unknown>|null;
   if(meta?.aiGenerated!==true)reject(400,'INVALID_CROP_SOURCE','AI로 만든 결과 사진만 자를 수 있어요.');
@@ -164,18 +175,18 @@ export class AiPhotoService{
   const cropMeta={...meta};delete cropMeta.aiLibrary;
   return this.save(sub,cropped,{...cropMeta,aiGenerated:true,croppedFrom:input.sourceId});
  }
- async edit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number}){
+ async edit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number},guest?:{ipHash:string}){
   const mode=input?.mode??'general',selectedProvider='seedream';
   const trace:AiFailureTrace={requestId:requestContext.getStore()?.requestId||randomUUID(),actorId:sub,selectedProvider,selectedModel:this.settings.model,sequence:0,stage:'validation',provider:'local'},started=Date.now();
   return aiFailureTrace.run(trace,async()=>{
    await traceAiEvent(this.service.db,'started',{mode:diagnosticId(mode),selectedModel:trace.selectedModel,selectedProvider});
-   try{const result=await this.performEdit(sub,input,mask);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);return result;}
+   try{const result=await this.performEdit(sub,input,mask,guest);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);return result;}
    catch(error){await recordAiFailure(this.service.db,this.configService,sub,input,error,trace,started);throw error;}
   });
  }
- private async performEdit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number}){
-  const started=Date.now();await this.service.requireCreator(sub);
-  if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');
+ private async performEdit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number},guest?:{ipHash:string}){
+  const started=Date.now();if(!guest){await this.service.member(sub);
+  if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');}else if(input?.libraryIds||input?.heartGameId)reject(400,'GUEST_FEATURE_UNAVAILABLE','내 보관함과 하트 게임은 회원만 이용할 수 있어요.');
   const mode=input?.mode??'general';if(mode!=='general'&&mode!=='cosplay')reject(400,'INVALID_EDIT_MODE','편집 모드를 다시 골라 주세요.');
   const aspectRatio=input?.aspectRatio??'original';if(aspectRatio!=='original'&&!Object.prototype.hasOwnProperty.call(RATIO_SIZES,aspectRatio))reject(400,'INVALID_ASPECT_RATIO','비율을 다시 골라 주세요.');
   const model=this.settings.model;
@@ -218,12 +229,13 @@ export class AiPhotoService{
   if(1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상과 보관함 참고 사진의 수를 줄여 주세요. 원본을 포함해 최대 10장이에요.');
   await this.stage('quota');
   const key=this.creatorKey(sub);
-  let paidUse:any=null,rewardUse:any=null;
-  try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch(error){if(error?.getStatus?.()!==429)throw error;rewardUse=await reserveHeartCredit(this.service.db,sub,aiFailureTrace.getStore()?.requestId||randomUUID());if(!rewardUse)paidUse=await reservePaidPhoto(this.service.db,sub,aiFailureTrace.getStore()?.requestId);}
-  try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,false);else if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);else await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
+  let paidUse:any=null,rewardUse:any=null;const guestTaken:{key:string;seconds:number}[]=[];
+  if(guest){for(const item of this.guestKeys(sub,guest)){try{await this.limiter.limit(item.key,item.max,item.seconds);guestTaken.push(item);}catch(error){if(error?.getStatus?.()!==429)throw error;await this.giveBackIn(item.key,item.seconds);for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(item.code==='GUEST_DAILY_CLOSED')await this.guestUsageAlert(true);reject(429,item.code,item.message);}}}
+  else try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch(error){if(error?.getStatus?.()!==429)throw error;rewardUse=await reserveHeartCredit(this.service.db,sub,aiFailureTrace.getStore()?.requestId||randomUUID());if(!rewardUse)paidUse=await reservePaidPhoto(this.service.db,sub,aiFailureTrace.getStore()?.requestId);}
+  try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,false);else if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);else if(!guest)await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
   let charged=true,gameStarted=false;
   try{
-   await startHeartGame(this.service.db,sub,input?.heartGameId);gameStarted=typeof input?.heartGameId==='string';
+   if(!guest){await startHeartGame(this.service.db,sub,input?.heartGameId);gameStarted=typeof input?.heartGameId==='string';}
    // Moderation accepts one image per request. Every source/reference must pass before generation.
    await this.stage('input','openai');
    for(const [referenceIndex,item] of [{mime:'image/png',bytes:image!},...references.map(bytes=>({mime:'image/webp',bytes}))].entries()){
@@ -263,13 +275,14 @@ export class AiPhotoService{
    catch(error){await traceAiEvent(this.service.db,'step.failed',{operation:'storage',provider:'local',attemptId:storageId,attempt:storageAttempt,outcome:'failed',errorCode:diagnosticId(error?.code)||'STORAGE_ERROR'},Date.now()-storageStart);throw error;}
    if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,true);
    if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,true);
+   if(guest){await this.guestUsageAlert();return{images,remaining:await this.guestRemaining(sub)};}
    return{images,remaining:Math.max(0,this.settings.perDay-await this.used(key))+(await paidPhotoCount(this.service.db,sub))+(await heartBalance(this.service.db,sub)).credits};
   }catch(error){
    // Refused without a usable answer (moderation unavailable, provider error/timeout): give the try back.
    // A blocked input or output still counts, so repeated unsafe requests use up the day.
    if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,false);
    if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);
-   if(charged){if(!paidUse&&!rewardUse)await this.giveBack(key);await this.giveBack('ai-photo:total');}
+   if(charged){for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(!guest&&!paidUse&&!rewardUse)await this.giveBack(key);await this.giveBack('ai-photo:total');}
    throw error;
   }finally{if(gameStarted){try{await closeHeartGame(this.service.db,sub,input.heartGameId);await settleHeartGame(this.service.db,sub,input.heartGameId);}catch{this.logger.warn({event:'ai-photo.heart_settlement_pending',requestId:aiFailureTrace.getStore()?.requestId});}}}
  }
