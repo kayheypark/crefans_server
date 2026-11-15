@@ -1,4 +1,5 @@
 import {recordPostView} from './post-views';
+import {LocalMemberService} from '../auth/local/local-member.service';
 import {CategoriesService} from './categories.service';
 import {Res} from '@nestjs/common';
 import {Body,Controller,Delete,Get,Header,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
@@ -9,7 +10,7 @@ import {myReferral,referralHistory} from './referrals';
 import {PlatformAuthGuard,PlatformOptionalAuthGuard} from './platform-auth.guard';
 @Controller()
 export class PlatformController {
- constructor(private service:PlatformService,private emailChange:EmailChangeService,private categories:CategoriesService){}
+ constructor(private service:PlatformService,private emailChange:EmailChangeService,private categories:CategoriesService,private local:LocalMemberService){}
  @Get('categories/:id/icon/:version') categoryIcon(@Param('id') id:string,@Param('version') version:string,@Res() res:any){return this.categories.image(id,version,res);}
  @Get('health') async health(){await this.service.db.$queryRaw`SELECT 1`;return{status:'ready',version:'v1'};}
  @Get('events/founding-badge') @Header('Cache-Control','private, no-store') @UseGuards(PlatformAuthGuard) foundingBadge(@Req() r:any){return this.service.foundingBadge(r.user.sub);}
@@ -48,7 +49,8 @@ export class PlatformController {
  @Put('me/profile/photos') @UseGuards(PlatformAuthGuard) profilePhotos(@Body() b:any,@Req() r:any){return updateProfilePhotos(this.service.db,r.user.sub,b);}
  @Post('me/email/request') @UseGuards(PlatformAuthGuard) emailRequest(@Body() b:any,@Req() r:any){return this.emailChange.request(r.user.sub,b?.email,b?.currentPassword);}
  @Post('me/email/confirm') @UseGuards(PlatformAuthGuard) emailConfirm(@Body() b:any,@Req() r:any){return this.emailChange.confirm(r.user.sub,b.email,b.code);}
- @Put('me/settings') @UseGuards(PlatformAuthGuard) settings(@Body() b:any,@Req() r:any){return this.service.settings(r.user.sub,b);}
+ // Password changes: 5 tries per member per 10 minutes, so a stolen session cannot guess the current password (2026-11-16).
+ @Put('me/settings') @UseGuards(PlatformAuthGuard) async settings(@Body() b:any,@Req() r:any){if(b?.section==='password')await this.local.limit('password-change:'+r.user.sub,5,600);return this.service.settings(r.user.sub,b,r.cookies?.access_token);}
  @Post('me/inquiries') @UseGuards(PlatformAuthGuard) inquiry(@Body() b:any,@Req() r:any){return this.service.inquiry(r.user.sub,b);}
  @Post('me/withdraw') @UseGuards(PlatformAuthGuard) withdraw(@Req() r:any){return this.service.withdrawAccount(r.user.sub);}
 }

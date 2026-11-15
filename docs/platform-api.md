@@ -86,7 +86,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | PUT | /notifications/read | 회원; ids, 본인 알림만 처리 |
 | GET | /me/handle-availability | 회원; 필수 handle(영문 소문자·숫자·밑줄 3~24자), 본인 제외 회원·크리에이터 핸들 중복 확인(비활성 포함). {handle, available}만 반환, 예약/변경 없음, private no-store |
 | PUT | /me/profile | 회원; name(사용자명), bio, 선택 handle(크리에이터 핸들도 동기화). 저장 시 중복 재검사, 충돌 409 HANDLE_TAKEN |
-| PUT | /me/settings | 회원; section=password/notifications/privacy 등 |
+| PUT | /me/settings | 회원; section=password/notifications/privacy 등. password는 현재 비밀번호 확인·같은 비밀번호 거절·10분 5회, 변경한 기기만 로그인 유지·다른 세션 철회·알림/메일(2026-11-16) |
 | POST | /me/email/request | 회원; 새 email과 현재 비밀번호(currentPassword, 회원별 10분 5회 제한), 현재 회원과 대상에 묶인 코드 |
 | POST | /me/email/confirm | 회원; email/code, 변경 후 세션 철회 |
 | POST | /me/inquiries | 회원; category/title/message |

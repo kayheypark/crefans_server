@@ -1,3 +1,4 @@
+import {randomUUID} from 'crypto';
 import {promotionActive} from './advertising-use';
 import {GUEST_PREFIX,guestCutoff,guestProfile,isGuestId} from './guest-policy';
 import {foundingBadgeVisible,foundingBadgeStatus,claimFoundingBadge,setFoundingBadgeVisibility} from './founding-badge';
@@ -11,14 +12,14 @@ import {LegalDocumentsService} from './legal-documents';
 import {ConfigService} from '@nestjs/config';
 import {signupPolicy} from './signup-policy';
 import {billingMethodView} from './billing-failures';
-import {auditChange} from './audit';
+import {appendAudit,auditChange} from './audit';
 import {enqueueOperation} from './operations-events';
 import {Injectable} from '@nestjs/common';
 import {Prisma} from '@prisma/client';
 import {PrismaService} from '../prisma/prisma.service';
-import {assertNewPassword,hashPassword,matchesPassword} from '../auth/local/credentials';
+import {assertNewPassword,digest,hashPassword,matchesPassword} from '../auth/local/credentials';
 import {reject,text,dateOnly} from './http';
-import {memberNoticeLabels} from './member-notices';
+import {memberNoticeLabels,notifyMember} from './member-notices';
 const preferences=(p:any)=>({contentAlert:p?.content_alert??true,messageAlert:p?.message_alert??true,marketingAlert:p?.marketing_alert??false,showActivity:p?.show_activity??true,allowSearch:p?.allow_search??true,showFollowers:p?.show_followers??true,showFollowing:p?.show_following??true});
 // Stored notification kinds shown as the Korean filter labels of the notifications page.
 const notificationLabels:Record<string,string>={subscription:'멤버십',comment:'댓글',message:'메시지',content:'새 게시물',settlement:'정산',media:'게시물 처리',...memberNoticeLabels};
@@ -175,8 +176,14 @@ export class PlatformService {
     // The old handle stays this member's and keeps leading to the profile (watermarks print it, 2026-11-02); taking it back frees the reservation.
     if(priorMember?.preferred_username)await tx.retiredHandle.upsert({where:{handle:priorMember.preferred_username},create:{handle:priorMember.preferred_username,member_id:member},update:{}});await tx.retiredHandle.deleteMany({where:{handle,member_id:member}});}
    await tx.member.update({where:{id:member},data:{nickname:text(input.name,40),...(handle!==undefined?{preferred_username:handle}:{})}});await tx.userProfile.upsert({where:{user_id:member},create:{user_id:member,bio:text(input.bio,120,false)},update:{bio:text(input.bio,120,false)}});await enqueueOperation(tx,'member.profile.updated',{memberId:member},undefined,auditChange({nickname:priorMember?.nickname,bio:priorProfile?.bio,handle:priorMember?.preferred_username},{nickname:input.name,bio:input.bio,handle:handle??priorMember?.preferred_username}));});}catch(error){if(handle!==undefined&&error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2002'&&await this.handleTaken(this.db,member,handle))reject(409,'HANDLE_TAKEN','이미 사용 중인 핸들입니다. 다시 중복 확인해주세요.');throw error;}return{message:'프로필을 저장했습니다.'};}
- async settings(member:string,input:any){const keys={notifications:{contentAlert:'content_alert',messageAlert:'message_alert',marketingAlert:'marketing_alert'},privacy:{showActivity:'show_activity',allowSearch:'allow_search',showFollowers:'show_followers',showFollowing:'show_following'}};
-   if(input.section==='password'){const m=await this.member(member);if(typeof input.currentPassword!=='string'||input.currentPassword.length>256||!await matchesPassword(input.currentPassword,m.password_hash))reject(403,'INVALID_PASSWORD','현재 비밀번호를 확인해주세요.');const password=assertNewPassword(input.newPassword);await this.db.$transaction([this.db.member.update({where:{id:member},data:{password_hash:await hashPassword(password)}}),this.db.memberSession.deleteMany({where:{member_id:member}})]);}
+ async settings(member:string,input:any,currentAccess?:string){const keys={notifications:{contentAlert:'content_alert',messageAlert:'message_alert',marketingAlert:'marketing_alert'},privacy:{showActivity:'show_activity',allowSearch:'allow_search',showFollowers:'show_followers',showFollowing:'show_following'}};
+   if(input.section==='password'){const m=await this.member(member);if(typeof input.currentPassword!=='string'||input.currentPassword.length>256||!await matchesPassword(input.currentPassword,m.password_hash))reject(403,'INVALID_PASSWORD','현재 비밀번호를 확인해주세요.');const password=assertNewPassword(input.newPassword);if(await matchesPassword(password,m.password_hash))reject(400,'PASSWORD_UNCHANGED','현재 비밀번호와 다른 비밀번호를 입력해주세요.');const hash=await hashPassword(password);
+    // 2026-11-16 user decision: the device that changed the password stays signed in, every other session ends, and the member
+    // gets an in-app notice plus mail (an unexpected change is the main sign of a taken-over account).
+    await this.db.$transaction(async tx=>{await tx.member.update({where:{id:member},data:{password_hash:hash}});await tx.memberSession.deleteMany({where:{member_id:member,...(currentAccess?{NOT:{access_hash:digest(currentAccess)}}:{})}});
+     await appendAudit(tx,{category:'security',action:'member.password_changed',entityId:member});
+     await notifyMember(tx,{dedupeKey:`password-changed:${randomUUID()}`,memberId:member,kind:'password-changed',path:'/settings',text:'계정 비밀번호가 변경됐어요. 본인이 바꾸지 않았다면 바로 비밀번호 찾기로 다시 바꾸고 고객센터에 알려 주세요.',rows:[['내용','비밀번호 변경'],['적용','다른 기기는 로그아웃']],note:'본인이 바꾸지 않았다면 로그인 화면의 비밀번호 찾기로 바로 다시 바꿔 주세요.'});});
+    return{message:'비밀번호를 변경했어요. 다른 기기에서는 다시 로그인해야 해요.'};}
    else if(input.section==='email')reject(409,'EMAIL_VERIFICATION_REQUIRED','새 이메일 인증 후 변경할 수 있습니다.');
    else if(input.section==='account')return this.profile(member,{name:input.name,bio:(await this.db.userProfile.findUnique({where:{user_id:member}}))?.bio||''});
    else{const mapping=keys[input.section];if(!mapping)reject(400,'INVALID_SECTION','설정 항목을 확인해주세요.');const data:any={};for(const [key,field]of Object.entries(mapping)){if(key==='showFollowers'&&input[key]===undefined)continue;if(typeof input[key]!=='boolean')reject(400,'INVALID_INPUT','설정값을 확인해주세요.');data[field as string]=input[key];}await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;if(input.section==='notifications'){const before=await tx.accountPreference.findUnique({where:{member_id:member}});if(input.marketingAlert&&(!before?.marketing_alert||!before.marketing_consent_id)){const agreement=this.legal.requirePublished();if(input.marketingVersion!==agreement.versions.marketing)reject(409,'POLICY_VERSION_CHANGED','광고 메일 선택 동의 내용을 다시 확인해주세요.');}await recordMarketingChoice(tx,member,input.marketingAlert,'settings',this.legal.signup().documents.marketing);delete data.marketing_alert;}await tx.accountPreference.upsert({where:{member_id:member},create:{member_id:member,...data},update:data});});}return{message:'설정을 저장했습니다.'};}
