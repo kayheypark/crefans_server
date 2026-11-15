@@ -1,4 +1,4 @@
-## 2026-11-15 비로그인 AI 사진 체험·체험 게시물 (서버, 운영 미배포)
+## 2026-11-15 비로그인 AI 사진 체험·체험 게시물 (서버, 운영 배포 완료)
 - 사용자 지시: 비로그인도 글 작성(핵심 목적: AI 생성 체험 + 홈·피드에 보여 사이트가 활발해 보이게), 하루 지나면 접근 불가 비공개, 같은 브라우저로 회원가입·로그인하면 본인 게시물로 연결, 고지 문구, 브라우저·IP로 비식별 사용자 인식, 비회원 AI 10회·하트 없음, 배포.
 - 결정(AskUserQuestion): 노출은 "제한 없이 즉시"(사용자 선택; 나이 확인 없음·미성년/타인 얼굴 합성 위험을 안내했고 기존 AI 유해성 검사·AI 생성 표시는 유지), 처리방침 개정안+체험 전 동의 함께 배포(개정안 확인 후), 비회원 전체 하루 200회+텔레그램 사용량 알림, PD=피드.
 - 구현: guest-policy.ts(상수·순수 함수)+guest.ts(GuestService/Controller). 비회원=httpOnly 쿠키 cf_guest(무작위 32바이트, 30일), 서버는 SHA-256만 작성자 id "guest:<40hex>"로 저장, IP는 HMAC(LOCAL_AUTH_SECRET)만. 동의(GUEST_CONSENT_VERSION 2026-11-15.guest.1)는 감사 기록(business/guest.consented).
@@ -9,8 +9,8 @@
 - 보관: 연결 안 된 체험 게시물은 게시 30일 후 삭제(jobs guest-expiry), 쓰이지 않는 사진은 기존 미사용 파일 정리(운영 MEDIA_DELETE_ENABLED=true, MEDIA_ORPHAN_GRACE_DAYS=7 확인).
 - 처리방침 2026-11-15.guest.1: 17항 '선택 기능: 비회원 AI 사진 체험' 추가(항목·목적·24시간 공개·연결·보유·국외 이전은 16항과 같음·동의), 10항 쿠키에 cf_guest 30일. 약관은 미개정(사용자: 약관은 나중에).
 - 검증: build 0. 새 tests/platform-guest.test.cjs 5/5(동의·쿠키 해시, 게시 규칙·피드 24시간·검색 제외·404, 계정 연결·지난 글 비공개, AI 10회·IP 10회·반환·보관함/하트 불가, 스팸 가드). 대조: 24시간 닫힘을 끄면 2 fail. platform-legal 22/22(판 번호 갱신+17항 테스트), openapi 14/14(운영 경로 243→249, 사용자 문서 90→96), member-posts 5, ai-photo 39, beans 43, payment-lifecycle 69 등 통과.
-
-## 2026-11-15 크리에이터가 아닌 회원도 글쓰기 (서버, 운영 미배포)
+- 운영 배포(2026-11-15 14:52 KST): prod 94e5cea(회원 글쓰기+체험) → API/worker crefans-api:guest-trial-20261115(직전 이미지 위 src·dist, 해시 로컬 빌드와 일치, ship-api PASS, 복구 crefans-recovery/20261115/guest-trial-api). 재시작 0, 운영 GET /api/v1/guest/session active:false·limit 10, /api/v1/common 처리방침 2026-11-15.guest.1·17항 확인. 프론트 front-guest-trial-20261115 함께 배포. 운영 실제 체험 AI 생성(BytePlus·OpenAI 호출)·텔레그램 사용량 알림은 미실행(50회 도달 전 발생 안 함).
+## 2026-11-15 크리에이터가 아닌 회원도 글쓰기 (서버, 운영 배포 완료)
 - 사용자 지시: "크리에이터가 아닌 사람들도 글을 작성할 수 있게… 어떠한 형태로든 후원은 못받는다 멤버십도못하고". 결정(AskUserQuestion): 전체 피드에도 노출 / 스튜디오 작성 화면 재사용 / AI 사진 편집 일반 회원도 허용(허용 목록 방식 유지) / 약관·처리방침은 나중에(현재 약관 7조 "크리에이터는 게시물…", 처리방침 표식 "활성 크리에이터 게시물" 문구와 어긋남 — 미결).
 - saveContent: 크리에이터가 아니면 회원 활성만 확인, 상품·레벨 지정은 MEMBER_POST_PUBLIC_ONLY, tipsEnabled true는 MEMBER_POST_NO_TIPS, 저장 시 allow_tips=false·is_membership=false 강제.
 - access(): 크리에이터 행이 없으면 작성자 회원이 enabled이고 멤버십이 아닌 공개 글만 열람. post() DTO tipsEnabled는 크리에이터 글만, 댓글은 회원 글이면 게시물 설정만 따름.
