@@ -2,6 +2,7 @@
 - 사용자 결정(/ask-me): 새 멤버십 생성·중지 멤버십 재개는 인증 배지(creators.is_verified=파트너 계약)만, 기존 멤버십은 판매·수정·중지 유지, 약관·가이드·화면 함께 개정, 약관 즉시 시행(베타·실청구 없음·기존 영향 없음 판단, 공지에 이유 기재), 검증 통과 시 배포.
 - 코드: partner-policy.ts requirePartnerForMembership/MEMBERSHIP_PARTNER_MESSAGE(403 MEMBERSHIP_PARTNER_REQUIRED), studio.service.ts saveMembership(id 없을 때)·membershipState(비활성→활성). 약관 2026-11-16.membership.1(6조 'MEMBERSHIP_PARTNER_TO', catalog 분기 추가). openapi·docs/platform-api.md 설명.
 - 테스트: tests/platform-membership-partner.test.cjs 2건(배지 없으면 생성 거절·배지 있으면 생성 / 배지 해제 후 수정·중지 가능·재활성 거절·배지 복구 후 재활성), legal 새 테스트+기존 '최신 시행본' 기대값 갱신. 관련 47/47. 대조: 생성 검사·재활성 검사를 각각 dist에서 제거하면 해당 테스트 실패 확인.
+- 운영 배포(2026-11-16 08:5x KST): server prod 5fc6325 → crefans-api:membership-partner-20261116(JS 해시 일치, ship exit 0, healthy·재시작0·다른 컨테이너 불변, /common 약관 membership.1·6조 새 문구, studio/memberships 비로그인 401, 복구 crefans-recovery/20261116/membership-partner-api). front prod 2c32f35 → front-membership-partner-20261116(운영 JS에 안내 문구 확인), 가이드 prod(바뀐 15파일, 109파일 해시·10경로 확인, 복구 20261116/guide-membership). 실제 배지 없는 계정으로 생성 거절은 운영에서 실행하지 않음(테스트로만).
 - 참고: platform.integration·media-cloud·studio-replies는 prod에서도 같은 15건 실패(서버 실행 필요 등 기존 미연결 테스트)라 이번 회귀 판단에서 제외.
 
 ## 2026-11-16 회원 비밀번호 변경 보완 (feat/password-change, 사용자 '기존 기능 보완' 선택)
