@@ -1,0 +1,49 @@
+[
+ {
+  "pdf": "crefans-preferential-terms.pdf",
+  "sha256": "98cb65c0d7ff2d30c45700f4de36aafc939d9afd2ad5ae19b8fb23b4c6ef24e5",
+  "bytes": 234228,
+  "fonts": [
+   {
+    "family": "P",
+    "status": "loaded"
+   },
+   {
+    "family": "P",
+    "status": "loaded"
+   }
+  ]
+ },
+ {
+  "pdf": "crefans-terms-policy-copy-2026-11-12.pdf",
+  "sha256": "4ab398c294ffdd3f96368c9b00f0e9dcddaa27b5dcd334e9ed6b67c805db293f",
+  "bytes": 333286,
+  "fonts": [
+   {
+    "family": "P",
+    "status": "loaded"
+   },
+   {
+    "family": "P",
+    "status": "loaded"
+   }
+  ]
+ },
+ {
+  "legalDocuments": [
+   {
+    "title": "이용약관",
+    "version": "2026-11-11.payout.1",
+    "effectiveAt": "2026-11-11",
+    "sha256": "13d6e7c736535e14bb5367e6316a3f40bb58d4fc2e5a3555f444a790f0793f5d"
+   },
+   {
+    "title": "운영정책",
+    "version": "2026-11-06.1",
+    "effectiveAt": "2026-11-06",
+    "sha256": "6d0cd13ebda413e7ac2aff75694a8bfaea8b97273c945a0e3ae22d0341ca648a"
+   }
+  ],
+  "builtFrom": "/Users/ethan/repository/crefans_server-privacy-esign/dist"
+ }
+]

@@ -1,0 +1,18 @@
+{
+  "time": "2026-11-03T09:11:56.084620+09:00",
+  "sourceSha256": "de41dd44d7a3fdce8de0ca492a391a0040b87a02364c0e2472c190ac9f08570d",
+  "outputSha256": "0d17f8e1bc151728ce5ca2a80883001d6d237b902b211f8669ba4d336269628d",
+  "pages": 5,
+  "pdfBodyEqualIgnoringWhitespaceHeadersFooters": true,
+  "htmlBodyEqual": true,
+  "firstAndSignatureTextSizeBaselineWithin0_01pt": true,
+  "visualReview": "Annex page inspected; other pages pixel-identical to prior approved version",
+  "command": "node build.cjs; Python verify.py; both exit0",
+  "change": "Removed only fan count definition input row",
+  "unchangedPagePixels": [
+    1,
+    2,
+    3,
+    5
+  ]
+}
