@@ -1,3 +1,12 @@
+## 2026-11-15 공개 가입·비회원 체험 보강 (night-work 후속 /ask-me 결정, feat/launch-hardening)
+- 결정: 비회원 게시 첨부는 AI 결과물만 · 가입 인증 메일 IP 제한+전체 상한 · 비회원 AI 예산 분리 · IP 문구 수정+키 필수 · 약관·처리방침·FAQ·가이드 지금 개정 · 테스트 연결 · 계약서 '파트너십 계약' 명칭 · 검증 통과 시 배포.
+- 코드: studio.service.ts 비회원 첨부는 본인 metadata.aiGenerated만(GUEST_AI_RESULT_ONLY) / ai-photo.ts 비회원은 ai-photo:total 미사용 / auth.service.ts signupMailGuard(IP HMAC 시간 5·하루 20 SIGNUP_RATE_LIMITED, 전체 하루 SIGNUP_MAIL_DAILY_TOTAL 기본 500 SIGNUP_MAIL_BUSY+운영 알림 auth.signup_mail_closed, 발송 실패 시 3분 쿨다운 환원) / guest-policy.ts IP 키 필수(고정 대체값 제거), 체험 동의 버전 2026-11-15.guest.2.
+- 법률 문서: 약관 2026-11-15.open.1(2조 만 19세 이상 누구나 이메일 인증 가입, 6조 계약 전 판매·후원·적립 가능), 처리방침 2026-11-15.open.1(13항 '임시 초대 베타' 삭제, 17항 IP는 서버 보안키 변환값·체험 시작 기록 접속 IP 감사 2년·요청 기록 7일, 체험 게시물은 AI 사진만). 시행일 11-15(가입 범위 확대·고지 강화라 이용자 불리 아님).
+- 문서: docs/platform-api.md 비회원 체험·파트너 요청 API 7건 설명(오늘 낮 배포분 누락 보완), current-contracts 재생성.
+- 테스트: package.json test:launch(guest·signup-mode·signup-invites·partner-request·ai-photo·manual-payouts·legal). 추가: 비회원 결과물만·24시간 내 검색 제외·200회 상한 시 회원 total 불변·IP 시간 5회·전체 상한+알림·발송 실패 쿨다운 환원·open 개정 문구. 실행 2026-11-15 22:3x KST 95/95 통과, 인접(auth·referrals·operations·ai-photo-grants·beta-policy) 44/44, openapi 포함 22/22. 대조: 결과물 검사·예산 분리·메일 가드를 각각 dist에서 제거 시 해당 테스트 실패 확인 후 원복.
+- 계약 초안 v2.39(docs/contract-partnership, v2.38 위): 표제 '크리에이터 파트너십 계약서'·서문. 조문 변경 없음, 7조④는 v2.37에 이미 반영. 서명·발송 안 함.
+- 미결·주의: 체험 연결(공용 PC) 현행 유지(사용자 결정). 비회원 결과 화면 하트 0/100 안내 노출(프론트, 미결). 본문 텍스트 검사·IPv6 /64 묶기·업로드 300MB 선저장은 미착수.
+
 ## 2026-11-15 회원가입 전체 개방·파트너 계약 요청 (서버)
 - 사용자 지시: 지금부터 회원가입 모두 받기(오픈 공지·홍보는 하지 않음), 크리에이터 전환은 즉시, 실제 출금은 모두싸인 전자계약 후. 계약 시작 방식은 "요청 버튼+텔레그램"(AskUserQuestion).
 - 가입: signup-policy inviteOnly=(BETA_MODE && SIGNUP_OPEN!=='true')||허용목록. BETA_MODE의 결제 규칙은 그대로. 베타 초대 안내 문구(guidance.signup)는 inviteOnly일 때만. runtime.env.example에 SIGNUP_OPEN.
