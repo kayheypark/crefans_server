@@ -2,9 +2,13 @@ import {Body,Controller,Delete,Get,Param,Post,Put,Query,Req,UseGuards} from '@ne
 import {PlatformStudioService} from './studio.service';
 import {PlatformAuthGuard} from './platform-auth.guard';
 import {reject} from './http';
+import {PlatformOperationsService} from './operations.service';
+import {LocalMemberService} from '../auth/local/local-member.service';
+import {requestPartnerContract} from './partner-policy';
 @Controller('studio') @UseGuards(PlatformAuthGuard)
 export class PlatformStudioController {
- constructor(private studio:PlatformStudioService){}
+ constructor(private studio:PlatformStudioService,private operations:PlatformOperationsService,private limiter:LocalMemberService){}
+ @Post('partner-request') partnerRequest(@Req() r:any){return requestPartnerContract(this.studio.db,this.operations,this.limiter,r.user.sub);}
  @Get('overview') overview(@Req() r:any){return this.studio.overview(r.user.sub);}
  @Get('community') community(@Req() r:any){return this.studio.community(r.user.sub);}
  @Post('start') start(@Body() b:any,@Req() r:any){return this.studio.updateProfile(r.user.sub,b,true);}

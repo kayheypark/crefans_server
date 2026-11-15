@@ -39,3 +39,15 @@ test('invite restriction applies to both mail and signup; deferred identity cann
  await assert.rejects(restricted.signup(data),code('SIGNUP_INVITE_REQUIRED'));
  const blocked=auth({},Object.assign(new LegalDocumentsService(),{catalog:blockedCatalog}));await assert.rejects(blocked.requestCode(data.email),code('POLICY_NOT_PUBLISHED'));await assert.rejects(blocked.signup(data),code('POLICY_NOT_PUBLISHED'));assert.equal(await db.member.count({where:{email:data.email}}),0);
 });
+
+test('SIGNUP_OPEN opens signup during the beta; an explicit allowlist still restricts it (2026-11-15)',async()=>{
+ assert.equal(signupPolicy(new ConfigService({BETA_MODE:'true'})).inviteOnly,true);
+ assert.equal(signupPolicy(new ConfigService({BETA_MODE:'true',SIGNUP_OPEN:'true'})).inviteOnly,false);
+ assert.equal(signupPolicy(new ConfigService({BETA_MODE:'true',SIGNUP_OPEN:'true',SIGNUP_EMAIL_ALLOWLIST:'a@example.invalid'})).inviteOnly,true);
+ const closed=auth({BETA_MODE:'true'}),open=auth({BETA_MODE:'true',SIGNUP_OPEN:'true'});
+ const email=`open-${randomUUID()}@example.invalid`;emails.push(email);
+ await assert.rejects(closed.requestCode(email),code('SIGNUP_INVITE_REQUIRED'));
+ await open.requestCode(email);const {proof}=await open.verifyCode({email,code:messages.filter(m=>m.email===email).pop().code});
+ await open.signup({email,emailProof:proof,password:'Open-test-123!',nickname:'가입 개방',terms:true,privacy:true,marketing:false,ageAcknowledged:true,policyVersions:legal.signup().versions});
+ const member=await db.member.findUniqueOrThrow({where:{email}});members.push(member.id);
+});
