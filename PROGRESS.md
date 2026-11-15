@@ -1,4 +1,5 @@
-## 2026-11-15 내 보관함 목록 total 추가 (운영 미배포)
+## 2026-11-15 내 보관함 목록 total 추가 (운영 배포 완료)
+- 운영 배포(2026-11-15 13:3x KST, 사용자 지시 "ㅂㅍ"): prod 5baa56a → API/worker=crefans-api:library-total-20261115(bean-reconcile 위 src·dist 덮어쓰기, ai-photo-library.js 해시 로컬 prod 빌드와 일치). 배포 스크립트 PASS(API/worker healthy·재시작0, 다른 컨테이너 불변, .env/runtime.env는 API_IMAGE·APP_RELEASE만, 비로그인 401). 복구 /Users/ethan/crefans-recovery/20261115/library-total-api 검증 후 서버 이전 태그·임시본 정리, 로컬 api.tar.gz 삭제. 프론트 front-library-album-20261115와 함께.
 - 사용자 선택(프론트 B안): 보관함을 분류별 줄 "{분류} {전체 수} 전체보기"로 보여 줌. 전체 수가 필요해 GET studio/ai-photo/library 응답에 total(같은 조건의 db.media.count) 추가. items·hasMore·24개 페이지는 그대로라 이전 클라이언트와 호환. OpenAPI 설명 갱신.
 - 검증: build 0, platform-ai-photo 39/39(total 1/0/삭제 후 0 단언 추가, 로컬 .local/platform.env 격리 e2e DB). 대조: total을 빼면 1 fail. 프론트 feat/library-album과 함께 배포해야 개수가 정확히 보임(서버 미배포 시 프론트는 불러온 수와 + 표시로 대체).
 
