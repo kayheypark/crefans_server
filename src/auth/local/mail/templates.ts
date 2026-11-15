@@ -22,6 +22,7 @@ export const noticeCopy = {
   'withdrawal-completed': ['출금이 완료되었습니다', '출금이 완료되었습니다', '수령 계좌의 입금 내역을 확인해주세요.', '출금 상세 보기'],
   'withdrawal-failed': ['출금을 완료하지 못했습니다', '출금 계좌를 확인해주세요', '아래 사유와 수령 계좌 정보를 확인해주세요.', '출금 상세 보기'],
   'withdrawal-pin-changed': ['출금 PIN이 변경되었습니다', '출금 PIN이 변경되었습니다', 'PASS 본인인증으로 출금 PIN을 새 번호로 바꿨습니다.', '출금 PIN 확인'],
+  'password-changed': ['계정 비밀번호가 변경되었습니다', '계정 비밀번호가 변경되었습니다', '크레팬스 계정 비밀번호가 변경되어 다른 기기에서는 로그아웃되었습니다. 본인이 바꾸지 않았다면 로그인 화면의 비밀번호 찾기로 바로 다시 바꾸고 고객센터에 알려 주세요.', '계정 설정 열기'],
   'withdrawal-pin-locked': ['출금 PIN 사용이 중지되었습니다', '출금 PIN을 다시 설정해주세요', '출금 PIN을 여러 번 잘못 입력해 PIN 사용을 중지했습니다. PASS 본인인증으로 새 PIN을 설정해주세요.', '출금 PIN 재설정'],
 } as const;
 const clean = (value: string) => String(value).replace(/\u2014/g, ', ');
