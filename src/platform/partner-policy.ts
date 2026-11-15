@@ -12,6 +12,10 @@ export async function requirePartnerCreator(db:any,member:string){
  if(!c)reject(403,'CREATOR_REQUIRED','크리에이터만 이용할 수 있습니다.');
  if(!c.is_verified)reject(403,'PARTNER_CONTRACT_REQUIRED',PARTNER_REQUIRED_MESSAGE);
 }
+// 2026-11-16 user decision: only partner creators (verified badge) can open a new membership or turn one back on. Memberships
+// that already exist keep selling and can still be edited or turned off; existing subscribers are not affected.
+export const MEMBERSHIP_PARTNER_MESSAGE='멤버십은 크레팬스와 파트너 계약을 맺은 크리에이터(인증 배지)만 새로 열 수 있어요. 출금 화면에서 파트너 계약을 요청해주세요.';
+export async function requirePartnerForMembership(db:any,member:string){if(!await isPartnerCreator(db,member))reject(403,'MEMBERSHIP_PARTNER_REQUIRED',MEMBERSHIP_PARTNER_MESSAGE);}
 // 2026-11-15 user decision: a creator asks for the partnership contract from the withdrawal screen. The operator gets a
 // Telegram alert (no member identifier, per the 2026-11-02 rule), finds the creator in the console log (business
 // creator.partner_requested), sends the contract on Modusign, and grants the verified badge after signing.

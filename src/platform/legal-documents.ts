@@ -205,12 +205,22 @@ const openTerms:LegalDocument={...syncTerms,version:'2026-11-15.open.1',updatedA
  notice:syncTerms.notice+' 2026년 11월 15일 개정: 제2조 가입 대상을 초대 이메일에서 만 19세 이상 누구나(이메일 인증)로 넓히고, 제6조에 파트너십 계약 전에도 판매·후원 받기와 수익 적립이 된다는 점을 적었습니다(출금만 계약 필요). 이전 동의 사본은 보존합니다.',
  sections:syncTerms.sections.map(sec=>{const e=openTermsEdits[sec.title];if(!e)return sec;if(!sec.body.includes(e[0]))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(e[0],e[1])};})};
 const openCatalog:LegalCatalog={...syncCatalog,documents:{...syncCatalog.documents,terms:openTerms}};
+// 2026-11-16 user decision: opening a new membership (or turning one back on) needs the partnership contract (verified badge,
+// studio.service.ts requirePartnerForMembership). Existing memberships keep selling. Applied from the decision day: beta with
+// no real charges and no existing membership affected (user chose immediate effect; the notice states the reason).
+export const MEMBERSHIP_PARTNER_DATE='2026-11-16';
+const MEMBERSHIP_PARTNER_FROM='파트너십 계약 전에도 멤버십 판매·후원 받기와 수익 적립은 할 수 있으며, 정산 계좌와 출금 비밀번호도 미리 등록할 수 있습니다.';
+const MEMBERSHIP_PARTNER_TO='새 멤버십을 열거나 중지한 멤버십을 다시 여는 것도 파트너십 계약을 맺은 크리에이터만 할 수 있습니다. 이미 연 멤버십은 계약 전이라도 계속 판매하고 수정하거나 중지할 수 있습니다. 후원 받기와 수익 적립은 계약 전에도 할 수 있으며, 정산 계좌와 출금 비밀번호도 미리 등록할 수 있습니다.';
+const membershipTerms:LegalDocument={...openTerms,version:'2026-11-16.membership.1',updatedAt:MEMBERSHIP_PARTNER_DATE,publishedAt:MEMBERSHIP_PARTNER_DATE,effectiveAt:MEMBERSHIP_PARTNER_DATE,
+ notice:openTerms.notice+' 2026년 11월 16일 개정: 제6조에 새 멤버십 개설과 중지한 멤버십의 재개는 파트너십 계약(인증 배지) 크리에이터만 할 수 있다는 점을 적었습니다. 계약 확인 전 판매로 생기는 정산·분쟁 위험을 줄이기 위한 변경이며, 이미 연 멤버십과 기존 구독자에게는 영향이 없습니다. 이전 동의 사본은 보존합니다.',
+ sections:openTerms.sections.map(sec=>{if(sec.title!=='6. 크리에이터 수수료·정산·출금')return sec;if(!sec.body.includes(MEMBERSHIP_PARTNER_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(MEMBERSHIP_PARTNER_FROM,MEMBERSHIP_PARTNER_TO)};})};
+const membershipCatalog:LegalCatalog={...openCatalog,documents:{...openCatalog.documents,terms:membershipTerms}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)
