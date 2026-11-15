@@ -38,3 +38,7 @@ h2{font-size:13pt;line-height:1.5;letter-spacing:-.2px;margin:4mm 0 2mm;padding:
 .parties td.ex{padding-bottom:8.5mm}
 .contract-columns .clause{margin-bottom:.9mm}
 .contract-columns{line-height:1.47}
+
+/* 2026-11-15 v2.41: keep 5 pages after clauses 7.4, 9.4, 12.2 grew (spacing only, font sizes unchanged) */
+.contract-columns{line-height:1.43}
+.contract-columns h2{margin:2.4mm 0 1.2mm}
