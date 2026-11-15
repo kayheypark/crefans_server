@@ -5,6 +5,7 @@
 - postPage: 전체 피드(분류 없음)는 비활성 크리에이터·정지 회원 글만 제외(hiddenAuthors), 분류 피드는 기존처럼 그 분류 크리에이터만. 프로필 목록은 postAuthor()로 회원 id/핸들도 허용. postSearch도 회원 글 포함(검색 거부·정지 제외).
 - 후원: beans.tip이 받는 사람이 활성 크리에이터가 아니면 TIP_CREATOR_REQUIRED(기존에는 받는 사람 검사가 없어 API로 일반 회원에게 후원이 가능했던 구멍도 함께 막음).
 - AI 사진: ai-photo·ai-shop의 requireCreator→service.member(허용 목록 aiPhotoAllowed는 그대로). 콘솔 허용(grantAiPhoto)은 크리에이터 핸들이 없으면 활성 회원 핸들(preferred_username)도 받음, 목록은 회원 핸들·닉네임과 isCreator 표시. 관리자 화면 문구는 admin 저장소 확인 필요.
+- bootstrap에 viewerId(로그인 회원 id, 비로그인 null) 추가: 크리에이터가 아닌 회원의 내 프로필 글 목록용.
 - 워터마크: 처리방침 문구대로 기존 eligibility(업로드 시 회원 핸들 기록) 유지, 별도 변경 없음.
 - 검증: build 0, 새 tests/platform-member-posts.test.cjs 5/5(저장 규칙·피드/프로필/검색/분류 제외·정지 회원 제외·후원 차단·회원 AI 허용), 대조: prod 코드로 되돌리면 5/5 fail. platform-beans 43/43, ai-photo 39/39, beta-policy 11/11, watermark-followups 6/6, referrals 15/15, event-claim 12/12, payment-lifecycle 69/69, post-search 3/3, post-visibility 5/5. platform-feed-category·post-view-metrics·platform(.access).integration은 prod 기준선에서도 같은 방식으로 실패(실행 환경 필요)라 미검증.
 

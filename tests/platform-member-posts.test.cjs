@@ -33,6 +33,7 @@ test('member posts are readable, in the whole feed, search and the member profil
  assert.equal(await service.access(row,fan),true);assert.equal(await service.access(row,undefined),true);
  const dto=await service.post(row,fan,false);assert.equal(dto.tipsEnabled,false);assert.equal(dto.requiredRank,0);assert.equal(dto.commentsEnabled,true);assert.equal(dto.canAccess,true);
  const feed=await service.postPage(fan);assert.ok(feed.posts.some(p=>p.id===row.id),'whole feed carries the member post');assert.ok(feed.creators.some(c=>c.id===writer&&c.isCreator===false),'author profile comes with it');
+ assert.equal((await service.bootstrap(writer)).viewerId,writer,'own profile lists the member\'s posts by viewerId');assert.equal((await service.bootstrap(undefined)).viewerId,null);
  const profile=await service.postPage(fan,'mpwriter_'+tag);assert.deepEqual(profile.posts.map(p=>p.id),[row.id]);
  const category=await db.creatorCategory.findFirst();if(category){const filtered=await service.postPage(fan,undefined,undefined,category.name);assert.ok(!filtered.posts.some(p=>p.id===row.id),'a category feed lists creators only');}
  const found=await service.postSearch(fan,'회원 글 '+tag);assert.ok(found.posts.some(p=>p.id===row.id));
