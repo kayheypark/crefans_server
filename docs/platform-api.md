@@ -118,8 +118,8 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /studio/content | id?, title/body/media/commentsEnabled/accessPlanId/status/scheduledAt |
 | POST | /studio/content/:id/delete | `confirmation`에 현재 제목 정확 입력 필수. 게시물 잠금·소유권 검사 후 soft delete·운영 이벤트를 같은 트랜잭션으로 처리 |
 | PUT | /studio/content/:id/visibility | `{public:boolean}`. 본인 게시물 공개·미공개 전환(사유 없음, 2026-11-07). 아래 '게시물 미공개' 절 참고 |
-| POST | /studio/memberships | id?, name/price/benefits/image; price는 1~1,100,000원(2026-11-06 토스 신고 단건 최고가, finance.service createOrder도 같은 상한), immutable version 생성 |
-| PUT | /studio/memberships/:id | active 또는 deleted; 삭제는 confirmation에 현재 멤버십 이름 정확히 입력 필수, 잠금 후 이름·소유자·삭제 여부·유효 구독 재확인 |
+| POST | /studio/memberships | id?, name/price/benefits/image; price는 1~1,100,000원(2026-11-06 토스 신고 단건 최고가, finance.service createOrder도 같은 상한), immutable version 생성 새로 만들기(id 없음)는 인증 배지 크리에이터만(MEMBERSHIP_PARTNER_REQUIRED, 2026-11-16). |
+| PUT | /studio/memberships/:id | active 또는 deleted; 삭제는 confirmation에 현재 멤버십 이름 정확히 입력 필수, 잠금 후 이름·소유자·삭제 여부·유효 구독 재확인 중지된 멤버십 다시 켜기는 인증 배지 크리에이터만(MEMBERSHIP_PARTNER_REQUIRED). |
 | PUT | /studio/comments/:id | hidden, 본인 게시물만 |
 | POST | /studio/comments/:id/reply | body 1~1000자, 본인 게시물·삭제되지 않은 부모, 2뎁스·댓글 수 반영 |
 | PUT | /studio/comments/:id/replies/:replyId | body 1~1000자, 내 게시물의 해당 부모에 내가 쓴 답글만 수정 |

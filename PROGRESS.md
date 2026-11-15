@@ -1,3 +1,9 @@
+## 2026-11-16 멤버십은 파트너 계약 크리에이터만 새로 열기 (feat/membership-partner)
+- 사용자 결정(/ask-me): 새 멤버십 생성·중지 멤버십 재개는 인증 배지(creators.is_verified=파트너 계약)만, 기존 멤버십은 판매·수정·중지 유지, 약관·가이드·화면 함께 개정, 약관 즉시 시행(베타·실청구 없음·기존 영향 없음 판단, 공지에 이유 기재), 검증 통과 시 배포.
+- 코드: partner-policy.ts requirePartnerForMembership/MEMBERSHIP_PARTNER_MESSAGE(403 MEMBERSHIP_PARTNER_REQUIRED), studio.service.ts saveMembership(id 없을 때)·membershipState(비활성→활성). 약관 2026-11-16.membership.1(6조 'MEMBERSHIP_PARTNER_TO', catalog 분기 추가). openapi·docs/platform-api.md 설명.
+- 테스트: tests/platform-membership-partner.test.cjs 2건(배지 없으면 생성 거절·배지 있으면 생성 / 배지 해제 후 수정·중지 가능·재활성 거절·배지 복구 후 재활성), legal 새 테스트+기존 '최신 시행본' 기대값 갱신. 관련 47/47. 대조: 생성 검사·재활성 검사를 각각 dist에서 제거하면 해당 테스트 실패 확인.
+- 참고: platform.integration·media-cloud·studio-replies는 prod에서도 같은 15건 실패(서버 실행 필요 등 기존 미연결 테스트)라 이번 회귀 판단에서 제외.
+
 ## 2026-11-16 회원 비밀번호 변경 보완 (feat/password-change, 사용자 '기존 기능 보완' 선택)
 - 기존: 설정 → 비밀번호 변경(PUT me/settings section=password)은 있었으나 변경 시 현재 기기까지 모든 세션을 지워, 화면은 '설정을 저장했습니다' 후 다음 동작에서 갑자기 401. 테스트 없음, 횟수 제한·알림 없음.
 - 변경: 변경한 기기 세션(access_token 해시)만 남기고 나머지 철회 / 같은 비밀번호 거절 PASSWORD_UNCHANGED / 회원당 10분 5회(controller, LocalMemberService.limit 'password-change:') / 앱 알림+메일(member-notices 'password-changed', 계정 보안) / 감사 security 'member.password_changed' / 응답 '비밀번호를 변경했어요. 다른 기기에서는 다시 로그인해야 해요.'

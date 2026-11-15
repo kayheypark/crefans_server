@@ -91,7 +91,7 @@ test('2026-11-11 payout revision: article 6 states the company transfer from the
 test('2026-11-13 partner revision: article 6 limits withdrawals to partner creators and keeps the account/PIN and hold rules',()=>{
  const legal=new LegalDocumentsService(),{PARTNER_TERMS_DATE}=require('../dist/src/platform/legal-documents');assert.equal(PARTNER_TERMS_DATE,'2026-11-13');
  const before=legal.catalog(new Date('2026-11-12T23:59:00+09:00')).documents.terms,after=legal.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;
- assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-15.open.1');
+ assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-16.membership.1');
  const six=after.sections.find(s=>s.title==='6. 크리에이터 수수료·정산·출금').body;
  assert.match(six,/파트너십 계약을 맺은 크리에이터\(프로필에 인증 배지 표시\)만 신청할 수 있습니다/);assert.match(six,/정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다/);
  assert.match(six,/인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다/);assert.match(six,/출금에는 본인 명의 정산 계좌의 확인과 별도 출금 인증이 필요합니다/);
@@ -197,4 +197,12 @@ test('2026-11-15 open revision: signup open to adults, selling before the contra
  assert.doesNotMatch(by(p,'13. 아동과 민감정보'),/초대 베타/);
  const guest=by(p,'17. 선택 기능: 비회원 AI 사진 체험');assert.doesNotMatch(guest,/되돌릴 수 없게/);assert.match(guest,/감사 기록/);
  const {GUEST_CONSENT_VERSION}=require('../dist/src/platform/guest');assert.equal(GUEST_CONSENT_VERSION,'2026-11-15.guest.2','consent text changed, so the consent version moved');
+});
+
+// 2026-11-16 user decision: new memberships need the partnership contract; terms article 6 says so from the same day.
+test('2026-11-16 membership revision: article 6 limits opening a membership to partners and keeps existing ones',()=>{
+ const legal=new LegalDocumentsService(),t=legal.catalog(new Date('2026-11-16T09:00:00+09:00')).documents.terms,s6=t.sections.find(s=>s.title==='6. 크리에이터 수수료·정산·출금').body;
+ assert.equal(t.version,'2026-11-16.membership.1');assert.equal(legal.catalog(new Date('2026-11-15T12:00:00+09:00')).documents.terms.version,'2026-11-15.open.1');
+ assert.match(s6,/새 멤버십을 열거나 중지한 멤버십을 다시 여는 것도 파트너십 계약을 맺은 크리에이터만/);assert.match(s6,/이미 연 멤버십은 계약 전이라도 계속 판매/);assert.doesNotMatch(s6,/계약 전에도 멤버십 판매/);
+ const {MEMBERSHIP_PARTNER_MESSAGE}=require('../dist/src/platform/partner-policy');assert.match(MEMBERSHIP_PARTNER_MESSAGE,/인증 배지/);
 });
