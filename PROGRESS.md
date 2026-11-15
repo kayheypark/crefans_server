@@ -1,3 +1,12 @@
+## 2026-11-15 공개 가입·비회원 체험 보강 (night-work 후속 /ask-me 결정, feat/launch-hardening)
+- 결정: 비회원 게시 첨부는 AI 결과물만 · 가입 인증 메일 IP 제한+전체 상한 · 비회원 AI 예산 분리 · IP 문구 수정+키 필수 · 약관·처리방침·FAQ·가이드 지금 개정 · 테스트 연결 · 계약서 '파트너십 계약' 명칭 · 검증 통과 시 배포.
+- 코드: studio.service.ts 비회원 첨부는 본인 metadata.aiGenerated만(GUEST_AI_RESULT_ONLY) / ai-photo.ts 비회원은 ai-photo:total 미사용 / auth.service.ts signupMailGuard(IP HMAC 시간 5·하루 20 SIGNUP_RATE_LIMITED, 전체 하루 SIGNUP_MAIL_DAILY_TOTAL 기본 500 SIGNUP_MAIL_BUSY+운영 알림 auth.signup_mail_closed, 발송 실패 시 3분 쿨다운 환원) / guest-policy.ts IP 키 필수(고정 대체값 제거), 체험 동의 버전 2026-11-15.guest.2.
+- 법률 문서: 약관 2026-11-15.open.1(2조 만 19세 이상 누구나 이메일 인증 가입, 6조 계약 전 판매·후원·적립 가능), 처리방침 2026-11-15.open.1(13항 '임시 초대 베타' 삭제, 17항 IP는 서버 보안키 변환값·체험 시작 기록 접속 IP 감사 2년·요청 기록 7일, 체험 게시물은 AI 사진만). 시행일 11-15(가입 범위 확대·고지 강화라 이용자 불리 아님).
+- 문서: docs/platform-api.md 비회원 체험·파트너 요청 API 7건 설명(오늘 낮 배포분 누락 보완), current-contracts 재생성.
+- 테스트: package.json test:launch(guest·signup-mode·signup-invites·partner-request·ai-photo·manual-payouts·legal). 추가: 비회원 결과물만·24시간 내 검색 제외·200회 상한 시 회원 total 불변·IP 시간 5회·전체 상한+알림·발송 실패 쿨다운 환원·open 개정 문구. 실행 2026-11-15 22:3x KST 95/95 통과, 인접(auth·referrals·operations·ai-photo-grants·beta-policy) 44/44, openapi 포함 22/22. 대조: 결과물 검사·예산 분리·메일 가드를 각각 dist에서 제거 시 해당 테스트 실패 확인 후 원복.
+- 계약 초안 v2.39(docs/contract-partnership, v2.38 위): 표제 '크리에이터 파트너십 계약서'·서문. 조문 변경 없음, 7조④는 v2.37에 이미 반영. 서명·발송 안 함.
+- 미결·주의: 체험 연결(공용 PC) 현행 유지(사용자 결정). 비회원 결과 화면 하트 0/100 안내 노출(프론트, 미결). 본문 텍스트 검사·IPv6 /64 묶기·업로드 300MB 선저장은 미착수.
+
 ## 2026-11-15 회원가입 전체 개방·파트너 계약 요청 (서버)
 - 사용자 지시: 지금부터 회원가입 모두 받기(오픈 공지·홍보는 하지 않음), 크리에이터 전환은 즉시, 실제 출금은 모두싸인 전자계약 후. 계약 시작 방식은 "요청 버튼+텔레그램"(AskUserQuestion).
 - 가입: signup-policy inviteOnly=(BETA_MODE && SIGNUP_OPEN!=='true')||허용목록. BETA_MODE의 결제 규칙은 그대로. 베타 초대 안내 문구(guidance.signup)는 inviteOnly일 때만. runtime.env.example에 SIGNUP_OPEN.
@@ -51,6 +60,17 @@
 - 결제 조건 버전(PAYMENT_TERMS 2026-11-02.1)은 올리지 않음: 멤버십·구독 재개·콩이 공유하고 구독 재개는 정확한 버전만 받아 열린 결제 화면이 거절될 위험(올렸을 때 결제 생애주기 테스트 17건 실패 확인). 콩 충전·이어서 결제 화면에 한도 안내로 대체 — 사용자 확인 필요.
 - AI 횟수 소진 서버 문구(ai-shop.ts DAILY_LIMIT)를 "무료 횟수를 모두 썼어요. 매일 오전 9시에 다시 채워지고, 횟수권을 구매하면 계속 만들 수 있어요."로 프론트와 통일.
 - 검증: build 0, legal 21/21(동기화 개정 테스트 추가: 약관 숫자가 bean-policy·AI 상수와 일치하는지 대조), ai-shop+legal 28/28.
+
+## 2026-11-15 크리에이터 계약 초안 v2.38: 종료 후 30일 협의·미합의 시 전액 지급 (미서명·미발송)
+- 사용자 결정: 제12조② 종료일부터 30일 안에 처리 방법·일정 협의, 미합의 시 종료 시점까지 확정된 미정산 수익 전액을 등록 정산 계좌로 지급(분쟁 보류분은 제9조④), 일방 소멸 금지. 지급은 운영자 수동 지급(계약 본문 밖 운영 절차).
+- 검증: html(0)·pdf(0)·verify PASS(7쪽), 새 문장3 존재/옛 문장2 부재, 전 7쪽 PNG 육안 확인. PDF sha256 3881af05…9c0b. 세부·검토 필요는 docs/contracts/README.txt v2.38.
+- 코드 주의: 배지 해제 후에는 payout()·manualResult가 지급을 막으므로 30일 후 수동 지급 절차는 별도 정리 필요.
+
+## 2026-11-15 크리에이터 계약 초안 v2.37: 종료 후 출금 불가·잔액 별도 협의 (미서명·미발송)
+- /pilot-work 사용자 결정 "계약 초안을 코드에 맞춘다": 출금은 파트너 계약(인증 배지) 유효 기간에만(partner-policy.ts requirePartnerCreator). 제7조④ 유효기간 중 출금·배지 표시 추가, 제9조④ 종료 후 잔액은 제12조② 참조, 제12조② "미정산금 권리 유지"→종료 후 출금 신청 불가·미지급 신청 보류·남은 수익/미수금은 별도 협의·일방 소멸 금지. 세부·검토 필요는 docs/contracts/README.txt v2.37.
+- 검증: build-contract-html(0)·build-contract-pdf(0)·verify-contract-pdf PASS(7쪽·13조·별지1), 새 문장5 존재/옛 문장2 부재, 전 7쪽 PNG 육안 확인. PDF sha256 5ceaa92b…5cf1.
+- 프론트 check:docs(CREFANS_SERVER_DIR=작업 폴더) exit1: 기존 미검토 문서 3건·Generated contracts stale(계약서와 무관, origin/prod 기준에서도 stale 재현). docs:record는 프론트 evidence.json에 다른 세션의 미커밋 변경이 있어 미실행.
+- 검토 필요: 약관규제법 제6조·제9조 및 제9조④ 무기한 보류 금지와의 관계(협의 기한·결렬 처리 없음), 배지 없는 크리에이터의 탈퇴 전 출금·탈퇴 차단 운영 절차.
 
 ## 2026-11-15 처리방침 BytePlus 개정·하트 하루 상한 운영 배포 완료
 - prod 8272577(feat/privacy-byteplus + feat/ai-heart-daily-cap). API/worker=crefans-api:privacy-hearts-20261115(x-presets 위 src·dist 덮어쓰기, legal-documents.js·ai-photo-hearts.js 해시가 로컬 prod 빌드와 일치). 프론트 변경 없음. 콩 대사 수정(fix/bean-reconcile-kill-switch 95a925b)은 사용자 미선택으로 제외.

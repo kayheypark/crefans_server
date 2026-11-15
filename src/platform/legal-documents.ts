@@ -146,6 +146,21 @@ export const GUEST_PRIVACY_DATE='2026-11-15';
 export const GUEST_PRIVACY_SECTION={title:'17. 선택 기능: 비회원 AI 사진 체험',body:"로그인하지 않은 방문자가 'AI 사진 체험'을 시작하면 다음과 같이 처리합니다.\n\n처리 항목: 체험을 시작할 때 만드는 무작위 브라우저 식별 쿠키(cf_guest, 최대 30일)의 해시값, 접속 IP를 되돌릴 수 없게 변환한 값, 방문자가 올린 사진과 AI로 만든 사진, 게시물 제목·본문, 체험 동의 시각과 안내 판 번호. 이름·이메일·전화번호는 받지 않습니다.\n\n목적: 체험 횟수 제한(브라우저당 10회, 같은 접속 IP 하루 10회, 비회원 전체 하루 200회), 부정 이용 방지, 체험 게시물 게시, 같은 브라우저로 로그인했을 때 그 계정으로 게시물·사진 연결.\n\n공개와 연결: 체험 게시물은 게시 후 24시간 동안 전체 피드와 홈에 '체험 사용자' 이름으로 공개되고, 그 뒤에는 누구도 열람할 수 없는 비공개로 바뀝니다. 같은 브라우저에서 로그인하거나 회원가입 후 로그인하면 그 회원의 게시물·사진으로 옮겨지며, 24시간이 지난 게시물은 비공개 상태로 옮겨집니다. 체험 게시물에는 댓글·후원·멤버십을 쓸 수 없습니다.\n\n보유 기간: 계정에 연결되지 않은 체험 게시물은 게시 후 30일이 지나면 삭제하고, 게시물에 쓰이지 않았거나 삭제된 게시물의 사진은 미사용 파일 정리 기준(7일)에 따라 삭제합니다. 횟수 제한 기록은 기존 보안 기록 보관 기준을 따릅니다. 쿠키는 브라우저에서 언제든 지울 수 있으며, 지우면 체험 게시물을 계정에 연결할 수 없습니다.\n\nAI 처리와 국외 이전: 사진 생성(BytePlus)과 유해성 검사(OpenAI), 국외 이전되는 국가·일시·방법·보관 기간·거부 방법은 16항과 같습니다. 체험을 시작하기 전 화면에서 이 내용에 동의를 받으며, 동의하지 않으면 체험을 이용할 수 없습니다.\n\n사진 속 인물은 본인이거나 동의를 받은 사람이어야 하며, 노출·성적인 합성, 미성년자, 다른 사람 얼굴 합성은 만들 수 없습니다. 비회원 체험 게시물에도 신고·숨김 기준이 똑같이 적용됩니다.",links:AI_PHOTO_LINKS_BYTEPLUS};
 catalog.documents.privacy={...catalog.documents.privacy,version:'2026-11-15.guest.1',updatedAt:GUEST_PRIVACY_DATE,publishedAt:GUEST_PRIVACY_DATE,effectiveAt:GUEST_PRIVACY_DATE,notice:'2026년 11월 15일부터 로그인하지 않은 방문자의 AI 사진 체험(17항)을 시작합니다. 체험 식별 쿠키·접속 IP 변환값·사진을 처리하며, 체험 게시물은 24시간 공개 후 비공개로 바뀌고 같은 브라우저로 로그인하면 계정에 연결됩니다. 기존 동의 사본은 보존합니다.',sections:[...catalog.documents.privacy.sections.map(section=>section.title==='10. 쿠키와 자동 수집'?{...section,body:section.body+'\n비회원 AI 사진 체험을 시작하면 체험 식별 쿠키 cf_guest를 최대 30일 저장합니다(17항).'}:section),GUEST_PRIVACY_SECTION]};
 
+// 2026-11-15 user decisions (/ask-me after night-work): signup is open to everyone (SIGNUP_OPEN), so article 13 stops calling
+// email signup a temporary invite beta; section 17 states what the IP value really is (an HMAC keyed with a server secret,
+// pseudonymous, not irreversible), that the consent record keeps the connecting IP as an audit record, and that a trial post
+// may only carry AI results (studio.service.ts GUEST_AI_RESULT_ONLY).
+export const OPEN_LEGAL_DATE='2026-11-15';
+const openPrivacyEdits:Record<string,[string,string][]>={
+ '13. 아동과 민감정보':[['일반 콘텐츠만 제공하는 임시 초대 베타의 이메일 가입 모드에서는','일반 콘텐츠만 제공하는 현재의 이메일 가입 모드에서는']],
+ '17. 선택 기능: 비회원 AI 사진 체험':[['접속 IP를 되돌릴 수 없게 변환한 값','접속 IP를 서버 보안키로 변환한 값(같은 접속 IP의 체험 횟수를 세는 데만 씀)'],
+  ['이름·이메일·전화번호는 받지 않습니다.','이름·이메일·전화번호는 받지 않습니다. 체험 시작(동의) 기록에는 접속 IP가 감사 기록으로 남고, 접속 요청 기록에도 접속 IP가 남습니다.'],
+  ['체험 게시물에는 댓글·후원·멤버십을 쓸 수 없습니다.','체험 게시물에는 AI로 만든 사진만 올릴 수 있고, 댓글·후원·멤버십을 쓸 수 없습니다.'],
+  ['횟수 제한 기록은 기존 보안 기록 보관 기준을 따릅니다.','횟수 제한 기록은 기존 보안 기록 보관 기준을 따르고, 체험 시작 기록(접속 IP 포함)은 감사 기록 기준(2년), 접속 요청 기록은 7일 동안 보관합니다(7항).']]};
+catalog.documents.privacy={...catalog.documents.privacy,version:'2026-11-15.open.1',updatedAt:OPEN_LEGAL_DATE,publishedAt:OPEN_LEGAL_DATE,effectiveAt:OPEN_LEGAL_DATE,
+ notice:catalog.documents.privacy.notice+' 2026년 11월 15일 개정: 이메일 가입을 초대 베타가 아닌 현재 가입 방식으로 바로잡고(13항), 비회원 체험의 접속 IP 처리 방식(보안키 변환값, 체험 시작 기록의 접속 IP 보관)과 체험 게시물에는 AI로 만든 사진만 올릴 수 있다는 점을 17항에 적었습니다.',
+ sections:catalog.documents.privacy.sections.map(sec=>{const edits=openPrivacyEdits[sec.title];if(!edits)return sec;let body=sec.body;for(const[from,to]of edits){if(!body.includes(from))throw Error(`Legal revision anchor missing in ${sec.title}`);body=body.replace(from,to);}return{...sec,body};})};
+
 const nextCatalog:LegalCatalog={...catalog,documents:{...catalog.documents,terms:nextTerms,policy:nextPolicy}};
 // 2026-11-11 user decision (ask-me, manual payouts): article 6 drops "no real payouts in the test beta" and states that the
 // company transfers payouts itself from the start date it announces; article 4 keeps "no real charges" (real payments are a
@@ -181,12 +196,21 @@ const syncTerms:LegalDocument={...partnerTerms,version:'2026-11-15.sync.1',updat
  notice:partnerTerms.notice+' 2026년 11월 15일 개정: 제11조에 콩 충전 한도(한 번에 900콩·하루 200,000원)를, 제13조에 스튜디오 AI 사진 편집의 무료 횟수·하트 보상·횟수권 기준을 적었습니다. 이전 동의 사본은 보존합니다.',
  sections:[...partnerTerms.sections.map(sec=>{if(sec.title!=='11. 콩')return sec;if(!sec.body.includes(BEAN_LIMIT_ANCHOR))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(BEAN_LIMIT_ANCHOR,BEAN_LIMIT_TEXT+BEAN_LIMIT_ANCHOR)};}),AI_PHOTO_TERMS_SECTION]};
 const syncCatalog:LegalCatalog={...payoutCatalog,documents:{...payoutCatalog.documents,terms:syncTerms}};
+// 2026-11-15 user decisions (/ask-me): article 2 states open signup (adults 19+ with email verification) instead of the invite
+// beta, and article 6 states that creators can sell and receive support before the partnership contract (only withdrawal needs it).
+const openTermsEdits:Record<string,[string,string]>={
+ '2. 가입과 계정 관리':['오픈베타 기간(2026년 11월까지)에는 사전 협의된 초대 이메일로 가입하며 일반 콘텐츠만 제공합니다.','만 19세 이상이면 누구나 이메일 인증으로 가입할 수 있으며, 오픈베타 기간(2026년 11월까지)에는 일반 콘텐츠만 제공합니다.'],
+ '6. 크리에이터 수수료·정산·출금':['정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다.','파트너십 계약 전에도 멤버십 판매·후원 받기와 수익 적립은 할 수 있으며, 정산 계좌와 출금 비밀번호도 미리 등록할 수 있습니다.']};
+const openTerms:LegalDocument={...syncTerms,version:'2026-11-15.open.1',updatedAt:OPEN_LEGAL_DATE,publishedAt:OPEN_LEGAL_DATE,effectiveAt:OPEN_LEGAL_DATE,
+ notice:syncTerms.notice+' 2026년 11월 15일 개정: 제2조 가입 대상을 초대 이메일에서 만 19세 이상 누구나(이메일 인증)로 넓히고, 제6조에 파트너십 계약 전에도 판매·후원 받기와 수익 적립이 된다는 점을 적었습니다(출금만 계약 필요). 이전 동의 사본은 보존합니다.',
+ sections:syncTerms.sections.map(sec=>{const e=openTermsEdits[sec.title];if(!e)return sec;if(!sec.body.includes(e[0]))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(e[0],e[1])};})};
+const openCatalog:LegalCatalog={...syncCatalog,documents:{...syncCatalog.documents,terms:openTerms}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

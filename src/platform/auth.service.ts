@@ -6,6 +6,9 @@ import {INVITE_REQUIRED_MESSAGE,signupPolicy} from './signup-policy';
 import {consumeInvite} from './signup-invites';
 import {actorContext,observeAudit,safeError} from './audit';
 import {enqueueOperation} from './operations-events';
+import {guestIpHash} from './guest-policy';
+import {requestContext} from './request-context';
+export const SIGNUP_IP_HOURLY=5,SIGNUP_IP_DAILY=20,SIGNUP_MAIL_DAILY_TOTAL=500;
 import {Injectable} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {randomBytes,randomInt,randomUUID,createHmac} from 'crypto';
@@ -24,9 +27,20 @@ export class PlatformAuthService {
  private codeHash(email:string,code:string){return createHmac('sha256',this.config.get('LOCAL_AUTH_SECRET')).update(`${email}:${code}`).digest('hex');}
  // A valid referral link admits a visitor without an operator invite while the console switch is on (user decision 2026-11-01).
  private async assertInvitedOrReferred(email:string,referralCode:unknown){if(referralCodeInput(referralCode)!==undefined&&await referralOn(this.db)){await assertReferralCode(this.db,referralCode);return true;}await signupPolicy(this.config).assertInvited(email,this.db);return false;}
+ // 2026-11-15 user decision (open signup): verification mail per connecting IP (5 an hour, 20 a day) and a service-wide daily
+ // ceiling (SIGNUP_MAIL_DAILY_TOTAL, default 500) so scripts cannot flood inboxes or use up the SMTP quota that password resets need.
+ private async signupMailGuard(){
+  const peer=requestContext.getStore()?.ip,busy=()=>reject(429,'SIGNUP_RATE_LIMITED','인증 코드 요청이 너무 많아요. 잠시 후 다시 시도해주세요.');
+  // Requests always carry the connecting IP behind the proxy; direct service calls (tests, scripts) have none and skip this step.
+  if(peer)try{const ip=guestIpHash(this.config,peer);await this.local.limit(`signup-ip-hour:${ip}`,SIGNUP_IP_HOURLY,3600);await this.local.limit(`signup-ip-day:${ip}`,SIGNUP_IP_DAILY,86400);}catch(error:any){if(error?.getStatus?.()===429)busy();throw error;}
+  const total=Math.max(1,Number(this.config.get('SIGNUP_MAIL_DAILY_TOTAL'))||SIGNUP_MAIL_DAILY_TOTAL);
+  try{await this.local.limit('signup-mail:total',total,86400);}catch(error:any){if(error?.getStatus?.()!==429)throw error;
+   await this.db.$transaction(tx=>enqueueOperation(tx,'auth.signup_mail_closed',{status:'closed'},'signup-mail-closed:'+new Date().toISOString().slice(0,10))).catch(()=>undefined);
+   reject(429,'SIGNUP_MAIL_BUSY','오늘은 가입 인증 메일 요청이 많아 잠시 쉬고 있어요. 내일 다시 시도해주세요.');}
+ }
  async requestCode(raw:string,referralCode?:unknown){
    // The invitation check answers first so non-invited visitors see the beta notice; invited emails still wait for published terms.
-   const email=this.email(raw);await this.assertInvitedOrReferred(email,referralCode);this.legal.requirePublished();await this.local.limit(`signup-email:${email}`,10,3600);
+   const email=this.email(raw);await this.assertInvitedOrReferred(email,referralCode);this.legal.requirePublished();await this.signupMailGuard();await this.local.limit(`signup-email:${email}`,10,3600);
    if(await this.db.member.findUnique({where:{email}}))reject(409,'EMAIL_IN_USE','이미 가입한 이메일입니다.');
    const code=String(randomInt(0,1000000)).padStart(6,'0'),now=new Date();
    await this.db.$transaction(async tx=>{
@@ -35,7 +49,8 @@ export class PlatformAuthService {
      if(now.getTime()-new Date(rows[0].sent_at).getTime()<180000)reject(429,'RESEND_COOLDOWN','3분 후 인증 코드를 다시 요청해주세요.');
      await tx.signupChallenge.update({where:{email},data:{code_hash:this.codeHash(email,code),attempts:0,sent_at:now,expires_at:new Date(Date.now()+600000),proof_hash:null,verified_at:null}});
    });
-   try{await this.mail.sendCode(email,code,'verify');}catch{reject(503,'MAIL_UNAVAILABLE','이메일 발송 설정이 필요하거나 발송에 실패했습니다.');}
+   // A failed send gives the cooldown back so the visitor can retry right away (2026-11-15 night-work).
+   try{await this.mail.sendCode(email,code,'verify');}catch{await this.db.signupChallenge.update({where:{email},data:{sent_at:new Date(0)}}).catch(()=>undefined);reject(503,'MAIL_UNAVAILABLE','이메일 발송 설정이 필요하거나 발송에 실패했습니다.');}
    return{message:'인증 코드를 발송했습니다.'};
  }
  async verifyCode(input:any){const email=this.email(input.email),code=text(input.code,6);

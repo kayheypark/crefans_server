@@ -232,7 +232,8 @@ export class AiPhotoService{
   let paidUse:any=null,rewardUse:any=null;const guestTaken:{key:string;seconds:number}[]=[];
   if(guest){for(const item of this.guestKeys(sub,guest)){try{await this.limiter.limit(item.key,item.max,item.seconds);guestTaken.push(item);}catch(error){if(error?.getStatus?.()!==429)throw error;await this.giveBackIn(item.key,item.seconds);for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(item.code==='GUEST_DAILY_CLOSED')await this.guestUsageAlert(true);reject(429,item.code,item.message);}}}
   else try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch(error){if(error?.getStatus?.()!==429)throw error;rewardUse=await reserveHeartCredit(this.service.db,sub,aiFailureTrace.getStore()?.requestId||randomUUID());if(!rewardUse)paidUse=await reservePaidPhoto(this.service.db,sub,aiFailureTrace.getStore()?.requestId);}
-  try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,false);else if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);else if(!guest)await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
+  // 2026-11-15 user decision: guests have their own daily budget (ai-photo:guest-total), so they never use up the members' service-wide cap.
+  if(!guest)try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,false);else if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);else if(!guest)await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
   let charged=true,gameStarted=false;
   try{
    if(!guest){await startHeartGame(this.service.db,sub,input?.heartGameId);gameStarted=typeof input?.heartGameId==='string';}
@@ -282,7 +283,7 @@ export class AiPhotoService{
    // A blocked input or output still counts, so repeated unsafe requests use up the day.
    if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,false);
    if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);
-   if(charged){for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(!guest&&!paidUse&&!rewardUse)await this.giveBack(key);await this.giveBack('ai-photo:total');}
+   if(charged){for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(!guest&&!paidUse&&!rewardUse)await this.giveBack(key);if(!guest)await this.giveBack('ai-photo:total');}
    throw error;
   }finally{if(gameStarted){try{await closeHeartGame(this.service.db,sub,input.heartGameId);await settleHeartGame(this.service.db,sub,input.heartGameId);}catch{this.logger.warn({event:'ai-photo.heart_settlement_pending',requestId:aiFailureTrace.getStore()?.requestId});}}}
  }
