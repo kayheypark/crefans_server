@@ -291,12 +291,23 @@ const subPrivacy:LegalDocument={...promptPrivacy,version:'2026-11-16.sub.1',
  sections:promptPrivacy.sections.map(sec=>{if(sec.title.startsWith('4. '))return{...sec,body:sec.body+SUB_PRIVACY_PAY};
   if(sec.title.startsWith('8. ')){if(!sec.body.includes(SUB_PROVIDER_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(SUB_PROVIDER_FROM,SUB_PROVIDER_TO)};}return sec;})};
 const subCatalog:LegalCatalog={...promptCatalog,documents:{...promptCatalog.documents,terms:subTerms,privacy:subPrivacy}};
+// 2026-11-16 user decision: OCTOMO phone-number ownership check before the promotion 100콩 (one account per number). Effective the same day;
+// the check stays off until the operator sets the key, so the text says 'when the check is used'.
+const PHONE_PRIVACY_ADD='\n프로모션 100콩을 받을 때 휴대폰 번호 확인을 하면, 입력한 휴대폰 번호와 확인 문자 수신 여부를 처리합니다. 번호는 계정당 한 번만 받을 수 있도록 확인하는 데에만 쓰며, 회사는 번호 자체를 저장하지 않고 원래 번호로 되돌릴 수 없는 값(보안키로 변환한 값)만 보관합니다. 이 확인은 번호를 가지고 있는지만 확인하며 실명·나이 확인이 아닙니다.';
+const PHONE_RETENTION_ADD='\n휴대폰 번호 확인 값은 회원 탈퇴 후 개인정보 파기 시점(탈퇴 30일 후)에 함께 파기하며, 확인 전 임시 코드는 10분 뒤 쓸 수 없고 다음 확인 또는 탈퇴 파기 때 지웁니다.';
+const PHONE_PROVIDER_FROM='결제 등록과 자동결제는 토스페이먼츠 테스트 연동을 사용합니다.';
+const PHONE_PROVIDER_TO=PHONE_PROVIDER_FROM+' 프로모션콩 수령 전 휴대폰 번호 확인은 주식회사 옥토버스(OCTOMO)에 위탁하며, 확인을 위해 휴대폰 번호와 일회용 확인 코드를 전달합니다.';
+const phonePrivacy:LegalDocument={...subPrivacy,version:'2026-11-16.phone.1',
+ notice:subPrivacy.notice+' 같은 날 추가 개정: 4항·7항·8항에 프로모션 100콩 수령 전 휴대폰 번호 확인(옥토버스 위탁, 번호 원문 미보관, 실명·나이 확인 아님)을 적었습니다.',
+ sections:subPrivacy.sections.map(sec=>{if(sec.title.startsWith('4. '))return{...sec,body:sec.body+PHONE_PRIVACY_ADD};if(sec.title.startsWith('7. '))return{...sec,body:sec.body+PHONE_RETENTION_ADD};
+  if(sec.title.startsWith('8. ')){if(!sec.body.includes(PHONE_PROVIDER_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(PHONE_PROVIDER_FROM,PHONE_PROVIDER_TO)};}return sec;})};
+const phoneCatalog:LegalCatalog={...subCatalog,documents:{...subCatalog.documents,privacy:phonePrivacy}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BANK_TRANSFER_DATE?subCatalog:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BANK_TRANSFER_DATE?phoneCatalog:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

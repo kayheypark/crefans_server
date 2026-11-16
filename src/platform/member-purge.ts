@@ -30,6 +30,8 @@ export async function purgeMember(tx:any,id:string,email:string,now=new Date()){
   await tx.userProfile.deleteMany({where:{user_id:id}});
   await tx.settlementAccount.updateMany({where:{creator_id:id},data:{account_encrypted:null,holder_alias:'',verified:false}});
   await tx.withdrawalCredential.deleteMany({where:{creator_id:id}});
+  // 2026-11-16: phone-number check (OCTOMO) keyed hash and pending codes go with the account.
+  await tx.memberPhone.deleteMany({where:{member_id:id}});await tx.phoneVerification.deleteMany({where:{member_id:id}});
   // Watermarks keep printing old addresses, so the handle text stays reserved but no longer points to anyone (2026-11-02).
   const handle=(await tx.member.findUnique({where:{id},select:{preferred_username:true}}))?.preferred_username;
   await tx.retiredHandle.updateMany({where:{member_id:id},data:{member_id:null}});
