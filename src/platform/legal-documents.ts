@@ -359,12 +359,34 @@ const phoneStorePrivacy:LegalDocument={...aiPrivacy,version:'2026-11-17.phone.3'
   if(sec.title.startsWith('4. '))return{...sec,body:swapIn(sec.title,swapIn(sec.title,sec.body,PHONE3_PURPOSE_FROM,PHONE3_PURPOSE_TO),PHONE3_STORE_FROM,PHONE3_STORE_TO)};
   if(sec.title.startsWith('7. '))return{...sec,body:swapIn(sec.title,sec.body,PHONE3_RETENTION_FROM,PHONE3_RETENTION_TO)};return sec;})};
 const phoneStoreCatalog:LegalCatalog={...aiCatalog,documents:{...aiCatalog.documents,privacy:phoneStorePrivacy}};
+// 2026-11-17 user decision: the service is no longer in beta, and adult content is never allowed (it will not be 'opened later').
+// Making or posting adult content (nudity, sexual exposure), including with AI photo editing, may be removed and restricted without
+// prior warning; the review request in the operating policy stays. Effective the same day (user decision, same basis as 2026-11-16).
+const ADULT_RULE='크레팬스에서는 누드·성적 노출 등 성인 콘텐츠를 만들거나 올릴 수 없으며, AI 사진 편집으로 만드는 경우도 같습니다. 이를 어기면 사전 경고 없이 게시물 삭제, 이용 제한 등 제재를 받을 수 있습니다.';
+const ADULT_SWAPS:Record<string,[string,string][]>={
+ '2. ':[['만 19세 이상이면 누구나 이메일 인증으로 가입할 수 있으며, 오픈베타 기간(2026년 11월까지)에는 일반 콘텐츠만 제공합니다.','만 19세 이상이면 누구나 이메일 인증으로 가입할 수 있으며, 성인 콘텐츠는 제공하지 않습니다(제7조).']],
+ '4. ':[['베타에서는 첫 갱신 실패 후24시간 간격으로 최대3회 추가 시도합니다.','첫 갱신 실패 후 24시간 간격으로 최대 3회 추가 시도합니다.'],
+  ['현재 베타의 카드 결제 연동은 테스트 환경이며 실제 청구가 이루어지는 운영 결제와 구분합니다. 베타에서 카드 결제로는 실제 청구를 하지 않습니다.','현재 멤버십 카드 결제 연동은 테스트 환경이며 실제 청구가 이루어지는 운영 결제와 구분합니다. 멤버십 카드 결제로는 실제 청구를 하지 않습니다.'],
+  ['베타 종료 후 계정·콘텐츠는 유지하고 테스트 거래·구독은 실제 거래와 분리합니다.','카드 결제를 운영 결제로 전환해도 계정·콘텐츠는 유지하고 테스트 거래·구독은 실제 거래와 분리합니다.']],
+ '7. ':[['초기 베타에서는 일반 콘텐츠만 허용합니다. 누드 등 성인 콘텐츠는 본인·연령 확인, 구체적인 법적 취급 범위와 공급사 계약 조건을 확인한 뒤 별도 개방합니다.',ADULT_RULE]],
+};
+const adultTerms:LegalDocument={...aiTerms,version:'2026-11-17.adult.1',updatedAt:PHONE_STORE_DATE,publishedAt:PHONE_STORE_DATE,effectiveAt:PHONE_STORE_DATE,
+ // Fresh notice: the accumulated notices still described the invite-only open beta, which the guide AI repeated as current.
+ notice:'2026년 11월 17일부터 적용합니다. 제7조에 성인 콘텐츠(누드·성적 노출 등) 제작·게시 금지와 위반 시 사전 경고 없는 제재를 적고, 제2조·제4조의 지난 운영 기간 표현을 현재 기준으로 고쳤습니다(내용 변경 없음). 이전 개정 내역은 이전 버전에서 볼 수 있습니다.',
+ sections:aiTerms.sections.map(sec=>{const swaps=Object.entries(ADULT_SWAPS).find(([k])=>sec.title.startsWith(k))?.[1];return swaps?{...sec,body:swaps.reduce((body,[from,to])=>swapIn(sec.title,body,from,to),sec.body)}:sec;})};
+const POLICY_ADULT_FROM='오픈베타에서는 일반 콘텐츠만 제공합니다. 성인 콘텐츠는 법률·본인/연령 확인·공급사 확인 후 별도 개방합니다.';
+const basePolicy=aiCatalog.documents.policy;
+const adultPolicy:LegalDocument={...basePolicy,version:'2026-11-17.adult.1',updatedAt:PHONE_STORE_DATE,publishedAt:PHONE_STORE_DATE,effectiveAt:PHONE_STORE_DATE,
+ notice:'2026년 11월 17일부터 적용합니다. 성인 콘텐츠는 만들거나 올릴 수 없고, 위반하면 사전 경고 없이 제재할 수 있습니다.',
+ sections:basePolicy.sections.map(sec=>sec.body.includes(POLICY_ADULT_FROM)?{...sec,body:sec.body.replace(POLICY_ADULT_FROM,ADULT_RULE+' 제재가 잘못됐다고 생각하면 위의 검토 요청을 할 수 있습니다.')}:sec)};
+if(!adultPolicy.sections.some(sec=>sec.body.includes(ADULT_RULE)))throw Error('Legal revision anchor missing in operating policy');
+const adultCatalog:LegalCatalog={...phoneStoreCatalog,documents:{...phoneStoreCatalog.documents,terms:adultTerms,policy:adultPolicy}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=PHONE_STORE_DATE?phoneStoreCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

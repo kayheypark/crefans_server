@@ -229,3 +229,7 @@ test('equivalent Express paths keep the same advisor origin and CORS boundary',a
   }
  }
 });
+
+test('2026-11-17: the advisor is told the service is not a beta and adult content is never allowed or opened later',()=>{
+ assert.match(INSTRUCTIONS,/베타 서비스가 아닙니다/);assert.match(INSTRUCTIONS,/성인 콘텐츠[^\n]*만들거나 올릴 수 없고/);assert.match(INSTRUCTIONS,/사전 경고 없이/);assert.match(INSTRUCTIONS,/나중에 열리거나[^\n]*답하지 마세요/);
+});
