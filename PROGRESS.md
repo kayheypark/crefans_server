@@ -1,3 +1,10 @@
+## 2026-11-16 포트원 작업 보관·브랜치 분리
+- 사용자 결정: 포트원(KG이니시스 V2) 연동은 연습으로 보고 보관, 이니시스 직접 계약(11/14 신청, 사전심사 대기)을 기다림.
+- 보관 브랜치 archive/portone-inicis-practice (서버·프론트 로컬): 단건결제 PG 스위치(ONE_TIME_PAYMENT_PROVIDER), 광고상품 카드 결제·대사, 결제자 휴대폰 입력. 로컬 실결제 2,200원 결제·환불 검증 기록 포함. 운영 배포 안 함.
+- 포트원과 무관한 작업은 origin/prod 기준 새 브랜치로 분리(cherry-pick -x): 서버 feat/guest-edit-claim(비로그인 글 제목·내용 수정, 연동 전 개수 조회), 프론트 feat/guest-edit-shop(수정 메뉴, 상점 콩 충전 칩·구매 내역 버튼·섹션 아이콘 제거, 로그인 후 연동 확인 창). 미배포.
+- 검증: 프론트 npm test 711/18(기준선 동일), 서버 guest·openapi 22/24 — 실패 2건은 e2e DB의 비회원 하루 한도(200) 소진으로 보관 브랜치에서도 같음.
+- 로컬 테스트 자료(로컬 DB만): portone-local@crefans.test 계정, 테스트 상품 2개. ~/.crefans/portone.env 에 테스트 상점 키.
+
 ## 2026-11-16 회원가입 때 휴대폰 번호 확인 (feat/signup-phone)
 - 사용자 지시 "회원가입할 때 핸드폰 번호 받아야지": 이메일 코드 인증 뒤 휴대폰 번호 확인(OCTOMO) 단계. 서버: POST auth/signup/phone/start·confirm(이메일 인증 증명 필수, 키는 'signup:'+이메일 해시), 확인 시 30분 일회용 phoneProof, signup은 키 설정 시 phone+phoneProof 필수·같은 트랜잭션에서 member_phones 연결(번호당 계정 1개). 마이그레이션 20261116210000(phone_verifications.verified_at·proof_hash). bootstrap signupRequirements.phoneRequired. 기존 회원은 계속 100콩 수령 때 확인. 처리방침 2026-11-16.phone.2(4·8항 '회원가입 때').
 - 로컬 테스트 결정성: OCTOMO 키를 .local/platform.env에서 .local/octomo.env로 분리(테스트가 키를 읽어 동작이 바뀌는 문제).
