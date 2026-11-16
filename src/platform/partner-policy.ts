@@ -14,7 +14,7 @@ export async function requirePartnerCreator(db:any,member:string){
 }
 // 2026-11-16 user decision: only partner creators (verified badge) can open a new membership or turn one back on. Memberships
 // that already exist keep selling and can still be edited or turned off; existing subscribers are not affected.
-export const MEMBERSHIP_PARTNER_MESSAGE='멤버십은 크레팬스와 파트너 계약을 맺은 크리에이터(인증 배지)만 새로 열 수 있어요. 출금 화면에서 파트너 계약을 요청해주세요.';
+export const MEMBERSHIP_PARTNER_MESSAGE='멤버십은 크레팬스와 파트너 계약을 맺은 크리에이터(인증 배지)만 새로 열 수 있어요. 멤버십 또는 출금 화면에서 파트너 계약을 요청해주세요.';
 export async function requirePartnerForMembership(db:any,member:string){if(!await isPartnerCreator(db,member))reject(403,'MEMBERSHIP_PARTNER_REQUIRED',MEMBERSHIP_PARTNER_MESSAGE);}
 // 2026-11-15 user decision: a creator asks for the partnership contract from the withdrawal screen. The operator gets a
 // Telegram alert (no member identifier, per the 2026-11-02 rule), finds the creator in the console log (business
