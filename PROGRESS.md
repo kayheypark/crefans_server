@@ -5,6 +5,12 @@
 - 운영 배포(2026-11-16 09:2x~09:4x KST): API crefans-api:partner-sync-20261116(JS 해시 일치, /common 약관 membership.2 확인, 복구 20261116/partner-sync-api), front front-partner-sync-20261116(prod 5b24b43), 관리자 crefans-admin:partner-sync-20261116(서버 빌드, 새 확인 문구 산출물 2건·직전본 0건 대조, admin 200, 다른 컨테이너 불변, 직전 ai-shop-20261114는 복구 20261116/admin-partner-sync로 보관 후 서버 삭제), 가이드(바뀐 25파일·소개서 PDF 포함, 복구 20261116/guide-partnersync). 운영 데이터로 배지 해제·멤버십 중지는 실행하지 않음(테스트로만).
 - 테스트: membership-partner 3/3(배지 해제 시 판매 중 1개만 중지·부여 시 변화 없음·감사), legal·openapi·partner-request 포함 43/43. 대조: 중지 로직 제거 시 실패. platform-ai-shop은 prod에서도 7/7 실패(기존 'this.service.member' 문제)라 이번 확인에서 제외.
 
+## 2026-11-16 비회원 체험 AI 제목·본문 + AI 사진 실패 텔레그램 (feat/guest-ai-caption, 미배포)
+- 사용자 결정: 체험은 AI 사진을 먼저, 비워 둔 제목·본문은 게시 시점에 AI가 작성 → 고지·확인('확인하고 게시'/'직접 고치기') 후 게시. 비회원 체험만. AI 입력은 고른 항목 이름·요청 문장만(사진·IP·식별자 미전송). AI 사진 편집 실패는 원인 무관 모두 텔레그램.
+- 서버: src/platform/guest-caption.ts(POST /guest/content/caption, Responses API gpt-6-luna(GUEST_CAPTION_MODEL→GUIDE_ADVISOR_MODEL), store:false, safety_identifier 없음, 입력·결과 omni-moderation, 차단 시 항목 이름만/정해진 문장, 방문자당 하루 30회, 키 없음·실패·한도 초과는 정해진 문장 source=template). ai-photo.ts failureAlert → operations.record('ai-photo.failed',{errorCode,status,stage,provider,errorType,actor,durationMs},undefined,{omitIp:true}); operations.service: omitIp 시 저장 행 ip/peer_ip null, 알림문 '접속 IP: 보내지 않음', 허용 키 stage·provider·actor 추가.
+- 법률: 처리방침 2026-11-16.caption.1(17항 AI 처리에 제목·본문 작성·전송 범위·게시 전 확인, 목적에 작성 추가, 11-16 시행), GUEST_CONSENT_VERSION 2026-11-16.guest.3(체험 안내 문구 변경). 기존 활성 체험 쿠키는 재동의 없음 → 프론트 게시 버튼 아래 같은 고지 상시 표시.
+- 검증: tsc 0, build 0, tests/platform-guest-caption.test.cjs 6/6(대조: omitIp 무력화 시 1실패, store:true 시 2실패), npm run test:launch 103/0(신규 파일 포함), platform-legal 기대 버전 갱신+11-16 개정 테스트.
+
 ## 2026-11-16 멤버십은 파트너 계약 크리에이터만 새로 열기 (feat/membership-partner)
 - 사용자 결정(/ask-me): 새 멤버십 생성·중지 멤버십 재개는 인증 배지(creators.is_verified=파트너 계약)만, 기존 멤버십은 판매·수정·중지 유지, 약관·가이드·화면 함께 개정, 약관 즉시 시행(베타·실청구 없음·기존 영향 없음 판단, 공지에 이유 기재), 검증 통과 시 배포.
 - 코드: partner-policy.ts requirePartnerForMembership/MEMBERSHIP_PARTNER_MESSAGE(403 MEMBERSHIP_PARTNER_REQUIRED), studio.service.ts saveMembership(id 없을 때)·membershipState(비활성→활성). 약관 2026-11-16.membership.1(6조 'MEMBERSHIP_PARTNER_TO', catalog 분기 추가). openapi·docs/platform-api.md 설명.

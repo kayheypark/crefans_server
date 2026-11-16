@@ -80,6 +80,12 @@ export class AiPhotoService{
  private async usedIn(key:string,seconds:number){const row=await this.service.db.authRateBucket.findUnique({where:{id:this.bucket(key,seconds)}});return row?.count??0;}
  private async giveBackIn(key:string,seconds:number){await this.service.db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${this.bucket(key,seconds)}`;}
  async guestRemaining(id:string){return Math.max(0,GUEST_AI_LIMIT-await this.usedIn('ai-photo:guest:'+id,GUEST_LIFETIME));}
+ // 2026-11-16 user decision: every AI photo failure goes to Telegram (operations alert queue), user-caused ones included.
+ // Codes and stage only: no prompt, photo, member id or IP leaves the service; operators find the request by its record/request id.
+ private async failureAlert(sub:string,error:any,trace:AiFailureTrace,started:number,guest:boolean){try{
+  const code=diagnosticId(error?.getResponse?.()?.code||error?.code||error?.cause?.code)||'INTERNAL_ERROR';
+  await this.operations.record('ai-photo.failed',{errorCode:code,status:error?.getStatus?.()||500,stage:diagnosticId(trace.stage)||'unknown',provider:diagnosticId(trace.provider)||'unknown',errorType:diagnosticId(trace.providerCode)||'none',actor:guest||sub.startsWith('guest:')?'guest':'member',durationMs:Date.now()-started},undefined,{omitIp:true});
+ }catch{this.logger.warn({event:'ai-photo.failure_alert_failed',requestId:trace.requestId});}}
  // Telegram: every 50 guest generations a day and when the daily cap closes (operations alert queue, one message per milestone).
  private async guestUsageAlert(closed=false){try{const used=await this.usedIn('ai-photo:guest-total',DAY);if(closed)await this.operations.record('guest.ai_closed',{used:Math.min(used,GUEST_DAILY_TOTAL),limit:GUEST_DAILY_TOTAL},`guest-ai-closed:${this.window()}`);else if(used>0&&(used%50===0||used===GUEST_DAILY_TOTAL))await this.operations.record('guest.ai_usage',{used,limit:GUEST_DAILY_TOTAL},`guest-ai:${this.window()}:${used}`);}catch{}}
  private configured(){return !!this.settings.apiKey&&!!this.settings.seedreamKey;}
@@ -181,7 +187,7 @@ export class AiPhotoService{
   return aiFailureTrace.run(trace,async()=>{
    await traceAiEvent(this.service.db,'started',{mode:diagnosticId(mode),selectedModel:trace.selectedModel,selectedProvider});
    try{const result=await this.performEdit(sub,input,mask,guest);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);return result;}
-   catch(error){await recordAiFailure(this.service.db,this.configService,sub,input,error,trace,started);throw error;}
+   catch(error){await recordAiFailure(this.service.db,this.configService,sub,input,error,trace,started);await this.failureAlert(sub,error,trace,started,!!guest);throw error;}
   });
  }
  private async performEdit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number},guest?:{ipHash:string}){
