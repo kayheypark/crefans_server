@@ -18,7 +18,7 @@ export class AiShopController{
  @Post('orders') create(@Req() r:any,@Body() b:any){return this.shop.create(r.user.sub,b);}
  @Post('orders/:id/payment-window') window(@Req() r:any,@Param('id') id:string){return this.shop.window(r.user.sub,id);}
  @Post('orders/:id/confirm') confirm(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.shop.confirm(r.user.sub,id,b);}
- @Post('orders/:id/refund') refund(@Req() r:any,@Param('id') id:string){return this.shop.refund(r.user.sub,id);}
+ @Post('orders/:id/refund') refund(@Req() r:any,@Param('id') id:string,@Body() b:any){return this.shop.refund(r.user.sub,id,b);}
 }
 @Controller('admin/shop') @UseGuards(PlatformAdminGuard)
 export class AiShopAdminController{
