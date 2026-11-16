@@ -2264,6 +2264,9 @@ model PhoneVerification {
   code       String   @db.VarChar(12)
   expires_at DateTime
   created_at DateTime @default(now())
+  /// Signup flow (2026-11-16): set when OCTOMO confirmed the SMS before the account exists; the proof is shown once to the browser.
+  verified_at DateTime?
+  proof_hash  String?  @db.VarChar(64)
   @@index([member_id, created_at])
   @@map("phone_verifications")
 }

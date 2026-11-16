@@ -1,3 +1,8 @@
+## 2026-11-16 회원가입 때 휴대폰 번호 확인 (feat/signup-phone)
+- 사용자 지시 "회원가입할 때 핸드폰 번호 받아야지": 이메일 코드 인증 뒤 휴대폰 번호 확인(OCTOMO) 단계. 서버: POST auth/signup/phone/start·confirm(이메일 인증 증명 필수, 키는 'signup:'+이메일 해시), 확인 시 30분 일회용 phoneProof, signup은 키 설정 시 phone+phoneProof 필수·같은 트랜잭션에서 member_phones 연결(번호당 계정 1개). 마이그레이션 20261116210000(phone_verifications.verified_at·proof_hash). bootstrap signupRequirements.phoneRequired. 기존 회원은 계속 100콩 수령 때 확인. 처리방침 2026-11-16.phone.2(4·8항 '회원가입 때').
+- 로컬 테스트 결정성: OCTOMO 키를 .local/platform.env에서 .local/octomo.env로 분리(테스트가 키를 읽어 동작이 바뀌는 문제).
+- 검증: tsc 0, phone-verification 3/3, signup-mode 6/6(대조: 가입 게이트 제거 시 실패), legal 28, openapi 14(275), beans 43, auth 3, signup-invites 8, auth-hardening 4, bank-transfer 8. 로컬 dev DB에 migrate deploy.
+
 ## 2026-11-16 프로모션 100콩 전 휴대폰 번호 확인(OCTOMO) (feat/octomo-phone)
 - 사용자 지시 "옥토모로 바로 연결": 질문 거절로 추천 기본값 적용 — 적용 범위는 프로모션 100콩 수령 때만, 키 없으면 꺼짐(기존 수령 그대로).
 - OCTOMO 공식 명세(2026-11-16 확인, octomo.octoverse.kr/api-docs): POST https://api.octoverse.kr/octomo/v1/public/message/exists, Authorization: Octomo {KEY}, {mobileNum,text,withinMinutes 1~60}→{exists}. 업체 스스로 '번호 소유 확인, 본인확인기관 아님' 명시 → 성인·실명 확인으로 쓰지 않음.

@@ -31,7 +31,27 @@ test('number format, OCTOMO request shape, only a keyed hash stored, one account
 test('promotion 100콩 claim requires a verified number while OCTOMO is configured; off without the key',async()=>{
  const status=await beans.promotionEvent(b);assert.equal(status.phoneRequired,true);assert.equal(status.phoneVerified,false);
  await assert.rejects(beans.claimPromotionEvent(b,{}),code('PHONE_VERIFICATION_REQUIRED'));
- const off=new PhoneVerificationService(service,new ConfigService({LOCAL_AUTH_SECRET:'x'}),limiter);assert.equal(off.enabled(),false);await assert.rejects(off.start(a,{phone:'01012345678'}),code('PHONE_VERIFICATION_UNAVAILABLE'));
+ const off=new PhoneVerificationService(service,new ConfigService({LOCAL_AUTH_SECRET:'x',OCTOMO_API_KEY:''}),limiter);assert.equal(off.enabled(),false);await assert.rejects(off.start(a,{phone:'01012345678'}),code('PHONE_VERIFICATION_UNAVAILABLE'));
  const plain=new BeansService(service,finance,provider,{},config,transfers,off);assert.equal((await plain.promotionEvent(b)).phoneRequired,undefined,'without the key the event looks exactly as before');
  phones.fetcher=async()=>({ok:false,json:async()=>({statusCode:401})});const s=await phones.start(b,{phone:'01077776666'});await assert.rejects(phones.confirm(b,{phone:'01077776666'}),code('PHONE_CHECK_UNAVAILABLE'),'provider failure is never a pass');assert.equal(await phones.verified(b),false);void s;
+});
+
+test('signup: needs the verified email proof, OCTOMO-confirmed SMS gives a one-time proof, the new account gets the number once',async()=>{
+ const {digest}=require('../dist/src/auth/local/credentials');
+ phones.fetcher=async(u,init)=>{const body=JSON.parse(init.body);return{ok:true,json:async()=>({exists:sms.has(body.mobileNum+':'+body.text)})};};
+ const email=randomUUID()+'@signup-phone.test.invalid',emailProof='proof-'+randomUUID();
+ await assert.rejects(phones.signupStart(email,{emailProof,phone:'01055554444'}),code('EMAIL_VERIFICATION_REQUIRED'),'no verified email yet');
+ await db.signupChallenge.create({data:{email,code_hash:'x',attempts:0,sent_at:new Date(),expires_at:new Date(Date.now()+1800000),verified_at:new Date(),proof_hash:digest(emailProof)}});
+ try{
+  await assert.rejects(phones.signupStart(email,{emailProof:'wrong',phone:'01055554444'}),code('EMAIL_VERIFICATION_REQUIRED'));
+  await assert.rejects(phones.signupStart(email,{emailProof,phone:'01012345678'}),code('PHONE_IN_USE'),'a number already bound to account A cannot sign up again');
+  const s=await phones.signupStart(email,{emailProof,phone:'010-5555-4444'});
+  await assert.rejects(phones.signupConfirm(email,{emailProof,phone:'01055554444'}),code('PHONE_SMS_NOT_FOUND'));
+  sms.add('01055554444:'+s.code);const c=await phones.signupConfirm(email,{emailProof,phone:'01055554444'});assert.equal(c.verified,true);assert.match(c.proof,/^[A-Za-z0-9_-]{32}$/);
+  const newMember=randomUUID();await db.member.create({data:{id:newMember,email,name:'',nickname:'가입',preferred_username:newMember.slice(0,20),email_verified:true}});ids.push(newMember);
+  await assert.rejects(db.$transaction(tx=>phones.attachSignup(tx,email,{phone:'01055554444',phoneProof:'forged'},newMember)),code('PHONE_VERIFICATION_REQUIRED'),'forged proof');
+  await db.$transaction(tx=>phones.attachSignup(tx,email,{phone:'01055554444',phoneProof:c.proof},newMember));
+  assert.equal(await phones.verified(newMember),true);
+  await assert.rejects(db.$transaction(tx=>phones.attachSignup(tx,email,{phone:'01055554444',phoneProof:c.proof},newMember)),code('PHONE_VERIFICATION_REQUIRED'),'the proof is single-use');
+ }finally{await db.signupChallenge.deleteMany({where:{email}});}
 });
