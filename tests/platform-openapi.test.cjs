@@ -40,7 +40,7 @@ const request=(path,cookie)=>fetch(base+path,{headers:cookie?{cookie}:{},redirec
 test('OpenAPI 3 validates, has all 250 runtime operations and no legacy controllers',async()=>{
  await Parser.validate(structuredClone(document));
  const operations=Object.entries(document.paths).flatMap(([path,item])=>Object.keys(item).filter(method=>['get','post','put','patch','delete','head','options'].includes(method)).map(method=>method+' '+path));
- assert.equal(operations.length,266);// 266: +1 guest caption, +15 bank transfer (2026-11-16: payments/methods, instructions, ad order/refund, 11 console deposit routes).
+ assert.equal(operations.length,270);// 270: +4 studio AI subscription list/start/cancel/refund (2026-11-16); 266: +1 guest caption, +15 bank transfer (2026-11-16: payments/methods, instructions, ad order/refund, 11 console deposit routes).
  assert.deepEqual(operations.sort(),Object.keys(endpoints).sort());// 250: +1 studio partner-request (2026-11-15); 249: +6 signed-out AI photo trial (guest session get/post, content, ai-photo/edit, claim, media/guest) (2026-11-15); 225: +3 console AI photo reset tickets, +1 studio reset-ticket use (2026-11-13); 221: +2 console AI photo quota reset per creator/all (2026-11-13); 219: +1 user comment like (2026-11-13); 218: +2 console payout list/account reveal (2026-11-10); 216: +1 user post search (2026-11-08); 215: +2 studio AI photo quota/edit (2026-11-08); 213: +4 console AI photo allow-list (2026-11-08); 209: +1 guide advisor (user POST guide/advisor, 2026-11-07); 208: +2 post visibility (studio PUT content/:id/visibility, admin POST posts/:id/visibility, 2026-11-07). 206: +1 admin membership withdrawal reject after a refund (2026-11-07). 205: +1 admin subscription full refund (2026-11-06). 204: +1 admin subscription immediate cancel (2026-11-06). 203: +2 admin memberships/subscriptions (2026-11-06). 171: +4 manual payout routes, +1 GET categories (2026-10-31), +1 PUT me/profile/photos, +1 GET me/referral, +3 admin referrals, +1 GET media/:id/status, +1 POST admin/referrals/:id/revoke (2026-11-02) (2026-11-01)
  assert.ok(operations.every(key=>key.includes(' /api/v1/')));assert.equal(document.info.version,'v1');
  assert.equal(document.components.securitySchemes.memberSession.name,'access_token');
@@ -124,7 +124,7 @@ test('three valid documents isolate business APIs, retain required shared calls 
  const user=operations(documents.user),studio=operations(documents.studio),console=operations(documents.console);
  assert.equal(user.length,99);// 2026-11-16: +1 guest caption, +2 payment methods/instructions.
  // 2026-11-15: +6 signed-out AI photo trial routes.
- assert.equal(studio.length,66);// 2026-11-16: +2 advertising order/refund.
+ assert.equal(studio.length,70);// 2026-11-16: +2 advertising order/refund, +4 AI subscription.
  // 2026-11-15: +1 studio partner-request.
  assert.equal(console.length,121);// 2026-11-16: +11 console bank transfer (account, payments, cash receipts, manual refunds).
  // 2026-11-13: +1 studio, +3 console AI photo reset tickets. 2026-11-13: +2 console AI photo quota reset. 2026-11-13: +1 user comment like. 2026-11-10: +2 console payout list/account reveal. 2026-11-08: +4 console AI photo allow-list. 2026-11-07: +1 user guide advisor, +1 studio, +1 console post visibility; +1 console withdrawal reject

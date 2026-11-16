@@ -264,12 +264,39 @@ const bankPrivacy:LegalDocument={...captionPrivacy,version:'2026-11-16.bank.1',
   if(sec.title==='17. 선택 기능: 비회원 AI 사진 체험'){let body=sec.body;for(const[from,to]of CAPTION_BUTTON_EDITS){need(from);body=body.replace(from,to);}return{...sec,body};}
   return sec;})};
 const bankCatalog:LegalCatalog={...captionCatalog,documents:{...captionCatalog.documents,terms:bankTerms,privacy:bankPrivacy}};
+// 2026-11-16 user decision: successful AI photo requests are kept like failed ones (prompt + options, encrypted, 30 days) so
+// operators can review what was asked. Effective the same day; the guest trial consent moves to .guest.5 (section 17 changed).
+const PROMPT_LOG_FROM='AI 사진 편집 실패 원인 확인과 문의 대응을 위해 실패한 요청의 질문 내용과 선택 옵션을 암호화하여 실패 시점부터 30일 보관한 뒤 파기합니다.';
+const PROMPT_LOG_TO='AI 사진 편집(회원 스튜디오와 비회원 체험) 요청의 질문 내용과 선택 옵션은 성공·실패와 관계없이 부적절한 요청 확인, 실패 원인 확인과 문의 대응을 위해 암호화하여 요청 시점부터 30일 보관한 뒤 파기합니다.';
+const PROMPT_GUEST_FROM='국외 이전되는 국가·일시·방법·보관 기간·거부 방법은 16항과 같습니다.';
+const PROMPT_GUEST_TO=PROMPT_GUEST_FROM+' AI 사진 편집 요청 문구와 선택 옵션은 7항에 따라 암호화해 30일 보관합니다.';
+const promptPrivacy:LegalDocument={...bankPrivacy,version:'2026-11-16.prompt.1',
+ notice:bankPrivacy.notice+' 같은 날 추가 개정: 7항과 17항에 AI 사진 편집 요청 문구·선택 옵션을 성공한 요청도 실패와 같이 암호화해 30일 보관한다는 점을 적었습니다.',
+ sections:bankPrivacy.sections.map(sec=>{const swap=(from:string,to:string)=>{if(!sec.body.includes(from))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(from,to)};};
+  if(sec.title.startsWith('7. '))return swap(PROMPT_LOG_FROM,PROMPT_LOG_TO);
+  if(sec.title==='17. 선택 기능: 비회원 AI 사진 체험')return swap(PROMPT_GUEST_FROM,PROMPT_GUEST_TO);return sec;})};
+const promptCatalog:LegalCatalog={...bankCatalog,documents:{...bankCatalog.documents,privacy:promptPrivacy}};
+// 2026-11-16 user decision: AI 이용권 구독형 (monthly card auto-billing through KG이니시스 빌링) next to 횟수형. Card auto-billing starts
+// only after the PG contract is confirmed (server reports 'payment preparing' until then), so the privacy text names KG이니시스 as planned.
+const SUB_TERMS_ADD="\nAI 이용권 구독형: AI 이용권은 한 번 결제하는 횟수형과 매달 자동결제하는 구독형이 있습니다. 구독형은 카드를 등록하면 그때 첫 달 요금을 결제하고, 이후 매달 같은 날(그 날이 없는 달은 그 달 말일)에 같은 금액을 등록한 카드로 자동결제합니다. 결제할 때마다 상품에 표시된 그 달의 횟수가 주어지며 다음 결제일까지 쓸 수 있고, 쓰지 않은 횟수는 다음 달로 이월되지 않습니다. 구독 중 금액과 횟수는 신청 당시 조건으로 유지되며 바뀐 상품 조건은 새로 신청할 때부터 적용됩니다. 자동결제가 실패하면 24시간 간격으로 3번까지 다시 시도하고, 그래도 실패하면 구독이 끝납니다. 회원은 언제든 구독 관리에서 해지를 예약할 수 있으며, 해지하면 다음 결제가 이루어지지 않고 이미 결제한 달의 횟수는 그 기간이 끝날 때까지 쓸 수 있습니다. 이번 달에 쓰지 않은 횟수는 구독 관리에서 1회 단가(월 금액 ÷ 월 횟수)로 환불받을 수 있고, 환불하면 결제한 카드로 해당 금액이 취소되며 구독은 바로 끝납니다. 사진을 만드는 중에는 생성이 끝난 뒤 환불할 수 있습니다. 구독형 카드 자동결제는 결제대행사 계약이 확정된 뒤 시작하며, 그 전에는 신청할 수 없습니다.";
+const subTerms:LegalDocument={...bankTerms,version:'2026-11-16.sub.1',
+ notice:bankTerms.notice+' 같은 날 추가 개정: 제13조에 AI 이용권 구독형(매달 같은 날 자동결제, 이월 없음, 실패 시 24시간 간격 3회 재시도, 해지 예약, 남은 횟수 1회 단가 환불)을 적었습니다.',
+ sections:bankTerms.sections.map(sec=>sec.title==='13. 스튜디오 AI 사진 편집과 AI 이용권'?{...sec,body:sec.body+SUB_TERMS_ADD}:sec)};
+if(!subTerms.sections.some(sec=>sec.body.endsWith(SUB_TERMS_ADD)))throw Error('Legal revision anchor missing in 13. 스튜디오 AI 사진 편집과 AI 이용권');
+const SUB_PRIVACY_PAY='\nAI 이용권 구독형을 신청하면 카드 등록과 자동결제를 위해 결제대행사가 발급한 빌링키(암호화 보관), 카드사·일부를 가린 카드 표시, 결제·재시도·취소 일시와 금액, 결제대행사 거래번호를 처리합니다. 카드번호와 유효기간은 결제대행사가 직접 받으며 회사는 받거나 저장하지 않습니다. 구독이 끝나면 빌링키는 다음 결제에 쓰지 않습니다.';
+const SUB_PROVIDER_FROM='결제 등록과 자동결제는 토스페이먼츠 테스트 연동을 사용합니다.';
+const SUB_PROVIDER_TO=SUB_PROVIDER_FROM+' AI 이용권 구독형의 카드 등록과 자동결제는 KG이니시스 빌링을 이용할 예정이며(계약 확정 후 시작), 결제 처리와 결제 결과 확인을 위해 주문번호, 상품명, 결제 금액과 구매자 닉네임·이메일을 제공합니다.';
+const subPrivacy:LegalDocument={...promptPrivacy,version:'2026-11-16.sub.1',
+ notice:promptPrivacy.notice+' 같은 날 추가 개정: 4항에 AI 이용권 구독형 카드 자동결제 정보(빌링키 암호화 보관, 카드번호 미보관)를, 8항에 KG이니시스 빌링 위탁 예정을 적었습니다.',
+ sections:promptPrivacy.sections.map(sec=>{if(sec.title.startsWith('4. '))return{...sec,body:sec.body+SUB_PRIVACY_PAY};
+  if(sec.title.startsWith('8. ')){if(!sec.body.includes(SUB_PROVIDER_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(SUB_PROVIDER_FROM,SUB_PROVIDER_TO)};}return sec;})};
+const subCatalog:LegalCatalog={...promptCatalog,documents:{...promptCatalog.documents,terms:subTerms,privacy:subPrivacy}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BANK_TRANSFER_DATE?bankCatalog:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BANK_TRANSFER_DATE?subCatalog:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

@@ -28,7 +28,8 @@ export async function adminLogDetail(db:any,admin:any,id:string,config?:ConfigSe
  const delivery=row.source_id?await db.platformOperationalEvent.findUnique({where:{id:row.source_id},select:{attempts:true,available_at:true,delivered_at:true,last_error_code:true}}):null;
  const attemptEvents=row.request_id?await db.platformAuditLog.findMany({where:{request_id:row.request_id,action:{startsWith:'ai-photo.'}},orderBy:[{occurred_at:'asc'},{id:'asc'}],take:200}):[];
  const aiAttempt=attemptEvents.some(r=>r.action==='ai-photo.started')?{...attemptView(attemptEvents),events:attemptEvents.map(auditView)}:null;
- const failure=related.find(r=>r.action==='ai-photo.failed');
+ // The encrypted request record exists for failed and (since 2026-11-16) succeeded attempts; payload.outcome tells them apart.
+ const failure=related.find(r=>r.action==='ai-photo.failed')||(row.request_id?attemptEvents.find(r=>r.action==='ai-photo.succeeded'):undefined);
  const aiFailure=failure?.request_id?await aiFailureDetail(db,admin,failure.request_id,config):null;
  return{aiAttempt,aiFailure,event:auditView(row),timeline:related.slice(0,100).reverse().map(auditView),hasMore:related.length>100,delivery};
 }

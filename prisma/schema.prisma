@@ -2056,6 +2056,8 @@ model AiPhotoFailureDetail {
 
 model AiShopProduct {
  id String @id @default(uuid())
+ // 'pack' = AI 이용권 횟수형(one payment), 'subscription' = AI 이용권 구독형(monthly card billing, uses reset each period).
+ kind String @default("pack") @db.VarChar(20)
  name String @db.VarChar(100)
  description String @db.Text
  amount Int
@@ -2198,4 +2200,50 @@ model ManualRefund {
  @@unique([kind, refund_id])
  @@index([status, due_at])
  @@map("manual_refunds")
+}
+
+// 2026-11-16 user decision: AI 이용권 구독형 — monthly card billing (KG이니시스 빌링). Each paid period creates an ai_shop_orders row
+// (paid, remaining=quantity, expires at the period end, no carry-over) so generation uses the existing paid-use path.
+model AiSubscription {
+ id String @id @default(uuid())
+ creator_id String @db.VarChar(191)
+ product_id String @db.VarChar(191)
+ product_snapshot Json
+ provider String @db.VarChar(20)
+ environment String @db.VarChar(10)
+ status String @default("pending") @db.VarChar(20)
+ billing_key_encrypted String? @db.Text
+ card_label String? @db.VarChar(60)
+ current_period_start DateTime?
+ current_period_end DateTime?
+ next_charge_at DateTime?
+ retry_count Int @default(0)
+ last_failure_code String? @db.VarChar(100)
+ cancel_requested_at DateTime?
+ ended_at DateTime?
+ locked_until DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([creator_id, status])
+ @@index([status, next_charge_at])
+ @@map("ai_subscriptions")
+}
+model AiSubscriptionCharge {
+ id String @id @default(uuid())
+ subscription_id String @db.VarChar(191)
+ moid String @unique @db.VarChar(64)
+ period_start DateTime
+ period_end DateTime
+ amount Int
+ status String @default("processing") @db.VarChar(20)
+ provider_tid String? @db.VarChar(100)
+ order_id String? @db.VarChar(191)
+ failure_code String? @db.VarChar(100)
+ refund_amount Int?
+ paid_at DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([subscription_id, created_at])
+ @@index([status, updated_at])
+ @@map("ai_subscription_charges")
 }
