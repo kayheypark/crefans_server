@@ -133,6 +133,8 @@
 | POST | `/api/v1/auth/signup` | `src/platform/auth.controller.ts::signup` |
 | POST | `/api/v1/auth/signup/email/request` | `src/platform/auth.controller.ts::request` |
 | POST | `/api/v1/auth/signup/email/verify` | `src/platform/auth.controller.ts::verify` |
+| POST | `/api/v1/auth/signup/phone/confirm` | `src/platform/auth.controller.ts::phoneConfirm` |
+| POST | `/api/v1/auth/signup/phone/start` | `src/platform/auth.controller.ts::phoneStart` |
 | POST | `/api/v1/beans/charges` | `src/platform/beans.controller.ts::create` |
 | GET | `/api/v1/beans/charges/:id` | `src/platform/beans.controller.ts::charge` |
 | POST | `/api/v1/beans/charges/:id/confirm` | `src/platform/beans.controller.ts::confirm` |
@@ -164,8 +166,10 @@
 | GET | `/api/v1/events/promotion-beans` | `src/platform/beans.controller.ts::promotionEvent` |
 | POST | `/api/v1/events/promotion-beans/claim` | `src/platform/beans.controller.ts::claimPromotionEvent` |
 | POST | `/api/v1/guest/ai-photo/edit` | `src/platform/guest.ts::edit` |
+| GET | `/api/v1/guest/claim` | `src/platform/guest.ts::claimable` |
 | POST | `/api/v1/guest/claim` | `src/platform/guest.ts::claim` |
 | POST | `/api/v1/guest/content` | `src/platform/guest.ts::content` |
+| POST | `/api/v1/guest/content/:id` | `src/platform/guest.ts::editContent` |
 | POST | `/api/v1/guest/content/caption` | `src/platform/guest.ts::caption` |
 | GET | `/api/v1/guest/session` | `src/platform/guest.ts::session` |
 | POST | `/api/v1/guest/session` | `src/platform/guest.ts::start` |
@@ -471,6 +475,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261116090000_bank_transfer`
 - `20261116120000_ai_subscription`
 - `20261116190000_member_phone`
+- `20261116210000_signup_phone`
 
 ## Prisma 전체 정의 (110 models · 15 enums)
 
@@ -2743,6 +2748,9 @@ model PhoneVerification {
   code       String   @db.VarChar(12)
   expires_at DateTime
   created_at DateTime @default(now())
+  /// Signup flow (2026-11-16): set when OCTOMO confirmed the SMS before the account exists; the proof is shown once to the browser.
+  verified_at DateTime?
+  proof_hash  String?  @db.VarChar(64)
   @@index([member_id, created_at])
   @@map("phone_verifications")
 }
