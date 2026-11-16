@@ -9,7 +9,7 @@ const error=code=>e=>e.getResponse().code===code;
 test('the released documents are in force with no open items: terms/policy from 2026-11-06, collection/marketing from 2026-10-30',()=>{
  const source=new LegalDocumentsService();assert.deepEqual(source.catalog().blockers,[]);assert.equal(source.signup().signupReady,true);
  // 2026-11-06 user decision: the merged revision is now the single version in force, so terms/policy carry that day.
- for(const d of [source.catalog().documents.policy]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-06');assert.equal(d.effectiveAt,'2026-11-06');assert.doesNotMatch(d.version,/draft/);}
+ for(const d of [source.catalog(new Date('2026-11-16T12:00:00+09:00')).documents.policy]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-06');assert.equal(d.effectiveAt,'2026-11-06');assert.doesNotMatch(d.version,/draft/);}
  // 2026-11-13: the partner revision of article 6 (only partners withdraw) is in force from its deploy day.
  {const d=source.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-13');assert.equal(d.effectiveAt,'2026-11-13');assert.equal(d.version,'2026-11-13.partner.1');}
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
@@ -91,7 +91,7 @@ test('2026-11-11 payout revision: article 6 states the company transfer from the
 test('2026-11-13 partner revision: article 6 limits withdrawals to partner creators and keeps the account/PIN and hold rules',()=>{
  const legal=new LegalDocumentsService(),{PARTNER_TERMS_DATE}=require('../dist/src/platform/legal-documents');assert.equal(PARTNER_TERMS_DATE,'2026-11-13');
  const before=legal.catalog(new Date('2026-11-12T23:59:00+09:00')).documents.terms,after=legal.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;
- assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-16.ai.1');
+ assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-17.adult.1');
  const six=after.sections.find(s=>s.title==='6. 크리에이터 수수료·정산·출금').body;
  assert.match(six,/파트너십 계약을 맺은 크리에이터\(프로필에 인증 배지 표시\)만 신청할 수 있습니다/);assert.match(six,/정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다/);
  assert.match(six,/인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다/);assert.match(six,/출금에는 본인 명의 정산 계좌의 확인과 별도 출금 인증이 필요합니다/);
@@ -260,4 +260,15 @@ test('2026-11-17 phone.3: privacy 4 says the number is kept encrypted and shown 
  assert.doesNotMatch(by('4. '),/번호 자체를 저장하지 않고/);assert.match(by('7. '),/암호화한 휴대폰 번호와 확인 값은 회원 탈퇴 후/);
  assert.match(by('16. '),/./,'the ai.1 titles are kept');assert.match(p.notice,/2026-11-17 개정/);
  assert.equal(legal.catalog(new Date('2026-11-16T12:00:00+09:00')).documents.privacy.version,'2026-11-16.ai.1','the previous day keeps ai.1');
+});
+
+// 2026-11-17 user decision: not a beta any more, and adult content is never allowed (not 'opened later'); sanctions without prior warning.
+test('2026-11-17 adult.1: terms/policy carry no beta wording, forbid adult content incl. AI photos, and keep the review request',()=>{
+ const legal=new LegalDocumentsService(),c=legal.catalog(new Date('2026-11-17T12:00:00+09:00')),t=c.documents.terms,p=c.documents.policy,by=x=>t.sections.find(sec=>sec.title.startsWith(x)).body;
+ assert.equal(t.version,'2026-11-17.adult.1');assert.equal(p.version,'2026-11-17.adult.1');assert.equal(t.effectiveAt,'2026-11-17');assert.equal(p.effectiveAt,'2026-11-17');
+ for(const d of [t,p])assert.doesNotMatch(JSON.stringify(d),/베타|별도 개방/,'no beta or later-opening wording');
+ assert.match(by('7. '),/성인 콘텐츠를 만들거나 올릴 수 없으며, AI 사진 편집으로 만드는 경우도 같습니다/);assert.match(by('7. '),/사전 경고 없이/);
+ assert.match(JSON.stringify(p),/사전 경고 없이/);assert.match(JSON.stringify(p),/검토 요청/,'the review request stays');
+ assert.match(by('4. '),/첫 갱신 실패 후 24시간 간격으로 최대 3회/);assert.match(by('4. '),/멤버십 카드 결제로는 실제 청구를 하지 않습니다/,'test-card wording kept without beta');
+ assert.equal(legal.catalog(new Date('2026-11-16T12:00:00+09:00')).documents.terms.version,'2026-11-16.ai.1','the previous day keeps ai.1');
 });
