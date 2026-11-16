@@ -288,7 +288,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `/preview/following` | 팔로잉 목록 |
 | `/preview/followers` | 팔로워 목록 |
 | `/preview/payment-methods` | 결제수단 관리 |
-| `/preview/studio/advertising` | 광고상품 |
+| `/preview/studio/advertising` | 상점(광고상품) |
 | `/preview/studio/beans` | 콩 후원·출금 |
 | `/preview/studio` | 대시보드 |
 | `/preview/studio/start` | 크리에이터 시작하기 |
