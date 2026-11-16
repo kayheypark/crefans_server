@@ -3,14 +3,17 @@ import {can} from './admin-permissions';
 import {appendAudit,auditChange,contentDigest} from './audit';
 import {beanPolicy} from './bean-policy';
 import {betaPolicy} from './beta-policy';
-import {POLICY_CONFIRMATION,policyView} from './financial-policy';
+import {POLICY_CONFIRMATION,effectiveTerms,policyView} from './financial-policy';
+export {effectiveTerms};
 import {reject,text} from './http';
 
 // Per-creator overrides. null keeps the platform default (DB financial policy, bean policy, beta minimum withdrawal).
-const termKeys=['platform_fee_bps','settlement_hold_days','bean_withdrawal_fee_bps','minimum_withdrawal_krw'] as const;
+const termKeys=['platform_fee_bps','settlement_hold_days','bean_withdrawal_fee_bps','minimum_withdrawal_krw','minimum_withdrawal_beans'] as const;
+// 2026-11-17 user decision (signed contract article 8(3)): special terms may carry a start and end; outside that window the base terms apply.
+const dateKeys=['special_starts_at','special_ends_at'] as const;
 type Terms=Record<typeof termKeys[number],number|null>;
-const limits:Record<typeof termKeys[number],[number,number]>={platform_fee_bps:[0,10000],settlement_hold_days:[0,365],bean_withdrawal_fee_bps:[0,10000],minimum_withdrawal_krw:[beanPolicy.krwPerBean,100000000]};
-const fromInput:Record<typeof termKeys[number],string>={platform_fee_bps:'platformFeeBps',settlement_hold_days:'settlementHoldDays',bean_withdrawal_fee_bps:'beanWithdrawalFeeBps',minimum_withdrawal_krw:'minimumWithdrawalKrw'};
+const limits:Record<typeof termKeys[number],[number,number]>={platform_fee_bps:[0,10000],settlement_hold_days:[0,365],bean_withdrawal_fee_bps:[0,10000],minimum_withdrawal_krw:[beanPolicy.krwPerBean,100000000],minimum_withdrawal_beans:[1,1000000]};
+const fromInput:Record<typeof termKeys[number],string>={platform_fee_bps:'platformFeeBps',settlement_hold_days:'settlementHoldDays',bean_withdrawal_fee_bps:'beanWithdrawalFeeBps',minimum_withdrawal_krw:'minimumWithdrawalKrw',minimum_withdrawal_beans:'minimumWithdrawalBeans'};
 export function termsInput(input:any):Terms{
  const out={} as Terms;
  for(const key of termKeys){
@@ -20,15 +23,17 @@ export function termsInput(input:any):Terms{
  }
  return out;
 }
-export const termsView=(t:any)=>({platformFeeBps:t?.platform_fee_bps??null,settlementHoldDays:t?.settlement_hold_days??null,beanWithdrawalFeeBps:t?.bean_withdrawal_fee_bps??null,minimumWithdrawalKrw:t?.minimum_withdrawal_krw??null});
-const sameTerms=(a:any,b:Terms)=>termKeys.every(k=>(a?.[k]??null)===b[k]);
+export const termsView=(t:any)=>({platformFeeBps:t?.platform_fee_bps??null,settlementHoldDays:t?.settlement_hold_days??null,beanWithdrawalFeeBps:t?.bean_withdrawal_fee_bps??null,minimumWithdrawalKrw:t?.minimum_withdrawal_krw??null,minimumWithdrawalBeans:t?.minimum_withdrawal_beans??null,specialStartsAt:t?.special_starts_at??null,specialEndsAt:t?.special_ends_at??null});
+const sameTerms=(a:any,b:Terms&Partial<Record<typeof dateKeys[number],Date|null>>)=>termKeys.every(k=>(a?.[k]??null)===b[k])&&dateKeys.every(k=>(a?.[k]?.getTime?.()??null)===((b as any)[k]?.getTime?.()??null));
+function termDates(input:any){const out:Record<string,Date|null>={};for(const [key,field] of [['special_starts_at','specialStartsAt'],['special_ends_at','specialEndsAt']] as const){const v=input?.[field];if(v===null||v===undefined||v===''){out[key]=null;continue;}const d=new Date(v);if(typeof v!=='string'||!Number.isFinite(d.getTime()))reject(400,'INVALID_CREATOR_TERMS','우대 적용 기간을 확인해주세요.');out[key]=d;}
+ if(out.special_starts_at&&out.special_ends_at&&out.special_ends_at<=out.special_starts_at)reject(400,'INVALID_CREATOR_TERMS','우대 종료일은 시작일보다 뒤여야 합니다.');return out;}
 const hasTerms=(t:any)=>termKeys.some(k=>t?.[k]!==null&&t?.[k]!==undefined);
 // Changing money terms needs the financial-policy permission and the same typed phrase as the platform policy.
 function assertTermsChange(admin:any,input:any){
  if(!can(admin,'settings','update'))reject(403,'ADMIN_PERMISSION_REQUIRED','수수료·출금 조건을 변경할 권한이 없습니다.');
  if(input?.confirmation!==POLICY_CONFIRMATION)reject(400,'CONFIRMATION_REQUIRED','확인 문구를 정확히 입력해주세요.');
 }
-const termsAudit=(t:any)=>t?{platform_fee_bps:t.platform_fee_bps??null,settlement_hold_days:t.settlement_hold_days??null,bean_withdrawal_fee_bps:t.bean_withdrawal_fee_bps??null,minimum_withdrawal_krw:t.minimum_withdrawal_krw??null,version:t.version}:null;
+const termsAudit=(t:any)=>t?{platform_fee_bps:t.platform_fee_bps??null,settlement_hold_days:t.settlement_hold_days??null,bean_withdrawal_fee_bps:t.bean_withdrawal_fee_bps??null,minimum_withdrawal_krw:t.minimum_withdrawal_krw??null,minimum_withdrawal_beans:t.minimum_withdrawal_beans??null,special_starts_at:t.special_starts_at??null,special_ends_at:t.special_ends_at??null,version:t.version}:null;
 
 export const inviteView=(i:any)=>({id:i.id,email:i.email,memo:i.memo,terms:termsView(i),status:i.used_at?'used':i.revoked_at?'revoked':'active',memberId:i.member_id,usedAt:i.used_at,revokedAt:i.revoked_at,version:i.version,createdAt:i.created_at,updatedAt:i.updated_at});
 export async function listInvites(db:any,query:any){
@@ -96,7 +101,7 @@ export async function consumeInvite(tx:any,email:string,memberId:string){
 
 // One history row per saved version; (member_id, version) is unique so a version is never rewritten.
 async function recordTermChange(tx:any,saved:any,source:'admin'|'invite',changedBy:string|null,reason:string){
- await tx.creatorFinancialTermChange.create({data:{member_id:saved.member_id,version:saved.version,...Object.fromEntries(termKeys.map(k=>[k,saved[k]])),source,changed_by:changedBy,reason}});
+ await tx.creatorFinancialTermChange.create({data:{member_id:saved.member_id,version:saved.version,...Object.fromEntries(termKeys.map(k=>[k,saved[k]])),special_starts_at:saved.special_starts_at??null,special_ends_at:saved.special_ends_at??null,source,changed_by:changedBy,reason}});
 }
 export async function memberTerms(db:any,memberId:string){
  if(!await db.member.findUnique({where:{id:memberId},select:{id:true}}))reject(404,'MEMBER_NOT_FOUND','회원을 찾을 수 없습니다.');
@@ -107,7 +112,7 @@ export async function memberTerms(db:any,memberId:string){
  return{terms:termsView(row),version:row?.version??0,defaults:await defaultTerms(db),history};
 }
 export async function saveMemberTerms(db:any,admin:any,memberId:string,input:any){
- const terms=termsInput(input);
+ const terms={...termsInput(input),...termDates(input)};
  return db.$transaction(async(tx:any)=>{
   await tx.$queryRaw`SELECT id FROM members WHERE id=${memberId} FOR UPDATE`;
   if(!await tx.member.findUnique({where:{id:memberId},select:{id:true}}))reject(404,'MEMBER_NOT_FOUND','회원을 찾을 수 없습니다.');
@@ -124,17 +129,18 @@ export async function saveMemberTerms(db:any,admin:any,memberId:string,input:any
 
 async function defaultTerms(db:any){
  const p=policyView(await db.financialPolicy.findUnique({where:{id:'platform'}}));
- return{platformFeeBps:p.platformFeeBps,settlementHoldDays:p.settlementHoldDays,beanWithdrawalFeeBps:beanPolicy.withdrawalFeeBps,minimumWithdrawalKrw:betaPolicy.minimumWithdrawal};
+ return{platformFeeBps:p.platformFeeBps,settlementHoldDays:p.settlementHoldDays,beanWithdrawalFeeBps:beanPolicy.withdrawalFeeBps,minimumWithdrawalKrw:betaPolicy.minimumWithdrawal,minimumWithdrawalBeans:beanPolicy.minimumWithdrawalBeans};
 }
 // Withdrawal terms in effect for a creator right now. Membership fee/hold are resolved in paymentPolicy.
 export async function withdrawalTerms(db:any,memberId:string){
- const row=await db.creatorFinancialTerms.findUnique({where:{member_id:memberId}});
+ const row=effectiveTerms(await db.creatorFinancialTerms.findUnique({where:{member_id:memberId}}));
+ // Contract Schedule A: membership (KRW) and 콩 minimums are separate (defaults 100,000원 / 1,000콩).
  const minimumWithdrawalKrw=row?.minimum_withdrawal_krw??betaPolicy.minimumWithdrawal;
- return{beanWithdrawalFeeBps:row?.bean_withdrawal_fee_bps??beanPolicy.withdrawalFeeBps,minimumWithdrawalKrw,minimumWithdrawalBeans:Math.ceil(minimumWithdrawalKrw/beanPolicy.krwPerBean)};
+ return{beanWithdrawalFeeBps:row?.bean_withdrawal_fee_bps??beanPolicy.withdrawalFeeBps,minimumWithdrawalKrw,minimumWithdrawalBeans:row?.minimum_withdrawal_beans??beanPolicy.minimumWithdrawalBeans};
 }
 // Always return effective terms, including current DB defaults for creators without overrides.
 export async function studioTerms(db:any,memberId:string){
- const row=await db.creatorFinancialTerms.findUnique({where:{member_id:memberId}});
+ const row=effectiveTerms(await db.creatorFinancialTerms.findUnique({where:{member_id:memberId}}));
  const d=await defaultTerms(db);
- return{platformFeeBps:row?.platform_fee_bps??d.platformFeeBps,settlementHoldDays:row?.settlement_hold_days??d.settlementHoldDays,beanWithdrawalFeeBps:row?.bean_withdrawal_fee_bps??d.beanWithdrawalFeeBps,minimumWithdrawalKrw:row?.minimum_withdrawal_krw??d.minimumWithdrawalKrw};
+ return{platformFeeBps:row?.platform_fee_bps??d.platformFeeBps,settlementHoldDays:row?.settlement_hold_days??d.settlementHoldDays,beanWithdrawalFeeBps:row?.bean_withdrawal_fee_bps??d.beanWithdrawalFeeBps,minimumWithdrawalKrw:row?.minimum_withdrawal_krw??d.minimumWithdrawalKrw,minimumWithdrawalBeans:row?.minimum_withdrawal_beans??d.minimumWithdrawalBeans,specialEndsAt:row?.special_ends_at??null};
 }

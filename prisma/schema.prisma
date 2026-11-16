@@ -1728,6 +1728,7 @@ model SignupInvite {
   settlement_hold_days Int?
   bean_withdrawal_fee_bps Int?
   minimum_withdrawal_krw Int?
+  minimum_withdrawal_beans Int?
   member_id String? @db.VarChar(191)
   used_at DateTime?
   revoked_at DateTime?
@@ -1744,6 +1745,9 @@ model CreatorFinancialTerms {
   settlement_hold_days Int?
   bean_withdrawal_fee_bps Int?
   minimum_withdrawal_krw Int?
+  minimum_withdrawal_beans Int?
+  special_starts_at DateTime?
+  special_ends_at DateTime?
   version Int @default(1)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -1758,6 +1762,9 @@ model CreatorFinancialTermChange {
   settlement_hold_days Int?
   bean_withdrawal_fee_bps Int?
   minimum_withdrawal_krw Int?
+  minimum_withdrawal_beans Int?
+  special_starts_at DateTime?
+  special_ends_at DateTime?
   source String @db.VarChar(20)
   changed_by String? @db.VarChar(191)
   reason String @default("") @db.VarChar(500)

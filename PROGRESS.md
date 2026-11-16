@@ -1,3 +1,13 @@
+## 2026-11-17 크리에이터 계약 약속대로 코드 수정 (fix/contract-obligations)
+- 사용자 결정(pilot-work): 계약 초안과 코드 불일치 4건은 '코드를 약속대로'. 체결 계약 기준(별지 A·8조③·9조④·12조②).
+  1. 최소 출금: creator_financial_terms·signup_invites·term_changes 에 minimum_withdrawal_beans(콩) 추가. withdrawalTerms 의 콩 최소는 이 칸 또는 기본 1,000콩(멤버십 원÷100 파생 제거).
+  2. 우대 기간: special_starts_at·special_ends_at, effectiveTerms(financial-policy.ts) — 기간 밖이면 기본 조건(paymentPolicy·withdrawalTerms·studioTerms). 관리자 저장 시 날짜 검증.
+  3. 분쟁 보류 고지: freezeCharge → noticeHold: 영향받은 크리에이터에게 범위(해당 결제분)·사유·재검토일(30일, BEAN_HOLD_REVIEW_DAYS)·나머지 출금 가능 알림, 운영 알림 beans.hold_review(dueAt).
+  4. 종료 통지: 인증 배지 해제 시 미정산 수익(보류·출금 가능·지급 대기)·출금 가능 콩·미수금 통지, 30일 기한, 운영 알림 creator.partner_ended(dueAt). **30일 뒤 지급 경로(비파트너 지급 허용)는 미구현 — 다음 결정.**
+- 알림 문장 191자 제한(테스트가 실제 버그로 잡음) → 짧게.
+- 검증: beans·membership-partner·signup-invites·financial-policy·bean-ledger·openapi 82/82, 대조(noticeHold·terminationNotice 끄면 실패). 관리자 npm test 26/26, 프론트 콩 최소 안내 테스트 갱신.
+- 마이그레이션 20261117010000_creator_terms_contract(추가 칸만).
+
 ## 2026-11-17 night-work 후속: 비회원 캡션 상한·AI 구독 갱신 이중 청구 방지 (fix/caption-caps-renewal)
 - 사용자 결정(pilot-work/ask-me): ① 비회원 'AI로 내용 작성'에 IP 하루 30·전체 하루 1,000 상한(넘으면 정해진 문장, OpenAI 호출 없음) ② AI 구독 갱신: 402 INICIS_* 확정 거절만 실패, 그 외(타임아웃·BILLING_UNCERTAIN·승인 후 DB 실패)는 charge 'uncertain'·같은 moid·일정 유지·자동 재청구 안 함·운영 알림(ai_subscription.charge_uncertain), 첫 결제 불명확은 503 BILLING_UNCERTAIN. 횟수형 주문 requestId 'aisub_' 금지. ③ '점검 중' 문구 유지 ④ OCTOMO·포트원 키 교체 안 함.
 - 검증: guest-caption 7/7, ai-subscription 6/6(대조: 불명확 분기 끄면 실패), ai-shop·openapi·operations 통과, guest 2건 실패는 e2e DB 비회원 하루 한도 소진(기존).
