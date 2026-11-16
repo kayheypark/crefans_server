@@ -192,7 +192,7 @@ export class AiPhotoService{
  }
  private async performEdit(sub:string,input:any,mask?:{buffer:Buffer;mimetype:string;size:number},guest?:{ipHash:string}){
   const started=Date.now();if(!guest){await this.service.member(sub);
-  if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집은 운영팀이 허용한 크리에이터만 쓸 수 있어요.');}else if(input?.libraryIds||input?.heartGameId)reject(400,'GUEST_FEATURE_UNAVAILABLE','내 보관함과 하트 게임은 회원만 이용할 수 있어요.');
+  if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집을 사용할 수 없는 계정이에요.');}else if(input?.libraryIds||input?.heartGameId)reject(400,'GUEST_FEATURE_UNAVAILABLE','내 보관함과 하트 게임은 회원만 이용할 수 있어요.');
   const mode=input?.mode??'general';if(mode!=='general'&&mode!=='cosplay')reject(400,'INVALID_EDIT_MODE','편집 모드를 다시 골라 주세요.');
   const aspectRatio=input?.aspectRatio??'original';if(aspectRatio!=='original'&&!Object.prototype.hasOwnProperty.call(RATIO_SIZES,aspectRatio))reject(400,'INVALID_ASPECT_RATIO','비율을 다시 골라 주세요.');
   const model=this.settings.model;

@@ -30,11 +30,10 @@ before(async()=>{
 });
 after(async()=>{await app?.close();try{await db.aiHeartUse.deleteMany({where:{user_id:{in:members}}});await db.aiHeartGame.deleteMany({where:{user_id:{in:members}}});await db.aiHeartWallet.deleteMany({where:{user_id:{in:members}}});await db.aiShopUse.deleteMany({where:{creator_id:{in:members}}});await db.aiShopOrder.deleteMany({where:{creator_id:{in:members}}});const made=await db.media.findMany({where:{user_sub:{in:members}},select:{id:true}});await db.media.deleteMany({where:{id:{in:made.map(m=>m.id)}}});await db.aiPhotoGrant.deleteMany({where:{creator_user_id:{in:members}}});await db.creator.deleteMany({where:{user_id:{in:members}}});await db.member.deleteMany({where:{id:{in:members}}});fs.rmSync(mediaRoot,{recursive:true,force:true});}finally{await db.$disconnect();await release?.();}});
 
-test('only allow-listed creators: quota shows not allowed and edits are refused until granted',async()=>{
- reset();assert.deepEqual(await photos.quota(creator),{allowed:false,limit:10,remaining:0,paidRemaining:0,hearts:0,rewardRemaining:0,typicalSeconds:null,resetTickets:{count:0,nextExpiresAt:null}});
- await assert.rejects(photos.edit(creator,base()),code('AI_PHOTO_NOT_ALLOWED'));assert.equal(calls.length,0);
+test('2026-11-16: every member may use AI photo editing (no allow-list); a grant row changes nothing',async()=>{
+ reset();{const q=await photos.quota(creator);assert.deepEqual([q.allowed,q.limit,q.remaining],[true,10,10]);assert.ok(q.typicalSeconds===null||Number.isInteger(q.typicalSeconds));}
  await db.aiPhotoGrant.create({data:{creator_user_id:creator,reason:'테스트 허용'}});
- {const q=await photos.quota(creator);assert.deepEqual([q.allowed,q.limit,q.remaining],[true,10,10]);assert.ok(q.typicalSeconds===null||Number.isInteger(q.typicalSeconds));}
+ {const q=await photos.quota(creator);assert.deepEqual([q.allowed,q.limit,q.remaining],[true,10,10]);}
 });
 
 test('input rules are checked before the provider: consent, prompt, personal data, mask, own photo only',async()=>{
