@@ -24,7 +24,7 @@ import {requestContext} from './request-context';
 import {PlatformOperationsService} from './operations.service';
 import {GUEST_AI_LIMIT,GUEST_DAILY_TOTAL,GUEST_IP_DAILY} from './guest-policy';
 const GUEST_LIFETIME=3650*86400;
-import {aiFailureTrace,diagnosticId,recordAiFailure,traceAiEvent,AiFailureTrace} from './ai-photo-failures';
+import {aiFailureTrace,diagnosticId,recordAiFailure,recordAiRequest,traceAiEvent,AiFailureTrace} from './ai-photo-failures';
 import {aiPhotoAllowed} from './ai-photo-grants';
 import {backgroundReferenceId,readBackgroundReference} from './ai-photo-background-references';
 import {costumeReferenceIds,readCostumeReference} from './ai-photo-costume-references';
@@ -186,7 +186,7 @@ export class AiPhotoService{
   const trace:AiFailureTrace={requestId:requestContext.getStore()?.requestId||randomUUID(),actorId:sub,selectedProvider,selectedModel:this.settings.model,sequence:0,stage:'validation',provider:'local'},started=Date.now();
   return aiFailureTrace.run(trace,async()=>{
    await traceAiEvent(this.service.db,'started',{mode:diagnosticId(mode),selectedModel:trace.selectedModel,selectedProvider});
-   try{const result=await this.performEdit(sub,input,mask,guest);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);return result;}
+   try{const result=await this.performEdit(sub,input,mask,guest);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);await recordAiRequest(this.service.db,this.configService,input,trace,{count:result.images.length,targetId:result.images[0]?.id});return result;}
    catch(error){await recordAiFailure(this.service.db,this.configService,sub,input,error,trace,started);await this.failureAlert(sub,error,trace,started,!!guest);throw error;}
   });
  }
