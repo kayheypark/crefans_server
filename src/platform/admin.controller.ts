@@ -49,6 +49,19 @@ export class PlatformAdminGuard implements CanActivate{
   if(rule==='super')requireSuperAdmin(admin);else requirePermission(admin,rule[0],rule[1]);
   return true;}
 }
+// Module-level, not a controller method: every controller method must be a permitted route (admin-operators test).
+async function terminationNotice(db:any,finance:PlatformFinanceService,id:string){
+  const f=await finance.finance(id),s=f.summary;
+  const beans=(await db.beanLot.aggregate({_sum:{available:true},where:{member_id:id,bucket:{in:[...beanPolicy.withdrawableBuckets]}}}))._sum.available||0;
+  const receivables=await db.creatorReceivable.findMany({where:{creator_id:id,status:'open'},select:{amount:true,kind:true}});
+  const owed=receivables.reduce((n:number,r:any)=>n+r.amount,0),unsettled=Math.max(0,Number(s.pending)+Number(s.available)+Number(s.requested));
+  const due=new Date(Date.now()+30*86400000),won=(n:number)=>`${n.toLocaleString('ko-KR')}원`;
+  await db.$transaction(async(tx:any)=>{
+   await tx.memberNotification.create({data:{member_id:id,type:'settlement',text:`파트너 계약이 종료되었어요. 미정산 수익 ${won(unsettled)}, 출금 가능 콩 ${beans.toLocaleString('ko-KR')}콩, 미수금 ${won(owed)}이 남아 있어요. ${dateOnly(due)}까지 처리 방법을 정하고, 합의가 없으면 확정 수익 전액을 정산 계좌로 보내 드려요.`.slice(0,191),path:'/studio/revenue'}});
+   await enqueueOperation(tx,'creator.partner_ended',{creatorId:id,status:'ended',dueAt:due.toISOString()},`creator.partner_ended:${id}:${dateOnly(new Date())}`,{unsettled,beans,owed,receivables:receivables.length});
+  });
+ }
+
 @Controller('admin') @UseGuards(PlatformAdminGuard)
 export class PlatformAdminController{
  constructor(private service:PlatformService,private limiter:LocalMemberService,private marketing:MarketingService,private beans:BeansService,private finance:PlatformFinanceService,private categoryManager:CategoriesService,private config:ConfigService){}
@@ -162,19 +175,8 @@ await tx.memberNotification.create({data:{member_id:report.reporter_id,type:'mod
   });
   // 2026-11-17 user decision (signed contract article 12(2)): ending the partnership tells the creator the unsettled revenue and
   // receivables (amounts and items) and starts the 30-day consultation; operators get the 30-day date to pay if no agreement.
-  if(!isVerified)await this.terminationNotice(id);
+  if(!isVerified)await terminationNotice(this.service.db,this.finance,id);
   return{message:isVerified?'인증 배지를 부여했습니다.':`인증 배지를 해제했습니다.${paused?` 판매 중이던 멤버십 ${paused}개를 중지했어요(기존 구독자는 이용 기간까지, 다음 갱신은 없음).`:''}`,isVerified,...(isVerified?{}:{membershipsPaused:paused})};
- }
- private async terminationNotice(id:string){
-  const db=this.service.db,f=await this.finance.finance(id),s=f.summary;
-  const beans=(await db.beanLot.aggregate({_sum:{available:true},where:{member_id:id,bucket:{in:[...beanPolicy.withdrawableBuckets]}}}))._sum.available||0;
-  const receivables=await db.creatorReceivable.findMany({where:{creator_id:id,status:'open'},select:{amount:true,kind:true}});
-  const owed=receivables.reduce((n:number,r:any)=>n+r.amount,0),unsettled=Math.max(0,Number(s.pending)+Number(s.available)+Number(s.requested));
-  const due=new Date(Date.now()+30*86400000),won=(n:number)=>`${n.toLocaleString('ko-KR')}원`;
-  await db.$transaction(async(tx:any)=>{
-   await tx.memberNotification.create({data:{member_id:id,type:'settlement',text:`파트너 계약이 종료되었어요. 미정산 수익 ${won(unsettled)}, 출금 가능 콩 ${beans.toLocaleString('ko-KR')}콩, 미수금 ${won(owed)}이 남아 있어요. ${dateOnly(due)}까지 처리 방법을 정하고, 합의가 없으면 확정 수익 전액을 정산 계좌로 보내 드려요.`.slice(0,191),path:'/studio/revenue'}});
-   await enqueueOperation(tx,'creator.partner_ended',{creatorId:id,status:'ended',dueAt:due.toISOString()},`creator.partner_ended:${id}:${dateOnly(new Date())}`,{unsettled,beans,owed,receivables:receivables.length});
-  });
  }
  @Get('creators/:id/closing-payout') @Permit(['revenue','create']) closingPayout(@Param('id') id:string,@Req() req:any){return this.finance.closingPayoutPreview(req.admin,id);}
  @Post('creators/:id/closing-payout') @Permit(['revenue','create']) startClosingPayout(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.startClosingPayout(req.admin,id,body);}
