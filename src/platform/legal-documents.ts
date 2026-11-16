@@ -312,12 +312,43 @@ const phonePrivacy2:LegalDocument={...phonePrivacy,version:'2026-11-16.phone.2',
  sections:phonePrivacy.sections.map(sec=>{const swap=(from:string,to:string,body=sec.body)=>{if(!body.includes(from))throw Error(`Legal revision anchor missing in ${sec.title}`);return body.replace(from,to);};
   if(sec.title.startsWith('4. '))return{...sec,body:swap(PHONE2_FROM,PHONE2_TO)};if(sec.title.startsWith('8. '))return{...sec,body:swap(PHONE2_PROVIDER_FROM,PHONE2_PROVIDER_TO)};return sec;})};
 const phoneCatalog2:LegalCatalog={...phoneCatalog,documents:{...phoneCatalog.documents,privacy:phonePrivacy2}};
+// 2026-11-16 user decision: AI photo editing is the main service (PG reviews kept reading the fan/creator platform positioning),
+// open to every member; memberships and 콩 후원 stay as creator features. Effective the same day (users are invited acquaintances,
+// user decision: no notice period). Draft and grounds: docs/terms-amendment-ai-positioning-draft-20261116.md.
+export const AI_POSITION_DATE='2026-11-16';
+const AI_T1_FROM='이 약관은 크레팬스(CREFANS)의 회원가입, 크리에이터 콘텐츠 이용, 멤버십 구독과 정산에 관한 기본 조건을 설명합니다. 팬은 콘텐츠를 이용하는 회원, 크리에이터는 콘텐츠와 멤버십을 제공하는 회원입니다.';
+const AI_T1_TO='이 약관은 사진 한 장으로 의상·메이크업·포즈·배경을 바꾸는 AI 사진 편집 서비스 크레팬스(CREFANS)와, 함께 제공하는 게시물 공유·크리에이터 멤버십·콩 후원 기능의 이용 조건을 설명합니다. 회원은 AI 사진 편집과 게시물 기능을 이용하는 회원이며, 그중 크리에이터는 멤버십과 후원 기능을 운영하는 회원입니다.';
+// Same sentence as front lib/content/business.ts and the mail footer (src/auth/local/mail/templates.ts).
+export const SALES_NOTICE='AI 이용권·콩·광고상품은 크레팬스가 직접 판매합니다. 크리에이터 멤버십 거래에서 크레팬스는 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다.';
+const AI_SALES_FROM='크레팬스는 크리에이터 멤버십 거래의 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다. 콩은 크레팬스가 직접 판매합니다.';
+const AI_T13_TITLE_FROM='13. 스튜디오 AI 사진 편집과 AI 이용권',AI_T13_TITLE_TO='13. AI 사진 편집과 AI 이용권';
+const AI_T13_FROM="운영팀이 허용한 크리에이터는 스튜디오 게시물 작성에서 'AI로 사진 만들기'로 본인이 올린 사진을 편집할 수 있습니다.";
+const AI_T13_TO="AI 사진 편집은 크레팬스의 대표 기능입니다. 회원은 누구나 게시물 작성 화면의 'AI로 사진 만들기'로 본인이 올린 사진을 편집할 수 있고, 로그인하지 않은 방문자는 체험 화면에서 정해진 횟수만큼 무료로 이용할 수 있습니다.";
+const AI_P1_FROM='공개된 프로필·게시물, 회원 계정, 결제·정산, 고객지원과 서비스 보안에 관한 처리 현황을';
+const AI_P1_TO='AI 사진 편집(사진 업로드와 생성 결과), 공개된 프로필·게시물, 회원 계정, 결제·정산, 고객지원과 서비스 보안에 관한 처리 현황을';
+const AI_P16_FROM='16. 선택 기능: 스튜디오 AI 사진 편집',AI_P16_TO='16. 대표 기능: AI 사진 편집';
+const AI_P17_FROM='17. 선택 기능: 비회원 AI 사진 체험',AI_P17_TO='17. 대표 기능: 비회원 AI 사진 체험';
+const swapIn=(title:string,body:string,from:string,to:string)=>{if(!body.includes(from))throw Error(`Legal revision anchor missing in ${title}`);return body.replace(from,to);};
+const aiTerms:LegalDocument={...subTerms,version:'2026-11-16.ai.1',updatedAt:AI_POSITION_DATE,publishedAt:AI_POSITION_DATE,effectiveAt:AI_POSITION_DATE,
+ notice:subTerms.notice+' 같은 날 추가 개정: 제1조에 크레팬스를 AI 사진 편집 서비스로 정의하고 판매 주체(AI 이용권·콩·광고상품은 회사 직접 판매, 멤버십은 크리에이터 판매)를 밝혔으며, 제13조에서 AI 사진 편집을 모든 회원에게 열었습니다.',
+ sections:subTerms.sections.map(sec=>{
+  if(sec.title.startsWith('1. ')){let body=swapIn(sec.title,sec.body,AI_T1_FROM,AI_T1_TO);if(body.includes(AI_SALES_FROM))body=body.replace(AI_SALES_FROM,SALES_NOTICE);else body=body.replace(AI_T1_TO,AI_T1_TO+' '+SALES_NOTICE);return{...sec,body};}
+  if(sec.title===AI_T13_TITLE_FROM)return{...sec,title:AI_T13_TITLE_TO,body:swapIn(sec.title,sec.body,AI_T13_FROM,AI_T13_TO)};
+  return sec;})};
+if(!aiTerms.sections.some(sec=>sec.title===AI_T13_TITLE_TO)||!aiTerms.sections.some(sec=>sec.body.includes(SALES_NOTICE)))throw Error('Legal revision anchor missing in AI positioning terms');
+const aiPrivacy:LegalDocument={...phonePrivacy2,version:'2026-11-16.ai.1',updatedAt:AI_POSITION_DATE,publishedAt:AI_POSITION_DATE,effectiveAt:AI_POSITION_DATE,
+ notice:phonePrivacy2.notice+' 같은 날 추가 개정: AI 사진 편집을 대표 기능으로 1항 적용 범위에 적고 16·17항 제목을 바꿨습니다(처리 항목·보유기간·위탁·국외 이전은 그대로).',
+ sections:phonePrivacy2.sections.map(sec=>{
+  if(sec.title.startsWith('1. '))return{...sec,body:swapIn(sec.title,sec.body,AI_P1_FROM,AI_P1_TO)};
+  if(sec.title===AI_P16_FROM)return{...sec,title:AI_P16_TO};if(sec.title===AI_P17_FROM)return{...sec,title:AI_P17_TO};return sec;})};
+if(!aiPrivacy.sections.some(sec=>sec.title===AI_P16_TO)||!aiPrivacy.sections.some(sec=>sec.title===AI_P17_TO))throw Error('Legal revision anchor missing in AI positioning privacy');
+const aiCatalog:LegalCatalog={...phoneCatalog2,documents:{...phoneCatalog2.documents,terms:aiTerms,privacy:aiPrivacy}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

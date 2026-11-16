@@ -57,7 +57,7 @@ export function marketingMail(subject:string,body:string,unsubscribeUrl:string,a
  * 통신판매중개자 고지(전자상거래법 제20조①, 시행규칙 제11조의2: 계약내용에 관한 서면에도 고지하고, 계약 당사자를 알리는 글씨와
  * 같거나 더 크게 표시). 문구는 이용약관 제1조(src/platform/legal-documents.ts)·프론트 lib/content/business.ts 와 같다. 2026-11-07 사용자 결정.
  */
-export const intermediaryNotice = '크레팬스는 크리에이터 멤버십 거래의 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다. 콩은 크레팬스가 직접 판매합니다.';
+export const intermediaryNotice = 'AI 이용권·콩·광고상품은 크레팬스가 직접 판매합니다. 크리에이터 멤버십 거래에서 크레팬스는 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다.';
 // Membership payment mail is a written contract notice: it must carry a '판매자' (creator) row and the notice.
 const sellerKinds = new Set<string>(['payment-completed']);
 const rowStyle = 'padding:8px 0;vertical-align:top;font-size:13px';

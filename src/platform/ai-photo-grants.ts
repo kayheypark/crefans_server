@@ -25,8 +25,10 @@ export async function usedToday(db:PrismaClient|Prisma.TransactionClient,creator
  return new Map(rows.map(r=>[ids.get(r.id)!,r.count]));
 }
 
-/** Whether a creator may use the AI photo editor. The studio feature must check this on every request. */
-export async function aiPhotoAllowed(db:PrismaClient|Prisma.TransactionClient,creatorUserId:string){return !!await db.aiPhotoGrant.findUnique({where:{creator_user_id:creatorUserId}});}
+/** Whether a member may use the AI photo editor. The studio feature must check this on every request.
+ * 2026-11-16 user decision: AI photo editing is the main service and is open to every member (it was an operator allow-list).
+ * Any enabled member passes (same rule as PlatformService.member); the grant table stays for operator records and the daily/service caps still apply. */
+export async function aiPhotoAllowed(db:PrismaClient|Prisma.TransactionClient,creatorUserId:string){return !!await db.member.findFirst({where:{id:creatorUserId,enabled:true},select:{id:true}});}
 
 export async function listAiPhotoGrants(db:PrismaClient,admin:any,query:any,dailyLimit:number){
  requirePermission(admin,'members','view');

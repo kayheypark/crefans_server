@@ -30,7 +30,7 @@ test('event bean expiry notice names event beans and does not offer a refund',()
 });
 // 2026-11-07 user decision: the membership payment mail is a written contract notice (전자상거래법 시행규칙 제11조의2),
 // so it names the seller (creator) and the intermediary notice in a type size at least as large as the seller line.
-const NOTICE='크레팬스는 크리에이터 멤버십 거래의 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다. 콩은 크레팬스가 직접 판매합니다.';
+const NOTICE='AI 이용권·콩·광고상품은 크레팬스가 직접 판매합니다. 크리에이터 멤버십 거래에서 크레팬스는 통신판매중개자로 거래 당사자가 아니며, 멤버십의 판매자는 각 크리에이터입니다.';
 const px=(html,marker)=>{const i=html.indexOf(marker);assert.ok(i>0,marker);const open=html.lastIndexOf('<',i);const tag=html.slice(open,html.indexOf('>',open));const m=/font-size:(\d+)px/.exec(tag);assert.ok(m,'font-size on '+marker);return Number(m[1]);};
 test('membership payment mail names the seller and the intermediary notice, notice at least as large as the seller',()=>{
  assert.equal(intermediaryNotice,NOTICE);
