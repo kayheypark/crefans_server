@@ -115,3 +115,22 @@ test('operator cancel before a deposit and the business-day due date',async()=>{
  // Friday 10:00 KST + 3 business days = Wednesday 10:00 KST.
  assert.equal(addBusinessDays(new Date('2026-11-20T01:00:00Z'),3).toISOString(),'2026-11-25T01:00:00.000Z');
 });
+
+test('operator Telegram outbox: deposit wait, 6 hours left (once), expiry and refund request — amount and kind only, no name or account',async()=>{
+ const {operationsAlertText}=require('../dist/src/platform/operations.service');
+ const events=async(type,targetId)=>db.platformOperationalEvent.findMany({where:{type,data:{path:'$.targetId',equals:targetId}}});
+ const o=await shop.create(creator,{productId:product.id,version:product.version,termsVersion:AI_SHOP_TERMS,requestId:randomUUID(),...order});const pay=await paymentOf('ai-shop',o.id);
+ const [opened]=await events('bank_transfer.opened',pay.id);assert.ok(opened,'alert on every new deposit wait');assert.deepEqual(Object.keys(opened.data).sort(),['amount','dueAt','kind','targetId']);assert.equal(opened.data.amount,5000);assert.equal(opened.data.kind,'ai-shop');
+ const text=operationsAlertText(opened,'test','secret');assert.match(text,/무통장 입금 대기 주문 접수/);assert.match(text,/kind: AI 이용권/);assert.match(text,/amount: 5,000원/);assert.doesNotMatch(text,/홍길동|010-1234|@bank\.test/,'no depositor name, receipt number or email');
+ assert.equal(await transfers.remind(),0,'more than 6 hours left: no reminder');
+ await db.bankTransferPayment.update({where:{id:pay.id},data:{expires_at:new Date(Date.now()+5*3600000)}});
+ await transfers.remind();await transfers.remind();assert.equal((await events('bank_transfer.expiring',pay.id)).length,1,'one reminder per order');
+ await db.bankTransferPayment.update({where:{id:pay.id},data:{expires_at:new Date(Date.now()-1)}});await transfers.expire();await transfers.expire();
+ assert.equal((await events('bank_transfer.expired',pay.id)).length,1);
+ const b=await beans.createCharge(fan,{quantity:10,requestId:randomUUID(),...order});const bp=await paymentOf('bean',b.id);await transfers.confirm(admin,bp.id,{amount:bp.amount,receivedAt:new Date().toISOString(),reference:'기업 0009'});
+ assert.equal((await events('bank_transfer.expired',bp.id)).length,0,'a confirmed order never raises the expiry alert');
+ const p=await shop.create(creator,{productId:product.id,version:product.version,termsVersion:AI_SHOP_TERMS,requestId:randomUUID(),...order});await transfers.confirm(admin,(await paymentOf('ai-shop',p.id)).id,{amount:5000,receivedAt:new Date().toISOString(),reference:'기업 0010'});
+ await shop.refund(creator,p.id,{refundAccount});const m=await db.manualRefund.findFirstOrThrow({where:{kind:'ai-shop',order_id:p.id}});
+ const [refund]=await events('manual_refund.requested',m.id);assert.ok(refund);assert.equal(refund.data.amount,5000);assert.equal(refund.data.dueAt,m.due_at.toISOString());assert.doesNotMatch(JSON.stringify(refund.data),/국민은행|123456789012|홍길동/);
+ await db.platformOperationalEvent.deleteMany({where:{type:{in:['bank_transfer.opened','bank_transfer.expiring','bank_transfer.expired','manual_refund.requested']},data:{path:'$.kind',equals:'ai-shop'}}}).catch(()=>{});
+});

@@ -1,3 +1,9 @@
+## 2026-11-16 무통장입금 운영 텔레그램 알림 4종 (feat/bank-transfer-alerts, origin/prod bc7345c 기반)
+- 사용자 결정(야간 조사에서 발견한 '입금 대기 알림 없음'): 주문 접수·기한 6시간 전·기한 만료 자동 취소·환불 이체 요청을 운영 텔레그램으로. 모두 배포.
+- 구현: bank-transfer.ts open/openRefund에서 같은 트랜잭션 outbox(enqueueOperation), cancel(expired)·remind(6시간, 주문당 dedupe 키 1회)는 별도 트랜잭션 outbox. 작업 'bank-transfer-expiry'가 remind→expire 순서로 실행. outbox 메타데이터에 kind·dueAt(문자열)·amount(정수)만 추가 허용, 알림 문구에서 kind는 콩 충전/AI 이용권/광고상품, 금액은 'N원'. 입금자명·현금영수증 번호·계좌·이메일은 넣지 않음. DB 변경 없음.
+- 검증: tsc 0, platform-bank-transfer 8/8(새 테스트: 4종 기록·키 목록·개인정보 미포함·리마인더 1회·확인된 주문은 만료 알림 없음, 대조: dedupe 키 제거 시 실패), operations-events 15·operations 10·operations-http 1·jobs 2·ai-shop 7·advertising 8·beans 43·ai-subscription 5·openapi 14 통과. platform-audit 8/10 — 실패 2건(watchdog 테스트 대역에 count 없음)은 origin/prod에서도 같은 실패(이 변경과 무관, 별도 수정 필요).
+- 실제 텔레그램 수신은 운영 첫 주문 때 확인 필요.
+
 ## 2026-11-16 AI 이용권 구독형(KG이니시스 빌링) + 성공 요청 기록 병합 (feat/ai-subscription, origin/prod 6373ed5 기반, 미배포)
 - 사용자 결정: 빌링=AI 이용권 구독형, 단건=AI 이용권 횟수형(이니시스 증빙심사 취지). 3단계 구독·3종 횟수형, 1회 단가 정수·98원 하한(AI_SHOP_MIN_UNIT_KRW). 상품안: 구독 9,900/66·19,800/150·39,600/330, 횟수형 1,900/10·4,800/30·15,900/100(운영 등록 승인됨).
 - 서버: ai-subscription.ts(첫 달 즉시·매달 같은 날 갱신·이월 없음·24h×3 재시도·해지 예약·남은 횟수×단가 부분취소), inicis-billing.ts(v1 billing/refund 해시, 빌키 복호화 미확인 → INICIS_BILLKEY_DECRYPT_CONFIRMED 전 unavailable), 구독 주문 단건환불 차단(SUBSCRIPTION_ORDER), openapi 270.
