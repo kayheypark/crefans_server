@@ -55,3 +55,12 @@ test('signup: needs the verified email proof, OCTOMO-confirmed SMS gives a one-t
   await assert.rejects(db.$transaction(tx=>phones.attachSignup(tx,email,{phone:'01055554444',phoneProof:c.proof},newMember)),code('PHONE_VERIFICATION_REQUIRED'),'the proof is single-use');
  }finally{await db.signupChallenge.deleteMany({where:{email}});}
 });
+
+test('PC asks for a QR: OCTOMO qr-code is called with the code and a bad QR response is dropped without blocking the check',async()=>{
+ const seen=[];phones.fetcher=async(u,init)=>{seen.push(u);if(u.endsWith('/qr-code'))return{ok:true,json:async()=>({qrCode:'data:image/png;base64,AAAA'})};return{ok:true,json:async()=>({exists:false})};};
+ const m=randomUUID();ids.push(m);await db.member.create({data:{id:m,email:m+'@phone.test.invalid',name:'Synthetic',nickname:'QR',preferred_username:m.slice(0,20),email_verified:true}});
+ const withQr=await phones.start(m,{phone:'01033332222',qr:true});assert.equal(withQr.qrCode,'data:image/png;base64,AAAA');assert.ok(seen.some(u=>u.endsWith('/qr-code')));
+ const bodies=[];phones.fetcher=async(u,init)=>{bodies.push(JSON.parse(init.body));return{ok:true,json:async()=>({qrCode:'javascript:alert(1)'})};};
+ const bad=await phones.start(m,{phone:'01033332222',qr:true});assert.equal(bad.qrCode,undefined,'only PNG data URLs are passed on');assert.equal(bodies[0].text,bad.code);
+ const mobile=await phones.start(m,{phone:'01033332222'});assert.equal(mobile.qrCode,undefined,'no QR call for mobile');
+});
