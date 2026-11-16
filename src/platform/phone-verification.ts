@@ -13,7 +13,7 @@ import {reject} from './http';
 // header `Authorization: Octomo {API_KEY}`, body {mobileNum:'010xxxxxxxx', text, withinMinutes 1..60} → {exists:boolean}.
 // OCTOMO states it is a number-ownership check, not a designated 본인확인기관: no name, birth date or CI, so it is never age proof.
 // The number is sent to OCTOMO only for the check; the service keeps an HMAC of it (unique), never the number itself.
-export const OCTOMO_URL='https://api.octoverse.kr/octomo/v1/public/message/exists',OCTOMO_RECEIVER='1666-3538',PHONE_CODE_MINUTES=10;
+export const OCTOMO_URL='https://api.octoverse.kr/octomo/v1/public/message/exists',OCTOMO_QR_URL='https://api.octoverse.kr/octomo/v1/public/message/qr-code',OCTOMO_RECEIVER='1666-3538',PHONE_CODE_MINUTES=10;
 export const normalizePhone=(value:unknown)=>{const digits=typeof value==='string'?value.replace(/[^0-9]/g,''):'';if(!/^010[0-9]{8}$/.test(digits))reject(400,'INVALID_PHONE','010으로 시작하는 휴대폰 번호 11자리를 입력해 주세요.');return digits;};
 
 @Injectable()
@@ -28,13 +28,18 @@ export class PhoneVerificationService{
  async verified(member:string){return !!await this.db.memberPhone.findUnique({where:{member_id:member}});}
  async status(member:string){return{required:this.enabled(),verified:await this.verified(member),receiver:OCTOMO_RECEIVER};}
  /** Issues a code for `key` (a member id, or 'signup:'+email digest before the account exists). */
- private async issue(key:string,phone:string,limitKey:string){if(!this.enabled())reject(503,'PHONE_VERIFICATION_UNAVAILABLE','휴대폰 확인을 준비 중이에요.');
+ private async issue(key:string,phone:string,limitKey:string,qr=false){if(!this.enabled())reject(503,'PHONE_VERIFICATION_UNAVAILABLE','휴대폰 확인을 준비 중이에요.');
   const phoneHash=this.hash(phone);await this.limiter.limit(limitKey,5,3600);
   const owner=await this.db.memberPhone.findUnique({where:{phone_hash:phoneHash}});if(owner&&owner.member_id!==key)reject(409,'PHONE_IN_USE','이미 다른 계정에서 확인한 번호예요.');
   const code=String(randomInt(100000,1000000)),expires=new Date(Date.now()+PHONE_CODE_MINUTES*60000);
   await this.db.phoneVerification.deleteMany({where:{member_id:key}});
   await this.db.phoneVerification.create({data:{member_id:key,phone_hash:phoneHash,code,expires_at:expires}});
-  return{code,receiver:OCTOMO_RECEIVER,smsUri:`sms:${OCTOMO_RECEIVER.replace(/-/g,'')}?&body=${code}`,expiresAt:expires.toISOString()};}
+  // PC (qr:true): OCTOMO's QR (checked 2026-11-16, /api-docs/qr-code: {text,width}→{qrCode:data URL}) lets a phone camera open the SMS app.
+  // Mobile builds the platform sms: link itself (Android '?body=', iOS '&body='); a QR failure only drops the QR, never the check.
+  const qrCode=qr?await this.qr(code):undefined;
+  return{code,receiver:OCTOMO_RECEIVER,smsUri:`sms:${OCTOMO_RECEIVER.replace(/-/g,'')}?&body=${code}`,expiresAt:expires.toISOString(),...(qrCode?{qrCode}:{})};}
+ private async qr(text:string){const res=await this.fetcher(OCTOMO_QR_URL,{method:'POST',signal:AbortSignal.timeout(8000),headers:{Authorization:`Octomo ${this.key()}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({text,width:220})}).catch(()=>null);
+  const body=res&&res.ok?await res.json().catch(()=>null):null;return typeof body?.qrCode==='string'&&body.qrCode.startsWith('data:image/png;base64,')&&body.qrCode.length<200000?body.qrCode:undefined;}
  /** Asks OCTOMO whether the code arrived from that number; a provider failure is never a pass. */
  private async check(key:string,phone:string,limitKey:string){if(!this.enabled())reject(503,'PHONE_VERIFICATION_UNAVAILABLE','휴대폰 확인을 준비 중이에요.');
   const phoneHash=this.hash(phone);await this.limiter.limit(limitKey,20,3600);
@@ -45,7 +50,7 @@ export class PhoneVerificationService{
   if(!res||!res.ok||typeof body?.exists!=='boolean')reject(502,'PHONE_CHECK_UNAVAILABLE','문자 확인이 잠시 안 돼요. 잠시 후 다시 시도해 주세요.');
   if(!body.exists)reject(409,'PHONE_SMS_NOT_FOUND','아직 문자가 확인되지 않았어요. 인증 번호를 그대로 보냈는지 확인해 주세요.');
   return{pending:pending!,phoneHash};}
- async start(member:string,input:any){if(!this.enabled())reject(503,'PHONE_VERIFICATION_UNAVAILABLE','휴대폰 확인을 준비 중이에요.');await this.service.member(member);return this.issue(member,normalizePhone(input?.phone),'phone-start:'+member);}
+ async start(member:string,input:any){if(!this.enabled())reject(503,'PHONE_VERIFICATION_UNAVAILABLE','휴대폰 확인을 준비 중이에요.');await this.service.member(member);return this.issue(member,normalizePhone(input?.phone),'phone-start:'+member,input?.qr===true);}
  async confirm(member:string,input:any){const phone=normalizePhone(input?.phone),{phoneHash}=await this.check(member,phone,'phone-confirm:'+member);
   await this.db.$transaction(async(tx:any)=>{
    const owner=await tx.memberPhone.findUnique({where:{phone_hash:phoneHash}});if(owner&&owner.member_id!==member)reject(409,'PHONE_IN_USE','이미 다른 계정에서 확인한 번호예요.');
@@ -58,7 +63,7 @@ export class PhoneVerificationService{
  private signupKey(email:string){return 'signup:'+digest(email).slice(0,48);}
  private async verifiedEmail(db:any,email:string,emailProof:unknown){const challenge=await db.signupChallenge.findUnique({where:{email}});
   if(!challenge?.verified_at||challenge.expires_at<=new Date()||challenge.proof_hash!==digest(typeof emailProof==='string'?emailProof.slice(0,100):''))reject(403,'EMAIL_VERIFICATION_REQUIRED','이메일 인증을 먼저 해 주세요.');}
- async signupStart(email:string,input:any){await this.verifiedEmail(this.db,email,input?.emailProof);return this.issue(this.signupKey(email),normalizePhone(input?.phone),'signup-phone-start:'+digest(email));}
+ async signupStart(email:string,input:any){await this.verifiedEmail(this.db,email,input?.emailProof);return this.issue(this.signupKey(email),normalizePhone(input?.phone),'signup-phone-start:'+digest(email),input?.qr===true);}
  async signupConfirm(email:string,input:any){await this.verifiedEmail(this.db,email,input?.emailProof);const key=this.signupKey(email),{pending}=await this.check(key,normalizePhone(input?.phone),'signup-phone-confirm:'+digest(email));
   const proof=randomBytes(24).toString('base64url');
   await this.db.phoneVerification.update({where:{id:pending.id},data:{verified_at:new Date(),proof_hash:digest(proof),expires_at:new Date(Date.now()+30*60000)}});
