@@ -215,12 +215,22 @@ const membershipTerms:LegalDocument={...openTerms,version:'2026-11-16.membership
  notice:openTerms.notice+' 2026년 11월 16일 개정: 제6조에 새 멤버십 개설과 중지한 멤버십의 재개는 파트너십 계약(인증 배지) 크리에이터만 할 수 있다는 점을 적었습니다. 계약 확인 전 판매로 생기는 정산·분쟁 위험을 줄이기 위한 변경이며, 이미 연 멤버십과 기존 구독자에게는 영향이 없습니다. 이전 동의 사본은 보존합니다.',
  sections:openTerms.sections.map(sec=>{if(sec.title!=='6. 크리에이터 수수료·정산·출금')return sec;if(!sec.body.includes(MEMBERSHIP_PARTNER_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(MEMBERSHIP_PARTNER_FROM,MEMBERSHIP_PARTNER_TO)};})};
 const membershipCatalog:LegalCatalog={...openCatalog,documents:{...openCatalog.documents,terms:membershipTerms}};
+// 2026-11-16 user decisions (/pilot-work): when the partnership contract ends (badge removed) the creator's memberships on sale
+// are paused like contract article 12(2) says (no new sales or renewals; paid periods continue), and article 13 uses the
+// shop name 'AI 이용권' instead of '횟수권'. Same effective day as membership.1.
+const CONTRACT_END_FROM='파트너십 계약이 끝나 인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다.';
+const CONTRACT_END_TO=CONTRACT_END_FROM+' 이때 판매 중인 멤버십은 판매가 중지되며, 기존 구독자는 이미 결제한 이용 기간까지 이용하고 다음 자동 갱신은 이루어지지 않습니다.';
+const membershipTerms2:LegalDocument={...membershipTerms,version:'2026-11-16.membership.2',
+ notice:membershipTerms.notice+' 같은 날 추가 개정: 제6조에 파트너십 계약 종료 시 판매 중인 멤버십이 중지되고 기존 구독은 결제한 기간까지 유지되며 다음 자동 갱신은 없다는 점을 적고(크리에이터 계약서 제12조와 일치), 제13조의 \'횟수권\'을 상점 이름과 같은 \'AI 이용권\'으로 바꿨습니다.',
+ sections:membershipTerms.sections.map(sec=>{if(sec.title==='6. 크리에이터 수수료·정산·출금'){if(!sec.body.includes(CONTRACT_END_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(CONTRACT_END_FROM,CONTRACT_END_TO)};}
+  if(sec.title==='13. 스튜디오 AI 사진 편집과 횟수권')return{...sec,title:'13. 스튜디오 AI 사진 편집과 AI 이용권',body:sec.body.split('횟수권').join('AI 이용권')};return sec;})};
+const membershipCatalog2:LegalCatalog={...openCatalog,documents:{...openCatalog.documents,terms:membershipTerms2}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

@@ -147,15 +147,19 @@ await tx.memberNotification.create({data:{member_id:report.reporter_id,type:'mod
  }
  @Put('creators/:id/verification') @Permit(['members','update']) async verification(@Param('id') id:string,@Body('isVerified') isVerified:boolean,@Req() req:any){
   if(typeof isVerified!=='boolean')reject(400,'INVALID_INPUT','인증 여부를 확인해주세요.');
+  let paused=0;
   await this.service.db.$transaction(async tx=>{
    await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${id} FOR UPDATE`;
    const before=await tx.creator.findUnique({where:{user_id:id}});
    if(!before)reject(404,'CREATOR_NOT_FOUND','크리에이터를 찾을 수 없습니다.');
    if(before.is_verified===isVerified)return;
    await tx.creator.update({where:{user_id:id},data:{is_verified:isVerified}});
-   await appendAudit(tx,{category:'admin',action:'admin.creator_verification_changed',entityId:id,data:auditChange({is_verified:before.is_verified},{is_verified:isVerified})});
+   // 2026-11-16 user decision (contract article 12(2)): ending the partnership pauses the memberships on sale. Paid periods
+   // continue; the renewal job stops renewing a paused membership and tells the subscriber (membership-notices 'unavailable').
+   if(!isVerified)paused=(await tx.membershipItem.updateMany({where:{creator_id:id,is_active:true,is_deleted:false},data:{is_active:false}})).count;
+   await appendAudit(tx,{category:'admin',action:'admin.creator_verification_changed',entityId:id,data:{...auditChange({is_verified:before.is_verified},{is_verified:isVerified}),...(isVerified?{}:{membershipsPaused:paused})}});
   });
-  return{message:isVerified?'인증 배지를 부여했습니다.':'인증 배지를 해제했습니다.',isVerified};
+  return{message:isVerified?'인증 배지를 부여했습니다.':`인증 배지를 해제했습니다.${paused?` 판매 중이던 멤버십 ${paused}개를 중지했어요(기존 구독자는 이용 기간까지, 다음 갱신은 없음).`:''}`,isVerified,...(isVerified?{}:{membershipsPaused:paused})};
  }
  @Post('creators/:id/promotion') @Permit(['members','update']) async promotion(@Param('id') id:string,@Body('promoted') promoted:boolean,@Req() req:any){if(typeof promoted!=='boolean')reject(400,'INVALID_INPUT','광고 설정 값을 확인해주세요.');await this.service.db.$transaction(async tx=>{const before=await tx.creator.findUniqueOrThrow({where:{user_id:id}});await tx.creator.update({where:{user_id:id},data:{promoted}});await appendAudit(tx,{category:'admin',action:'admin.promotion_changed',entityId:id,data:auditChange(before,{promoted})});});return{message:'노출 설정을 저장했습니다.'};}
 }
