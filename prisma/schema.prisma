@@ -2247,3 +2247,23 @@ model AiSubscriptionCharge {
  @@index([status, updated_at])
  @@map("ai_subscription_charges")
 }
+
+// 2026-11-16 user decision: phone-number ownership check (OCTOMO, MO SMS) before the promotion 100콩, one account per number.
+// Only a keyed hash of the number is stored; OCTOMO is an ownership check, not legal identity verification (no name, birth date, CI).
+model MemberPhone {
+  member_id   String   @id @db.VarChar(191)
+  phone_hash  String   @unique @db.VarChar(64)
+  verified_at DateTime @default(now())
+  @@map("member_phones")
+}
+
+model PhoneVerification {
+  id         String   @id @default(uuid())
+  member_id  String   @db.VarChar(191)
+  phone_hash String   @db.VarChar(64)
+  code       String   @db.VarChar(12)
+  expires_at DateTime
+  created_at DateTime @default(now())
+  @@index([member_id, created_at])
+  @@map("phone_verifications")
+}
