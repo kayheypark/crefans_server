@@ -476,6 +476,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261116120000_ai_subscription`
 - `20261116190000_member_phone`
 - `20261116210000_signup_phone`
+- `20261117010000_creator_terms_contract`
 
 ## Prisma 전체 정의 (110 models · 15 enums)
 
@@ -2212,6 +2213,7 @@ model SignupInvite {
   settlement_hold_days Int?
   bean_withdrawal_fee_bps Int?
   minimum_withdrawal_krw Int?
+  minimum_withdrawal_beans Int?
   member_id String? @db.VarChar(191)
   used_at DateTime?
   revoked_at DateTime?
@@ -2228,6 +2230,9 @@ model CreatorFinancialTerms {
   settlement_hold_days Int?
   bean_withdrawal_fee_bps Int?
   minimum_withdrawal_krw Int?
+  minimum_withdrawal_beans Int?
+  special_starts_at DateTime?
+  special_ends_at DateTime?
   version Int @default(1)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -2242,6 +2247,9 @@ model CreatorFinancialTermChange {
   settlement_hold_days Int?
   bean_withdrawal_fee_bps Int?
   minimum_withdrawal_krw Int?
+  minimum_withdrawal_beans Int?
+  special_starts_at DateTime?
+  special_ends_at DateTime?
   source String @db.VarChar(20)
   changed_by String? @db.VarChar(191)
   reason String @default("") @db.VarChar(500)
