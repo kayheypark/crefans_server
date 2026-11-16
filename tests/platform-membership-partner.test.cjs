@@ -30,3 +30,17 @@ test('after the badge is removed, an existing membership can be edited and turne
  await db.creator.update({where:{user_id:id},data:{is_verified:true}});
  await studio.membershipState(id,item.id,{active:true});assert.equal((await db.membershipItem.findUnique({where:{id:item.id}})).is_active,true);
 });
+
+// 2026-11-16 user decision (/pilot-work, contract article 12(2)): removing the badge (contract ended) pauses the memberships on
+// sale; paid periods continue and the renewal job stops renewing a paused membership. Granting the badge pauses nothing.
+test('removing the badge pauses the memberships on sale; granting it changes no membership',async()=>{
+ const {PlatformAdminController}=require('../dist/src/platform/admin.controller');const admin=app.get(PlatformAdminController);
+ const id=await creator(true);await studio.saveMembership(id,plan());await studio.saveMembership(id,plan({name:'두 번째',rank:2}));
+ const paused=await db.membershipItem.findFirstOrThrow({where:{creator_id:id,name:'두 번째'}});await studio.membershipState(id,paused.id,{active:false});
+ const result=await admin.verification(id,false,{admin:{id:'qa'}});
+ assert.equal(result.membershipsPaused,1,'only the one on sale is paused');assert.match(result.message,/멤버십 1개를 중지/);
+ assert.equal(await db.membershipItem.count({where:{creator_id:id,is_active:true}}),0);
+ const again=await admin.verification(id,true,{admin:{id:'qa'}});assert.equal(again.membershipsPaused,undefined);
+ assert.equal(await db.membershipItem.count({where:{creator_id:id,is_active:true}}),0,'granting does not reopen anything by itself');
+ assert.ok(await db.platformAuditLog.findFirst({where:{action:'admin.creator_verification_changed',entity_id:id}}));
+});
