@@ -3,10 +3,12 @@ export const POLICY_CONFIRMATION='정책 변경';
 import {appendAudit} from './audit';
 import {reject,text} from './http';
 
+/** The terms row in force at `now`: outside its special window a creator is back on the base terms (contract 8(3)). */
+export function effectiveTerms(row:any,now=new Date()){if(!row)return null;if(row.special_starts_at&&now<row.special_starts_at)return null;if(row.special_ends_at&&now>=row.special_ends_at)return null;return row;}
 export function policyView(row:any){return{version:row?.version??0,platformFeeBps:row?.platform_fee_bps??null,settlementHoldDays:row?.settlement_hold_days??null,configured:Number.isInteger(row?.platform_fee_bps)&&row.platform_fee_bps>=0&&row.platform_fee_bps<=10000&&Number.isInteger(row?.settlement_hold_days)&&row.settlement_hold_days>=0&&row.settlement_hold_days<=365};}
 // A creator's own fee/hold (creator_financial_terms) replaces the platform value for new orders only; orders keep this snapshot.
 export async function paymentPolicy(db:any,creatorId?:string){
- const policy=policyView(await db.financialPolicy.findUnique({where:{id:'platform'}})),terms=creatorId?await db.creatorFinancialTerms.findUnique({where:{member_id:creatorId}}):null;
+ const policy=policyView(await db.financialPolicy.findUnique({where:{id:'platform'}})),terms=creatorId?effectiveTerms(await db.creatorFinancialTerms.findUnique({where:{member_id:creatorId}})):null;
  const platformFeeBps=terms?.platform_fee_bps??policy.platformFeeBps,settlementHoldDays=terms?.settlement_hold_days??policy.settlementHoldDays;
  if(!policyView({platform_fee_bps:platformFeeBps,settlement_hold_days:settlementHoldDays}).configured)reject(503,'FINANCIAL_POLICY_REQUIRED','DB 수수료·정산 정책 설정이 필요합니다.');
  return{platformFeeBps,settlementHoldDays,financialPolicyVersion:policy.version,...(terms?{creatorTermsVersion:terms.version}:{})};

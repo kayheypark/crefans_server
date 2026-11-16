@@ -27,7 +27,7 @@ test('an invited email passes the beta check; revoking it brings the beta notice
 test('fee and withdrawal terms need settings.update and the typed phrase, and are range checked',async()=>{const email=mail('creator');
  assert.equal((await api('/admin/invites','inviter',{email,...terms,confirmation:'정책 변경'})).status,403);assert.equal((await api('/admin/invites','owner',{email,...terms})).errorCode,'CONFIRMATION_REQUIRED');
  for(const bad of [{platformFeeBps:10001},{settlementHoldDays:-1},{beanWithdrawalFeeBps:1.5},{minimumWithdrawalKrw:50050},{minimumWithdrawalKrw:0}])assert.equal((await api('/admin/invites','owner',{email,...terms,...bad,confirmation:'정책 변경'})).errorCode,'INVALID_CREATOR_TERMS');
- const made=await api('/admin/invites','owner',{email,...terms,confirmation:'정책 변경'});assert.equal(made.status,201,made.errorMessage);assert.deepEqual(made.data.invite.terms,terms);
+ const made=await api('/admin/invites','owner',{email,...terms,confirmation:'정책 변경'});assert.equal(made.status,201,made.errorMessage);assert.deepEqual(made.data.invite.terms,{...terms,minimumWithdrawalBeans:null,specialStartsAt:null,specialEndsAt:null});
  assert.equal((await api('/admin/invites/'+made.data.invite.id,'inviter',{memo:'메모만',...terms,expectedVersion:1},'PUT')).status,200,'memo-only edits keep terms and need no phrase');
  const logs=await db.platformAuditLog.findMany({where:{entity_id:made.data.invite.id}});assert.ok(logs.length>=2);assert.ok(logs.every(l=>!JSON.stringify(l.metadata).includes(email)),'audit stores a digest, never the email');assert.equal(logs.find(l=>l.action==='admin.signup_invite_created').metadata.after.platform_fee_bps,1500);});
 test('signup consumes the invite once and copies its terms to the new member',async()=>{const invite=await db.signupInvite.findUnique({where:{email:mail('creator')}});
@@ -37,8 +37,8 @@ test('signup consumes the invite once and copies its terms to the new member',as
  assert.equal((await api('/admin/invites?status=used','reader')).data.items.some(i=>i.id===invite.id),true);});
 test('creator terms apply to new orders and withdrawals; null fields fall back to platform defaults',async()=>{
  const policy=await paymentPolicy(db,memberId);assert.equal(policy.platformFeeBps,1500);assert.equal(policy.settlementHoldDays,3);assert.equal(policy.creatorTermsVersion,1);
- const w=await withdrawalTerms(db,memberId);assert.deepEqual(w,{beanWithdrawalFeeBps:1000,minimumWithdrawalKrw:50000,minimumWithdrawalBeans:500});
- assert.deepEqual(beanWithdrawalQuote(500,'earned-paid',w),{quantity:500,grossKrw:'50000',feeKrw:'5000',netKrw:'45000',feeBps:1000});assert.throws(()=>beanWithdrawalQuote(499,'earned-paid',w),e=>e.response?.errorCode==='BEAN_WITHDRAWAL_MINIMUM'||/50,000원\(500콩\)/.test(JSON.stringify(e.response??e.message)));
+ const w=await withdrawalTerms(db,memberId);assert.deepEqual(w,{beanWithdrawalFeeBps:1000,minimumWithdrawalKrw:50000,minimumWithdrawalBeans:1000},'2026-11-17 contract Schedule A: the 콩 minimum is its own field (default 1,000콩), not derived from the KRW minimum');
+ assert.deepEqual(beanWithdrawalQuote(1000,'earned-paid',w),{quantity:1000,grossKrw:'100000',feeKrw:'10000',netKrw:'90000',feeBps:1000});assert.throws(()=>beanWithdrawalQuote(999,'earned-paid',w),e=>e.response?.errorCode==='BEAN_WITHDRAWAL_MINIMUM'||/100,000원\(1,000콩\)/.test(JSON.stringify(e.response??e.message)));
  assert.deepEqual(await withdrawalTerms(db,randomUUID()),{beanWithdrawalFeeBps:2000,minimumWithdrawalKrw:100000,minimumWithdrawalBeans:1000},'creators without terms keep the platform policy');});
 test('member terms edits need a version match, permission and phrase; clearing a field restores the default',async()=>{const path=`/admin/members/${memberId}/terms`;
  const read=await api(path,'reader');assert.equal(read.status,403);const got=await api(path,'inviter');assert.equal(got.status,200);assert.equal(got.data.version,1);assert.equal(got.data.defaults.beanWithdrawalFeeBps,2000);
@@ -54,7 +54,7 @@ test('re-inviting a revoked email with blank terms needs no phrase; the old cust
  const made=await api('/admin/invites','owner',{email,...terms,confirmation:'정책 변경'});assert.equal(made.status,201,made.errorMessage);
  assert.equal((await api('/admin/invites/'+made.data.invite.id,'owner',{expectedVersion:1},'DELETE')).status,200);
  const plain=await api('/admin/invites','inviter',{email,memo:'수기 재초대'});assert.equal(plain.status,201,plain.errorCode);assert.equal(plain.data.invite.id,made.data.invite.id);
- assert.deepEqual(plain.data.invite.terms,{platformFeeBps:null,settlementHoldDays:null,beanWithdrawalFeeBps:null,minimumWithdrawalKrw:null},'revoked terms must not come back');
+ assert.deepEqual(plain.data.invite.terms,{platformFeeBps:null,settlementHoldDays:null,beanWithdrawalFeeBps:null,minimumWithdrawalKrw:null,minimumWithdrawalBeans:null,specialStartsAt:null,specialEndsAt:null},'revoked terms must not come back');
  assert.equal((await api('/admin/invites/'+plain.data.invite.id,'owner',{expectedVersion:plain.data.invite.version},'DELETE')).status,200);
  assert.equal((await api('/admin/invites','owner',{email,...terms})).errorCode,'CONFIRMATION_REQUIRED','custom terms on a re-invite still need the phrase');});
 
@@ -76,4 +76,16 @@ test('a withdrawn member can be invited again: the used invite is reissued and t
    assert.equal(await db.platformAuditLog.count({where:{entity_id:again.data.invite.id,action:'admin.signup_invite_reissued'}}),1);
   }
  }finally{await db.platformAuditLog.deleteMany({where:{entity_id:{in:cases}}});await db.member.deleteMany({where:{id:{in:cases}}});}
+});
+
+test('2026-11-17 contract 8(3): special terms apply only inside their window, then the creator is back on the base terms; the 콩 minimum can be set on its own',async()=>{
+ const {effectiveTerms}=require('../dist/src/platform/financial-policy');
+ const row={platform_fee_bps:1000,special_starts_at:new Date('2026-12-01T00:00:00+09:00'),special_ends_at:new Date('2027-01-01T00:00:00+09:00')};
+ assert.equal(effectiveTerms(row,new Date('2026-11-30T12:00:00+09:00')),null,'not yet');assert.equal(effectiveTerms(row,new Date('2026-12-15T12:00:00+09:00')),row);assert.equal(effectiveTerms(row,new Date('2027-01-01T00:00:00+09:00')),null,'ended: base terms again');
+ assert.equal(effectiveTerms({platform_fee_bps:1000},new Date()).platform_fee_bps,1000,'no window: always in force');
+ await db.creatorFinancialTerms.update({where:{member_id:memberId},data:{minimum_withdrawal_beans:300,special_ends_at:new Date(Date.now()+86400000)}});
+ assert.equal((await withdrawalTerms(db,memberId)).minimumWithdrawalBeans,300);assert.equal((await paymentPolicy(db,memberId)).platformFeeBps,1500);
+ await db.creatorFinancialTerms.update({where:{member_id:memberId},data:{special_ends_at:new Date(Date.now()-1000)}});
+ assert.equal((await withdrawalTerms(db,memberId)).minimumWithdrawalBeans,1000,'after the end date the default 콩 minimum applies');assert.notEqual((await paymentPolicy(db,memberId)).platformFeeBps,1500,'after the end date the platform fee applies');
+ await db.creatorFinancialTerms.update({where:{member_id:memberId},data:{minimum_withdrawal_beans:null,special_ends_at:null}});
 });

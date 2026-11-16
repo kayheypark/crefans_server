@@ -1,3 +1,4 @@
+import {beanPolicy} from './bean-policy';
 import {listReservedHandles,reservedHandleHistory,saveReservedHandle,deleteReservedHandle} from './reserved-handles';
 import {aiPhotoGrantHistory,grantAiPhoto,listAiPhotoGrants,resetAiPhotoQuota,resetAllAiPhotoQuota,revokeAiPhoto} from './ai-photo-grants';
 import {aiPhotoConfig} from './ai-photo';
@@ -23,7 +24,7 @@ import {digest} from '../auth/local/credentials';
 import {ADMIN_ACCESS_COOKIE,adminFromAccess} from './admin-auth';
 import {PlatformService} from './service';
 import {policyView,updateFinancialPolicy} from './financial-policy';
-import {reject,text} from './http';
+import {dateOnly,reject,text} from './http';
 import {enqueueOperation} from './operations-events';
 import {adminDashboard} from './admin-dashboard';
 import {adminReferralLink,adminReferrals,updateReferralSettings} from './admin-referrals';
@@ -159,7 +160,21 @@ await tx.memberNotification.create({data:{member_id:report.reporter_id,type:'mod
    if(!isVerified)paused=(await tx.membershipItem.updateMany({where:{creator_id:id,is_active:true,is_deleted:false},data:{is_active:false}})).count;
    await appendAudit(tx,{category:'admin',action:'admin.creator_verification_changed',entityId:id,data:{...auditChange({is_verified:before.is_verified},{is_verified:isVerified}),...(isVerified?{}:{membershipsPaused:paused})}});
   });
+  // 2026-11-17 user decision (signed contract article 12(2)): ending the partnership tells the creator the unsettled revenue and
+  // receivables (amounts and items) and starts the 30-day consultation; operators get the 30-day date to pay if no agreement.
+  if(!isVerified)await this.terminationNotice(id);
   return{message:isVerified?'인증 배지를 부여했습니다.':`인증 배지를 해제했습니다.${paused?` 판매 중이던 멤버십 ${paused}개를 중지했어요(기존 구독자는 이용 기간까지, 다음 갱신은 없음).`:''}`,isVerified,...(isVerified?{}:{membershipsPaused:paused})};
+ }
+ private async terminationNotice(id:string){
+  const db=this.service.db,f=await this.finance.finance(id),s=f.summary;
+  const beans=(await db.beanLot.aggregate({_sum:{available:true},where:{member_id:id,bucket:{in:[...beanPolicy.withdrawableBuckets]}}}))._sum.available||0;
+  const receivables=await db.creatorReceivable.findMany({where:{creator_id:id,status:'open'},select:{amount:true,kind:true}});
+  const owed=receivables.reduce((n:number,r:any)=>n+r.amount,0),unsettled=Math.max(0,Number(s.pending)+Number(s.available)+Number(s.requested));
+  const due=new Date(Date.now()+30*86400000),won=(n:number)=>`${n.toLocaleString('ko-KR')}원`;
+  await db.$transaction(async(tx:any)=>{
+   await tx.memberNotification.create({data:{member_id:id,type:'settlement',text:`파트너 계약이 종료되었어요. 미정산 수익 ${won(unsettled)}, 출금 가능 콩 ${beans.toLocaleString('ko-KR')}콩, 미수금 ${won(owed)}이 남아 있어요. ${dateOnly(due)}까지 처리 방법을 정하고, 합의가 없으면 확정 수익 전액을 정산 계좌로 보내 드려요.`.slice(0,191),path:'/studio/revenue'}});
+   await enqueueOperation(tx,'creator.partner_ended',{creatorId:id,status:'ended',dueAt:due.toISOString()},`creator.partner_ended:${id}:${dateOnly(new Date())}`,{unsettled,beans,owed,receivables:receivables.length});
+  });
  }
  @Post('creators/:id/promotion') @Permit(['members','update']) async promotion(@Param('id') id:string,@Body('promoted') promoted:boolean,@Req() req:any){if(typeof promoted!=='boolean')reject(400,'INVALID_INPUT','광고 설정 값을 확인해주세요.');await this.service.db.$transaction(async tx=>{const before=await tx.creator.findUniqueOrThrow({where:{user_id:id}});await tx.creator.update({where:{user_id:id},data:{promoted}});await appendAudit(tx,{category:'admin',action:'admin.promotion_changed',entityId:id,data:auditChange(before,{promoted})});});return{message:'노출 설정을 저장했습니다.'};}
 }
