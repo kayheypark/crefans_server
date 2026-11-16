@@ -1,3 +1,5 @@
+import {PaymentProvider} from './payment-provider';
+import {memberPhoneHash} from './phone-verification';
 import {beanPolicy} from './bean-policy';
 import {listReservedHandles,reservedHandleHistory,saveReservedHandle,deleteReservedHandle} from './reserved-handles';
 import {aiPhotoGrantHistory,grantAiPhoto,listAiPhotoGrants,resetAiPhotoQuota,resetAllAiPhotoQuota,revokeAiPhoto} from './ai-photo-grants';
@@ -96,7 +98,9 @@ export class PlatformAdminController{
  @Get('ai-photo-grants/:creatorId/history') @Permit(['members','view']) aiPhotoGrantHistory(@Param('creatorId') id:string,@Query() query:any,@Req() req:any){return aiPhotoGrantHistory(this.service.db,req.admin,id,query);}
  @Post('ai-photo-grants') @Permit(['members','update']) grantAiPhoto(@Body() body:any,@Req() req:any){return grantAiPhoto(this.service.db,req.admin,body);}
  @Delete('ai-photo-grants/:creatorId') @Permit(['members','update']) revokeAiPhoto(@Param('creatorId') id:string,@Body() body:any,@Req() req:any){return revokeAiPhoto(this.service.db,req.admin,id,body);}
- @Get('members') @Permit(['members','view']) members(@Query() query:any){return adminMembers(this.service.db,query);}
+ @Get('members') @Permit(['members','view']) members(@Query() query:any){return adminMembers(this.service.db,query,phone=>memberPhoneHash(this.config,phone));}
+ // 2026-11-17: the full number only on request, never cached, each reveal audited (who, whose) without the number itself.
+ @Get('members/:id/phone') @Permit(['members','view']) @Header('Cache-Control','no-store') async memberPhone(@Param('id') id:string,@Req() req:any){const row=await this.service.db.memberPhone.findUnique({where:{member_id:id}});if(!row?.phone_encrypted)reject(404,'PHONE_NOT_KEPT','보관된 휴대폰 번호가 없습니다.');const phone=new PaymentProvider(this.config).decrypt(row.phone_encrypted);await appendAudit(this.service.db,{category:'admin',action:'admin.member_phone_revealed',entityId:id,data:{adminId:req.admin.id}});return{phone:`${phone.slice(0,3)}-${phone.slice(3,7)}-${phone.slice(7)}`};}
  @Get('referrals') @Permit(['referrals','view']) referrals(@Query() query:any){return adminReferrals(this.service.db,query);}
  @Put('referrals/settings') @Permit(['referrals','update']) referralSettings(@Body() body:any,@Req() req:any){return updateReferralSettings(this.service.db,req.admin,body);}
  @Post('members/:id/referral') @Permit(['referrals','create']) referralLink(@Param('id') id:string){return adminReferralLink(this.service.db,id);}

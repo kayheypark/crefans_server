@@ -15,7 +15,7 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-16');assert.equal(p.effectiveAt,'2026-11-16');assert.equal(p.version,'2026-11-16.ai.1');assert.match(JSON.stringify(p),/16\. 대표 기능: AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-17');assert.equal(p.effectiveAt,'2026-11-17');assert.equal(p.version,'2026-11-17.phone.3');assert.match(JSON.stringify(p),/16\. 대표 기능: AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -137,7 +137,7 @@ test('guide AI privacy notice distinguishes optional requests, provider retentio
 });
 test('privacy article 8 discloses Modusign as the e-contract processor (2026-11-12 ask-me)',()=>{
  const p=new LegalDocumentsService().catalog().documents.privacy;
- assert.equal(p.version,'2026-11-16.ai.1');assert.equal(p.effectiveAt,'2026-11-16');assert.equal(p.status,'published');
+ assert.equal(p.version,'2026-11-17.phone.3');assert.equal(p.effectiveAt,'2026-11-17');assert.equal(p.status,'published');
  const s8=p.sections.find(s=>s.title==='8. 처리 위탁과 제3자 제공');
  assert.match(s8.body,/전자계약 체결·보관을 주식회사 모두싸인에 위탁/);
  assert.ok(s8.links.some(l=>l.href==='https://support.modusign.co.kr/ko/articles/9ae892d6'),'links to Modusign privacy policy');
@@ -179,7 +179,7 @@ test('2026-11-15 sync revision: article 11 states bean charge limits and article
 
 // 2026-11-15 user decision: signed-out AI photo trial is disclosed before it ships (section 17 + cookie note in section 10).
 test('privacy 2026-11-15.guest.1 discloses the signed-out AI photo trial: cookie, IP hash, limits, 24h public, claim, retention, transfer',async()=>{
- const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-16.ai.1');
+ const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-17.phone.3');
  const guest=p.sections.find(s=>s.title==='17. 대표 기능: 비회원 AI 사진 체험');assert.ok(guest);
  for(const phrase of ['cf_guest','최대 30일','서버 보안키로 변환','감사 기록 기준(2년)','AI로 만든 사진만','브라우저당 10회','하루 10회','하루 200회','24시간','비공개','같은 브라우저','게시 후 30일','16항과 같습니다','동의'])assert.ok(guest.body.includes(phrase),phrase);
  assert.match(p.sections.find(s=>s.title==='10. 쿠키와 자동 수집').body,/cf_guest를 최대 30일/);
@@ -250,4 +250,14 @@ test('2026-11-16 ai.1: AI photo editing is the service; sales notice names direc
  assert.match(p.sections.find(s=>s.title.startsWith('1. ')).body,/AI 사진 편집\(사진 업로드와 생성 결과\)/);
  assert.ok(p.sections.some(s=>s.title==='16. 대표 기능: AI 사진 편집'));assert.ok(p.sections.some(s=>s.title==='17. 대표 기능: 비회원 AI 사진 체험'));
  const before=new LegalDocumentsService().catalog(new Date('2026-11-15T12:00:00+09:00'));assert.notEqual(before.documents.terms.version,'2026-11-16.ai.1','older dates keep their own text');
+});
+
+// 2026-11-17 user decision: checked phone numbers are kept encrypted, shown masked in the console (audited full reveal) and searchable.
+test('2026-11-17 phone.3: privacy 4 says the number is kept encrypted and shown masked to operators; earlier revisions unchanged',()=>{
+ const legal=new LegalDocumentsService(),p=legal.catalog(new Date('2026-11-17T12:00:00+09:00')).documents.privacy,by=x=>p.sections.find(sec=>sec.title.startsWith(x)).body;
+ assert.equal(p.version,'2026-11-17.phone.3');assert.equal(p.effectiveAt,'2026-11-17');
+ assert.match(by('4. '),/번호는 암호화해 보관/);assert.match(by('4. '),/가운데 자리를 가려/);assert.match(by('4. '),/열람은 기록/);assert.match(by('4. '),/회원 문의 처리와 부정 이용 확인/);
+ assert.doesNotMatch(by('4. '),/번호 자체를 저장하지 않고/);assert.match(by('7. '),/암호화한 휴대폰 번호와 확인 값은 회원 탈퇴 후/);
+ assert.match(by('16. '),/./,'the ai.1 titles are kept');assert.match(p.notice,/2026-11-17 개정/);
+ assert.equal(legal.catalog(new Date('2026-11-16T12:00:00+09:00')).documents.privacy.version,'2026-11-16.ai.1','the previous day keeps ai.1');
 });

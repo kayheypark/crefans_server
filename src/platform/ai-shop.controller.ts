@@ -1,7 +1,7 @@
 import {LocalMemberService} from '../auth/local/local-member.service';
 import {digest} from '../auth/local/credentials';
 import {requestContext} from './request-context';
-import {Body,Controller,Delete,Get,HttpCode,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
+import {Body,Controller,Delete,Get,Header,HttpCode,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
 import {PlatformAuthGuard} from './platform-auth.guard';
 import {PlatformAdminGuard} from './admin.controller';
 import {Permit} from './admin-permissions';
@@ -44,6 +44,9 @@ export class AiShopAdminController{
 
 @Controller('shop')
 export class AiShopWebhookController {
- constructor(private service:PlatformService,private limiter:LocalMemberService){}
+ constructor(private service:PlatformService,private limiter:LocalMemberService,private shop:AiShopService,private aiSubscriptions:AiSubscriptionService){}
+ // 2026-11-17 user decision: the shop can be browsed without signing in. Only the public product list and whether monthly plans
+ // are on sale; buying, orders and subscriptions stay behind the member session (studio/shop).
+ @Get('products') @Header('Cache-Control','no-store') async publicCatalog(){return{products:await this.shop.publicCatalog(),subscriptionsAvailable:this.aiSubscriptions.available()};}
  @Post('webhook') @HttpCode(200) async webhook(@Req() r:any,@Body() b:any){await this.limiter.limit('shop-webhook:'+digest(requestContext.getStore()?.ip||r.socket?.remoteAddress||'unknown'),30,60);const id=b?.data?.orderId;if(typeof id==='string'&&/^[a-f0-9-]{36}$/.test(id))await this.service.db.aiShopOrder.updateMany({where:{id,status:{in:['paid','processing','refunding']}},data:{updated_at:new Date(0)}});return{received:true};}
 }
