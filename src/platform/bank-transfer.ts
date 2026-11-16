@@ -3,6 +3,7 @@ import {ConfigService} from '@nestjs/config';
 import {PlatformService} from './service';
 import {PaymentProvider} from './payment-provider';
 import {appendAudit} from './audit';
+import {enqueueOperation} from './operations-events';
 import {livePayments} from './beta-policy';
 import {reject,text} from './http';
 
@@ -11,7 +12,7 @@ import {reject,text} from './http';
 // deposit only when the amount matches (mismatches are handled with the buyer by hand). Cash receipts are requested at order time
 // and issued by the operator. Refunds of these purchases go to an account the member enters (encrypted) and are transferred by an
 // operator within 3 business days (전자상거래법 제18조). PG card payment stays as another method and is shown once live payments open.
-export const BANK_TRANSFER_HOURS=24,REFUND_BUSINESS_DAYS=3;
+export const BANK_TRANSFER_HOURS=24,BANK_TRANSFER_REMIND_HOURS=6,REFUND_BUSINESS_DAYS=3;
 export type BankTransferKind='bean'|'ai-shop'|'ad';
 export const BANK_TRANSFER_KINDS:BankTransferKind[]=['bean','ai-shop','ad'];
 export type BankTransferHandler={
@@ -61,6 +62,8 @@ export class BankTransferService{
   const name=depositorName(input?.depositorName),receipt=cashReceiptInput(input?.cashReceipt);
   const row=await tx.bankTransferPayment.create({data:{kind,order_id:orderId,member_id:member,amount,depositor_name:name,account_snapshot:account,cash_receipt_type:receipt?.type??null,cash_receipt_number_encrypted:receipt?this.provider.encrypt(receipt.number):null,expires_at:new Date(Date.now()+BANK_TRANSFER_HOURS*3600000)}});
   await appendAudit(tx,{category:'finance',action:'bank_transfer.opened',entityId:row.id,data:{kind,orderId,amount,cashReceipt:receipt?.type||'none'}});
+  // 2026-11-16: operators learn of every deposit wait right away (Telegram outbox, same transaction; no depositor name or account).
+  await enqueueOperation(tx,'bank_transfer.opened',{targetId:row.id,kind,amount,dueAt:row.expires_at.toISOString()});
   return row;
  }
  view(row:any){if(!row)return null;return{id:row.id,kind:row.kind,orderId:row.order_id,amount:row.amount,status:row.status,statusLabel:statusLabels[row.status]||row.status,depositorName:row.depositor_name,account:row.account_snapshot,expiresAt:row.expires_at,confirmedAt:row.confirmed_at,cashReceipt:row.cash_receipt_type?{type:row.cash_receipt_type,issued:!!row.cash_receipt_issued_at}:null};}
@@ -72,6 +75,7 @@ export class BankTransferService{
   const account=refundAccountInput(input);
   const row=await tx.manualRefund.create({data:{kind,refund_id:refundId,order_id:orderId,member_id:member,amount,bank_name:account.bankName,account_encrypted:this.provider.encrypt(account.accountNumber),holder_encrypted:this.provider.encrypt(account.holder),due_at:addBusinessDays(new Date(),REFUND_BUSINESS_DAYS),actor_id:actor}});
   await appendAudit(tx,{category:'finance',action:'manual_refund.requested',entityId:row.id,data:{kind,orderId,amount}});
+  await enqueueOperation(tx,'manual_refund.requested',{targetId:row.id,kind,amount,dueAt:row.due_at.toISOString()});
   return row;
  }
  refundView(row:any){if(!row)return null;return{id:row.id,kind:row.kind,refundId:row.refund_id,orderId:row.order_id,memberId:row.member_id,amount:row.amount,status:row.status,statusLabel:refundLabels[row.status]||row.status,bankName:row.bank_name,dueAt:row.due_at,completedAt:row.completed_at,transferReference:row.transfer_reference,rejectReason:row.reject_reason,createdAt:row.created_at};}
@@ -107,8 +111,12 @@ export class BankTransferService{
   const changed=await this.db.bankTransferPayment.updateMany({where:{id,status:'awaiting'},data:{status,cancel_reason:reason.slice(0,200)}});if(!changed.count)return this.view(await this.db.bankTransferPayment.findUnique({where:{id}}));
   await this.handler(row.kind).cancel(row.order_id,reason);
   await appendAudit(this.db,{category:'finance',action:`bank_transfer.${status}`,entityId:id,data:{kind:row.kind,orderId:row.order_id,amount:row.amount,actor:admin?.user_sub||'system'}});
+  if(status==='expired')await this.db.$transaction(async(tx:any)=>enqueueOperation(tx,'bank_transfer.expired',{targetId:id,kind:row.kind,amount:row.amount},`bank-transfer-expired:${id}`));
   return this.view(await this.db.bankTransferPayment.findUnique({where:{id}}));}
  async adminCancel(admin:any,id:string,input:any){return this.cancel(id,text(input?.reason,200),'cancelled',admin);}
+ /** Alerts once per order when 6 hours or less remain and the deposit is still unconfirmed (dedupe key per order). */
+ async remind(now=new Date()){const rows=await this.db.bankTransferPayment.findMany({where:{status:'awaiting',expires_at:{gt:now,lte:new Date(now.getTime()+BANK_TRANSFER_REMIND_HOURS*3600000)}},orderBy:{expires_at:'asc'},take:100});
+  for(const row of rows)await this.db.$transaction(async(tx:any)=>enqueueOperation(tx,'bank_transfer.expiring',{targetId:row.id,kind:row.kind,amount:row.amount,dueAt:row.expires_at.toISOString()},`bank-transfer-expiring:${row.id}`));return rows.length;}
  async expire(now=new Date()){const rows=await this.db.bankTransferPayment.findMany({where:{status:'awaiting',expires_at:{lt:now}},orderBy:{expires_at:'asc'},take:50});let count=0;for(const row of rows){try{await this.cancel(row.id,'입금 기한 24시간 경과','expired');count++;}catch{/* next tick retries */}}return count;}
  async revealCashReceipt(admin:any,id:string){const row=await this.db.bankTransferPayment.findUnique({where:{id}});if(!row?.cash_receipt_number_encrypted)reject(404,'CASH_RECEIPT_NOT_REQUESTED','현금영수증 신청이 없는 주문이에요.');await appendAudit(this.db,{category:'security',action:'bank_transfer.cash_receipt_revealed',entityId:id,data:{actor:admin.user_sub}});return{type:row.cash_receipt_type,number:this.provider.decrypt(row.cash_receipt_number_encrypted)};}
  async recordCashReceipt(admin:any,id:string,input:any){const reference=text(input?.reference,191),issuedAt=new Date(input?.issuedAt);if(!Number.isFinite(issuedAt.getTime())||issuedAt>new Date(Date.now()+60000))reject(400,'INVALID_CASH_RECEIPT','발급 시각을 확인해 주세요.');
