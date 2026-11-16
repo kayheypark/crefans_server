@@ -1,3 +1,10 @@
+## 2026-11-16 프로모션 100콩 전 휴대폰 번호 확인(OCTOMO) (feat/octomo-phone)
+- 사용자 지시 "옥토모로 바로 연결": 질문 거절로 추천 기본값 적용 — 적용 범위는 프로모션 100콩 수령 때만, 키 없으면 꺼짐(기존 수령 그대로).
+- OCTOMO 공식 명세(2026-11-16 확인, octomo.octoverse.kr/api-docs): POST https://api.octoverse.kr/octomo/v1/public/message/exists, Authorization: Octomo {KEY}, {mobileNum,text,withinMinutes 1~60}→{exists}. 업체 스스로 '번호 소유 확인, 본인확인기관 아님' 명시 → 성인·실명 확인으로 쓰지 않음.
+- 서버: phone-verification.ts(시작: 010 11자리, 6자리 코드·수신 1666-3538·sms 링크·10분, 회원당 시간당 5회 / 확인: 번호 재입력→OCTOMO 조회, 공급사 오류는 통과 처리하지 않음), member_phones(phone_hash 유일, HMAC=LOCAL_AUTH_SECRET) · phone_verifications 마이그레이션 20261116190000, 라우트 GET me/phone-verification, POST …/start, …/confirm(openapi 273). 프로모션 상태에 phoneRequired/phoneVerified, 수령 시 미확인이면 409 PHONE_VERIFICATION_REQUIRED. 탈퇴 파기(member-purge)에 번호 값 삭제. 처리방침 2026-11-16.phone.1(4·7·8항: 옥토버스 위탁, 번호 원문 미보관, 실명·나이 확인 아님).
+- 검증: tsc 0, platform-phone-verification 2/2(대조: 수령 게이트 제거 시 실패), beans 43, bank-transfer 8, openapi 14, legal 28, guest 8, guest-caption 6, moderation 7, pilot-followups 4 통과. 실제 OCTOMO 호출은 미검증(키 없음).
+- 사용자 할 일: octomo.octoverse.kr 가입·앱 생성·API 키 발급 → 운영 runtime.env에 OCTOMO_API_KEY 추가 후 api/worker 재시작.
+
 ## 2026-11-16 무통장입금 운영 텔레그램 알림 4종 (feat/bank-transfer-alerts, origin/prod bc7345c 기반)
 - 사용자 결정(야간 조사에서 발견한 '입금 대기 알림 없음'): 주문 접수·기한 6시간 전·기한 만료 자동 취소·환불 이체 요청을 운영 텔레그램으로. 모두 배포.
 - 구현: bank-transfer.ts open/openRefund에서 같은 트랜잭션 outbox(enqueueOperation), cancel(expired)·remind(6시간, 주문당 dedupe 키 1회)는 별도 트랜잭션 outbox. 작업 'bank-transfer-expiry'가 remind→expire 순서로 실행. outbox 메타데이터에 kind·dueAt(문자열)·amount(정수)만 추가 허용, 알림 문구에서 kind는 콩 충전/AI 이용권/광고상품, 금액은 'N원'. 입금자명·현금영수증 번호·계좌·이메일은 넣지 않음. DB 변경 없음.

@@ -1,10 +1,11 @@
 import {BankTransferService,BANK_TRANSFER_HOURS} from './bank-transfer';
+import {PhoneVerificationService} from './phone-verification';
 import {attributeTips,attributePayouts,tipSourceTotals,payoutFundingGroups} from './bean-attribution';
 import {TIP_PROVISION} from './creator-provision';
 import {AdminAction,requirePermission,requireSuperAdmin} from './admin-permissions';
 import {postSupporterCount} from './post-supporters';
 import {beanHistoryFilter} from './bean-history';
-import {Injectable} from '@nestjs/common';
+import {Injectable,Optional} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {randomUUID} from 'crypto';
 import {verifyPassword,digest} from '../auth/local/credentials';
@@ -43,7 +44,7 @@ const won=(n:number)=>`${n.toLocaleString('ko-KR')}원`;
 const BEAN_NOTE_MAX=500,BEAN_REJECT_PREFIX='수동 이체 반려 · ';
 @Injectable()
 export class BeansService {
- constructor(private service:PlatformService,private finance:PlatformFinanceService,private provider:PaymentProvider,private bank:BankProvider,private config:ConfigService,private transfers:BankTransferService){
+ constructor(private service:PlatformService,private finance:PlatformFinanceService,private provider:PaymentProvider,private bank:BankProvider,private config:ConfigService,private transfers:BankTransferService,@Optional() private phones?:PhoneVerificationService){
   // 2026-11-16: bean charges paid by bank transfer (environment 'bank') are settled by an operator's deposit confirmation.
   transfers?.register('bean',{confirm:(tx,id,at)=>this.confirmBankCharge(tx,id,at),cancel:id=>this.releaseCharge(id,'cancelled'),refunded:id=>this.finishRefund(id),refundRejected:id=>this.restoreRefund(id,'MANUAL_REFUND_REJECTED')});
  }
@@ -84,13 +85,15 @@ export class BeansService {
   if(!user?.enabled||user.withdrawn_at||!user.email_verified||user.suspended_at&&(!user.suspended_until||user.suspended_until>new Date()))reject(403,'MEMBER_INACTIVE','이용할 수 없는 계정입니다.');
   const old=await db.beanPromotion.findUnique({where:{request_key:EVENT_PREFIX+digest(member)}});
   if(old){if(old.member_id!==member||old.quantity!==EVENT_QUANTITY||old.actor_id!==EVENT_ACTOR)reject(409,'BEAN_REQUEST_CONFLICT','지급 이력 확인이 필요합니다. 고객센터로 문의해주세요.');const lot=await db.beanLot.findFirst({where:{member_id:member,bucket:'promotion',grant_id:old.id}});return{status:'claimed',quantity:EVENT_QUANTITY,claimedAt:old.created_at.toISOString(),expiresAt:lot?.expires_at?.toISOString()||null};}
-  return{quantity:EVENT_QUANTITY,claimedAt:null,expiresAt:null,status:this.available()?'available':'unavailable'};
+  return{quantity:EVENT_QUANTITY,claimedAt:null,expiresAt:null,status:this.available()?'available':'unavailable',...(this.phones?.enabled()?{phoneRequired:true,phoneVerified:await this.phones.verified(member)}:{})};
  }
  async promotionEvent(member:string){return this.promotionEventStatus(this.db,member);}
  async claimPromotionEvent(member:string,input:any={}){
   if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).length)reject(400,'INVALID_EVENT_CLAIM','지급 수량과 대상은 서버에서 확인합니다.');
   const initial=await this.promotionEventStatus(this.db,member);
   if(initial.status!=='available')return initial;
+  // 2026-11-16: once OCTOMO is configured, the 100콩 needs a verified phone number (one account per number).
+  if(this.phones?.enabled()&&!await this.phones.verified(member))reject(409,'PHONE_VERIFICATION_REQUIRED','휴대폰 번호를 확인하면 받을 수 있어요.');
   return this.transaction(async tx=>{
    // Same company-first locking order as all other bean grants and transfers.
    await this.lock(tx,[member],true);

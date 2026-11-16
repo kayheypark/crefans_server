@@ -5,12 +5,17 @@ import {requestContext} from './request-context';
 import {digest} from '../auth/local/credentials';
 import {Body,Controller,Get,Post,Param,Query,Req,UseGuards,HttpCode} from '@nestjs/common';
 import {BeansService} from './beans.service';
+import {PhoneVerificationService} from './phone-verification';
 import {PlatformAuthGuard} from './platform-auth.guard';
 import {PlatformAdminGuard} from './admin.controller';
 import {Permit} from './admin-permissions';
 @Controller() @UseGuards(PlatformAuthGuard)
 export class BeansController {
- constructor(private beans:BeansService){}
+ constructor(private beans:BeansService,private phones:PhoneVerificationService){}
+ // 2026-11-16: phone-number ownership check (OCTOMO) for the promotion 100콩.
+ @Get('me/phone-verification') phoneStatus(@Req() r:any){return this.phones.status(r.user.sub);}
+ @Post('me/phone-verification/start') @HttpCode(200) phoneStart(@Req() r:any,@Body() b:any){return this.phones.start(r.user.sub,b);}
+ @Post('me/phone-verification/confirm') @HttpCode(200) phoneConfirm(@Req() r:any,@Body() b:any){return this.phones.confirm(r.user.sub,b);}
  @Get('events/promotion-beans') promotionEvent(@Req() r:any){return this.beans.promotionEvent(r.user.sub);}
  @Post('events/promotion-beans/claim') claimPromotionEvent(@Req() r:any,@Body() b:any){return this.beans.claimPromotionEvent(r.user.sub,b);}
  @Get('beans/wallet') wallet(@Req() r:any,@Query() query:any){return this.beans.wallet(r.user.sub,query.page,query);}
