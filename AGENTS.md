@@ -55,7 +55,7 @@
 
 - Swagger는 `/api/v1/admin/docs/{user,studio,console}` 세 페이지다. 전용 API는 분리하고 실제 사용하는 공통 API만 함께 표시한다. 모든 문서·JSON/YAML·정적 파일에 회원·활성 관리자 guard를 적용하고 UI 요청 실행은 비활성화한다. route 변경 시 `src/platform/openapi-contract.ts`와 의미 문서를 갱신하며 `npm run test:openapi`로 합집합·분류·권한을 검증한다. 비밀값·실제 개인정보 예시는 금지한다.
 
-- 운영 SSH: 2026-10-24 사용자가 현재 집 IP의 지속 허용을 승인했다. AWS `crefans-beta`의 TCP 22 관리 규칙 `sgr-0042cbcbcd1b74b35`은 기한 없이 유지하고 배포 후 정리에서 삭제하지 않는다. 정확한 /32·검증은 server `.local/home-ssh-20261024/verification.json`, 공개 증거는 server `docs/home-ssh-access-20261024.json`. IP 변경 시 허용 범위를 임의로 넓히지 않는다.
+- 운영 SSH: 2026-11-16 사용자 결정으로 포트를 22→7722로 바꾸고 22는 서버(ssh.socket, /etc/ssh/sshd_config.d/10-crefans-port.conf)와 보안 그룹 모두에서 닫았다. 허용 규칙은 집 IP `sgr-00086d407086dbc24`, 관리 PC `sgr-06cb961b8682388a0`(둘 다 TCP 7722, 기한 없이 유지, 배포 후 정리에서 삭제 금지). 맥북은 `~/.ssh/config`의 `Host 15.164.140.26 / Port 7722 / HostKeyAlias 15.164.140.26`로 기존 ssh.sh 래퍼가 그대로 동작한다. 이전 22번 규칙(sgr-0042cbcbcd1b74b35·sgr-0f882e5427c045329)은 삭제됨. IP 변경 시 허용 범위를 임의로 넓히지 않는다.
 
 - 2026-10-25 베타 선택·개방 조건은 프론트 `docs/beta-role-test-plan.md`, 서버 적용 계약은 `docs/platform-api.md` 최신 베타 절을 따른다. BETA_MODE의 테스트 결제/실송금 차단, 신규 환불 snapshot·기존 계약 보존, PG 입금 대사와 광고 동의/철회 이력을 우회하지 않는다. 실제 처리 사실이 미확정이면 법률문서 signupReady를 임의로 해제하지 않는다.
 
