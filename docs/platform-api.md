@@ -670,6 +670,16 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | GET | /admin/shop/orders | shop 조회 권한 주문 페이지 |
 | GET | /admin/shop/orders/:id | shop 조회 권한 주문·사용 이력 |
 | POST | /shop/webhook | PG 재조회 예약, 콜백 자체로 지급하지 않음 |
+| GET | /studio/shop/subscriptions | 본인 AI 이용권 구독 목록과 결제 준비 여부(available) |
+| POST | /studio/shop/subscriptions | 구독 신청(productId,version,termsVersion) → 카드 등록 창 값 |
+| POST | /studio/shop/subscriptions/:id/cancel | 다음 결제 해지 예약(이번 달 횟수 유지), 재시도 중이면 즉시 종료 |
+| POST | /studio/shop/subscriptions/:id/refund | 이번 달 남은 횟수 × 1회 단가를 결제사 부분 취소, 구독 즉시 종료 |
+
+AI 이용권 구독형/횟수형 (2026-11-16 사용자 결정)
+- 상품 `kind`: `pack`(AI 이용권 횟수형, 단건 결제) / `subscription`(AI 이용권 구독형, KG이니시스 빌링 월 자동결제, 이용 기간 30일 고정). 모든 상품은 1회 단가가 원 단위 정수이고 `AI_SHOP_MIN_UNIT_KRW`=98원 이상이어야 저장·판매된다(최악 Seedream 원가 USD 0.059≈86원 + 부가세 + PG 수수료).
+- 구독: 카드 등록 직후 첫 달을 서버에서 청구하고, 결제마다 `ai_shop_orders`(paid, 남은 횟수=월 횟수, 만료=기간 끝)를 만들어 기존 횟수 차감 경로를 그대로 쓴다. 이월 없음. 매달 같은 날(말일 보정) 갱신, 실패 시 24시간 간격 3회 재시도 후 종료. 같은 기간은 moid 고유값으로 두 번 청구하지 않는다. 구독 주문은 단건 환불 경로에서 거부(SUBSCRIPTION_ORDER).
+- KG이니시스(manual.inicis.com, 2026-11-16 확인): 승인 `/api/v1/billing`, 취소 `/api/v1/refund`(Refund/PartialRefund) 해시 구현. 빌키 응답 복호화·응답 해시 규격은 공개 문서로 확인되지 않아, 계약 MID 확인 후 운영자가 `INICIS_BILLKEY_DECRYPT_CONFIRMED=true`를 설정하기 전까지 `available=false`(결제 준비 중). 필요한 설정: `INICIS_BILLING_MID`, `INICIS_INIAPI_KEY`, `INICIS_INILITE_KEY`, `INICIS_ENV`(live/test), `INICIS_SERVER_IP`.
+- 검증: `tests/platform-ai-subscription.test.cjs`(결제사 대역). 실제 이니시스 호출 검증 아님.
 
 ### 기존 AI 리셋권 API 문서 누락 보완 (2026-11-14)
 
