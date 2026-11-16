@@ -224,6 +224,8 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /admin/categories | 신규 등록: content.create / 기존 상태 변경: content.update, content.view 공통 필수. active 생략 시 생성만 가능하며 중복 이름은 409. active 지정은 boolean만 허용하고 없는 분야는 404. 변경·감사 이력 원자 저장 |
 | POST | /admin/creators/:id/promotion | 주목할 크리에이터 광고 배치 설정 |
 | PUT | /admin/creators/:id/verification | 회원·크리에이터 수정 권한; 크리에이터 인증 배지 부여·해제. body isVerified:boolean, 감사 이력 동시 저장 |
+| GET | /admin/creators/:id/closing-payout | 매출·정산 생성 권한. 종료 정산 지급(계약 제12조②, 2026-11-17) 가능 여부: 계약 종료일(배지 해제 감사 기록)·지급 가능일(+30일)·지급액(확정 출금 가능 수익 전액)·보류 중 수익·확인 계좌 요약·막힌 사유(blocker) |
+| POST | /admin/creators/:id/closing-payout | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. body expectedAmount(화면의 지급액과 같아야 함, 다르면 409 AMOUNT_CHANGED). 배지 없음·종료 30일 경과·처리 중 출금 없음·지급액>0·확인 계좌일 때 처리 중 출금(request_key `closing:`)을 만들고 크리에이터에게 알림. 이체 결과는 `/admin/withdrawals/:id/manual-result`로 기록하며 이 출금만 배지 없이 paid 기록 가능 |
 | POST | /admin/auth/login | 운영자 전용 계정(admins) 로그인. 팬·크리에이터 회원 계정으로는 불가. 이메일당 10분10회, 실패 시 동일 응답·동일 해시 비용. HttpOnly·SameSite=Strict·콘솔 도메인 전용 admin_access_token(1시간)/admin_refresh_token(7일). 2차 인증(2026-10-30, 안전성 확보조치 기준 제6조제2항 2026-10-31 시행): 등록 운영자는 code(TOTP 6자리) 또는 recoveryCode 필요(401 TOTP_REQUIRED/TOTP_INVALID, 5분 5회 제한, 같은 시간창 재사용 거부). 미등록 운영자는 첫 로그인부터 7일 유예 후 본인(self) 경로만 허용(403 TOTP_ENROLLMENT_REQUIRED) |
 | POST | /admin/me/totp/setup | 본인. 비밀값(base32)·otpauth URI 발급, 암호화해 등록 대기로 저장. 등록 후 409 |
 | POST | /admin/me/totp/enable | 본인. 6자리 확인 후 켜기, 일회용 복구 코드 8개를 한 번만 반환(해시 저장), 유예 해제 |

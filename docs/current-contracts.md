@@ -53,6 +53,8 @@
 | POST | `/api/v1/admin/client-errors` | `src/platform/admin.controller.ts::clientError` |
 | GET | `/api/v1/admin/comments/:id/moderation` | `src/platform/moderation.ts::commentHistory` |
 | POST | `/api/v1/admin/comments/:id/moderation` | `src/platform/moderation.ts::comment` |
+| GET | `/api/v1/admin/creators/:id/closing-payout` | `src/platform/admin.controller.ts::closingPayout` |
+| POST | `/api/v1/admin/creators/:id/closing-payout` | `src/platform/admin.controller.ts::startClosingPayout` |
 | POST | `/api/v1/admin/creators/:id/promotion` | `src/platform/admin.controller.ts::promotion` |
 | PUT | `/api/v1/admin/creators/:id/verification` | `src/platform/admin.controller.ts::verification` |
 | GET | `/api/v1/admin/dashboard` | `src/platform/admin.controller.ts::dashboard` |
