@@ -732,7 +732,7 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 | POST | /media/guest | 체험 사진 업로드(이미지만, IP당 하루 60회) |
 | POST | /guest/ai-photo/edit | 체험 AI 사진 편집(보관함·하트 불가) |
 | POST | /guest/content | 체험 게시물 바로 게시(본인 AI 결과물만) |
-| POST | /guest/content/caption | 비워 둔 제목·본문 AI 작성(고른 항목 이름·요청 문장만 OpenAI 전송, 입력·결과 유해성 검사, 실패·한도 초과 시 정해진 문장, 방문자당 하루 30회). 방문자가 확인한 뒤 /guest/content로 게시 |
+| POST | /guest/content/caption | 비워 둔 제목·본문 AI 작성(고른 항목 이름·요청 문장만 OpenAI 전송, 입력·결과 유해성 검사, 실패·한도 초과 시 정해진 문장, 방문자당·IP당 하루 30회, 전체 하루 1,000회). 방문자가 확인한 뒤 /guest/content로 게시 |
 | POST | /guest/content/:id | 같은 브라우저(작성자 guest id) 체험 게시물의 제목·본문만 수정(사진·공개 범위·삭제 불가, 하루 30회·IP 60회, 남의 글 404) — 2026-11-16 |
 | GET | /guest/claim | 로그인 회원: 이 브라우저의 연동할 체험 게시물 수. 로그인 후 자동 연동하지 않고 화면이 먼저 묻는다 — 2026-11-16 |
 | POST | /guest/claim | 로그인 회원에게 같은 브라우저의 체험 게시물·사진 연결 |

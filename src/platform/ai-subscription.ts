@@ -4,6 +4,7 @@ import {appendAudit} from './audit';
 import {reject} from './http';
 import {AI_SHOP_MIN_UNIT_KRW,AI_SHOP_TERMS,shopTerms} from './ai-shop';
 import {aiPhotoAllowed} from './ai-photo-grants';
+import {enqueueOperation} from './operations-events';
 import {ConfigService} from '@nestjs/config';
 import {InicisBillingProvider} from './inicis-billing';
 
@@ -66,6 +67,9 @@ export class AiSubscriptionService{
   const moid=`aisub_${row.id.replace(/-/g,'').slice(0,16)}_${start.getTime()}`.slice(0,64);
   let charge=await this.db.aiSubscriptionCharge.findUnique({where:{moid}});
   if(charge?.status==='paid'){await this.db.aiSubscription.update({where:{id:row.id},data:{locked_until:null}});return;}
+  // 2026-11-16 user decision (night-work #1): a charge whose result is unknown is never charged again, here or with a new order number.
+  // It stays 'uncertain' with the same moid and schedule until an operator reconciles it with the KG이니시스 transaction (거래조회).
+  if(charge?.status==='uncertain'){await this.db.aiSubscription.update({where:{id:row.id},data:{locked_until:null}});if(first)reject(503,'BILLING_UNCERTAIN','결제 결과를 확인하고 있어요. 같은 결제가 두 번 청구되지는 않아요.');return;}
   if(!charge)charge=await this.db.aiSubscriptionCharge.create({data:{subscription_id:row.id,moid,period_start:start,period_end:end,amount:p.amount}});
   try{const member=await this.db.member.findUnique({where:{id:row.creator_id}});
    const result=await provider.charge({billingKey:decrypt(row.billing_key_encrypted),moid,amount:p.amount,goodName:`${p.name}`.slice(0,40),buyerName:(member?.nickname||member?.name||'크레팬스 회원').slice(0,30),buyerEmail:member?.email||undefined});
@@ -74,6 +78,13 @@ export class AiSubscriptionService{
     await tx.aiSubscription.update({where:{id:row.id},data:{status:row.cancel_requested_at?'cancel_scheduled':'active',current_period_start:start,current_period_end:end,next_charge_at:end,retry_count:0,last_failure_code:null,locked_until:null}});
     await appendAudit(tx,{category:'finance',action:'ai_subscription.charged',entityId:row.id,data:{amount:p.amount,count:p.quantity,orderId:order.id}});});
   }catch(error:any){const code=String(error?.getResponse?.()?.code||error?.code||'BILLING_FAILED').slice(0,100),retries=row.retry_count+1,give=first||retries>AI_SUBSCRIPTION_RETRIES;
+   // Only a received refusal (402 INICIS_<resultCode>) is a failure. A timeout, BILLING_UNCERTAIN or a DB error after approval may mean the
+   // card was charged: keep the moid and next_charge_at, mark the charge uncertain, alert operators and never retry it automatically.
+   if(!(error?.getStatus?.()===402&&code.startsWith('INICIS_'))){
+    await this.db.$transaction(async(tx:any)=>{await tx.aiSubscriptionCharge.update({where:{id:charge!.id},data:{status:'uncertain',failure_code:code}});
+     await tx.aiSubscription.update({where:{id:row.id},data:{last_failure_code:'BILLING_UNCERTAIN',locked_until:null}});
+     await enqueueOperation(tx,'ai_subscription.charge_uncertain',{subscriptionId:row.id,memberId:row.creator_id,orderId:moid,status:'uncertain'},`ai_subscription.charge_uncertain:${moid}`,{amount:p.amount,errorCode:code});});
+    if(first)reject(503,'BILLING_UNCERTAIN','결제 결과를 확인하고 있어요. 같은 결제가 두 번 청구되지는 않아요.');return;}
    await this.db.aiSubscriptionCharge.update({where:{id:charge.id},data:{status:'failed',failure_code:code}});
    await this.db.aiSubscription.update({where:{id:row.id},data:give?{status:'ended',ended_at:new Date(),last_failure_code:code,next_charge_at:null,locked_until:null}:{status:'past_due',retry_count:retries,last_failure_code:code,next_charge_at:new Date(Date.now()+AI_SUBSCRIPTION_RETRY_MS),locked_until:null}});
    await appendAudit(this.db,{category:'finance',action:give?'ai_subscription.ended':'ai_subscription.charge_failed',entityId:row.id,data:{errorCode:code,count:retries}});

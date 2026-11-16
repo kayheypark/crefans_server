@@ -58,7 +58,7 @@ export class GuestController{
  @Post('session') start(@Req() req:any,@Res({passthrough:true}) res:any,@Body() body:any){return this.guests.start(req,res,body);}
  @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);return this.studio.saveContent(id,body,{guest:true});}
  // Writes the empty title/body at publish time; the visitor confirms before posting (2026-11-16).
- @Post('content/caption') caption(@Req() req:any,@Body() body:any){return this.captions.caption(this.guests.require(req),body);}
+ @Post('content/caption') caption(@Req() req:any,@Body() body:any){return this.captions.caption(this.guests.require(req),body,this.guests.ipHash());}
  // 2026-11-16 user decision: the signed-out author may edit only the title and body of their own post; deleting stays unavailable.
  // Declared after content/caption so that literal route wins.
  @Post('content/:id') async editContent(@Req() req:any,@Param('id') postId:string,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('edit',id);return this.studio.updateGuestText(id,postId,body);}
