@@ -59,7 +59,7 @@ export class PlatformJobsService {
   await run('member-notices',async()=>this.memberNotices?.deliver());
   await run('ai-shop-reconciliation',async()=>this.aiShop?.reconcile());
   // 2026-11-16: bank-transfer orders not paid within 24 hours are cancelled (beans return to stock, orders close).
-  await run('bank-transfer-expiry',async()=>{await this.bankTransfers?.expire();});
+  await run('bank-transfer-expiry',async()=>{await this.bankTransfers?.remind();await this.bankTransfers?.expire();});
   // 2026-11-16 AI 이용권 구독형: renew due subscriptions (inactive until the PG billing keys are configured).
   await run('ai-subscription-renewal',async()=>{const crypto=new PaymentProvider(this.config);await this.aiSubscriptions?.tick(v=>crypto.decrypt(v));});
   await run('bean-expiry',async()=>this.beans?.expireLots(now));
