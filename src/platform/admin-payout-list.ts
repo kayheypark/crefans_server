@@ -14,7 +14,7 @@ const OPEN=['requested','processing'],LIMIT=500;
 export async function adminPayoutList(db:any,admin:any,now=new Date()){
  financialAdmin(admin);const beans=can(admin,'beans','view');
  const [withdrawals,payouts]=await Promise.all([
-  db.withdrawalRequest.findMany({where:{status:{in:OPEN}},orderBy:[{created_at:'asc'},{id:'asc'}],take:LIMIT+1,select:{id:true,creator_id:true,account_id:true,amount:true,status:true,note:true,created_at:true}}),
+  db.withdrawalRequest.findMany({where:{status:{in:OPEN}},orderBy:[{created_at:'asc'},{id:'asc'}],take:LIMIT+1,select:{id:true,creator_id:true,account_id:true,amount:true,status:true,note:true,created_at:true,request_key:true}}),
   beans?db.beanPayout.findMany({where:{status:{in:OPEN}},orderBy:[{created_at:'asc'},{id:'asc'}],take:LIMIT+1,select:{id:true,creator_id:true,account_id:true,account_version:true,net:true,environment:true,status:true,note:true,created_at:true}}):[]]);
  const truncated=withdrawals.length>LIMIT||payouts.length>LIMIT,ws=withdrawals.slice(0,LIMIT),ps=payouts.slice(0,LIMIT);
  const creatorIds=[...new Set([...ws,...ps].map((r:any)=>r.creator_id))],accountIds=[...new Set([...ws,...ps].map((r:any)=>r.account_id))];
@@ -28,10 +28,11 @@ export async function adminPayoutList(db:any,admin:any,now=new Date()){
   return{id,bank:a.bank,holder:a.holder_alias,lastFour:a.last_four,verified:a.verified,hasNumber:!!a.account_encrypted,changed:version!==undefined&&version!==a.version};};
  const cutoff=nextPayoutCutoff(now);
  // 2026-11-12: without the partner badge the server refuses the transfer record (PARTNER_CONTRACT_REQUIRED), so it is held.
- const hold=(i:any)=>i.test?'test':!i.partner?'partner-unverified':i.account.missing?'account-missing':!i.account.verified||!i.account.hasNumber?'account-unverified':i.account.changed?'account-changed':i.status==='requested'&&+i.createdAt>=+cutoff?'next-batch':null;
+ // 2026-11-17: a closing payout (contract 12(2)) is paid to a former partner, so the badge is not required for it.
+ const hold=(i:any)=>i.test?'test':!i.partner&&!i.closing?'partner-unverified':i.account.missing?'account-missing':!i.account.verified||!i.account.hasNumber?'account-unverified':i.account.changed?'account-changed':i.status==='requested'&&+i.createdAt>=+cutoff?'next-batch':null;
  const items=[
-  ...ws.map((w:any)=>({id:w.id,kind:'membership',...person(w.creator_id),amount:w.amount,status:w.status,note:w.note||null,test:false,createdAt:w.created_at,account:accountView(w.account_id)})),
-  ...ps.map((p:any)=>({id:p.id,kind:'bean',...person(p.creator_id),amount:p.net,status:p.status,note:p.note||null,test:p.environment!=='live',createdAt:p.created_at,account:accountView(p.account_id,p.account_version)}))]
+  ...ws.map((w:any)=>({id:w.id,kind:'membership',...person(w.creator_id),amount:w.amount,status:w.status,note:w.note||null,test:false,closing:w.request_key.startsWith('closing:'),createdAt:w.created_at,account:accountView(w.account_id)})),
+  ...ps.map((p:any)=>({id:p.id,kind:'bean',...person(p.creator_id),amount:p.net,status:p.status,note:p.note||null,test:p.environment!=='live',closing:false,createdAt:p.created_at,account:accountView(p.account_id,p.account_version)}))]
   .map((i:any)=>{const reason=hold(i);return{...i,due:!reason,holdReason:reason};})
   .sort((a,b)=>a.creatorName.localeCompare(b.creatorName,'ko')||a.creatorId.localeCompare(b.creatorId)||+a.createdAt-+b.createdAt);
  // Test-environment bean payouts are listed so the operator can reject them, but they are never part of a transfer total.

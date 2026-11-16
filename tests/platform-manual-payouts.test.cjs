@@ -145,3 +145,31 @@ test('without the partner badge: PIN check and request are refused, open request
  // with the badge back the same checks pass the partner gate (they fail later on PIN or authorization instead)
  await assert.rejects(finance.requestWithdrawal(creator,{requestId:randomUUID(),amount:100000,accountId:account.id,authorizationId:randomUUID()}),code('AUTHORIZATION_EXPIRED'));
 });
+
+// 2026-11-17 user decision (signed contract article 12(2)): if no agreement is reached within 30 days after the partnership ends,
+// the confirmed unsettled revenue is paid in full to the registered account. The operator starts it, then records the transfer.
+test('closing payout: only 30 days after the badge was removed, for the whole available balance, recorded without the badge',async()=>{
+ const admin=admins[0],{appendAudit}=require('../dist/src/platform/audit'),day=86400000,t0=new Date();
+ assert.equal((await finance.closingPayoutPreview(admin,creator,t0)).blocker,'PARTNER_NOT_ENDED','a current partner is not closed out');
+ assert.equal((await api(`/admin/creators/${creator}/closing-payout`,'viewer')).status,403);
+ await db.creator.update({where:{user_id:creator},data:{is_verified:false}});
+ try{
+  await appendAudit(db,{category:'admin',action:'admin.creator_verification_changed',entityId:creator,data:{}});
+  const early=new Date(Date.now()+29*day),later=new Date(Date.now()+31*day);
+  assert.equal((await finance.closingPayoutPreview(admin,creator,early)).blocker,'CLOSING_PAYOUT_NOT_DUE');
+  await assert.rejects(finance.startClosingPayout(admin,creator,{expectedAmount:1},early),code('CLOSING_PAYOUT_NOT_DUE'));
+  const preview=await finance.closingPayoutPreview(admin,creator,later),amount=(await finance.finance(creator)).summary.available;
+  assert.equal(preview.blocker,null);assert.ok(amount>0);assert.equal(preview.amount,amount);assert.equal(preview.account.lastFour,'5678');
+  await assert.rejects(finance.startClosingPayout(admin,creator,{expectedAmount:amount-1},later),code('AMOUNT_CHANGED'),'the operator confirms the amount shown');
+  const started=await finance.startClosingPayout(admin,creator,{expectedAmount:amount},later),id=started.withdrawal.id;
+  const w=await db.withdrawalRequest.findUniqueOrThrow({where:{id}});assert.equal(w.status,'processing');assert.equal(w.amount,amount);assert.match(w.request_key,/^closing:/);
+  await assert.rejects(finance.startClosingPayout(admin,creator,{expectedAmount:0},later),code('WITHDRAWAL_OPEN'),'started once');
+  const row=(await api('/admin/payouts/due','viewer')).data.items.find(i=>i.id===id);assert.notEqual(row.holdReason,'partner-unverified','not held for the missing badge');
+  await finance.manualResult(admin,id,{result:'paid',reference:'BANK-CLOSE-1',transferredAt:later.toISOString()},later);
+  assert.equal((await db.withdrawalRequest.findUniqueOrThrow({where:{id}})).status,'paid');
+  assert.equal((await finance.finance(creator)).summary.available,0);
+  assert.equal((await finance.closingPayoutPreview(admin,creator,later)).blocker,'NOTHING_TO_PAY');
+  assert.equal(await db.memberNotification.count({where:{member_id:creator,text:{contains:'계약 제12조'}}}),1);
+  assert.equal(await db.platformAuditLog.count({where:{entity_id:id,action:'withdrawal.closing_started'}}),1);
+ }finally{await db.creator.update({where:{user_id:creator},data:{is_verified:true}});await db.memberNotification.deleteMany({where:{member_id:creator}});}
+});
