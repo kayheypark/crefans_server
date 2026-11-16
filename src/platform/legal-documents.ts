@@ -343,12 +343,28 @@ const aiPrivacy:LegalDocument={...phonePrivacy2,version:'2026-11-16.ai.1',update
   if(sec.title===AI_P16_FROM)return{...sec,title:AI_P16_TO};if(sec.title===AI_P17_FROM)return{...sec,title:AI_P17_TO};return sec;})};
 if(!aiPrivacy.sections.some(sec=>sec.title===AI_P16_TO)||!aiPrivacy.sections.some(sec=>sec.title===AI_P17_TO))throw Error('Legal revision anchor missing in AI positioning privacy');
 const aiCatalog:LegalCatalog={...phoneCatalog2,documents:{...phoneCatalog2.documents,terms:aiTerms,privacy:aiPrivacy}};
+// 2026-11-17 user decision: operators see members' checked phone numbers in the console (masked; full number only on an audited
+// request) and search members by number, for member inquiries and abuse checks. Numbers checked from this date are kept encrypted.
+// Effective the same day (users are invited acquaintances, same basis as the 2026-11-16 revisions).
+export const PHONE_STORE_DATE='2026-11-17';
+const PHONE3_PURPOSE_FROM='확인하는 데에만 쓰며,';
+const PHONE3_PURPOSE_TO='확인하고, 회원 문의 처리와 부정 이용 확인 때 운영자가 회원을 찾고 연락처를 확인하는 데 쓰며,';
+const PHONE3_STORE_FROM='회사는 번호 자체를 저장하지 않고 원래 번호로 되돌릴 수 없는 값(보안키로 변환한 값)만 보관합니다.';
+const PHONE3_STORE_TO='번호는 암호화해 보관하고, 같은 번호 확인용으로 원래 번호로 되돌릴 수 없는 값(보안키로 변환한 값)도 함께 보관합니다. 운영 화면에는 가운데 자리를 가려 보여 주며, 전체 번호는 권한 있는 운영자가 따로 요청할 때만 보이고 그 열람은 기록합니다. 2026년 11월 17일 전에 확인한 번호는 변환한 값만 있어 원래 번호를 보관하지 않습니다.';
+const PHONE3_RETENTION_FROM='휴대폰 번호 확인 값은 회원 탈퇴 후';
+const PHONE3_RETENTION_TO='암호화한 휴대폰 번호와 확인 값은 회원 탈퇴 후';
+const phoneStorePrivacy:LegalDocument={...aiPrivacy,version:'2026-11-17.phone.3',updatedAt:PHONE_STORE_DATE,publishedAt:PHONE_STORE_DATE,effectiveAt:PHONE_STORE_DATE,
+ notice:aiPrivacy.notice+' 2026-11-17 개정: 4항·7항 — 확인한 휴대폰 번호를 암호화해 보관하고, 회원 문의 처리·부정 이용 확인 때 운영자가 가린 번호로 회원을 찾도록 했습니다(전체 번호 열람은 기록).',
+ sections:aiPrivacy.sections.map(sec=>{
+  if(sec.title.startsWith('4. '))return{...sec,body:swapIn(sec.title,swapIn(sec.title,sec.body,PHONE3_PURPOSE_FROM,PHONE3_PURPOSE_TO),PHONE3_STORE_FROM,PHONE3_STORE_TO)};
+  if(sec.title.startsWith('7. '))return{...sec,body:swapIn(sec.title,sec.body,PHONE3_RETENTION_FROM,PHONE3_RETENTION_TO)};return sec;})};
+const phoneStoreCatalog:LegalCatalog={...aiCatalog,documents:{...aiCatalog.documents,privacy:phoneStorePrivacy}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=PHONE_STORE_DATE?phoneStoreCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

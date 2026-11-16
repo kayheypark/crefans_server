@@ -2256,10 +2256,13 @@ model AiSubscriptionCharge {
 }
 
 // 2026-11-16 user decision: phone-number ownership check (OCTOMO, MO SMS) before the promotion 100콩, one account per number.
-// Only a keyed hash of the number is stored; OCTOMO is an ownership check, not legal identity verification (no name, birth date, CI).
+// A keyed hash (unique, search) and, from 2026-11-17, the encrypted number for the operator console; OCTOMO is an ownership check, not legal identity verification (no name, birth date, CI).
 model MemberPhone {
   member_id   String   @id @db.VarChar(191)
   phone_hash  String   @unique @db.VarChar(64)
+  /// 2026-11-17: AES-256-GCM of the number (checked from this date on); null for earlier checks, which kept only the hash.
+  phone_encrypted String? @db.Text
+  last_four   String?  @db.Char(4)
   verified_at DateTime @default(now())
   @@map("member_phones")
 }

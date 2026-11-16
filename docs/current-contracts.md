@@ -80,6 +80,7 @@
 | POST | `/api/v1/admin/me/totp/setup` | `src/platform/admin-totp.ts::setup` |
 | GET | `/api/v1/admin/members` | `src/platform/admin.controller.ts::members` |
 | POST | `/api/v1/admin/members/:id/erase` | `src/platform/moderation.ts::erase` |
+| GET | `/api/v1/admin/members/:id/phone` | `src/platform/admin.controller.ts::memberPhone` |
 | POST | `/api/v1/admin/members/:id/referral` | `src/platform/admin.controller.ts::referralLink` |
 | GET | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::memberHistory` |
 | POST | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::member` |
@@ -228,6 +229,7 @@
 | GET | `/api/v1/profiles/:id/following` | `src/platform/controller.ts::profileFollowing` |
 | POST | `/api/v1/reports` | `src/platform/controller.ts::report` |
 | GET | `/api/v1/session` | `src/platform/controller.ts::session` |
+| GET | `/api/v1/shop/products` | `src/platform/ai-shop.controller.ts::publicCatalog` |
 | POST | `/api/v1/shop/webhook` | `src/platform/ai-shop.controller.ts::webhook` |
 | POST | `/api/v1/studio/accounts` | `src/platform/finance.controller.ts::account` |
 | PUT | `/api/v1/studio/accounts/:id/default` | `src/platform/finance.controller.ts::defaultAccount` |
@@ -479,6 +481,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261116190000_member_phone`
 - `20261116210000_signup_phone`
 - `20261117010000_creator_terms_contract`
+- `20261117020000_member_phone_encrypted`
 
 ## Prisma 전체 정의 (110 models · 15 enums)
 
@@ -2743,10 +2746,13 @@ model AiSubscriptionCharge {
 }
 
 // 2026-11-16 user decision: phone-number ownership check (OCTOMO, MO SMS) before the promotion 100콩, one account per number.
-// Only a keyed hash of the number is stored; OCTOMO is an ownership check, not legal identity verification (no name, birth date, CI).
+// A keyed hash (unique, search) and, from 2026-11-17, the encrypted number for the operator console; OCTOMO is an ownership check, not legal identity verification (no name, birth date, CI).
 model MemberPhone {
   member_id   String   @id @db.VarChar(191)
   phone_hash  String   @unique @db.VarChar(64)
+  /// 2026-11-17: AES-256-GCM of the number (checked from this date on); null for earlier checks, which kept only the hash.
+  phone_encrypted String? @db.Text
+  last_four   String?  @db.Char(4)
   verified_at DateTime @default(now())
   @@map("member_phones")
 }

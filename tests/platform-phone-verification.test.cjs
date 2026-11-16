@@ -17,7 +17,7 @@ before(async()=>{globalThis.__release=await require('./e2e-db-lock.cjs').lockE2E
  for(const id of ids)await db.member.create({data:{id,email:id+'@phone.test.invalid',name:'Synthetic',nickname:'번호검증',preferred_username:id.slice(0,20),email_verified:true}});});
 after(async()=>{try{await db.phoneVerification.deleteMany({where:{member_id:{in:ids}}});await db.memberPhone.deleteMany({where:{member_id:{in:ids}}});await db.member.deleteMany({where:{id:{in:ids}}});}finally{await db.$disconnect();await globalThis.__release?.();}});
 
-test('number format, OCTOMO request shape, only a keyed hash stored, one account per number',async()=>{
+test('number format, OCTOMO request shape, only a keyed hash stored without an encryption key, one account per number',async()=>{
  assert.equal(normalizePhone('010-1234-5678'),'01012345678');assert.throws(()=>normalizePhone('+821012345678'),code('INVALID_PHONE'));
  const s=await phones.start(a,{phone:'010-1234-5678'});assert.match(s.code,/^[0-9]{6}$/);assert.equal(s.receiver,'1666-3538');assert.match(s.smsUri,new RegExp(`^sms:16663538\\?&body=${s.code}$`));
  await assert.rejects(phones.confirm(a,{phone:'01012345678'}),code('PHONE_SMS_NOT_FOUND'),'no SMS yet');
@@ -63,4 +63,18 @@ test('PC asks for a QR: OCTOMO qr-code is called with the code and a bad QR resp
  const bodies=[];phones.fetcher=async(u,init)=>{bodies.push(JSON.parse(init.body));return{ok:true,json:async()=>({qrCode:'javascript:alert(1)'})};};
  const bad=await phones.start(m,{phone:'01033332222',qr:true});assert.equal(bad.qrCode,undefined,'only PNG data URLs are passed on');assert.equal(bodies[0].text,bad.code);
  const mobile=await phones.start(m,{phone:'01033332222'});assert.equal(mobile.qrCode,undefined,'no QR call for mobile');
+});
+
+// 2026-11-17 user decision: the console shows the number masked and searches by it; the number is kept encrypted from this date.
+test('with DATA_ENCRYPTION_KEY the number is kept encrypted (not plain), the member list masks it, a 010 search finds the member',async()=>{
+ const {adminMembers}=require('../dist/src/platform/admin-console'),{PaymentProvider}=require('../dist/src/platform/payment-provider');
+ const keyed=new ConfigService({OCTOMO_API_KEY:'test-octomo-key',LOCAL_AUTH_SECRET:'phone-test-secret',DATA_ENCRYPTION_KEY:'a'.repeat(64)}),p2=new PhoneVerificationService(new PlatformService(db,undefined,keyed),keyed,limiter);p2.fetcher=async(u,init)=>{const body=JSON.parse(init.body);return{ok:true,json:async()=>({exists:sms.has(body.mobileNum+':'+body.text)})};};
+ const s=await p2.start(b,{phone:'010-2222-3434'});sms.add('01022223434:'+s.code);await p2.confirm(b,{phone:'01022223434'});
+ const row=await db.memberPhone.findUniqueOrThrow({where:{member_id:b}});assert.equal(row.last_four,'3434');assert.ok(row.phone_encrypted&&!row.phone_encrypted.includes('01022223434'),'stored encrypted, never plain');
+ assert.equal(new PaymentProvider(keyed).decrypt(row.phone_encrypted),'01022223434');
+ const hash=x=>p2.hash(x),found=await adminMembers(db,{search:'010-2222-3434'},hash);assert.deepEqual(found.items.map(m=>m.id),[b]);assert.deepEqual(found.items[0].phone,{masked:'010-****-3434',kept:true});
+ assert.equal(JSON.stringify(found).includes('01022223434'),false,'the list never carries the full number');
+ assert.equal((await adminMembers(db,{search:'010-2222-0000'},hash)).items.some(m=>m.id===b),false,'another number does not match');
+ await db.memberPhone.upsert({where:{member_id:a},create:{member_id:a,phone_hash:hash('01055556666')},update:{phone_encrypted:null,last_four:null}});
+ const older=(await adminMembers(db,{search:a},hash)).items.find(m=>m.id===a);assert.deepEqual(older.phone,{masked:null,kept:false},'a number checked before 2026-11-17 shows as not kept');
 });
