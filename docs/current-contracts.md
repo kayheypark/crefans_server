@@ -264,6 +264,10 @@
 | POST | `/api/v1/studio/shop/orders/:id/payment-window` | `src/platform/ai-shop.controller.ts::window` |
 | POST | `/api/v1/studio/shop/orders/:id/refund` | `src/platform/ai-shop.controller.ts::refund` |
 | GET | `/api/v1/studio/shop/products` | `src/platform/ai-shop.controller.ts::products` |
+| GET | `/api/v1/studio/shop/subscriptions` | `src/platform/ai-shop.controller.ts::subscriptions` |
+| POST | `/api/v1/studio/shop/subscriptions` | `src/platform/ai-shop.controller.ts::subscribe` |
+| POST | `/api/v1/studio/shop/subscriptions/:id/cancel` | `src/platform/ai-shop.controller.ts::cancelSubscription` |
+| POST | `/api/v1/studio/shop/subscriptions/:id/refund` | `src/platform/ai-shop.controller.ts::refundSubscription` |
 | POST | `/api/v1/studio/start` | `src/platform/studio.controller.ts::start` |
 | GET | `/api/v1/studio/tips` | `src/platform/beans.controller.ts::received` |
 | POST | `/api/v1/studio/withdraw` | `src/platform/finance.controller.ts::withdraw` |
@@ -462,8 +466,9 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261114060000_ai_heart_rewards`
 - `20261114140000_ai_shop`
 - `20261116090000_bank_transfer`
+- `20261116120000_ai_subscription`
 
-## Prisma 전체 정의 (106 models · 15 enums)
+## Prisma 전체 정의 (108 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -2526,6 +2531,8 @@ model AiPhotoFailureDetail {
 
 model AiShopProduct {
  id String @id @default(uuid())
+ // 'pack' = AI 이용권 횟수형(one payment), 'subscription' = AI 이용권 구독형(monthly card billing, uses reset each period).
+ kind String @default("pack") @db.VarChar(20)
  name String @db.VarChar(100)
  description String @db.Text
  amount Int
@@ -2668,5 +2675,51 @@ model ManualRefund {
  @@unique([kind, refund_id])
  @@index([status, due_at])
  @@map("manual_refunds")
+}
+
+// 2026-11-16 user decision: AI 이용권 구독형 — monthly card billing (KG이니시스 빌링). Each paid period creates an ai_shop_orders row
+// (paid, remaining=quantity, expires at the period end, no carry-over) so generation uses the existing paid-use path.
+model AiSubscription {
+ id String @id @default(uuid())
+ creator_id String @db.VarChar(191)
+ product_id String @db.VarChar(191)
+ product_snapshot Json
+ provider String @db.VarChar(20)
+ environment String @db.VarChar(10)
+ status String @default("pending") @db.VarChar(20)
+ billing_key_encrypted String? @db.Text
+ card_label String? @db.VarChar(60)
+ current_period_start DateTime?
+ current_period_end DateTime?
+ next_charge_at DateTime?
+ retry_count Int @default(0)
+ last_failure_code String? @db.VarChar(100)
+ cancel_requested_at DateTime?
+ ended_at DateTime?
+ locked_until DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([creator_id, status])
+ @@index([status, next_charge_at])
+ @@map("ai_subscriptions")
+}
+model AiSubscriptionCharge {
+ id String @id @default(uuid())
+ subscription_id String @db.VarChar(191)
+ moid String @unique @db.VarChar(64)
+ period_start DateTime
+ period_end DateTime
+ amount Int
+ status String @default("processing") @db.VarChar(20)
+ provider_tid String? @db.VarChar(100)
+ order_id String? @db.VarChar(191)
+ failure_code String? @db.VarChar(100)
+ refund_amount Int?
+ paid_at DateTime?
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@index([subscription_id, created_at])
+ @@index([status, updated_at])
+ @@map("ai_subscription_charges")
 }
 ```
