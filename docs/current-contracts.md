@@ -155,6 +155,7 @@
 | POST | `/api/v1/guest/ai-photo/edit` | `src/platform/guest.ts::edit` |
 | POST | `/api/v1/guest/claim` | `src/platform/guest.ts::claim` |
 | POST | `/api/v1/guest/content` | `src/platform/guest.ts::content` |
+| POST | `/api/v1/guest/content/caption` | `src/platform/guest.ts::caption` |
 | GET | `/api/v1/guest/session` | `src/platform/guest.ts::session` |
 | POST | `/api/v1/guest/session` | `src/platform/guest.ts::start` |
 | POST | `/api/v1/guide/advisor` | `src/platform/guide-advisor.ts::ask` |
@@ -379,7 +380,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 | `npm run test:operations` | `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs tests/platform-billing-activity.test.cjs tests/platform-disk-alert.test.cjs` |
 | `npm run test:audit` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-audit.test.cjs tests/platform-audit-export.test.cjs tests/platform-external-monitor.test.cjs tests/platform-log-config.test.cjs tests/platform-security.test.cjs tests/platform-operations.test.cjs tests/platform-operations-events.test.cjs tests/platform-operations-http.test.cjs` |
 | `npm run test:openapi` | `npm run build && CREFANS_E2E=true node --test tests/platform-openapi.test.cjs` |
-| `npm run test:launch` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-guest.test.cjs tests/platform-signup-mode.test.cjs tests/platform-signup-invites.test.cjs tests/platform-partner-request.test.cjs tests/platform-ai-photo.test.cjs tests/platform-manual-payouts.test.cjs tests/platform-legal.test.cjs` |
+| `npm run test:launch` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-guest.test.cjs tests/platform-guest-caption.test.cjs tests/platform-signup-mode.test.cjs tests/platform-signup-invites.test.cjs tests/platform-partner-request.test.cjs tests/platform-ai-photo.test.cjs tests/platform-manual-payouts.test.cjs tests/platform-legal.test.cjs` |
 | `npm run test:beans` | `npm run build && CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-beans.test.cjs tests/platform-bean-ledger.test.cjs tests/platform-bean-charge-limit.test.cjs tests/platform-openapi.test.cjs` |
 
 ## migration 파일 목록

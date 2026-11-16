@@ -6,6 +6,7 @@ import {randomBytes} from 'node:crypto';
 import {PlatformService} from './service';
 import {PlatformStudioService} from './studio.service';
 import {AiPhotoService} from './ai-photo';
+import {GuestCaptionService} from './guest-caption';
 import {PlatformAuthGuard} from './platform-auth.guard';
 import {appendAudit} from './audit';
 import {reject} from './http';
@@ -50,10 +51,12 @@ export class GuestService{
 
 @Controller('guest')
 export class GuestController{
- constructor(private guests:GuestService,private studio:PlatformStudioService,private photos:AiPhotoService){}
+ constructor(private guests:GuestService,private studio:PlatformStudioService,private photos:AiPhotoService,private captions:GuestCaptionService){}
  @Get('session') session(@Req() req:any){return this.guests.status(req,id=>this.photos.guestRemaining(id));}
  @Post('session') start(@Req() req:any,@Res({passthrough:true}) res:any,@Body() body:any){return this.guests.start(req,res,body);}
  @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);return this.studio.saveContent(id,body,{guest:true});}
+ // Writes the empty title/body at publish time; the visitor confirms before posting (2026-11-16).
+ @Post('content/caption') caption(@Req() req:any,@Body() body:any){return this.captions.caption(this.guests.require(req),body);}
  @Post('ai-photo/edit') @UseInterceptors(FileInterceptor('mask',{storage:memoryStorage(),limits:{fileSize:5*1024*1024,files:1}}))
  edit(@Req() req:any,@Body() body:any,@UploadedFile() mask:any){return this.photos.edit(this.guests.require(req),body,mask,{ipHash:this.guests.ipHash()});}
  @Post('claim') @UseGuards(PlatformAuthGuard) claim(@Req() req:any,@Res({passthrough:true}) res:any){return this.guests.claim(req.user.sub,req,res);}

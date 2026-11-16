@@ -225,12 +225,24 @@ const membershipTerms2:LegalDocument={...membershipTerms,version:'2026-11-16.mem
  sections:membershipTerms.sections.map(sec=>{if(sec.title==='6. 크리에이터 수수료·정산·출금'){if(!sec.body.includes(CONTRACT_END_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(CONTRACT_END_FROM,CONTRACT_END_TO)};}
   if(sec.title==='13. 스튜디오 AI 사진 편집과 횟수권')return{...sec,title:'13. 스튜디오 AI 사진 편집과 AI 이용권',body:sec.body.split('횟수권').join('AI 이용권')};return sec;})};
 const membershipCatalog2:LegalCatalog={...openCatalog,documents:{...openCatalog.documents,terms:membershipTerms2}};
+// 2026-11-16 user decision: in the guest trial an empty post title/body is written by AI at publish time from the chosen edit
+// item names and the visitor's request text only (OpenAI, no photo/IP/identifier), shown to the visitor before posting.
+// Applied the same day: the trial screen states it before consent (GUEST_CONSENT_VERSION .guest.3) and next to the publish button.
+export const GUEST_CAPTION_DATE='2026-11-16';
+const CAPTION_FROM='AI 처리와 국외 이전: 사진 생성(BytePlus)과 유해성 검사(OpenAI), 국외 이전되는';
+const CAPTION_TO='AI 처리와 국외 이전: 사진 생성(BytePlus)과 유해성 검사(OpenAI), 게시할 때 비워 둔 제목·본문 작성(OpenAI)에 씁니다. 제목·본문 작성에는 방문자가 고른 편집 항목 이름과 직접 입력한 요청 문장만 보내고 사진·접속 IP·식별자는 보내지 않으며, 작성된 글은 게시 전에 방문자에게 보여 주고 확인을 받습니다(OpenAI에 저장하지 않도록 요청, 결과도 유해성 검사). 국외 이전되는';
+const captionPrivacyBase=membershipCatalog2.documents.privacy;
+const captionPrivacy:LegalDocument={...captionPrivacyBase,version:'2026-11-16.caption.1',updatedAt:GUEST_CAPTION_DATE,publishedAt:GUEST_CAPTION_DATE,effectiveAt:GUEST_CAPTION_DATE,
+ notice:captionPrivacyBase.notice+' 2026년 11월 16일 개정: 비회원 AI 사진 체험에서 비워 둔 게시물 제목·본문을 게시할 때 AI(OpenAI)가 작성하는 처리를 17항에 적었습니다(고른 편집 항목 이름과 요청 문장만 전송, 게시 전 확인).',
+ sections:captionPrivacyBase.sections.map(sec=>{if(sec.title!=='17. 선택 기능: 비회원 AI 사진 체험')return sec;if(!sec.body.includes(CAPTION_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);
+  return{...sec,body:sec.body.replace(CAPTION_FROM,CAPTION_TO).replace('체험 게시물 게시, 같은 브라우저로','체험 게시물 게시와 비워 둔 제목·본문 작성, 같은 브라우저로')};})};
+const captionCatalog:LegalCatalog={...membershipCatalog2,documents:{...membershipCatalog2.documents,privacy:captionPrivacy}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

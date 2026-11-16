@@ -707,6 +707,7 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 - 비회원 체험은 `cf_guest`(httpOnly, 30일) 쿠키로 방문자를 구분한다. 동의 버전은 `GUEST_CONSENT_VERSION`(현재 2026-11-15.guest.2)과 같아야 한다. 접속 IP는 서버 보안키 HMAC 값으로만 횟수를 센다.
 - AI 한도: 브라우저당 10회(GUEST_AI_LIMIT), 같은 IP 하루 10회(GUEST_IP_LIMIT), 비회원 전체 하루 200회(GUEST_DAILY_CLOSED). 비회원 생성은 회원의 서비스 전체 상한(`ai-photo:total`)을 쓰지 않는다.
 - 체험 게시물은 바로 게시만 되고(댓글·후원 없음) 24시간 공개 후 비공개, 검색 제외. 첨부는 본인의 AI 결과물만(GUEST_AI_RESULT_ONLY). 같은 브라우저로 로그인하면 `/guest/claim`이 게시물·사진을 회원으로 옮긴다.
+- AI 사진 편집 실패는 회원·비회원·원인과 관계없이 모두 운영 텔레그램 알림 `ai-photo.failed`로 보낸다(오류 코드·단계·공급자·회원/비회원 구분·소요 시간만, 접속 IP·요청 문장·사진·회원 식별자 없음. 2026-11-16 결정).
 - `/studio/partner-request`는 인증 배지 없는 크리에이터의 파트너 계약 요청이다. 하루 1회, 감사 기록 `creator.partner_requested`와 운영 텔레그램 알림(회원 식별자 없음). 출금은 인증 배지가 있어야 한다(PARTNER_CONTRACT_REQUIRED).
 
 | Method | 경로 | 동작 |
@@ -716,5 +717,6 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 | POST | /media/guest | 체험 사진 업로드(이미지만, IP당 하루 60회) |
 | POST | /guest/ai-photo/edit | 체험 AI 사진 편집(보관함·하트 불가) |
 | POST | /guest/content | 체험 게시물 바로 게시(본인 AI 결과물만) |
+| POST | /guest/content/caption | 비워 둔 제목·본문 AI 작성(고른 항목 이름·요청 문장만 OpenAI 전송, 입력·결과 유해성 검사, 실패·한도 초과 시 정해진 문장, 방문자당 하루 30회). 방문자가 확인한 뒤 /guest/content로 게시 |
 | POST | /guest/claim | 로그인 회원에게 같은 브라우저의 체험 게시물·사진 연결 |
 | POST | /studio/partner-request | 파트너 계약 요청(하루 1회, 운영 알림) |
