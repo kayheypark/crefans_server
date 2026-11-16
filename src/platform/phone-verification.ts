@@ -6,15 +6,20 @@ import {PlatformService} from './service';
 import {LocalMemberService} from '../auth/local/local-member.service';
 import {appendAudit} from './audit';
 import {reject} from './http';
+import {PaymentProvider} from './payment-provider';
 
 // 2026-11-16 user decision: before the promotion 100콩, the member proves they hold a phone number with OCTOMO (MO SMS: the member
 // texts a one-time code to 1666-3538 and the server asks OCTOMO whether that text arrived). One account per number.
 // Official spec (checked 2026-11-16, octomo.octoverse.kr/api-docs): POST https://api.octoverse.kr/octomo/v1/public/message/exists,
 // header `Authorization: Octomo {API_KEY}`, body {mobileNum:'010xxxxxxxx', text, withinMinutes 1..60} → {exists:boolean}.
 // OCTOMO states it is a number-ownership check, not a designated 본인확인기관: no name, birth date or CI, so it is never age proof.
-// The number is sent to OCTOMO only for the check; the service keeps an HMAC of it (unique), never the number itself.
+// The number is sent to OCTOMO only for the check; the service keeps an HMAC of it (unique, search). 2026-11-17 user decision: it
+// also keeps the number encrypted (DATA_ENCRYPTION_KEY) so operators can see it masked in the console and reveal it with an audit.
 export const OCTOMO_URL='https://api.octoverse.kr/octomo/v1/public/message/exists',OCTOMO_QR_URL='https://api.octoverse.kr/octomo/v1/public/message/qr-code',OCTOMO_RECEIVER='1666-3538',PHONE_CODE_MINUTES=10;
 export const normalizePhone=(value:unknown)=>{const digits=typeof value==='string'?value.replace(/[^0-9]/g,''):'';if(!/^010[0-9]{8}$/.test(digits))reject(400,'INVALID_PHONE','010으로 시작하는 휴대폰 번호 11자리를 입력해 주세요.');return digits;};
+
+export function memberPhoneHash(config:ConfigService,phone:string){const secret=config.get<string>('LOCAL_AUTH_SECRET')||config.get<string>('DATA_ENCRYPTION_KEY');if(!secret)reject(503,'PHONE_VERIFICATION_UNAVAILABLE','잠시 후 다시 시도해 주세요.');return createHmac('sha256',secret).update(`member-phone:${phone}`).digest('hex');}
+export const maskPhone=(lastFour:string|null|undefined)=>lastFour?`010-****-${lastFour}`:null;
 
 @Injectable()
 export class PhoneVerificationService{
@@ -24,7 +29,9 @@ export class PhoneVerificationService{
  private key(){return (this.config.get<string>('OCTOMO_API_KEY')||'').trim();}
  /** Off (claims work as before) until the operator sets OCTOMO_API_KEY. */
  enabled(){return !!this.key();}
- hash(phone:string){const secret=this.config.get<string>('LOCAL_AUTH_SECRET')||this.config.get<string>('DATA_ENCRYPTION_KEY');if(!secret)reject(503,'PHONE_VERIFICATION_UNAVAILABLE','잠시 후 다시 시도해 주세요.');return createHmac('sha256',secret).update(`member-phone:${phone}`).digest('hex');}
+ hash(phone:string){return memberPhoneHash(this.config,phone);}
+ /** Encrypted copy for the console; without an encryption key (tests, local) only the hash is kept, as before 2026-11-17. */
+ stored(phone:string){if(!/^[a-f0-9]{64}$/i.test(this.config.get<string>('DATA_ENCRYPTION_KEY')||''))return{phone_encrypted:null,last_four:null};return{phone_encrypted:new PaymentProvider(this.config).encrypt(phone),last_four:phone.slice(-4)};}
  async verified(member:string){return !!await this.db.memberPhone.findUnique({where:{member_id:member}});}
  async status(member:string){return{required:this.enabled(),verified:await this.verified(member),receiver:OCTOMO_RECEIVER};}
  /** Issues a code for `key` (a member id, or 'signup:'+email digest before the account exists). */
@@ -54,7 +61,7 @@ export class PhoneVerificationService{
  async confirm(member:string,input:any){const phone=normalizePhone(input?.phone),{phoneHash}=await this.check(member,phone,'phone-confirm:'+member);
   await this.db.$transaction(async(tx:any)=>{
    const owner=await tx.memberPhone.findUnique({where:{phone_hash:phoneHash}});if(owner&&owner.member_id!==member)reject(409,'PHONE_IN_USE','이미 다른 계정에서 확인한 번호예요.');
-   await tx.memberPhone.upsert({where:{member_id:member},create:{member_id:member,phone_hash:phoneHash},update:{phone_hash:phoneHash,verified_at:new Date()}});
+   const kept=this.stored(phone);await tx.memberPhone.upsert({where:{member_id:member},create:{member_id:member,phone_hash:phoneHash,...kept},update:{phone_hash:phoneHash,...kept,verified_at:new Date()}});
    await tx.phoneVerification.deleteMany({where:{member_id:member}});
    await appendAudit(tx,{category:'security',action:'member.phone_verified',entityId:member,data:{provider:'octomo'}});
   }).catch((error:any)=>{if(error?.code==='P2002')reject(409,'PHONE_IN_USE','이미 다른 계정에서 확인한 번호예요.');throw error;});
@@ -73,6 +80,6 @@ export class PhoneVerificationService{
   const row=await tx.phoneVerification.findFirst({where:{member_id:key,phone_hash:phoneHash,verified_at:{not:null},expires_at:{gt:new Date()},proof_hash:digest(typeof input?.phoneProof==='string'?input.phoneProof.slice(0,100):'')}});
   if(!row)reject(403,'PHONE_VERIFICATION_REQUIRED','휴대폰 번호 확인이 필요해요.');
   if(await tx.memberPhone.findUnique({where:{phone_hash:phoneHash}}))reject(409,'PHONE_IN_USE','이미 다른 계정에서 확인한 번호예요.');
-  await tx.memberPhone.create({data:{member_id:memberId,phone_hash:phoneHash}});await tx.phoneVerification.deleteMany({where:{member_id:key}});
+  await tx.memberPhone.create({data:{member_id:memberId,phone_hash:phoneHash,...this.stored(phone)}});await tx.phoneVerification.deleteMany({where:{member_id:key}});
   await appendAudit(tx,{category:'security',action:'member.phone_verified',entityId:memberId,data:{provider:'octomo',stage:'signup'}});}
 }

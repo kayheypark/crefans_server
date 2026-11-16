@@ -225,6 +225,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /admin/creators/:id/promotion | 주목할 크리에이터 광고 배치 설정 |
 | PUT | /admin/creators/:id/verification | 회원·크리에이터 수정 권한; 크리에이터 인증 배지 부여·해제. body isVerified:boolean, 감사 이력 동시 저장 |
 | GET | /admin/creators/:id/closing-payout | 매출·정산 생성 권한. 종료 정산 지급(계약 제12조②, 2026-11-17) 가능 여부: 계약 종료일(배지 해제 감사 기록)·지급 가능일(+30일)·지급액(확정 출금 가능 수익 전액)·보류 중 수익·확인 계좌 요약·막힌 사유(blocker) |
+| GET | /admin/members/:id/phone | 회원 조회 권한. 2026-11-17부터 확인한 휴대폰 번호(암호화 보관)의 전체 번호. 캐시 금지, 열람마다 감사 기록 admin.member_phone_revealed(번호는 기록하지 않음). 이전 확인분은 404 PHONE_NOT_KEPT. 회원 목록은 phone{masked:'010-****-1234',kept}만 주고 search에 010 번호를 넣으면 해시로 찾음 |
 | POST | /admin/creators/:id/closing-payout | 매출·정산 생성 권한, `MANUAL_PAYOUTS_ENABLED`일 때만. body expectedAmount(화면의 지급액과 같아야 함, 다르면 409 AMOUNT_CHANGED). 배지 없음·종료 30일 경과·처리 중 출금 없음·지급액>0·확인 계좌일 때 처리 중 출금(request_key `closing:`)을 만들고 크리에이터에게 알림. 이체 결과는 `/admin/withdrawals/:id/manual-result`로 기록하며 이 출금만 배지 없이 paid 기록 가능 |
 | POST | /admin/auth/login | 운영자 전용 계정(admins) 로그인. 팬·크리에이터 회원 계정으로는 불가. 이메일당 10분10회, 실패 시 동일 응답·동일 해시 비용. HttpOnly·SameSite=Strict·콘솔 도메인 전용 admin_access_token(1시간)/admin_refresh_token(7일). 2차 인증(2026-10-30, 안전성 확보조치 기준 제6조제2항 2026-10-31 시행): 등록 운영자는 code(TOTP 6자리) 또는 recoveryCode 필요(401 TOTP_REQUIRED/TOTP_INVALID, 5분 5회 제한, 같은 시간창 재사용 거부). 미등록 운영자는 첫 로그인부터 7일 유예 후 본인(self) 경로만 허용(403 TOTP_ENROLLMENT_REQUIRED) |
 | POST | /admin/me/totp/setup | 본인. 비밀값(base32)·otpauth URI 발급, 암호화해 등록 대기로 저장. 등록 후 409 |
@@ -676,6 +677,7 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | DELETE | /admin/shop/products/:id | shop 삭제 권한 및 소프트 삭제 |
 | GET | /admin/shop/orders | shop 조회 권한 주문 페이지 |
 | GET | /admin/shop/orders/:id | shop 조회 권한 주문·사용 이력 |
+| GET | /shop/products | 로그인 없이. 2026-11-17 비로그인 상점 둘러보기: 공개 상품(visible)과 구독형 판매 가능 여부(subscriptionsAvailable). 구매·주문·구독은 /studio/shop(로그인) |
 | POST | /shop/webhook | PG 재조회 예약, 콜백 자체로 지급하지 않음 |
 | GET | /studio/shop/subscriptions | 본인 AI 이용권 구독 목록과 결제 준비 여부(available) |
 | POST | /studio/shop/subscriptions | 구독 신청(productId,version,termsVersion) → 카드 등록 창 값 |
