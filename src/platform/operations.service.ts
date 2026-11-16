@@ -5,7 +5,7 @@ import {PrismaService} from '../prisma/prisma.service';
 import {requestContext} from './request-context';
 import {createHmac,randomUUID} from 'crypto';
 
-const labels:Record<string,string>={'creator.partner_requested':'파트너 계약 요청(콘솔 로그에서 크리에이터 확인 후 모두싸인 발송)','guest.ai_usage':'비회원 AI 체험 사용량','guest.ai_closed':'비회원 AI 체험 오늘 상한 도달','auth.signup_mail_closed':'가입 인증 메일 오늘 상한 도달(SIGNUP_MAIL_DAILY_TOTAL)',
+const labels:Record<string,string>={'creator.partner_requested':'파트너 계약 요청(콘솔 로그에서 크리에이터 확인 후 모두싸인 발송)','guest.ai_usage':'비회원 AI 체험 사용량','ai-photo.failed':'AI 사진 편집 실패','guest.ai_closed':'비회원 AI 체험 오늘 상한 도달','auth.signup_mail_closed':'가입 인증 메일 오늘 상한 도달(SIGNUP_MAIL_DAILY_TOTAL)',
  'beans.charge_created':'콩 충전 주문','beans.charge_paid':'콩 충전 완료','beans.tip':'콩 후원','beans.promotion':'프로모션콩 지급','beans.payout_requested':'후원콩 출금 접수','beans.payout_paid':'후원콩 은행 지급 완료','beans.payout_rejected':'후원콩 은행 반려','beans.charge_disputed':'콩 충전 취소·차지백 감지','beans.ledger_mismatch':'콩 원장 대사 불일치',
  'worker.stale':'배치 실행 지연','operations.test':'운영 알림 연결 확인','member.signup':'회원가입', 'subscription.started':'멤버십 구독', 'subscription.payment_failed':'멤버십 정기결제 실패','subscription.renewed':'멤버십 정기 갱신', 'subscription.cancelled':'멤버십 구독 해지', 'subscription.resumed':'멤버십 자동 갱신 재개',
  'content.created':'콘텐츠 등록','content.updated':'콘텐츠 수정','content.deleted':'콘텐츠 삭제',
@@ -14,7 +14,7 @@ const labels:Record<string,string>={'creator.partner_requested':'파트너 계�
  'disk.warning':'디스크 사용률 경고','disk.critical':'디스크 사용률 위험','disk.recovered':'디스크 사용률 회복',
  'security.injection_detected':'인젝션 시도 감지','security.ip_blocked':'공격 IP 자동 차단','security.ip_released':'IP 차단 만료',
 };
-const allowed=new Set(['ip','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각']);
+const allowed=new Set(['ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각']);
 function metadata(data:Record<string,unknown>){
  const result:Record<string,any>={};
  for(const [key,value] of Object.entries(data)){
@@ -29,9 +29,10 @@ function metadata(data:Record<string,unknown>){
 }
 /** Telegram is outside the service (overseas transfer): member identifiers leave only as a keyed hash (2026-11-02 user decision).
  * Operators find the raw value through 기록 ID in the console log. */
+const NO_IP_TYPES=new Set(['ai-photo.failed']);
 export function operationsAlertText(row:{type:string;ip:string|null;peer_ip:string|null;created_at:Date;id:string;request_id:string|null;data:unknown},env:string,secret?:string){
  const hidden=(value:unknown)=>secret?'h:'+createHmac('sha256',secret).update(`operations-alert:${String(value)}`).digest('hex').slice(0,12):'(숨김)';
- const lines=[`[crefans] ${labels[row.type]||row.type}`,`환경: ${env}`,`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`,`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
+ const lines=[`[crefans] ${labels[row.type]||row.type}`,`환경: ${env}`,...(NO_IP_TYPES.has(row.type)?['접속 IP: 보내지 않음']:[`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`]),`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
  for(const [key,value] of Object.entries(row.data as Record<string,unknown>))lines.push(`${key}: ${['memberId','creatorId'].includes(key)?hidden(value):typeof value==='object'?JSON.stringify(value):String(value)}`);
  return lines.join('\n').slice(0,3800);
 }
@@ -73,8 +74,9 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
   ];
   for(const [type,count] of checks){const pending=await count();if(pending>0)await this.record(type,{job:'watchdog',status:'backlog',count:pending},`${type}:${hour}`);}
  }
- async record(type:string,data:Record<string,unknown>,dedupeKey?:string){
-  const context=requestContext.getStore(),safe=metadata(data);
+ // omitIp: the alert leaves the service (Telegram), so events that promise no IP keep it out of the stored row too (2026-11-16 AI photo failures).
+ async record(type:string,data:Record<string,unknown>,dedupeKey?:string,options:{omitIp?:boolean}={}){
+  const stored=requestContext.getStore(),context=options.omitIp&&stored?{...stored,ip:'',peerIp:''}:stored,safe=metadata(data);
   console.log(JSON.stringify({event:type,...context,data:safe}));
   try{return await this.db.$transaction(async tx=>{const row={type,data:safe,ip:context?.ip||null,peer_ip:context?.peerIp||null,request_id:context?.requestId||null,dedupe_key:dedupeKey||null};const saved=dedupeKey?await tx.platformOperationalEvent.upsert({where:{dedupe_key:dedupeKey},create:row,update:{}}):await tx.platformOperationalEvent.create({data:row});await auditOperation(tx,saved);return saved;});}
   catch{console.error(JSON.stringify({event:'operations_persist_failed',type,requestId:context?.requestId}));}

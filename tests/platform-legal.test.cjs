@@ -15,7 +15,7 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-15');assert.equal(p.effectiveAt,'2026-11-15');assert.equal(p.version,'2026-11-15.open.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-16');assert.equal(p.effectiveAt,'2026-11-16');assert.equal(p.version,'2026-11-16.caption.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -137,7 +137,7 @@ test('guide AI privacy notice distinguishes optional requests, provider retentio
 });
 test('privacy article 8 discloses Modusign as the e-contract processor (2026-11-12 ask-me)',()=>{
  const p=new LegalDocumentsService().catalog().documents.privacy;
- assert.equal(p.version,'2026-11-15.open.1');assert.equal(p.effectiveAt,'2026-11-15');assert.equal(p.status,'published');
+ assert.equal(p.version,'2026-11-16.caption.1');assert.equal(p.effectiveAt,'2026-11-16');assert.equal(p.status,'published');
  const s8=p.sections.find(s=>s.title==='8. 처리 위탁과 제3자 제공');
  assert.match(s8.body,/전자계약 체결·보관을 주식회사 모두싸인에 위탁/);
  assert.ok(s8.links.some(l=>l.href==='https://support.modusign.co.kr/ko/articles/9ae892d6'),'links to Modusign privacy policy');
@@ -179,7 +179,7 @@ test('2026-11-15 sync revision: article 11 states bean charge limits and article
 
 // 2026-11-15 user decision: signed-out AI photo trial is disclosed before it ships (section 17 + cookie note in section 10).
 test('privacy 2026-11-15.guest.1 discloses the signed-out AI photo trial: cookie, IP hash, limits, 24h public, claim, retention, transfer',async()=>{
- const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-15.open.1');
+ const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-16.caption.1');
  const guest=p.sections.find(s=>s.title==='17. 선택 기능: 비회원 AI 사진 체험');assert.ok(guest);
  for(const phrase of ['cf_guest','최대 30일','서버 보안키로 변환','감사 기록 기준(2년)','AI로 만든 사진만','브라우저당 10회','하루 10회','하루 200회','24시간','비공개','같은 브라우저','게시 후 30일','16항과 같습니다','동의'])assert.ok(guest.body.includes(phrase),phrase);
  assert.match(p.sections.find(s=>s.title==='10. 쿠키와 자동 수집').body,/cf_guest를 최대 30일/);
@@ -196,7 +196,7 @@ test('2026-11-15 open revision: signup open to adults, selling before the contra
  assert.match(by(t,'6. 크리에이터 수수료·정산·출금'),/파트너십 계약 전에도 멤버십 판매·후원 받기와 수익 적립/);
  assert.doesNotMatch(by(p,'13. 아동과 민감정보'),/초대 베타/);
  const guest=by(p,'17. 선택 기능: 비회원 AI 사진 체험');assert.doesNotMatch(guest,/되돌릴 수 없게/);assert.match(guest,/감사 기록/);
- const {GUEST_CONSENT_VERSION}=require('../dist/src/platform/guest');assert.equal(GUEST_CONSENT_VERSION,'2026-11-15.guest.2','consent text changed, so the consent version moved');
+ const {GUEST_CONSENT_VERSION}=require('../dist/src/platform/guest');assert.equal(GUEST_CONSENT_VERSION,'2026-11-16.guest.3','consent text changed, so the consent version moved');
 });
 
 // 2026-11-16 user decision: new memberships need the partnership contract; terms article 6 says so from the same day.
@@ -205,4 +205,13 @@ test('2026-11-16 membership revision: article 6 limits opening a membership to p
  assert.equal(t.version,'2026-11-16.membership.2');assert.equal(legal.catalog(new Date('2026-11-15T12:00:00+09:00')).documents.terms.version,'2026-11-15.open.1');
  assert.match(s6,/새 멤버십을 열거나 중지한 멤버십을 다시 여는 것도 파트너십 계약을 맺은 크리에이터만/);assert.match(s6,/이미 연 멤버십은 계약 전이라도 계속 판매/);assert.doesNotMatch(s6,/계약 전에도 멤버십 판매/);
  const {MEMBERSHIP_PARTNER_MESSAGE}=require('../dist/src/platform/partner-policy');assert.match(MEMBERSHIP_PARTNER_MESSAGE,/인증 배지/);
+});
+
+// 2026-11-16 user decision: guest trial titles/bodies written by AI at publish time from item names + request text only.
+test('privacy 2026-11-16.caption.1 discloses AI-written guest post title/body: inputs, no photo/IP, confirmation, from 11-16',()=>{
+ const legal=new LegalDocumentsService(),p=legal.catalog(new Date('2026-11-16T09:00:00+09:00')).documents.privacy,guest=p.sections.find(s=>s.title==='17. 선택 기능: 비회원 AI 사진 체험').body;
+ assert.equal(p.version,'2026-11-16.caption.1');assert.equal(p.effectiveAt,'2026-11-16');
+ assert.match(guest,/비워 둔 제목·본문 작성\(OpenAI\)/);assert.match(guest,/고른 편집 항목 이름과 직접 입력한 요청 문장만/);assert.match(guest,/사진·접속 IP·식별자는 보내지 않으며/);assert.match(guest,/게시 전에 방문자에게 보여 주고 확인/);
+ assert.match(p.notice,/2026년 11월 16일 개정/);
+ assert.equal(legal.catalog(new Date('2026-11-15T23:59:00+09:00')).documents.privacy.version,'2026-11-15.open.1');
 });
