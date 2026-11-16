@@ -181,6 +181,9 @@
 | PUT | `/api/v1/me/founding-badge` | `src/platform/controller.ts::badgeVisibility` |
 | GET | `/api/v1/me/handle-availability` | `src/platform/controller.ts::handleAvailability` |
 | POST | `/api/v1/me/inquiries` | `src/platform/controller.ts::inquiry` |
+| GET | `/api/v1/me/phone-verification` | `src/platform/beans.controller.ts::phoneStatus` |
+| POST | `/api/v1/me/phone-verification/confirm` | `src/platform/beans.controller.ts::phoneConfirm` |
+| POST | `/api/v1/me/phone-verification/start` | `src/platform/beans.controller.ts::phoneStart` |
 | PUT | `/api/v1/me/profile` | `src/platform/controller.ts::profile` |
 | PUT | `/api/v1/me/profile/photos` | `src/platform/controller.ts::profilePhotos` |
 | GET | `/api/v1/me/referral` | `src/platform/controller.ts::referral` |
@@ -467,8 +470,9 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261114140000_ai_shop`
 - `20261116090000_bank_transfer`
 - `20261116120000_ai_subscription`
+- `20261116190000_member_phone`
 
-## Prisma 전체 정의 (108 models · 15 enums)
+## Prisma 전체 정의 (110 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -2721,5 +2725,25 @@ model AiSubscriptionCharge {
  @@index([subscription_id, created_at])
  @@index([status, updated_at])
  @@map("ai_subscription_charges")
+}
+
+// 2026-11-16 user decision: phone-number ownership check (OCTOMO, MO SMS) before the promotion 100콩, one account per number.
+// Only a keyed hash of the number is stored; OCTOMO is an ownership check, not legal identity verification (no name, birth date, CI).
+model MemberPhone {
+  member_id   String   @id @db.VarChar(191)
+  phone_hash  String   @unique @db.VarChar(64)
+  verified_at DateTime @default(now())
+  @@map("member_phones")
+}
+
+model PhoneVerification {
+  id         String   @id @default(uuid())
+  member_id  String   @db.VarChar(191)
+  phone_hash String   @db.VarChar(64)
+  code       String   @db.VarChar(12)
+  expires_at DateTime
+  created_at DateTime @default(now())
+  @@index([member_id, created_at])
+  @@map("phone_verifications")
 }
 ```
