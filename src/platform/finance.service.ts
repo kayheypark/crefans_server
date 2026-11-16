@@ -24,6 +24,8 @@ import {clawBackReferralReward,qualifyReferralReward,requireBeanPayoutMember} fr
 import {isPartnerCreator,PARTNER_REQUIRED_MESSAGE,requirePartnerCreator,type PartnerCheck} from './partner-policy';
 export const nextMonth=(now:Date,anchor:Date=now)=>{const date=new Date(now),day=anchor.getUTCDate();date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+1);date.setUTCDate(Math.min(day,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()));return date;};
 const WITHDRAWAL_NOTE_MAX=191,MANUAL_REJECT_PREFIX='수동 이체 반려 · ';
+const CLOSING_PAYOUT_DAYS=30;
+const CLOSING_PAYOUT_MESSAGES:Record<string,string>={PARTNER_NOT_ENDED:'파트너 계약이 종료된 크리에이터만 종료 정산을 지급할 수 있습니다.',CLOSING_PAYOUT_NOT_DUE:'계약 종료 후 30일 협의 기간이 지나야 지급할 수 있습니다.',WITHDRAWAL_OPEN:'처리 중인 출금이 있습니다. 수동 지급 목록에서 먼저 마무리하세요.',NOTHING_TO_PAY:'지급할 확정 수익이 없습니다.',ACCOUNT_NOT_VERIFIED:'확인된 정산 계좌가 없습니다. 크리에이터에게 계좌 등록을 안내하세요.'};
 @Injectable()
 export class PlatformFinanceService {
  constructor(private service:PlatformService,private provider:PaymentProvider,private config:ConfigService,private bank:BankProvider){}
@@ -376,13 +378,38 @@ export class PlatformFinanceService {
   const result=input?.result,reference=text(input?.reference??'',100,false),reason=text(input?.reason??'',WITHDRAWAL_NOTE_MAX-MANUAL_REJECT_PREFIX.length,false),at=new Date(input?.transferredAt??now);
   if(!['paid','rejected'].includes(result)||(result==='paid'&&!reference)||(result==='rejected'&&!reason)||!Number.isFinite(at.getTime())||at>now)reject(400,'INVALID_MANUAL_RESULT','이체 결과·참조번호·이체 시각을 확인해주세요.');
   const first=await this.db.withdrawalRequest.findUnique({where:{id}});if(!first)reject(404,'WITHDRAWAL_NOT_FOUND','출금 신청을 찾을 수 없습니다.');
-  if(result==='paid')await requirePartnerCreator(this.db,first.creator_id);
+  if(result==='paid'&&!first.request_key.startsWith('closing:'))await requirePartnerCreator(this.db,first.creator_id);
   if(first.status==='requested')await this.payout(id,now,result==='paid'?'strict':'off');
   return this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${first.creator_id} FOR UPDATE`;const w=await tx.withdrawalRequest.findUniqueOrThrow({where:{id}});
    if(w.status!=='processing')reject(409,'WITHDRAWAL_NOT_PROCESSING','처리 중인 출금만 이체 결과를 기록할 수 있습니다.');
    await tx.withdrawalRequest.update({where:{id},data:{status:result,note:result==='paid'?`수동 이체 완료 · ${reference}`:MANUAL_REJECT_PREFIX+reason}});
    await this.audit(tx,'withdrawal.manual_result',id,{creatorId:w.creator_id,amount:w.amount,previousStatus:'processing',status:result,adminId:admin.id,reference:reference||null,transferredAt:at.toISOString(),reasonDigest:reason?reason.length:0});
    return{message:result==='paid'?'이체 완료를 기록했습니다.':'출금을 반려했습니다.'};});
+ }
+ // 2026-11-17 user decision (signed contract article 12(2)): when no agreement is reached within 30 days after the partnership
+ // ends, the company pays the confirmed unsettled membership revenue in full to the registered account. The operator starts it here:
+ // a 'processing' withdrawal (request key closing:) for the whole available balance, then reveals the account, transfers and
+ // records the result in the manual payout list like any other payout. It is the only payout allowed without the partner badge.
+ async closingPayoutState(creatorId:string,now=new Date(),tx:any=this.db){
+  const c=await tx.creator.findUnique({where:{user_id:creatorId},select:{is_verified:true}});if(!c)reject(404,'CREATOR_NOT_FOUND','크리에이터를 찾을 수 없습니다.');
+  // The verification audit is written only on a change, so for a creator without the badge the latest one is the removal.
+  const ended=c.is_verified?null:await tx.platformAuditLog.findFirst({where:{action:'admin.creator_verification_changed',entity_id:creatorId},orderBy:{occurred_at:'desc'},select:{occurred_at:true}});
+  const due=ended?new Date(+ended.occurred_at+CLOSING_PAYOUT_DAYS*86400000):null,f=await this.finance(creatorId,tx),s=f.summary;
+  const account=await tx.settlementAccount.findFirst({where:{creator_id:creatorId,verified:true},orderBy:[{is_default:'desc'},{created_at:'desc'}]});
+  const blocker=!ended?'PARTNER_NOT_ENDED':now<due!?'CLOSING_PAYOUT_NOT_DUE':s.requested>0?'WITHDRAWAL_OPEN':s.available<=0?'NOTHING_TO_PAY':!account?'ACCOUNT_NOT_VERIFIED':null;
+  return{endedAt:ended?.occurred_at??null,dueAt:due,amount:Math.max(0,s.available),pending:s.pending,requested:s.requested,account:account?this.accountView(account):null,accountRow:account,blocker};
+ }
+ async closingPayoutPreview(admin:any,creatorId:string,now=new Date()){requirePermission(admin,'revenue','create');const {accountRow,...state}=await this.closingPayoutState(creatorId,now);return{...state,message:state.blocker?CLOSING_PAYOUT_MESSAGES[state.blocker]:null};}
+ async startClosingPayout(admin:any,creatorId:string,input:any,now=new Date()){
+  if(!manualPayouts(this.config))reject(409,'MANUAL_PAYOUTS_DISABLED','수동 지급이 활성화되어 있지 않습니다.');requirePermission(admin,'revenue','create');
+  return this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${creatorId} FOR UPDATE`;
+   const s=await this.closingPayoutState(creatorId,now,tx);if(s.blocker)reject(409,s.blocker,CLOSING_PAYOUT_MESSAGES[s.blocker]);
+   // The operator confirms the amount shown in the console; a refund in between changes it and needs a fresh look.
+   if(input?.expectedAmount!==s.amount)reject(409,'AMOUNT_CHANGED','지급할 금액이 바뀌었습니다. 새로고침 후 다시 확인해주세요.');
+   const a=s.accountRow!,w=await tx.withdrawalRequest.create({data:{creator_id:creatorId,request_key:`closing:${creatorId}:${randomUUID()}`,account_id:a.id,account_label:`${a.bank} · •••• ${a.last_four}`,amount:s.amount,status:'processing',note:'종료 정산 지급(계약 제12조)'}});
+   await tx.memberNotification.create({data:{member_id:creatorId,type:'settlement',text:`파트너 계약 종료 후 30일 동안 합의가 없어 계약 제12조에 따라 확정된 미정산 멤버십 수익 ${s.amount.toLocaleString('ko-KR')}원을 등록한 정산 계좌(${a.bank} •••• ${a.last_four})로 보내 드려요. 이체가 끝나면 출금 내역에 지급 완료로 표시돼요.`.slice(0,191),path:'/studio/revenue'}});
+   await this.audit(tx,'withdrawal.closing_started',w.id,{creatorId,amount:s.amount,status:'processing',adminId:admin.id});
+   return{withdrawal:this.withdrawalView(w),message:'종료 정산 지급을 시작했습니다. 수동 지급 목록에서 계좌를 확인해 이체한 뒤 결과를 기록하세요.'};});
  }
  // A withdrawal requested before a refund that left the available balance negative can never pass payout() (PAYOUT_BALANCE_CHANGED);
  // the operator rejects it, the amount counts as available again and the creator may request anew (2026-11-07). Only that case,

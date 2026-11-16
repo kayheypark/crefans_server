@@ -176,5 +176,7 @@ await tx.memberNotification.create({data:{member_id:report.reporter_id,type:'mod
    await enqueueOperation(tx,'creator.partner_ended',{creatorId:id,status:'ended',dueAt:due.toISOString()},`creator.partner_ended:${id}:${dateOnly(new Date())}`,{unsettled,beans,owed,receivables:receivables.length});
   });
  }
+ @Get('creators/:id/closing-payout') @Permit(['revenue','create']) closingPayout(@Param('id') id:string,@Req() req:any){return this.finance.closingPayoutPreview(req.admin,id);}
+ @Post('creators/:id/closing-payout') @Permit(['revenue','create']) startClosingPayout(@Param('id') id:string,@Body() body:any,@Req() req:any){return this.finance.startClosingPayout(req.admin,id,body);}
  @Post('creators/:id/promotion') @Permit(['members','update']) async promotion(@Param('id') id:string,@Body('promoted') promoted:boolean,@Req() req:any){if(typeof promoted!=='boolean')reject(400,'INVALID_INPUT','광고 설정 값을 확인해주세요.');await this.service.db.$transaction(async tx=>{const before=await tx.creator.findUniqueOrThrow({where:{user_id:id}});await tx.creator.update({where:{user_id:id},data:{promoted}});await appendAudit(tx,{category:'admin',action:'admin.promotion_changed',entityId:id,data:auditChange(before,{promoted})});});return{message:'노출 설정을 저장했습니다.'};}
 }
