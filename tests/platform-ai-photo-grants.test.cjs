@@ -23,7 +23,7 @@ test('permissions: members.view lists, members.update grants and revokes; others
  assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+'a',reason:'권한 없음 QA'},'viewer')).status,403);
  assert.equal((await api('/admin/ai-photo-grants/'+creatorA,{reason:'권한 없음 QA'},'viewer','DELETE')).status,403);
  assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+'a',reason:'Origin 없음 QA'},'editor','POST',false)).status,403);
- assert.equal(await aiPhotoAllowed(db,creatorA),false);
+ assert.equal(await aiPhotoAllowed(db,creatorA),true,'2026-11-16: every member may use AI photo editing; grants are operator records only');
 });
 
 test('grant: handle normalized, reason required, inactive/unknown refused, duplicate 409, list shows who and why',async()=>{
@@ -32,7 +32,7 @@ test('grant: handle normalized, reason required, inactive/unknown refused, dupli
  assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+'missing',reason:'없음 QA'},'editor')).errorCode,'CREATOR_NOT_FOUND');
  const ok=await api('/admin/ai-photo-grants',{handle:' @'+(prefix+'a').toUpperCase()+' ',reason:'코스프레 시범 운영'},'editor');assert.equal(ok.status,201,JSON.stringify(ok));assert.equal(ok.data.creatorId,creatorA);
  assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+'a',reason:'중복 QA'},'editor')).errorCode,'ALREADY_GRANTED');
- assert.equal(await aiPhotoAllowed(db,creatorA),true);assert.equal(await aiPhotoAllowed(db,creatorB),false);
+ assert.equal(await aiPhotoAllowed(db,creatorA),true);assert.equal(await aiPhotoAllowed(db,creatorB),true,'2026-11-16: open to every member');
  const list=await api('/admin/ai-photo-grants?search='+prefix,undefined,'viewer');assert.equal(list.data.total,1);
  const row=list.data.items[0];assert.equal(row.handle,prefix+'a');assert.equal(row.reason,'코스프레 시범 운영');assert.equal(row.grantedByName,'AI 운영 QA editor');assert.ok(!('email'in row));
  assert.equal((await api('/admin/ai-photo-grants?search='+encodeURIComponent('코스프레 시범'),undefined,'viewer')).data.items.some(r=>r.creatorId===creatorA),true);
@@ -42,7 +42,7 @@ test('revoke: reason required, unknown 404, row removed, history and audit kept 
  assert.equal((await api('/admin/ai-photo-grants/'+creatorA,{reason:''},'editor','DELETE')).status,400);
  assert.equal((await api('/admin/ai-photo-grants/'+creatorB,{reason:'없는 허용 QA'},'editor','DELETE')).errorCode,'GRANT_NOT_FOUND');
  const r=await api('/admin/ai-photo-grants/'+creatorA,{reason:'시범 종료'},'editor','DELETE');assert.equal(r.status,200,JSON.stringify(r));
- assert.equal(await aiPhotoAllowed(db,creatorA),false);
+ assert.equal(await aiPhotoAllowed(db,creatorA),true,'2026-11-16: revoking a grant no longer closes the editor');
  const history=await api('/admin/ai-photo-grants/'+creatorA+'/history',undefined,'viewer');
  assert.deepEqual(history.data.items.map(i=>[i.action,i.reason,i.changedByName]),[['revoked','시범 종료','AI 운영 QA editor'],['granted','코스프레 시범 운영','AI 운영 QA editor']]);
  const audits=await db.platformAuditLog.findMany({where:{entity_id:creatorA},orderBy:{occurred_at:'asc'}});
@@ -56,7 +56,7 @@ test('quota reset: list shows today usage, per-creator and all reset need a reas
  const limiter=app.get(LocalMemberService),photos=app.get(AiPhotoService),charge=async(id,n)=>{for(let i=0;i<n;i++)await limiter.limit('ai-photo:creator-day:'+id,1000,86400);};
  const used=id=>photos['used']('ai-photo:creator-day:'+id),totalId=digest('ai-photo:total:'+Math.floor(Date.now()/86400000));
  try{
-  for(const h of ['a','b'])if(!await aiPhotoAllowed(db,h==='a'?creatorA:creatorB))assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+h,reason:'횟수 초기화 QA'},'editor')).status,201);
+  for(const h of ['a','b'])if(!await db.aiPhotoGrant.findUnique({where:{creator_user_id:h==='a'?creatorA:creatorB}}))assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+h,reason:'횟수 초기화 QA'},'editor')).status,201);
   await charge(creatorA,3);await limiter.limit('ai-photo:total',100000,86400);const totalBefore=(await db.authRateBucket.findUnique({where:{id:totalId}})).count;
   assert.equal(aiPhotoUsageId(creatorA),digest('ai-photo:creator-day:'+creatorA+':'+Math.floor(Date.now()/86400000)),'same bucket the service charges');
   const list=(await api('/admin/ai-photo-grants?search='+prefix,undefined,'viewer')).data,rowA=list.items.find(r=>r.creatorId===creatorA),rowB=list.items.find(r=>r.creatorId===creatorB);
@@ -90,7 +90,7 @@ test('reset tickets: grant/revoke with reasons, creator use clears today, oldest
  const used=id=>photos['used']('ai-photo:creator-day:'+id),totalId=digest('ai-photo:total:'+Math.floor(Date.now()/86400000));
  const tickets=id=>api('/admin/ai-photo-grants/'+id+'/tickets',undefined,'viewer');
  try{
-  for(const h of ['a','b'])if(!await aiPhotoAllowed(db,h==='a'?creatorA:creatorB))assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+h,reason:'리셋권 QA'},'editor')).status,201);
+  for(const h of ['a','b'])if(!await db.aiPhotoGrant.findUnique({where:{creator_user_id:h==='a'?creatorA:creatorB}}))assert.equal((await api('/admin/ai-photo-grants',{handle:prefix+h,reason:'리셋권 QA'},'editor')).status,201);
   assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/tickets',{quantity:2,reason:'권한 없음'},'viewer')).status,403);
   for(const quantity of [0,101,1.5,'x'])assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/tickets',{quantity,reason:'수량 QA'},'editor')).errorCode,'INVALID_QUANTITY',String(quantity));
   assert.equal((await api('/admin/ai-photo-grants/'+creatorA+'/tickets',{quantity:2,reason:''},'editor')).status,400);
@@ -120,7 +120,7 @@ test('reset tickets: grant/revoke with reasons, creator use clears today, oldest
   t=(await tickets(creatorA)).data;assert.equal(t.summary.count,0);assert.equal(t.items.find(i=>i.id===active.id).revokeReason,'지원 종료');
   await charge(creatorA,1);await assert.rejects(useAiPhotoTicket(db,creatorA),e=>e.getResponse().code==='NO_TICKET');
   // a creator who is not allow-listed cannot spend
-  await assert.rejects(useAiPhotoTicket(db,inactive),e=>e.getResponse().code==='AI_PHOTO_NOT_ALLOWED');
+  await assert.rejects(useAiPhotoTicket(db,inactive),e=>['NOTHING_TO_RESET','NO_TICKET'].includes(e.getResponse().code));// 2026-11-16: every member passes the editor check; a member without tickets has nothing to use
   const history=(await api('/admin/ai-photo-grants/'+creatorA+'/history',undefined,'viewer')).data.items.map(i=>i.action);
   for(const a of ['ticket_granted','ticket_used','ticket_revoked'])assert.ok(history.includes(a),a);
   const audits=await db.platformAuditLog.findMany({where:{entity_id:creatorA,action:{in:['admin.ai_photo_tickets_granted','admin.ai_photo_tickets_revoked','studio.ai_photo_ticket_used']}}});
