@@ -34,6 +34,8 @@ export class GuestService{
   await appendAudit(this.service.db,{category:'business',action:'guest.consented',entityId:id,data:{version:GUEST_CONSENT_VERSION}});
   return{active:true,consentVersion:GUEST_CONSENT_VERSION};
  }
+ // 2026-11-16 user decision: signing in no longer links trial posts by itself; the browser first asks. This counts what would move.
+ async claimable(member:string,req:any){await this.service.member(member);const id=guestFromRequest(req);if(!id)return{posts:0};return{posts:await this.service.db.posting.count({where:{user_sub:id,is_deleted:false}})};}
  // Moves this browser's guest posts and photos to the signed-in account. Posts already past 24 hours stay private (is_public=false).
  async claim(member:string,req:any,res:any){
   await this.service.member(member);const id=guestFromRequest(req);if(!id)return{claimed:0};
@@ -62,5 +64,6 @@ export class GuestController{
  @Post('content/:id') async editContent(@Req() req:any,@Param('id') postId:string,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('edit',id);return this.studio.updateGuestText(id,postId,body);}
  @Post('ai-photo/edit') @UseInterceptors(FileInterceptor('mask',{storage:memoryStorage(),limits:{fileSize:5*1024*1024,files:1}}))
  edit(@Req() req:any,@Body() body:any,@UploadedFile() mask:any){return this.photos.edit(this.guests.require(req),body,mask,{ipHash:this.guests.ipHash()});}
+ @Get('claim') @UseGuards(PlatformAuthGuard) claimable(@Req() req:any){return this.guests.claimable(req.user.sub,req);}
  @Post('claim') @UseGuards(PlatformAuthGuard) claim(@Req() req:any,@Res({passthrough:true}) res:any){return this.guests.claim(req.user.sub,req,res);}
 }

@@ -122,3 +122,10 @@ test('2026-11-16: the guest author edits only the title and body of their own po
  assert.equal((await db.posting.findUnique({where:{id:row.id}})).title,'새 제목');
  const routes=Reflect.getMetadataKeys?Object.getOwnPropertyNames(require('../dist/src/platform/guest').GuestController.prototype):[];assert.ok(!routes.some(n=>/delete/i.test(n)),'no guest delete route');
 });
+
+test('2026-11-16: before linking, the signed-in browser can count its trial posts; nothing moves until claim is called',async()=>{
+ const g=await startGuest();await studio.saveContent(g.id,post({title:'연동 전 '+tag}),{guest:true});
+ assert.deepEqual(await guestsService.claimable(member,g.req),{posts:1});
+ assert.equal(await db.posting.count({where:{user_sub:g.id}}),1,'counting moves nothing');
+ assert.deepEqual(await guestsService.claimable(member,browser().req),{posts:0},'a browser without a trial has nothing');
+});
