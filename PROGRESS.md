@@ -1,3 +1,13 @@
+## 2026-11-17 휴대폰 번호 콘솔 표시·검색, 비로그인 상점, 처리방침 phone.3 (feat/phone-console-shop, 운영 crefans-api:phone-20261117)
+- 사용자 결정(ask-me): 확인한 번호를 암호화 보관(AES-256-GCM, DATA_ENCRYPTION_KEY)+마스킹 표시, 전체 보기는 요청 시·감사 기록. 이전 확인분은 해시만 있어 '번호 미보관'. 검색은 010 번호를 해시로 비교해 이전 회원도 찾음.
+- 마이그레이션 20261117020000_member_phone_encrypted(member_phones.phone_encrypted, last_four). GET /admin/members/:id/phone(members.view, no-store, admin.member_phone_revealed). 목록 phone{masked,kept}.
+- 처리방침 2026-11-17.phone.3 즉시 시행: 4항 목적(회원 문의·부정 이용 확인)·암호화 보관·가림 표시·열람 기록, 7항 파기 문구. 프론트 휴대폰 확인 문구 '암호화해 안전하게 보관'.
+- GET /shop/products(로그인 없이): 공개 상품+구독형 판매 여부. 구매·주문·구독은 계속 로그인 필요.
+- 검증: phone-verification 5/5(대조: last_four 저장 끄면 실패), legal·openapi·ai-shop·admin-console/operators 통과. signup-mode 3건은 prod와 같은 기존 실패(로컬 dev DB 마이그레이션 누락).
+- 배포: API(DB 덤프·복구 보관 20261117/phone-api), 프론트 front-phone-20261117, 콘솔 crefans-admin:phone-20261117. 운영 확인: /shop/products 6개, 처리방침 phone.3, 관리자 번호 경로 401.
+- 심사용 계정: .local/review-account-20261117(crefans_server-member-posts)에 생성 스크립트 준비(비밀번호는 사용자가 직접 입력, 로컬 e2e DB에서 생성·중복·짧은 비밀번호 거부 확인). 운영 생성은 사용자 실행 대기.
+- 이니시스 심사 PDF: 단건·빌링 모두 결제창 전(구매 확인·구독 신청 확인)까지만 캡처(사용자 결정). 순정 코드에 이니시스 표준결제창(단건) 없음, 빌링 INILite 테스트 키 비공개.
+
 ## 2026-11-17 종료 정산 지급 (feat/closing-payout, 운영 배포 crefans-api:closing-20261117)
 - 사용자 결정(ask-me): 계약 12조② — 파트너 종료 후 30일 내 합의가 없으면 확정 미정산 수익 전액을 등록 계좌로 지급. 운영자가 콘솔에서 시작한다.
 - GET/POST /admin/creators/:id/closing-payout(revenue.create, POST는 MANUAL_PAYOUTS_ENABLED). 종료일은 배지 해제 감사 기록(admin.creator_verification_changed)에서 계산(새 칸·마이그레이션 없음). 조건: 배지 없음·30일 경과·처리 중 출금 없음·출금 가능액>0·확인 계좌. expectedAmount가 화면 금액과 달라지면 409.
