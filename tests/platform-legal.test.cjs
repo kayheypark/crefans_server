@@ -15,7 +15,7 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-16');assert.equal(p.effectiveAt,'2026-11-16');assert.equal(p.version,'2026-11-16.prompt.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-16');assert.equal(p.effectiveAt,'2026-11-16');assert.equal(p.version,'2026-11-16.sub.1');assert.match(JSON.stringify(p),/16\. 선택 기능: 스튜디오 AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -91,7 +91,7 @@ test('2026-11-11 payout revision: article 6 states the company transfer from the
 test('2026-11-13 partner revision: article 6 limits withdrawals to partner creators and keeps the account/PIN and hold rules',()=>{
  const legal=new LegalDocumentsService(),{PARTNER_TERMS_DATE}=require('../dist/src/platform/legal-documents');assert.equal(PARTNER_TERMS_DATE,'2026-11-13');
  const before=legal.catalog(new Date('2026-11-12T23:59:00+09:00')).documents.terms,after=legal.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;
- assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-16.bank.1');
+ assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-16.sub.1');
  const six=after.sections.find(s=>s.title==='6. 크리에이터 수수료·정산·출금').body;
  assert.match(six,/파트너십 계약을 맺은 크리에이터\(프로필에 인증 배지 표시\)만 신청할 수 있습니다/);assert.match(six,/정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다/);
  assert.match(six,/인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다/);assert.match(six,/출금에는 본인 명의 정산 계좌의 확인과 별도 출금 인증이 필요합니다/);
@@ -137,7 +137,7 @@ test('guide AI privacy notice distinguishes optional requests, provider retentio
 });
 test('privacy article 8 discloses Modusign as the e-contract processor (2026-11-12 ask-me)',()=>{
  const p=new LegalDocumentsService().catalog().documents.privacy;
- assert.equal(p.version,'2026-11-16.prompt.1');assert.equal(p.effectiveAt,'2026-11-16');assert.equal(p.status,'published');
+ assert.equal(p.version,'2026-11-16.sub.1');assert.equal(p.effectiveAt,'2026-11-16');assert.equal(p.status,'published');
  const s8=p.sections.find(s=>s.title==='8. 처리 위탁과 제3자 제공');
  assert.match(s8.body,/전자계약 체결·보관을 주식회사 모두싸인에 위탁/);
  assert.ok(s8.links.some(l=>l.href==='https://support.modusign.co.kr/ko/articles/9ae892d6'),'links to Modusign privacy policy');
@@ -179,7 +179,7 @@ test('2026-11-15 sync revision: article 11 states bean charge limits and article
 
 // 2026-11-15 user decision: signed-out AI photo trial is disclosed before it ships (section 17 + cookie note in section 10).
 test('privacy 2026-11-15.guest.1 discloses the signed-out AI photo trial: cookie, IP hash, limits, 24h public, claim, retention, transfer',async()=>{
- const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-16.prompt.1');
+ const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-16.sub.1');
  const guest=p.sections.find(s=>s.title==='17. 선택 기능: 비회원 AI 사진 체험');assert.ok(guest);
  for(const phrase of ['cf_guest','최대 30일','서버 보안키로 변환','감사 기록 기준(2년)','AI로 만든 사진만','브라우저당 10회','하루 10회','하루 200회','24시간','비공개','같은 브라우저','게시 후 30일','16항과 같습니다','동의'])assert.ok(guest.body.includes(phrase),phrase);
  assert.match(p.sections.find(s=>s.title==='10. 쿠키와 자동 수집').body,/cf_guest를 최대 30일/);
@@ -202,7 +202,7 @@ test('2026-11-15 open revision: signup open to adults, selling before the contra
 // 2026-11-16 user decision: new memberships need the partnership contract; terms article 6 says so from the same day.
 test('2026-11-16 membership revision: article 6 limits opening a membership to partners and keeps existing ones',()=>{
  const legal=new LegalDocumentsService(),t=legal.catalog(new Date('2026-11-16T09:00:00+09:00')).documents.terms,s6=t.sections.find(s=>s.title==='6. 크리에이터 수수료·정산·출금').body;
- assert.equal(t.version,'2026-11-16.bank.1');assert.equal(legal.catalog(new Date('2026-11-15T12:00:00+09:00')).documents.terms.version,'2026-11-15.open.1');
+ assert.equal(t.version,'2026-11-16.sub.1');assert.equal(legal.catalog(new Date('2026-11-15T12:00:00+09:00')).documents.terms.version,'2026-11-15.open.1');
  assert.match(s6,/새 멤버십을 열거나 중지한 멤버십을 다시 여는 것도 파트너십 계약을 맺은 크리에이터만/);assert.match(s6,/이미 연 멤버십은 계약 전이라도 계속 판매/);assert.doesNotMatch(s6,/계약 전에도 멤버십 판매/);
  const {MEMBERSHIP_PARTNER_MESSAGE}=require('../dist/src/platform/partner-policy');assert.match(MEMBERSHIP_PARTNER_MESSAGE,/인증 배지/);
 });
@@ -211,7 +211,7 @@ test('2026-11-16 membership revision: article 6 limits opening a membership to p
 // only), and bank transfer (무통장입금) for beans, AI 이용권 and advertising with account refunds within 3 business days.
 test('2026-11-16 bank.1: bank transfer terms and privacy, guest caption button wording, effective the same day',()=>{
  const legal=new LegalDocumentsService(),c=legal.catalog(new Date('2026-11-16T09:00:00+09:00')),t=c.documents.terms,p=c.documents.privacy,by=(d,start)=>d.sections.find(s=>s.title.startsWith(start)).body;
- assert.equal(t.version,'2026-11-16.bank.1');assert.equal(p.version,'2026-11-16.prompt.1');assert.equal(t.effectiveAt,'2026-11-16');assert.equal(p.effectiveAt,'2026-11-16');
+ assert.equal(t.version,'2026-11-16.sub.1');assert.equal(p.version,'2026-11-16.sub.1');assert.equal(t.effectiveAt,'2026-11-16');assert.equal(p.effectiveAt,'2026-11-16');
  const pay=by(t,'4. ');assert.match(pay,/베타에서 카드 결제로는 실제 청구를 하지 않습니다/);assert.doesNotMatch(pay,/베타에서는 실제 청구를 하지 않습니다/);assert.match(pay,/무통장입금/);assert.match(pay,/주문 후 24시간/);assert.match(pay,/자동으로 취소/);assert.match(pay,/현금영수증/);assert.match(pay,/광고상품은 사용을 시작하기 전이면 전액 환불/);
  assert.match(by(t,'5. '),/3영업일 이내에 이체/);
  assert.match(by(p,'4. '),/입금자명/);assert.match(by(p,'4. '),/계좌번호와 예금주는 암호화/);assert.match(by(p,'7. '),/무통장입금 주문·입금 확인·현금영수증·환불 이체 기록 포함/);assert.match(by(p,'8. '),/국세청에 제공/);
@@ -222,6 +222,16 @@ test('2026-11-16 bank.1: bank transfer terms and privacy, guest caption button w
 // 2026-11-16 user decision: successful AI photo prompts are kept like failures (encrypted, 30 days).
 test('2026-11-16 prompt.1: privacy keeps AI photo request prompts for successes and failures for 30 days, guest section points to it',()=>{
  const p=new LegalDocumentsService().catalog(new Date('2026-11-16T12:00:00+09:00')).documents.privacy,by=start=>p.sections.find(s=>s.title.startsWith(start)).body;
- assert.equal(p.version,'2026-11-16.prompt.1');assert.match(by('7. '),/성공·실패와 관계없이/);assert.match(by('7. '),/요청 시점부터 30일/);assert.doesNotMatch(by('7. '),/실패한 요청의 질문 내용/);
+ assert.equal(p.version,'2026-11-16.sub.1');assert.match(by('7. '),/성공·실패와 관계없이/);assert.match(by('7. '),/요청 시점부터 30일/);assert.doesNotMatch(by('7. '),/실패한 요청의 질문 내용/);
  assert.match(by('17. '),/요청 문구와 선택 옵션은 7항에 따라 암호화해 30일 보관/);assert.match(by('4. '),/무통장입금/,'keeps the bank.1 changes');
+});
+
+test('2026-11-16 sub.1: terms describe AI 이용권 구독형 billing rules and privacy names KG이니시스 billing without card numbers',()=>{
+ const c=new LegalDocumentsService().catalog(new Date('2026-11-16T12:00:00+09:00')),t=c.documents.terms,p=c.documents.privacy;
+ assert.equal(t.version,'2026-11-16.sub.1');assert.equal(p.version,'2026-11-16.sub.1');
+ const s13=t.sections.find(sec=>sec.title==='13. 스튜디오 AI 사진 편집과 AI 이용권').body;
+ for(const re of [/매달 같은 날/,/이월되지 않습니다/,/24시간 간격으로 3번/,/해지를 예약/,/1회 단가\(월 금액 ÷ 월 횟수\)/,/계약이 확정된 뒤 시작/])assert.match(s13,re);
+ const by=prefix=>p.sections.find(sec=>sec.title.startsWith(prefix)).body;
+ assert.match(by('4. '),/빌링키\(암호화 보관\)/);assert.match(by('4. '),/회사는 받거나 저장하지 않습니다/);assert.match(by('8. '),/KG이니시스 빌링을 이용할 예정/);
+ assert.match(by('7. '),/성공·실패와 관계없이/,'the prompt.1 revision is kept');
 });

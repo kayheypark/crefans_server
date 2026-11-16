@@ -1,3 +1,11 @@
+## 2026-11-16 AI 이용권 구독형(KG이니시스 빌링) + 성공 요청 기록 병합 (feat/ai-subscription, origin/prod 6373ed5 기반, 미배포)
+- 사용자 결정: 빌링=AI 이용권 구독형, 단건=AI 이용권 횟수형(이니시스 증빙심사 취지). 3단계 구독·3종 횟수형, 1회 단가 정수·98원 하한(AI_SHOP_MIN_UNIT_KRW). 상품안: 구독 9,900/66·19,800/150·39,600/330, 횟수형 1,900/10·4,800/30·15,900/100(운영 등록 승인됨).
+- 서버: ai-subscription.ts(첫 달 즉시·매달 같은 날 갱신·이월 없음·24h×3 재시도·해지 예약·남은 횟수×단가 부분취소), inicis-billing.ts(v1 billing/refund 해시, 빌키 복호화 미확인 → INICIS_BILLKEY_DECRYPT_CONFIRMED 전 unavailable), 구독 주문 단건환불 차단(SUBSCRIPTION_ORDER), openapi 270.
+- feat/ai-request-log(성공 요청 30일 암호화 보관) 병합. 법률문서 2026-11-16.sub.1: 약관 13조 구독형 규칙, 처리방침 4항(빌링키 암호화·카드번호 미보관)·8항(KG이니시스 빌링 이용 예정), prompt.1 내용 유지. 비회원 동의 guest.5(17항 변경분, request-log).
+- 사용자 지시(16:5x): 카드/빌링 진입 버튼은 활성으로 두고 클릭 시 기존 커스텀 알림으로 '점검 중입니다' 표시(프론트). 약관에는 '계약 확정 후 시작, 그 전에는 신청할 수 없음'으로 사실대로 기재.
+- 검증: tsc 0, 테스트 ai-subscription 5·ai-shop 7(11-15부터 깨진 대역에 member() 추가)·bank-transfer 7·ai-photo 39·legal 27·openapi 14·guest-caption 6·guest 8 통과. 대조: 98원 하한 제거→실패, 재시도 상한 변경→실패, 처리방침 문구 제거→실패. 실제 이니시스 호출은 미검증.
+- 남은 일: 이니시스 카드 등록 창 반환(billing-return) 처리와 빌키 복호화는 계약 MID 규격 확인 후 구현.
+
 ## 2026-11-16 파트너 계약 종료 = 멤버십 판매 중지, AI 이용권 명칭 (/pilot-work, feat/partner-sync)
 - 결정: 계약서 12조②(종료 시 신규 판매·갱신 중단)에 코드를 맞춤, 나머지 불일치 수정·배포, 'AI 이용권' 통일.
 - 코드: admin.controller verification에서 배지 true→false 시 판매 중 멤버십 is_active=false(감사 membershipsPaused, 응답 메시지). 기존 구독은 결제 기간까지, 갱신 작업이 비활성 멤버십 갱신을 멈추고 구독자에게 'unavailable' 안내(기존 finance.service 갱신 분기). 배지 부여는 자동 재개하지 않음.
