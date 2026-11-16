@@ -13,6 +13,7 @@ export const ADMIN_MENUS={
  content:['view','create','update'],
  revenue:['view','create'],
  beans:['view','create','update'],
+ deposits:['view','update'],
  support:['view','create','update'],
  settings:['view','update'],
  logs:['view'],

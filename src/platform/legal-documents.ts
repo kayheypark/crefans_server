@@ -237,12 +237,39 @@ const captionPrivacy:LegalDocument={...captionPrivacyBase,version:'2026-11-16.ca
  sections:captionPrivacyBase.sections.map(sec=>{if(sec.title!=='17. 선택 기능: 비회원 AI 사진 체험')return sec;if(!sec.body.includes(CAPTION_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);
   return{...sec,body:sec.body.replace(CAPTION_FROM,CAPTION_TO).replace('체험 게시물 게시, 같은 브라우저로','체험 게시물 게시와 비워 둔 제목·본문 작성, 같은 브라우저로')};})};
 const captionCatalog:LegalCatalog={...membershipCatalog2,documents:{...membershipCatalog2.documents,privacy:captionPrivacy}};
+// 2026-11-16 user decisions: bank transfer (무통장입금) for beans, AI 이용권 and advertising, effective on the deploy day (a new optional
+// payment method; card terms unchanged). Same day the guest trial caption moved to an explicit 'AI로 내용 작성' button.
+export const BANK_TRANSFER_DATE='2026-11-16';
+const BANK_TERMS_FROM='현재 베타의 결제 연동은 테스트 환경이며 실제 청구가 이루어지는 운영 결제와 구분합니다. 베타에서는 실제 청구를 하지 않습니다.';
+const BANK_TERMS_TO='현재 베타의 카드 결제 연동은 테스트 환경이며 실제 청구가 이루어지는 운영 결제와 구분합니다. 베타에서 카드 결제로는 실제 청구를 하지 않습니다. 아래 무통장입금은 실제 대금이 오가는 결제입니다.';
+const BANK_TERMS_ADD='\n무통장입금: 콩 충전, AI 이용권, 광고상품은 회사 계좌로 직접 입금하는 무통장입금으로 구매할 수 있습니다. 주문하면 입금 계좌, 금액, 입금자명과 입금 기한(주문 후 24시간)이 표시되며, 주문 금액과 같은 금액이 입금된 것을 회사가 확인한 때 결제가 완료되어 콩 지급, AI 이용권 사용, 광고 사용이 가능해집니다. 기한까지 입금이 확인되지 않으면 주문은 자동으로 취소됩니다. 입금액이나 입금자명이 주문과 다르면 회사가 연락해 확인하며 확인 전에는 지급하지 않고, 기한이 지난 뒤 들어왔거나 주문과 다른 금액으로 들어온 돈은 확인 후 돌려드립니다. 현금영수증은 주문할 때 휴대폰 번호(소득공제) 또는 사업자등록번호(지출증빙)로 신청할 수 있으며 회사가 입금 확인 후 발급합니다. 광고상품은 사용을 시작하기 전이면 전액 환불을 요청할 수 있습니다.';
+const BANK_REFUND_FROM='승인된 환불은 원래 결제수단을 통해 처리하며, 카드사 반영 시점은 결제 취소 완료 시점과 다를 수 있습니다.';
+const BANK_REFUND_TO=BANK_REFUND_FROM+' 무통장입금으로 결제한 금액은 회원이 환불 신청 때 알려 준 계좌로 회사가 직접 이체하며, 환불 신청(청약철회 포함)을 받은 날부터 3영업일 이내에 이체합니다. 이체가 늦어지면 관련 법령에 따른 지연배상금을 함께 지급합니다.';
+const bankTerms:LegalDocument={...membershipTerms2,version:'2026-11-16.bank.1',
+ notice:membershipTerms2.notice+' 같은 날 추가 개정: 제4조에 콩·AI 이용권·광고상품의 무통장입금(24시간 입금 기한, 회사 확인 후 결제 완료, 현금영수증 신청)과 광고상품 사용 전 환불을, 제5조에 무통장입금 결제분의 계좌 환불(3영업일 이내)을 적었습니다. 카드 결제 조건은 바뀌지 않습니다.',
+ sections:membershipTerms2.sections.map(sec=>{if(sec.title.startsWith('4. ')){if(!sec.body.includes(BANK_TERMS_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(BANK_TERMS_FROM,BANK_TERMS_TO)+BANK_TERMS_ADD};}
+  if(sec.title.startsWith('5. ')){if(!sec.body.includes(BANK_REFUND_FROM))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(BANK_REFUND_FROM,BANK_REFUND_TO)};}return sec;})};
+const BANK_PRIVACY_PAY='\n무통장입금으로 결제하면 입금자명, 주문 금액, 입금 확인 시각·확인한 운영자·거래 메모를 처리합니다. 현금영수증을 신청하면 휴대폰 번호 또는 사업자등록번호를 암호화해 보관하고 국세청 현금영수증 발급에만 쓰며, 발급 결과를 기록합니다. 무통장입금 결제분을 환불받을 때에는 환불 계좌의 은행명, 계좌번호와 예금주를 받아 계좌번호와 예금주는 암호화해 보관하고, 운영자가 이체할 때에만 열람하며 열람 기록을 남깁니다.';
+const BANK_RETENTION_FROM='계약·청약철회 기록과 대금결제·공급 기록은 전자상거래법 시행령 제6조에 따라 각각 5년';
+const BANK_RETENTION_TO='계약·청약철회 기록과 대금결제·공급 기록(무통장입금 주문·입금 확인·현금영수증·환불 이체 기록 포함)은 전자상거래법 시행령 제6조에 따라 각각 5년';
+const BANK_PROVIDER_FROM='결제 등록과 자동결제는 토스페이먼츠 테스트 연동을 사용합니다.';
+const BANK_PROVIDER_TO=BANK_PROVIDER_FROM+' 무통장입금은 결제대행사를 거치지 않고 회사 계좌로 직접 받으며, 현금영수증을 신청하면 발급을 위해 신청 번호와 거래 금액·일시를 국세청에 제공합니다(소득세법 제162조의3).';
+const CAPTION_BUTTON_EDITS:[string,string][]=[['체험 게시물 게시와 비워 둔 제목·본문 작성','체험 게시물 게시와 요청할 때 제목·본문 작성'],['게시할 때 비워 둔 제목·본문 작성(OpenAI)에 씁니다.',"AI 사진을 만든 뒤 'AI로 내용 작성'을 누를 때 제목·본문 작성(OpenAI)에 씁니다."],['작성된 글은 게시 전에 방문자에게 보여 주고 확인을 받습니다','작성된 글은 제목·본문 칸에 채워지고 방문자가 고친 뒤 게시합니다']];
+const bankPrivacy:LegalDocument={...captionPrivacy,version:'2026-11-16.bank.1',
+ notice:captionPrivacy.notice+" 같은 날 추가 개정: 4항에 무통장입금(입금자명, 현금영수증 번호, 환불 계좌의 암호화 보관)을, 7항에 그 기록의 보존 기간을, 8항에 국세청 현금영수증 제공을 적고, 17항의 체험 제목·본문 작성을 'AI로 내용 작성' 버튼을 누를 때로 바로잡았습니다.",
+ sections:captionPrivacy.sections.map(sec=>{const need=(from:string)=>{if(!sec.body.includes(from))throw Error(`Legal revision anchor missing in ${sec.title}`);};
+  if(sec.title.startsWith('4. '))return{...sec,body:sec.body+BANK_PRIVACY_PAY};
+  if(sec.title.startsWith('7. ')){need(BANK_RETENTION_FROM);return{...sec,body:sec.body.replace(BANK_RETENTION_FROM,BANK_RETENTION_TO)};}
+  if(sec.title.startsWith('8. ')){need(BANK_PROVIDER_FROM);return{...sec,body:sec.body.replace(BANK_PROVIDER_FROM,BANK_PROVIDER_TO)};}
+  if(sec.title==='17. 선택 기능: 비회원 AI 사진 체험'){let body=sec.body;for(const[from,to]of CAPTION_BUTTON_EDITS){need(from);body=body.replace(from,to);}return{...sec,body};}
+  return sec;})};
+const bankCatalog:LegalCatalog={...captionCatalog,documents:{...captionCatalog.documents,terms:bankTerms,privacy:bankPrivacy}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BANK_TRANSFER_DATE?bankCatalog:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

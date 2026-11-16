@@ -6,9 +6,13 @@ import {Permit} from './admin-permissions';
 import {adProductView,saveAdProduct,deleteAdProduct} from './advertising-catalog';
 import {reject} from './http';
 import {listAdPurchases,activateAdPurchase} from './advertising-use';
+import {AdvertisingPurchaseService} from './advertising-purchase';
 @Controller('studio/advertising') @UseGuards(PlatformAuthGuard)
 export class AdvertisingController {
- constructor(private service:PlatformService){}
+ constructor(private service:PlatformService,private purchases:AdvertisingPurchaseService){}
+ // 2026-11-16: purchase by bank transfer (deposit confirmed by an operator) and refund of a purchase not yet started.
+ @Post('orders') create(@Req() req:any,@Body() body:any){return this.purchases.create(req.user.sub,body);}
+ @Post('orders/:id/refund') refund(@Req() req:any,@Param('id') id:string,@Body() body:any){return this.purchases.refund(req.user.sub,id,body);}
  @Get('orders') async orders(@Req() req:any){await this.service.requireCreator(req.user.sub);return listAdPurchases(this.service.db,req.user.sub);}
  @Post('orders/:id/use') async use(@Req() req:any,@Param('id') id:string){return activateAdPurchase(this.service.db,req.user.sub,id);}
  @Get('products') async products(@Req() req:any){await this.service.requireCreator(req.user.sub);return(await this.service.db.adProduct.findMany({where:{deleted_at:null,visible:true},orderBy:[{sort_order:'asc'},{id:'asc'}],take:100})).map(adProductView);}

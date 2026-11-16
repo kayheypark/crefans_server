@@ -720,3 +720,30 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 | POST | /guest/content/caption | 비워 둔 제목·본문 AI 작성(고른 항목 이름·요청 문장만 OpenAI 전송, 입력·결과 유해성 검사, 실패·한도 초과 시 정해진 문장, 방문자당 하루 30회). 방문자가 확인한 뒤 /guest/content로 게시 |
 | POST | /guest/claim | 로그인 회원에게 같은 브라우저의 체험 게시물·사진 연결 |
 | POST | /studio/partner-request | 파트너 계약 요청(하루 1회, 운영 알림) |
+
+## 무통장입금 — 2026-11-16 (콩·AI 이용권·광고상품)
+
+사용자 결정: 무통장입금은 콩 충전·AI 이용권·광고상품에 연다(멤버십은 기존 카드). 입금 기한 24시간 후 자동 취소, 주문 금액과 같은 입금만 운영자가 확인, 현금영수증은 주문 때 선택 신청(휴대폰 번호/사업자번호, 암호화), 무통장입금 결제분 환불은 회원이 준 계좌로 운영자가 3영업일 이내 이체(계좌·예금주 암호화). 운영자가 콘솔에서 입금 계좌를 저장·사용 설정하기 전에는 주문 불가(BANK_TRANSFER_UNAVAILABLE). 카드(PG) 선택지는 실결제(LIVE_PAYMENTS_ENABLED)일 때만 `payments/methods.card=true`.
+구조: `src/platform/bank-transfer.ts`(BankTransferService: 계좌·입금 대기·만료·현금영수증·수동 환불, 상품별 handler 등록), `bank-transfer.controller.ts`, 상품 handler는 beans.service(environment `bank`, 확인 시 대사 완료·출금 가능 원천), ai-shop(environment `bank`, 30분 만료 제외), advertising-purchase.ts. 워커 `bank-transfer-expiry`가 기한 지난 주문 취소. 콘솔 메뉴 권한 `deposits`(view·update).
+
+| Method | 경로 | 동작 |
+| --- | --- | --- |
+| GET | /payments/methods | 결제 방식(bankTransfer, card, 기한 24시간, 환불 3영업일) |
+| GET | /payments/bank-transfer/:kind/:orderId | 본인 주문 입금 안내(계좌·금액·입금자명·기한·상태) |
+| POST | /beans/charges | method=bank_transfer + depositorName(+cashReceipt) 시 24시간 입금 대기 |
+| POST | /beans/charges/:id/refund | 무통장입금 충전은 refundAccount 필수, 운영자 이체 후 완료 |
+| POST | /studio/shop/orders | method=bank_transfer 시 입금 대기, 확인 시점부터 유효기간 |
+| POST | /studio/shop/orders/:id/refund | 무통장입금 주문은 refundAccount 필수, refunding → refunded |
+| POST | /studio/advertising/orders | 광고상품 무통장입금 주문(크리에이터, 입금 대기 3건 한도) |
+| POST | /studio/advertising/orders/:id/refund | 사용 전 무통장입금 구매 전액 환불 신청 |
+| GET/PUT | /admin/bank-transfer/account | 입금 계좌 조회·저장(감사 기록은 끝 4자리) |
+| GET | /admin/bank-transfer/payments | 입금 대기·내역(status, page) |
+| POST | /admin/bank-transfer/payments/:id/confirm | 금액 일치 시 입금 확인·같은 트랜잭션에서 지급 |
+| POST | /admin/bank-transfer/payments/:id/cancel | 입금 전 주문 취소 |
+| POST | /admin/bank-transfer/payments/:id/cash-receipt/reveal | 현금영수증 번호 보기(감사) |
+| POST | /admin/bank-transfer/payments/:id/cash-receipt | 현금영수증 발급 기록 |
+| GET | /admin/bank-transfer/refunds | 환불 이체 목록(기한순) |
+| POST | /admin/bank-transfer/refunds/:id/account/reveal | 환불 계좌 보기(감사) |
+| POST | /admin/bank-transfer/refunds/:id/complete | 이체 완료 기록 |
+| POST | /admin/bank-transfer/refunds/:id/reject | 환불 반려(구매 복원) |
+

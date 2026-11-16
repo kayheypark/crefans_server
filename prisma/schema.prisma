@@ -1974,6 +1974,10 @@ model AdPurchase {
  id String @id @default(uuid())
  creator_id String @db.VarChar(191)
  product_id String @db.VarChar(191)
+ request_key String? @unique @db.VarChar(100)
+ payment_method String? @db.VarChar(20)
+ refund_amount Int?
+ refunded_at DateTime?
  name String @db.VarChar(100)
  terms String @db.Text
  amount Int
@@ -2129,4 +2133,69 @@ model AiHeartUse {
  user_id String @db.VarChar(191)
  status String @default("reserved") @db.VarChar(20)
  @@map("ai_heart_uses")
+}
+
+// 2026-11-16 user decision: bank transfer (무통장입금) for beans, AI 이용권 and advertising, confirmed by an operator.
+// One row per company receiving account (id 'default'); the operator enters it in the console. Shown to buyers.
+model BankTransferAccount {
+ id String @id @db.VarChar(20)
+ bank_name String @db.VarChar(40)
+ account_number String @db.VarChar(40)
+ holder String @db.VarChar(40)
+ enabled Boolean @default(true)
+ updated_by String @db.VarChar(191)
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@map("bank_transfer_accounts")
+}
+// An order waiting for (or settled by) a deposit. kind+order_id points at bean_charges / ai_shop_orders / ad_purchases.
+model BankTransferPayment {
+ id String @id @default(uuid())
+ kind String @db.VarChar(20)
+ order_id String @db.VarChar(191)
+ member_id String @db.VarChar(191)
+ amount Int
+ depositor_name String @db.VarChar(40)
+ account_snapshot Json
+ cash_receipt_type String? @db.VarChar(10)
+ cash_receipt_number_encrypted String? @db.Text
+ cash_receipt_issued_at DateTime?
+ cash_receipt_reference String? @db.VarChar(191)
+ status String @default("awaiting") @db.VarChar(20)
+ expires_at DateTime
+ received_at DateTime?
+ deposit_reference String? @db.VarChar(191)
+ confirmed_at DateTime?
+ confirmed_by String? @db.VarChar(191)
+ cancel_reason String? @db.VarChar(200)
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@unique([kind, order_id])
+ @@index([status, expires_at])
+ @@index([member_id, created_at])
+ @@map("bank_transfer_payments")
+}
+// A refund the operator pays by account transfer (bank-transfer purchases). refund_id is the product refund row (bean_refunds id
+// or the order id for AI 이용권 / advertising). The refund account is encrypted (safety measures standard art. 7(2)6).
+model ManualRefund {
+ id String @id @default(uuid())
+ kind String @db.VarChar(20)
+ refund_id String @db.VarChar(191)
+ order_id String @db.VarChar(191)
+ member_id String @db.VarChar(191)
+ amount Int
+ bank_name String @db.VarChar(40)
+ account_encrypted String @db.Text
+ holder_encrypted String @db.Text
+ status String @default("requested") @db.VarChar(20)
+ due_at DateTime
+ completed_at DateTime?
+ transfer_reference String? @db.VarChar(191)
+ reject_reason String? @db.VarChar(200)
+ actor_id String? @db.VarChar(191)
+ created_at DateTime @default(now())
+ updated_at DateTime @updatedAt
+ @@unique([kind, refund_id])
+ @@index([status, due_at])
+ @@map("manual_refunds")
 }

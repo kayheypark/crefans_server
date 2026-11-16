@@ -22,6 +22,17 @@
 | POST | `/api/v1/admin/auth/login` | `src/platform/admin-auth.ts::login` |
 | POST | `/api/v1/admin/auth/logout` | `src/platform/admin-auth.ts::logout` |
 | POST | `/api/v1/admin/auth/refresh` | `src/platform/admin-auth.ts::refresh` |
+| GET | `/api/v1/admin/bank-transfer/account` | `src/platform/bank-transfer.controller.ts::account` |
+| PUT | `/api/v1/admin/bank-transfer/account` | `src/platform/bank-transfer.controller.ts::saveAccount` |
+| GET | `/api/v1/admin/bank-transfer/payments` | `src/platform/bank-transfer.controller.ts::list` |
+| POST | `/api/v1/admin/bank-transfer/payments/:id/cancel` | `src/platform/bank-transfer.controller.ts::cancel` |
+| POST | `/api/v1/admin/bank-transfer/payments/:id/cash-receipt` | `src/platform/bank-transfer.controller.ts::cashReceipt` |
+| POST | `/api/v1/admin/bank-transfer/payments/:id/cash-receipt/reveal` | `src/platform/bank-transfer.controller.ts::reveal` |
+| POST | `/api/v1/admin/bank-transfer/payments/:id/confirm` | `src/platform/bank-transfer.controller.ts::confirm` |
+| GET | `/api/v1/admin/bank-transfer/refunds` | `src/platform/bank-transfer.controller.ts::refunds` |
+| POST | `/api/v1/admin/bank-transfer/refunds/:id/account/reveal` | `src/platform/bank-transfer.controller.ts::revealAccount` |
+| POST | `/api/v1/admin/bank-transfer/refunds/:id/complete` | `src/platform/bank-transfer.controller.ts::complete` |
+| POST | `/api/v1/admin/bank-transfer/refunds/:id/reject` | `src/platform/bank-transfer.controller.ts::rejectRefund` |
 | POST | `/api/v1/admin/beans/charges/:id/receipt` | `src/platform/beans.controller.ts::receipt` |
 | POST | `/api/v1/admin/beans/charges/:id/refund` | `src/platform/beans.controller.ts::refund` |
 | GET | `/api/v1/admin/beans/overview` | `src/platform/beans.controller.ts::overview` |
@@ -188,6 +199,8 @@
 | POST | `/api/v1/members/:id/messages` | `src/platform/controller.ts::message` |
 | PUT | `/api/v1/members/:id/messages/read` | `src/platform/controller.ts::readMessages` |
 | PUT | `/api/v1/notifications/read` | `src/platform/controller.ts::read` |
+| GET | `/api/v1/payments/bank-transfer/:kind/:orderId` | `src/platform/bank-transfer.controller.ts::instructions` |
+| GET | `/api/v1/payments/methods` | `src/platform/bank-transfer.controller.ts::methods` |
 | GET | `/api/v1/posts` | `src/platform/controller.ts::posts` |
 | GET | `/api/v1/posts/:id` | `src/platform/controller.ts::post` |
 | GET | `/api/v1/posts/:id/comments` | `src/platform/controller.ts::comments` |
@@ -212,6 +225,8 @@
 | POST | `/api/v1/studio/accounts/:id/verify` | `src/platform/finance.controller.ts::verifyAccount` |
 | PUT | `/api/v1/studio/activity` | `src/platform/studio.controller.ts::activity` |
 | GET | `/api/v1/studio/advertising/orders` | `src/platform/advertising.controller.ts::orders` |
+| POST | `/api/v1/studio/advertising/orders` | `src/platform/advertising.controller.ts::create` |
+| POST | `/api/v1/studio/advertising/orders/:id/refund` | `src/platform/advertising.controller.ts::refund` |
 | POST | `/api/v1/studio/advertising/orders/:id/use` | `src/platform/advertising.controller.ts::use` |
 | GET | `/api/v1/studio/advertising/products` | `src/platform/advertising.controller.ts::products` |
 | POST | `/api/v1/studio/ai-photo/crop` | `src/platform/ai-photo.ts::crop` |

@@ -2,8 +2,10 @@ import {appendAudit} from './audit';
 import {reject} from './http';
 export const promotionActive=(creator:any,now=new Date())=>!!creator?.promoted||!!(creator?.ad_promoted_until&&new Date(creator.ad_promoted_until)>now);
 export function adPurchaseView(order:any,now=new Date(),blockedUntil:Date|null=null){
- const useStatus=order.starts_at?(order.ends_at&&order.ends_at>now?'active':'completed'):'ready';
- return{id:order.id,name:order.name,amount:order.amount,durationDays:order.duration_days,createdAt:order.created_at,status:order.status,useStatus,startsAt:order.starts_at,endsAt:order.ends_at,blockedUntil:useStatus==='ready'?blockedUntil:null};
+ // Only a paid purchase can be started; a bank-transfer order waiting for its deposit, cancelled or refunded is 'unavailable'.
+ const useStatus=order.starts_at?(order.ends_at&&order.ends_at>now?'active':'completed'):order.status==='paid'?'ready':'unavailable';
+ const statusLabel=({pending:'입금 대기',paid:'구매 완료',cancelled:'주문 취소',refunding:'환불 이체 대기',refunded:'환불 완료',processing:'결제 확인 중'} as Record<string,string>)[order.status]||order.status;
+ return{id:order.id,name:order.name,amount:order.amount,durationDays:order.duration_days,createdAt:order.created_at,status:order.status,statusLabel,method:order.payment_method||'card',refundable:order.status==='paid'&&!order.starts_at&&order.payment_method==='bank_transfer',useStatus,startsAt:order.starts_at,endsAt:order.ends_at,blockedUntil:useStatus==='ready'?blockedUntil:null};
 }
 export async function listAdPurchases(db:any,creatorId:string){
  const now=new Date();
