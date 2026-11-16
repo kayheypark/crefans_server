@@ -34,7 +34,7 @@ test('AI caption: moderated request goes to the Responses API with store:false a
  assert.equal(generation.body.safety_identifier,undefined);assert.match(generation.body.input,/판타지 마법사, 스튜디오 배경/);assert.match(generation.body.input,/신비로운 분위기로/);
  assert.deepEqual(p.calls.map(c=>c.url.split('/').pop()),['moderations','responses','moderations']);
  assert.doesNotMatch(JSON.stringify(p.calls.map(c=>c.body)),/guest:abc|base64|image_url/);
- assert.deepEqual(s.limiter.calls,[['guest-caption:guest:abc',CAPTION_LIMITS.perDay,86400]]);
+ assert.deepEqual(s.limiter.calls,[['guest-caption:guest:abc',CAPTION_LIMITS.perDay,86400],['guest-caption-ip:unknown',CAPTION_LIMITS.perIpDay,86400],['guest-caption-total',CAPTION_LIMITS.totalDay,86400]]);
 });
 
 test('a flagged request keeps only the catalog item names; a flagged or broken result falls back to the fixed sentence',async()=>{
@@ -77,4 +77,13 @@ test('the stored alert row and the Telegram text carry no IP for AI photo failur
  const row={id:'e1',type:'ai-photo.failed',ip:'203.0.113.9',peer_ip:null,created_at:new Date('2026-11-16T00:00:00Z'),request_id:'q1',data:rows[0].data};
  const text=operationsAlertText(row,'production','secret');assert.match(text,/AI 사진 편집 실패/);assert.match(text,/접속 IP: 보내지 않음/);assert.doesNotMatch(text,/203\.0\.113\.9/);assert.match(text,/errorCode: X/);
  assert.match(operationsAlertText({...row,type:'http.error'},'production','secret'),/203\.0\.113\.9/);
+});
+
+test('2026-11-16: a new cookie does not escape the caps — the IP cap and the service-wide cap fall back to the fixed sentence without OpenAI',async()=>{
+ assert.deepEqual([CAPTION_LIMITS.perIpDay,CAPTION_LIMITS.totalDay],[30,1000]);
+ for(const capped of ['guest-caption-ip:ip1','guest-caption-total']){
+  const p=provider();const s=service(p);s.limiter={calls:[],async limit(key,max){this.calls.push(key);if(key===capped){const e=new Error('limit');e.getStatus=()=>429;throw e;}}};
+  const r=await s.caption('guest:'+Math.random().toString(36).slice(2),{items:['메이드복'],prompt:''},'ip1');
+  assert.equal(r.source,'template',capped);assert.equal(p.calls.length,0,'no OpenAI call over '+capped);assert.ok(s.limiter.calls.includes(capped));
+ }
 });

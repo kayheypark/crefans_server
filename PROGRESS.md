@@ -1,3 +1,9 @@
+## 2026-11-17 night-work 후속: 비회원 캡션 상한·AI 구독 갱신 이중 청구 방지 (fix/caption-caps-renewal)
+- 사용자 결정(pilot-work/ask-me): ① 비회원 'AI로 내용 작성'에 IP 하루 30·전체 하루 1,000 상한(넘으면 정해진 문장, OpenAI 호출 없음) ② AI 구독 갱신: 402 INICIS_* 확정 거절만 실패, 그 외(타임아웃·BILLING_UNCERTAIN·승인 후 DB 실패)는 charge 'uncertain'·같은 moid·일정 유지·자동 재청구 안 함·운영 알림(ai_subscription.charge_uncertain), 첫 결제 불명확은 503 BILLING_UNCERTAIN. 횟수형 주문 requestId 'aisub_' 금지. ③ '점검 중' 문구 유지 ④ OCTOMO·포트원 키 교체 안 함.
+- 검증: guest-caption 7/7, ai-subscription 6/6(대조: 불명확 분기 끄면 실패), ai-shop·openapi·operations 통과, guest 2건 실패는 e2e DB 비회원 하루 한도 소진(기존).
+- 이니시스 통합인증 기입안(docs/inicis-application-prep-20261029.md): 보류·업종/판매상품 AI 사진 편집 기준으로(발송 없음).
+- 야간 조사 문서 요약·결정 목록 작성(.local/night-work/2026-11-16-1802.md). 남은 결정: 무통장 기한 뒤 입금 정책, 계약 초안 불일치 4건, 외부 감시, recovery 정리, 현금영수증·이니시스 체크리스트.
+
 ## 2026-11-16 대표 서비스를 'AI 사진 편집'으로 (포지셔닝 일괄 변경)
 - 사용자 결정(ask-me): 한 줄 소개 "사진 한 장으로 의상·메이크업·포즈·배경을 바꾸는 AI 사진 편집 서비스, 크레팬스". 팬·크리에이터 기능은 보조. 랜딩 오해 문구 정리. 경쟁사 비교는 제거하되 사본 보관. 안내 문구 먼저, 약관은 개정안→공지 후 시행. 토스 자료는 반려돼 수정 안 함. 이니시스 통합인증 우편 서류는 안 보냄·보류.
 - 운영 배포: 프론트 front-ai-positioning-20261116(사이트 설명·키워드·OG alt·llms.txt·/service/landing·루트 랜딩), 가이드(prod 7acb487: 홈·소개·서비스 소개서 페이지, 소개서 PDF 14→11쪽, 표지 AI 이미지). 복구 ~/crefans-recovery/20261116/{front-ai-positioning-20261116,guide-aipos}.
