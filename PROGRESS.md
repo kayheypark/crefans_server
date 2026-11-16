@@ -2,6 +2,7 @@
 - 결정: 계약서 12조②(종료 시 신규 판매·갱신 중단)에 코드를 맞춤, 나머지 불일치 수정·배포, 'AI 이용권' 통일.
 - 코드: admin.controller verification에서 배지 true→false 시 판매 중 멤버십 is_active=false(감사 membershipsPaused, 응답 메시지). 기존 구독은 결제 기간까지, 갱신 작업이 비활성 멤버십 갱신을 멈추고 구독자에게 'unavailable' 안내(기존 finance.service 갱신 분기). 배지 부여는 자동 재개하지 않음.
 - 약관 2026-11-16.membership.2: 6조 계약 종료 시 판매 중지 문장, 13조 제목·본문 '횟수권'→'AI 이용권'. 상점 구매 조건 '횟수권 1회'→'AI 이용권 1회', AI_SHOP_TERMS 2026-11-16.1. 무료 소진 안내·openapi 제목 'AI 이용권'. MEMBERSHIP_PARTNER_MESSAGE '멤버십 또는 출금 화면'.
+- 운영 배포(2026-11-16 09:2x~09:4x KST): API crefans-api:partner-sync-20261116(JS 해시 일치, /common 약관 membership.2 확인, 복구 20261116/partner-sync-api), front front-partner-sync-20261116(prod 5b24b43), 관리자 crefans-admin:partner-sync-20261116(서버 빌드, 새 확인 문구 산출물 2건·직전본 0건 대조, admin 200, 다른 컨테이너 불변, 직전 ai-shop-20261114는 복구 20261116/admin-partner-sync로 보관 후 서버 삭제), 가이드(바뀐 25파일·소개서 PDF 포함, 복구 20261116/guide-partnersync). 운영 데이터로 배지 해제·멤버십 중지는 실행하지 않음(테스트로만).
 - 테스트: membership-partner 3/3(배지 해제 시 판매 중 1개만 중지·부여 시 변화 없음·감사), legal·openapi·partner-request 포함 43/43. 대조: 중지 로직 제거 시 실패. platform-ai-shop은 prod에서도 7/7 실패(기존 'this.service.member' 문제)라 이번 확인에서 제외.
 
 ## 2026-11-16 멤버십은 파트너 계약 크리에이터만 새로 열기 (feat/membership-partner)
