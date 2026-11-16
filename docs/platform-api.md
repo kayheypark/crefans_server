@@ -45,6 +45,8 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | GET | /common | 선택 인증; 공지·FAQ·정책·내 결제수단 legal에 시행 전 개정본이 있으면 `terms-next`·`policy-next` 키로 함께 준다(2026-11-02 재공지한 2026-12-02 시행본, KST 시행일에 terms·policy로 자동 교체. 처리방침 개정은 공지일부터 현재본). |
 | POST | /auth/signup/email/request | email; 6자리 코드, 10분 유효·180초 재요청 제한 |
 | POST | /auth/signup/email/verify | email, code; 일회용 email proof |
+| POST | /auth/signup/phone/start | email, emailProof, phone(010 11자리) → 보낼 6자리 코드·1666-3538·sms 링크·10분. 2026-11-16 OCTOMO(번호 소유 확인, 본인확인 아님), 다른 계정 번호면 409 PHONE_IN_USE |
+| POST | /auth/signup/phone/confirm | email, emailProof, phone → OCTOMO 수신 조회 후 일회용 phoneProof(30분). 가입 요청에 phone·phoneProof 필수(키 설정 시, 없으면 403 PHONE_VERIFICATION_REQUIRED), 번호 HMAC을 새 계정에 연결 |
 | POST | /identity/start | purpose=signup 또는 withdrawal-pin; attemptId/state/redirectUrl |
 | POST | /identity/status | attemptId, state; 완료 시 서버 proof; URL에 증명값을 넣지 않음 |
 | POST | /identity/callback | 공급자 원문 HMAC, reference·목적·만료 검증 |

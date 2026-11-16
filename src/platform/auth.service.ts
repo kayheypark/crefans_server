@@ -1,6 +1,7 @@
 import {lockHandlePolicy,availableSignupHandle} from './handles';
 import {ensureBeanWallet} from './bean-ledger';
 import {recordMarketingChoice} from './marketing.service';
+import {PhoneVerificationService} from './phone-verification';
 import {LegalDocumentsService} from './legal-documents';
 import {INVITE_REQUIRED_MESSAGE,signupPolicy} from './signup-policy';
 import {consumeInvite} from './signup-invites';
@@ -9,7 +10,7 @@ import {enqueueOperation} from './operations-events';
 import {guestIpHash} from './guest-policy';
 import {requestContext} from './request-context';
 export const SIGNUP_IP_HOURLY=5,SIGNUP_IP_DAILY=20,SIGNUP_MAIL_DAILY_TOTAL=500;
-import {Injectable} from '@nestjs/common';
+import {Injectable,Optional} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {randomBytes,randomInt,randomUUID,createHmac} from 'crypto';
 import {PrismaService} from '../prisma/prisma.service';
@@ -22,7 +23,7 @@ import {assertReferralCode,linkReferralSignup,referralCodeInput,referralOn,REFER
 const signInPassword=(value:unknown)=>{if(typeof value!=='string'||!value||value.length>256)reject(400,'INVALID_INPUT','입력값을 확인해주세요.');return value as string;};
 @Injectable()
 export class PlatformAuthService {
- constructor(private db:PrismaService,private local:LocalMemberService,private mail:MemberMailService,private config:ConfigService,private legal:LegalDocumentsService=new LegalDocumentsService()){}
+ constructor(private db:PrismaService,private local:LocalMemberService,private mail:MemberMailService,private config:ConfigService,private legal:LegalDocumentsService=new LegalDocumentsService(),@Optional() private phones?:PhoneVerificationService){}
  private email(value:unknown){const email=normalizeEmail(text(value,191));if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))reject(400,'INVALID_EMAIL','이메일을 확인해주세요.');return email;}
  private codeHash(email:string,code:string){return createHmac('sha256',this.config.get('LOCAL_AUTH_SECRET')).update(`${email}:${code}`).digest('hex');}
  // A valid referral link admits a visitor without an operator invite while the console switch is on (user decision 2026-11-01).
@@ -60,6 +61,8 @@ export class PlatformAuthService {
    const result=await this.db.signupChallenge.updateMany({where:{email,code_hash:this.codeHash(email,code),verified_at:null,expires_at:{gt:new Date()},attempts:{lte:5}},data:{proof_hash:digest(proof),verified_at:new Date(),expires_at:new Date(Date.now()+1800000)}});
    if(!result.count)reject(400,'INVALID_CODE','인증 코드가 일치하지 않습니다.');return{message:'이메일 인증이 완료되었습니다.',proof};
  }
+ async signupPhoneStart(input:any){if(!this.phones)reject(503,'PHONE_VERIFICATION_UNAVAILABLE','휴대폰 확인을 준비 중이에요.');return this.phones!.signupStart(this.email(input?.email),input);}
+ async signupPhoneConfirm(input:any){if(!this.phones)reject(503,'PHONE_VERIFICATION_UNAVAILABLE','휴대폰 확인을 준비 중이에요.');return this.phones!.signupConfirm(this.email(input?.email),input);}
  async identity(){reject(503,'PASS_NOT_CONFIGURED','PASS 본인인증 공급자 설정이 필요합니다.');}
  async signup(input:any){const email=this.email(input.email),nickname=text(input.nickname,40);
    if(input.terms!==true||input.privacy!==true)reject(400,'INVALID_INPUT','비밀번호와 필수 동의를 확인해주세요.');const password=assertNewPassword(input.password);
@@ -67,6 +70,8 @@ export class PlatformAuthService {
    // Signing up through a referral link shows the referrer a masked email; the invitee agrees to it here (2026-11-02).
    if(referred&&input.referralDisclosure!==true)reject(400,'REFERRAL_DISCLOSURE_REQUIRED','초대한 회원에게 표시되는 정보에 동의해야 초대 링크로 가입할 수 있습니다.');
    if(!policy.identityRequired&&input.ageAcknowledged!==true)reject(400,'AGE_ACKNOWLEDGEMENT_REQUIRED','만 19세 이상 가입 조건을 확인해주세요.');
+   // 2026-11-16: once OCTOMO is configured, signup needs a verified phone number (one account per number; keyed hash only).
+   if(this.phones?.enabled()&&(typeof input.phone!=='string'||typeof input.phoneProof!=='string'))reject(403,'PHONE_VERIFICATION_REQUIRED','휴대폰 번호 확인이 필요해요.');
    const password_hash=await hashPassword(password);
    await this.db.$transaction(async tx=>{
      await lockHandlePolicy(tx);const challenge=await tx.signupChallenge.findUnique({where:{email}});
@@ -84,6 +89,7 @@ export class PlatformAuthService {
      if(!await consumeInvite(tx,email,member.id)&&policy.inviteOnly&&!policy.listed(email)&&!referred)reject(403,'SIGNUP_INVITE_REQUIRED',INVITE_REQUIRED_MESSAGE);
      if(referred&&!await linkReferralSignup(tx,input.referralCode,member.id))reject(400,'INVALID_REFERRAL','초대 링크를 확인해주세요.');
      if(referred)await tx.memberConsent.create({data:{member_id:member.id,kind:REFERRAL_DISCLOSURE_KIND,document_id:`code:referral-disclosure:${REFERRAL_DISCLOSURE.version}`,document_snapshot:{...REFERRAL_DISCLOSURE}}});
+     if(this.phones?.enabled())await this.phones.attachSignup(tx,email,input,member.id);
      if(this.config.get('BEAN_LEDGER_ENABLED')==='true')await ensureBeanWallet(tx,member.id);
      await tx.accountPreference.create({data:{member_id:member.id,marketing_alert:false}});
      await tx.memberConsent.createMany({data:consents.filter(c=>c.kind!=='marketing').map(c=>({...c,member_id:member.id}))});if(input.marketing===true)await recordMarketingChoice(tx,member.id,true,'signup',this.legal.signup().documents.marketing);await tx.signupChallenge.delete({where:{email}});await enqueueOperation(tx,'member.signup',{memberId:member.id},`member.signup:${member.id}`);

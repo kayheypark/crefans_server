@@ -1,4 +1,4 @@
-import {Body,Controller,Post,Req,Res} from '@nestjs/common';
+import {Body,Controller,HttpCode,Post,Req,Res} from '@nestjs/common';
 import {Response} from 'express';
 import {ConfigService} from '@nestjs/config';
 import {PlatformAuthService} from './auth.service';
@@ -9,6 +9,8 @@ export class PlatformAuthController {
  constructor(private auth:PlatformAuthService,private local:LocalMemberService,private config:ConfigService){}
  @Post('signup/email/request') request(@Body() body:any){return this.auth.requestCode(body.email,body.referralCode);}
  @Post('signup/email/verify') verify(@Body() body:any){return this.auth.verifyCode(body);}
+ @Post('signup/phone/start') @HttpCode(200) phoneStart(@Body() body:any){return this.auth.signupPhoneStart(body);}
+ @Post('signup/phone/confirm') @HttpCode(200) phoneConfirm(@Body() body:any){return this.auth.signupPhoneConfirm(body);}
  @Post('identity') identity(){return this.auth.identity();}
  @Post('signup') signup(@Body() body:any){return this.auth.signup(body);}
  @Post('login') async login(@Body() body:any,@Res({passthrough:true}) res:Response){const tokens=await this.auth.login(body);setAuthCookies(res,tokens,this.config);return{message:'로그인했습니다.'};}

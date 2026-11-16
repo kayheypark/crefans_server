@@ -78,3 +78,20 @@ test('signup verification mail: 5 per IP an hour, service-wide daily ceiling wit
  const email=fresh();await assert.rejects(flaky.requestCode(email),code('MAIL_UNAVAILABLE'));
  fail=false;await flaky.requestCode(email);assert.ok(messages.some(m=>m.email===email),'retry right after a failed send is accepted');
 });
+
+test('2026-11-16 phone at signup: with OCTOMO configured, signup needs the verified phone proof and binds the number to the new account',async()=>{
+ const {PhoneVerificationService}=require('../dist/src/platform/phone-verification'),{PlatformService}=require('../dist/src/platform/service');
+ const config=new ConfigService({LOCAL_AUTH_SECRET:'test-only-'.repeat(8),SIGNUP_IDENTITY_MODE:'email-only',OCTOMO_API_KEY:'k'}),phones=new PhoneVerificationService(new PlatformService(db,undefined,config),config,{limit:async()=>{}});
+ const sent=new Set();phones.fetcher=async(u,init)=>{const b=JSON.parse(init.body);return{ok:true,json:async()=>({exists:sent.has(b.mobileNum+':'+b.text)})};};
+ const client=new PlatformAuthService(db,{limit:async()=>{}},{sendCode:async(email,value)=>messages.push({email,code:value})},config,legal,phones);
+ const data=await input(client),phone='010'+String(Date.now()).slice(-8);
+ await assert.rejects(client.signup({...data,ageAcknowledged:true}),code('PHONE_VERIFICATION_REQUIRED'),'no phone, no account');
+ const s=await client.signupPhoneStart({email:data.email,emailProof:data.emailProof,phone});sent.add(phone+':'+s.code);
+ const c=await client.signupPhoneConfirm({email:data.email,emailProof:data.emailProof,phone});
+ await assert.rejects(client.signup({...data,ageAcknowledged:true,phone,phoneProof:'forged'}),code('PHONE_VERIFICATION_REQUIRED'));
+ assert.equal(await db.member.count({where:{email:data.email}}),0,'a failed phone proof leaves no account behind');
+ await client.signup({...data,ageAcknowledged:true,phone,phoneProof:c.proof});
+ const member=await db.member.findUniqueOrThrow({where:{email:data.email}});members.push(member.id);
+ assert.ok(await db.memberPhone.findUnique({where:{member_id:member.id}}),'number bound to the new account');
+ await db.memberPhone.deleteMany({where:{member_id:member.id}});
+});
