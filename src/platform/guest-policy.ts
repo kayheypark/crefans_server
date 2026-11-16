@@ -7,7 +7,7 @@ import {createHash,createHmac} from 'node:crypto';
 // - Signing in (or signing up) on the same browser moves the guest posts and photos to that account.
 // - AI use: 10 per visitor, 10 per IP per day, 200 for all visitors per day; no hearts, tickets or library.
 export const GUEST_COOKIE='cf_guest',GUEST_PREFIX='guest:',GUEST_POST_HOURS=24,GUEST_AI_LIMIT=10,GUEST_IP_DAILY=10,GUEST_DAILY_TOTAL=200;
-export const GUEST_CONSENT_VERSION='2026-11-16.guest.4';
+export const GUEST_CONSENT_VERSION='2026-11-16.guest.5';
 export const GUEST_RETENTION_DAYS=30;
 export const isGuestId=(id?:string|null)=>typeof id==='string'&&id.startsWith(GUEST_PREFIX);
 export const guestIdFromToken=(token:string)=>GUEST_PREFIX+createHash('sha256').update('crefans-guest:'+token).digest('hex').slice(0,40);

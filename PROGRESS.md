@@ -5,6 +5,11 @@
 - 운영 배포(2026-11-16 09:2x~09:4x KST): API crefans-api:partner-sync-20261116(JS 해시 일치, /common 약관 membership.2 확인, 복구 20261116/partner-sync-api), front front-partner-sync-20261116(prod 5b24b43), 관리자 crefans-admin:partner-sync-20261116(서버 빌드, 새 확인 문구 산출물 2건·직전본 0건 대조, admin 200, 다른 컨테이너 불변, 직전 ai-shop-20261114는 복구 20261116/admin-partner-sync로 보관 후 서버 삭제), 가이드(바뀐 25파일·소개서 PDF 포함, 복구 20261116/guide-partnersync). 운영 데이터로 배지 해제·멤버십 중지는 실행하지 않음(테스트로만).
 - 테스트: membership-partner 3/3(배지 해제 시 판매 중 1개만 중지·부여 시 변화 없음·감사), legal·openapi·partner-request 포함 43/43. 대조: 중지 로직 제거 시 실패. platform-ai-shop은 prod에서도 7/7 실패(기존 'this.service.member' 문제)라 이번 확인에서 제외.
 
+## 2026-11-16 AI 사진 편집 성공 요청도 질문 내용 보관 (feat/ai-request-log, 미배포)
+- 사용자 결정: 성공도 남긴다. recordAiRequest(ai-photo-failures.ts): 성공 시 같은 ai_photo_failure_details 표에 암호화 payload(outcome succeeded, prompt 마스킹, options, count, targetId), 30일 만료·자동 파기, 실패 시 응답에 영향 없음. adminLogDetail: 실패 행이 없으면 같은 요청의 ai-photo.succeeded로 상세 표시(권한 logs+members view, 열람 감사 기존 그대로). 회원·비회원 모두.
+- 처리방침 2026-11-16.prompt.1(7항: 성공·실패 관계없이 30일 암호화 보관, 17항: 체험 요청 문구 7항 기준 보관), GUEST_CONSENT_VERSION 2026-11-16.guest.5.
+- 검증: tsc 0, platform-ai-photo 39/39(성공 저장·복호 outcome·로그 상세 단언으로 교체), 대조(recordAiRequest 호출 제거 시 1실패), ai-photo·legal·guest·guest-caption·bank-transfer 86/0.
+
 ## 2026-11-16 무통장입금(콩·AI 이용권·광고상품) + 체험 'AI로 내용 작성' 문구 (feat/bank-transfer → prod, 운영 배포)
 - 운영 배포 2026-11-16 15:4x KST: API crefans-api:bank-transfer-20261116(DB 덤프 후 migrate deploy 20261116090000_bank_transfer, 1차 시도는 migrate status 확인 줄 pipefail로 자동 롤백·운영 영향 없음 → 수정 후 성공), front-bank-transfer-20261116, admin crefans-admin:bank-transfer-20261116(/console/deposits 200), 가이드 prod 0d57263(43파일 변경, 119파일 해시 일치, 소개서 PDF b475c4f4…). 복구본 crefans-recovery/20261116/{bank-transfer-api(이전 이미지·설정·DB 덤프), front-bank-transfer-20261116, admin-bank-transfer, guide-bank}. 운영 확인: 약관·처리방침 bank.1, 체험 guest.4, 새 API 무인증 401, 미리보기 콩 충전 화면 무통장입금·입금자명 노출·카드 미노출. 실제 입금 확인 흐름은 운영자가 콘솔에서 입금 계좌를 저장한 뒤부터 가능(현재 미설정 → 결제 준비 중).
 - 사용자 결정: 무통장입금을 콩·AI 이용권·광고상품에(멤버십 제외), 입금 기한 24시간 후 자동 취소, 금액 일치 시에만 운영자 확인(불일치는 수동), 배포와 동시 개시(단 콘솔에서 입금 계좌 저장 전에는 주문 불가), 계좌는 콘솔에서 운영자가 직접 입력, 카드(토스 테스트)는 세 상품에서 숨김(실결제 켜면 노출), 현금영수증은 주문 때 선택 신청, 무통장 결제분 환불은 회원 계좌로 운영자 이체(3영업일).

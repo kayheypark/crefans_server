@@ -264,12 +264,24 @@ const bankPrivacy:LegalDocument={...captionPrivacy,version:'2026-11-16.bank.1',
   if(sec.title==='17. 선택 기능: 비회원 AI 사진 체험'){let body=sec.body;for(const[from,to]of CAPTION_BUTTON_EDITS){need(from);body=body.replace(from,to);}return{...sec,body};}
   return sec;})};
 const bankCatalog:LegalCatalog={...captionCatalog,documents:{...captionCatalog.documents,terms:bankTerms,privacy:bankPrivacy}};
+// 2026-11-16 user decision: successful AI photo requests are kept like failed ones (prompt + options, encrypted, 30 days) so
+// operators can review what was asked. Effective the same day; the guest trial consent moves to .guest.5 (section 17 changed).
+const PROMPT_LOG_FROM='AI 사진 편집 실패 원인 확인과 문의 대응을 위해 실패한 요청의 질문 내용과 선택 옵션을 암호화하여 실패 시점부터 30일 보관한 뒤 파기합니다.';
+const PROMPT_LOG_TO='AI 사진 편집(회원 스튜디오와 비회원 체험) 요청의 질문 내용과 선택 옵션은 성공·실패와 관계없이 부적절한 요청 확인, 실패 원인 확인과 문의 대응을 위해 암호화하여 요청 시점부터 30일 보관한 뒤 파기합니다.';
+const PROMPT_GUEST_FROM='국외 이전되는 국가·일시·방법·보관 기간·거부 방법은 16항과 같습니다.';
+const PROMPT_GUEST_TO=PROMPT_GUEST_FROM+' AI 사진 편집 요청 문구와 선택 옵션은 7항에 따라 암호화해 30일 보관합니다.';
+const promptPrivacy:LegalDocument={...bankPrivacy,version:'2026-11-16.prompt.1',
+ notice:bankPrivacy.notice+' 같은 날 추가 개정: 7항과 17항에 AI 사진 편집 요청 문구·선택 옵션을 성공한 요청도 실패와 같이 암호화해 30일 보관한다는 점을 적었습니다.',
+ sections:bankPrivacy.sections.map(sec=>{const swap=(from:string,to:string)=>{if(!sec.body.includes(from))throw Error(`Legal revision anchor missing in ${sec.title}`);return{...sec,body:sec.body.replace(from,to)};};
+  if(sec.title.startsWith('7. '))return swap(PROMPT_LOG_FROM,PROMPT_LOG_TO);
+  if(sec.title==='17. 선택 기능: 비회원 AI 사진 체험')return swap(PROMPT_GUEST_FROM,PROMPT_GUEST_TO);return sec;})};
+const promptCatalog:LegalCatalog={...bankCatalog,documents:{...bankCatalog.documents,privacy:promptPrivacy}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BANK_TRANSFER_DATE?bankCatalog:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BANK_TRANSFER_DATE?promptCatalog:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

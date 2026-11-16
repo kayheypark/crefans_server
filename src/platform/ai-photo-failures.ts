@@ -13,6 +13,15 @@ export function diagnosticPrompt(value:unknown){
  if(typeof value!=='string')return '';
  return value.slice(0,2000).replace(/\b(?:sk-|ark-)[a-zA-Z0-9_-]+/g,'[키 숨김]').replace(/Bearer\s+\S+/gi,'Bearer [숨김]').replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi,'[이메일 숨김]').replace(/\b01[016789][- .]?\d{3,4}[- .]?\d{4}\b/g,'[전화번호 숨김]').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g,'');
 }
+/** The chosen options of one AI photo request, masked like the prompt (shared by failure and success records). */
+function requestOptions(input:any){const options:Record<string,unknown>={};for(const k of ['mode','style','kind','editKinds','targetGender','costumeIds','libraryIds','backgroundId','aspectRatio']){const v=input?.[k];if(typeof v==='string')options[k]=diagnosticPrompt(v).slice(0,300);else if(Array.isArray(v))options[k]=v.filter(x=>typeof x==='string').map(x=>diagnosticPrompt(x).slice(0,80)).slice(0,14);}return options;}
+/** 2026-11-16 user decision: successful requests are kept too (prompt + options, encrypted, 30 days, same table and console view as
+ * failures) so operators can review what members and guests asked for. Never blocks or changes the successful response. */
+export async function recordAiRequest(db:any,config:ConfigService,input:any,trace:AiFailureTrace,result:{count:number;targetId?:string}){
+ try{const payload={...trace,outcome:'succeeded',count:result.count,targetId:result.targetId,prompt:diagnosticPrompt(input?.prompt),options:requestOptions(input)};
+  await db.aiPhotoFailureDetail.create({data:{request_id:trace.requestId,payload_encrypted:new PaymentProvider(config).encrypt(JSON.stringify(payload)),expires_at:new Date(Date.now()+30*86400000)}});}
+ catch{console.error(JSON.stringify({event:'ai-photo.request_persist_failed',requestId:trace.requestId}));}
+}
 export async function recordAiFailure(db:any,config:ConfigService,sub:string,input:any,error:any,trace:AiFailureTrace,started:number){
  const code=diagnosticId(error?.getResponse?.()?.code||error?.code||error?.cause?.code)||'INTERNAL_ERROR',status=error?.getStatus?.()||500;
  const context={...(requestContext.getStore()||{ip:'',peerIp:''}),requestId:trace.requestId,actorId:sub};
@@ -20,8 +29,7 @@ export async function recordAiFailure(db:any,config:ConfigService,sub:string,inp
  // The general log contains only identifiers/codes; never prompt text or raw provider errors.
  console.warn(JSON.stringify({event:'audit',...row}));
  try{
-  const options:Record<string,unknown>={};for(const k of ['mode','style','kind','editKinds','targetGender','costumeIds','libraryIds','backgroundId','aspectRatio']){const v=input?.[k];if(typeof v==='string')options[k]=diagnosticPrompt(v).slice(0,300);else if(Array.isArray(v))options[k]=v.filter(x=>typeof x==='string').map(x=>diagnosticPrompt(x).slice(0,80)).slice(0,14);}
-  const payload={...trace,errorCode:code,prompt:diagnosticPrompt(input?.prompt),options};
+  const payload={...trace,outcome:'failed',errorCode:code,prompt:diagnosticPrompt(input?.prompt),options:requestOptions(input)};
   const encrypted=new PaymentProvider(config).encrypt(JSON.stringify(payload));
   await db.$transaction(async(tx:any)=>{await tx.platformAuditLog.create({data:row});await tx.aiPhotoFailureDetail.create({data:{request_id:trace.requestId,payload_encrypted:encrypted,expires_at:new Date(Date.now()+30*86400000)}});});
  }catch{
