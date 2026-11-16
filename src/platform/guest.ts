@@ -1,4 +1,4 @@
-import {Body,Controller,Get,Injectable,Post,Req,Res,UploadedFile,UseGuards,UseInterceptors} from '@nestjs/common';
+import {Param,Body,Controller,Get,Injectable,Post,Req,Res,UploadedFile,UseGuards,UseInterceptors} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {FileInterceptor} from '@nestjs/platform-express';
 import {memoryStorage} from 'multer';
@@ -21,12 +21,12 @@ const COOKIE_DAYS=30;
 export class GuestService{
  constructor(private service:PlatformService,private config:ConfigService,private limiter:LocalMemberService){}
  // Spam guard (2026-11-15): a visitor may publish 10 trial posts a day and one IP 20; uploads are capped at 60 per IP a day.
- async guard(kind:'post'|'upload',id:string){const ip=this.ipHash(),limits=kind==='post'?[['guest-post:'+id,10],['guest-post-ip:'+ip,20]]:[['guest-upload-ip:'+ip,60]];
+ async guard(kind:'post'|'upload'|'edit',id:string){const ip=this.ipHash(),limits=kind==='post'?[['guest-post:'+id,10],['guest-post-ip:'+ip,20]]:kind==='edit'?[['guest-edit:'+id,30],['guest-edit-ip:'+ip,60]]:[['guest-upload-ip:'+ip,60]];
   for(const [key,max] of limits as [string,number][]){try{await this.limiter.limit(key,max,86400);}catch(error:any){if(error?.getStatus?.()!==429)throw error;reject(429,'GUEST_RATE_LIMITED','체험 게시·업로드 횟수를 오늘 모두 썼어요. 회원가입하면 계속 이용할 수 있어요.');}}}
  private cookieOptions(){const cookie=this.config.get('app.cookie')||{};return{httpOnly:true,secure:!!cookie.secure,sameSite:'lax' as const,path:'/',maxAge:COOKIE_DAYS*86400000,...(cookie.domain?{domain:cookie.domain}:{})};}
  require(req:any){const id=guestFromRequest(req);if(!id)reject(401,'GUEST_SESSION_REQUIRED','체험을 시작하려면 안내에 동의해 주세요.');return id;}
  ipHash(){return guestIpHash(this.config,requestContext.getStore()?.ip);}
- async status(req:any,remaining:(id:string)=>Promise<number>){const id=guestFromRequest(req);return{active:!!id,consentVersion:GUEST_CONSENT_VERSION,limit:GUEST_AI_LIMIT,postHours:GUEST_POST_HOURS,remaining:id?await remaining(id):GUEST_AI_LIMIT};}
+ async status(req:any,remaining:(id:string)=>Promise<number>){const id=guestFromRequest(req);return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,limit:GUEST_AI_LIMIT,postHours:GUEST_POST_HOURS,remaining:id?await remaining(id):GUEST_AI_LIMIT};}
  async start(req:any,res:any,input:any){
   if(input?.consent!==true||input?.version!==GUEST_CONSENT_VERSION)reject(400,'GUEST_CONSENT_REQUIRED','체험 안내를 확인하고 동의해 주세요.');
   let id=guestFromRequest(req);
@@ -57,6 +57,9 @@ export class GuestController{
  @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);return this.studio.saveContent(id,body,{guest:true});}
  // Writes the empty title/body at publish time; the visitor confirms before posting (2026-11-16).
  @Post('content/caption') caption(@Req() req:any,@Body() body:any){return this.captions.caption(this.guests.require(req),body);}
+ // 2026-11-16 user decision: the signed-out author may edit only the title and body of their own post; deleting stays unavailable.
+ // Declared after content/caption so that literal route wins.
+ @Post('content/:id') async editContent(@Req() req:any,@Param('id') postId:string,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('edit',id);return this.studio.updateGuestText(id,postId,body);}
  @Post('ai-photo/edit') @UseInterceptors(FileInterceptor('mask',{storage:memoryStorage(),limits:{fileSize:5*1024*1024,files:1}}))
  edit(@Req() req:any,@Body() body:any,@UploadedFile() mask:any){return this.photos.edit(this.guests.require(req),body,mask,{ipHash:this.guests.ipHash()});}
  @Post('claim') @UseGuards(PlatformAuthGuard) claim(@Req() req:any,@Res({passthrough:true}) res:any){return this.guests.claim(req.user.sub,req,res);}

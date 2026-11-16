@@ -109,3 +109,16 @@ test("guest AI: the 200-a-day guest budget closes trials without touching the me
   assert.equal(await read('ai-photo:total'),memberTotal,'still untouched');
  }finally{await db.authRateBucket.update({where:{id},data:{count:guestTotal}});}
 });
+
+test('2026-11-16: the guest author edits only the title and body of their own post; others, empty text and deletion stay refused',async()=>{
+ const g=await startGuest(),other=await startGuest();
+ assert.equal((await guestsService.status(g.req,async()=>0)).authorId,g.id,'the session tells the browser its own author id');
+ await studio.saveContent(g.id,post({title:'고칠 글 '+tag}),{guest:true});const row=await db.posting.findFirst({where:{user_sub:g.id,title:'고칠 글 '+tag}});
+ await studio.updateGuestText(g.id,row.id,{title:' 새 제목 ',body:'새 내용',status:'draft',media:[],allow_comments:true});
+ const after=await db.posting.findUnique({where:{id:row.id}});assert.equal(after.title,'새 제목');assert.equal(after.content,'새 내용');
+ assert.equal(after.status,'PUBLISHED','other fields in the request are ignored');assert.equal(after.allow_comments,false);assert.equal(after.is_deleted,false);
+ await assert.rejects(studio.updateGuestText(other.id,row.id,{title:'남의 글',body:'x'}),code('POST_NOT_FOUND'),'another visitor cannot edit it');
+ await assert.rejects(studio.updateGuestText(g.id,row.id,{title:'',body:'x'}),code('INVALID_INPUT'));await assert.rejects(studio.updateGuestText(g.id,row.id,{title:'x',body:' '}),code('INVALID_INPUT'));
+ assert.equal((await db.posting.findUnique({where:{id:row.id}})).title,'새 제목');
+ const routes=Reflect.getMetadataKeys?Object.getOwnPropertyNames(require('../dist/src/platform/guest').GuestController.prototype):[];assert.ok(!routes.some(n=>/delete/i.test(n)),'no guest delete route');
+});
