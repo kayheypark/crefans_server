@@ -736,7 +736,8 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 | POST | /studio/shop/orders/:id/refund | 무통장입금 주문은 refundAccount 필수, refunding → refunded |
 | POST | /studio/advertising/orders | 광고상품 무통장입금 주문(크리에이터, 입금 대기 3건 한도) |
 | POST | /studio/advertising/orders/:id/refund | 사용 전 무통장입금 구매 전액 환불 신청 |
-| GET/PUT | /admin/bank-transfer/account | 입금 계좌 조회·저장(감사 기록은 끝 4자리) |
+| GET | /admin/bank-transfer/account | 입금 계좌 조회 |
+| PUT | /admin/bank-transfer/account | 입금 계좌 저장·사용 설정(감사 기록은 끝 4자리) |
 | GET | /admin/bank-transfer/payments | 입금 대기·내역(status, page) |
 | POST | /admin/bank-transfer/payments/:id/confirm | 금액 일치 시 입금 확인·같은 트랜잭션에서 지급 |
 | POST | /admin/bank-transfer/payments/:id/cancel | 입금 전 주문 취소 |
