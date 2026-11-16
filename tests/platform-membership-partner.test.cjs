@@ -43,4 +43,7 @@ test('removing the badge pauses the memberships on sale; granting it changes no 
  const again=await admin.verification(id,true,{admin:{id:'qa'}});assert.equal(again.membershipsPaused,undefined);
  assert.equal(await db.membershipItem.count({where:{creator_id:id,is_active:true}}),0,'granting does not reopen anything by itself');
  assert.ok(await db.platformAuditLog.findFirst({where:{action:'admin.creator_verification_changed',entity_id:id}}));
+ // 2026-11-17 contract 12(2): ending the partnership tells the creator what is left and when it is settled; operators get the date.
+ const notice=await db.memberNotification.findFirst({where:{member_id:id,type:'settlement',text:{startsWith:'파트너 계약이 종료되었어요.'}}});assert.ok(notice,'termination notice');assert.match(notice.text,/미정산 수익 .*원.*미수금 .*원.*까지 처리 방법을 정하고/);assert.ok(notice.text.length<=191);
+ assert.equal(await db.platformOperationalEvent.count({where:{type:'creator.partner_ended',dedupe_key:{startsWith:'creator.partner_ended:'+id}}}),1);
 });
