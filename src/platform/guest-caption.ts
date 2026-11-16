@@ -7,7 +7,7 @@ import {reject} from './http';
 // is written by AI from the chosen preset names and the visitor's own request text only (no photo, no IP, no identifier is sent).
 // The visitor sees the result and confirms before the post is published. Provider trouble falls back to a fixed sentence.
 const RESPONSES_URL='https://api.openai.com/v1/responses',MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
-export const CAPTION_LIMITS={items:12,itemLength:40,promptLength:300,title:40,body:300,perDay:30};
+export const CAPTION_LIMITS={items:12,itemLength:40,promptLength:300,title:40,body:300,perDay:30,perIpDay:30,totalDay:1000};
 const INSTRUCTIONS=`너는 사진 공유 서비스의 게시글 작성 도우미야. 사용자가 AI로 사진을 편집할 때 고른 항목과 요청 문장을 보고,
 그 사진을 올리는 게시글의 제목과 본문을 한국어로 써.
 - 제목: 20자 안팎, 최대 ${CAPTION_LIMITS.title}자. 본문: 1~2문장, 최대 ${CAPTION_LIMITS.body}자. 밝고 자연스러운 말투, 이모지는 많아야 1개.
@@ -44,9 +44,12 @@ export class GuestCaptionService{
   const body=await res.json().catch(()=>null),verdict=body?.results?.[0]?.flagged;
   if(!res.ok||typeof verdict!=='boolean')throw new Error('moderation');return verdict;
  }
- async caption(guestId:string,raw:any){
+ // 2026-11-16 user decision: the guest id comes from any well-formed cookie, so per-visitor counting alone can be bypassed by
+ // changing the cookie. Per-IP (30) and service-wide (1,000) daily caps bound the OpenAI cost; over a cap the fixed sentence is used.
+ async caption(guestId:string,raw:any,ipHash?:string){
   const input=captionInput(raw);
-  try{await this.limiter.limit('guest-caption:'+guestId,CAPTION_LIMITS.perDay,86400);}catch(error:any){if(error?.getStatus?.()!==429)throw error;return{...fallbackCaption(input.items),source:'template'};}
+  const keys:[string,number][]=[['guest-caption:'+guestId,CAPTION_LIMITS.perDay],['guest-caption-ip:'+(ipHash||'unknown'),CAPTION_LIMITS.perIpDay],['guest-caption-total',CAPTION_LIMITS.totalDay]];
+  for(const [key,max] of keys){try{await this.limiter.limit(key,max,86400);}catch(error:any){if(error?.getStatus?.()!==429)throw error;return{...fallbackCaption(input.items),source:'template'};}}
   const {apiKey,model}=this.settings();
   if(!apiKey||!input.items.length&&!input.prompt)return{...fallbackCaption(input.items),source:'template'};
   try{

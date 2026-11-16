@@ -10,10 +10,10 @@ const {InicisBillingProvider,billingHash,refundHash,windowHash}=require('../dist
 const creator=randomUUID(),code=c=>e=>e.getResponse?.().code===c,productIds=[];
 const service={db,member:async id=>db.member.findUniqueOrThrow({where:{id}}),requireCreator:async()=>{}};
 let charges=[],cancels=[],failNext=0;
-const provider={name:'fake',environment:()=>'test',charge:async input=>{if(failNext>0){failNext--;const e=new Error('declined');e.getResponse=()=>({code:'INICIS_CARD_DECLINED'});throw e;}charges.push(input);return{tid:'tid-'+charges.length,paidAt:new Date()};},cancel:async input=>{cancels.push(input);}};
+const provider={name:'fake',environment:()=>'test',charge:async input=>{if(failNext>0){failNext--;const e=new Error('declined');e.getResponse=()=>({code:'INICIS_CARD_DECLINED'});e.getStatus=()=>402;throw e;}if(uncertainNext>0){uncertainNext--;const e=new Error('timeout');e.code='ETIMEDOUT';throw e;}charges.push(input);return{tid:'tid-'+charges.length,paidAt:new Date()};},cancel:async input=>{cancels.push(input);}};
 const subs=new AiSubscriptionService(service,new ConfigService({}));subs.setProvider(provider);
 const admin=new AiShopAdminController(service),shop=new AiShopService(service,{configForClient:()=>({clientKey:'test_ck_x'})},{billingConfig:async()=>({customerKey:'c'})},{register:()=>{},requireOpen:async()=>{throw new Error('bank not used');}});
-let plan,pack;
+let plan,pack,uncertainNext=0;
 before(async()=>{globalThis.__release=await require('./e2e-db-lock.cjs').lockE2EDatabase(source);const r=require('child_process').spawnSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy'],{env:process.env,encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);
  await db.member.create({data:{id:creator,email:creator+'@sub.test.invalid',name:'Synthetic',nickname:'구독검증',preferred_username:creator.slice(0,20),email_verified:true}});await db.creator.create({data:{user_id:creator,is_active:true}});await db.aiPhotoGrant.create({data:{creator_user_id:creator,reason:'구독 테스트'}});
  plan=(await admin.create({kind:'subscription',name:'AI 이용권 구독 라이트',description:'매달 66회',amount:9900,quantity:66,validityDays:30,visible:true,onSale:true}));productIds.push(plan.id);
@@ -76,4 +76,19 @@ test('KG이니시스: hashes follow the official concatenation, and the provider
  assert.equal(new InicisBillingProvider(new ConfigService({})).environment(),'unavailable');
  assert.equal(new InicisBillingProvider(new ConfigService({INICIS_BILLING_MID:'m',INICIS_INIAPI_KEY:'k',INICIS_INILITE_KEY:'l'})).environment(),'unavailable','billkey decryption must be confirmed first');
  assert.equal(addMonth(new Date('2026-01-31T03:00:00+09:00')).toISOString(),new Date('2026-02-28T03:00:00+09:00').toISOString());
+});
+
+test('2026-11-16 night-work #1: an uncertain renewal is never charged again (same moid, no new order), operators are alerted; an uncertain first charge keeps nothing double-charged',async()=>{
+ const other=await db.member.findFirstOrThrow({where:{id:creator}});
+ const s=await db.aiSubscription.findFirstOrThrow({where:{creator_id:creator,status:{in:['active','cancel_scheduled','past_due']}}}).catch(()=>null);
+ let sub=s;if(!sub){const st=await subs.start(creator,{productId:plan.id,version:plan.version,termsVersion:AI_SHOP_TERMS});await subs.activate(st.id,'enc-u','신한 **** 1234');sub=await db.aiSubscription.findUniqueOrThrow({where:{id:st.id}});}
+ const due=new Date(Date.now()-1000);await db.aiSubscription.update({where:{id:sub.id},data:{status:'active',next_charge_at:due,retry_count:0}});
+ const before=charges.length;uncertainNext=1;await subs.tick(v=>v);
+ const row=await db.aiSubscription.findUniqueOrThrow({where:{id:sub.id}});
+ assert.equal(row.status,'active','not turned into a failure');assert.equal(row.next_charge_at.getTime(),due.getTime(),'schedule and order number kept');assert.equal(row.last_failure_code,'BILLING_UNCERTAIN');
+ const ch=await db.aiSubscriptionCharge.findFirstOrThrow({where:{subscription_id:sub.id},orderBy:{created_at:'desc'}});assert.equal(ch.status,'uncertain');
+ assert.equal(await db.platformOperationalEvent.count({where:{type:'ai_subscription.charge_uncertain',dedupe_key:'ai_subscription.charge_uncertain:'+ch.moid}}),1,'operators alerted once');
+ await subs.tick(v=>v);await subs.tick(v=>v);assert.equal(charges.length,before,'never charged again automatically');
+ assert.equal(await db.aiSubscriptionCharge.count({where:{subscription_id:sub.id,period_start:due}}),1,'no second order number for the period');
+ await assert.rejects(shop.create(creator,{productId:pack.id,version:pack.version,termsVersion:AI_SHOP_TERMS,requestId:ch.moid}),code('INVALID_REQUEST'),'clients cannot take a subscription order number');
 });
