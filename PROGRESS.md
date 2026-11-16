@@ -1,3 +1,12 @@
+## 2026-11-17 종료 정산 지급 (feat/closing-payout, 운영 배포 crefans-api:closing-20261117)
+- 사용자 결정(ask-me): 계약 12조② — 파트너 종료 후 30일 내 합의가 없으면 확정 미정산 수익 전액을 등록 계좌로 지급. 운영자가 콘솔에서 시작한다.
+- GET/POST /admin/creators/:id/closing-payout(revenue.create, POST는 MANUAL_PAYOUTS_ENABLED). 종료일은 배지 해제 감사 기록(admin.creator_verification_changed)에서 계산(새 칸·마이그레이션 없음). 조건: 배지 없음·30일 경과·처리 중 출금 없음·출금 가능액>0·확인 계좌. expectedAmount가 화면 금액과 달라지면 409.
+- 처리 중 출금(request_key closing:) 생성+크리에이터 알림 → 기존 수동 지급 목록에서 계좌 확인·이체·manual-result 기록. closing: 건만 배지 없이 paid 가능, 지급 목록 보류 사유에서도 제외.
+- 범위: 멤버십 확정 수익(available)만. 보류 중 수익은 확정 후 다시 지급, 콩은 이번 경로 밖(미결).
+- 함께 고침: terminationNotice를 컨트롤러 밖 함수로(관리자 경로 권한 테스트가 잡은 기존 실패).
+- 검증: manual-payouts 11/11(대조: closing 예외 제거 시 실패), openapi·partner·cutoff 포함 32/32. 전체 762 중 70 실패 → 실패 20개 파일을 origin/prod b5772c6과 같은 조건 비교: prod 70 / 기능 69, 새 실패 0(환경: fetch failed·e2e DB 잔여 데이터 등).
+- 배포: API closing-20261117(운영 경로 401 확인, 이전 이미지·DB 덤프 복구 보관 20261117/closing-api SHA 검증), 콘솔 crefans-admin:closing-20261117(20261117/admin-closing). 콘솔 화면 실사용 확인은 미실시.
+
 ## 2026-11-17 크리에이터 계약 약속대로 코드 수정 (fix/contract-obligations)
 - 사용자 결정(pilot-work): 계약 초안과 코드 불일치 4건은 '코드를 약속대로'. 체결 계약 기준(별지 A·8조③·9조④·12조②).
   1. 최소 출금: creator_financial_terms·signup_invites·term_changes 에 minimum_withdrawal_beans(콩) 추가. withdrawalTerms 의 콩 최소는 이 칸 또는 기본 1,000콩(멤버십 원÷100 파생 제거).
