@@ -11,6 +11,7 @@ export class BankTransferController{
  constructor(private transfers:BankTransferService){}
  @Get('methods') methods(){return this.transfers.methods();}
  @Get('bank-transfer/:kind/:orderId') instructions(@Req() r:any,@Param('kind') kind:string,@Param('orderId') id:string){return this.transfers.forMember(r.user.sub,kind,id);}
+ @Post('bank-transfer/:kind/:orderId/deposited') deposited(@Req() r:any,@Param('kind') kind:string,@Param('orderId') id:string){return this.transfers.reportDeposit(r.user.sub,kind,id);}
 }
 @Controller('admin/bank-transfer') @UseGuards(PlatformAdminGuard)
 export class BankTransferAdminController{

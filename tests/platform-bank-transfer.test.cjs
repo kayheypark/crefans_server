@@ -120,8 +120,12 @@ test('operator Telegram outbox: deposit wait, 6 hours left (once), expiry and re
  const {operationsAlertText}=require('../dist/src/platform/operations.service');
  const events=async(type,targetId)=>db.platformOperationalEvent.findMany({where:{type,data:{path:'$.targetId',equals:targetId}}});
  const o=await shop.create(creator,{productId:product.id,version:product.version,termsVersion:AI_SHOP_TERMS,requestId:randomUUID(),...order});const pay=await paymentOf('ai-shop',o.id);
- const [opened]=await events('bank_transfer.opened',pay.id);assert.ok(opened,'alert on every new deposit wait');assert.deepEqual(Object.keys(opened.data).sort(),['amount','dueAt','kind','targetId']);assert.equal(opened.data.amount,5000);assert.equal(opened.data.kind,'ai-shop');
- const text=operationsAlertText(opened,'test','secret');assert.match(text,/무통장 입금 대기 주문 접수/);assert.match(text,/kind: AI 이용권/);assert.match(text,/amount: 5,000원/);assert.doesNotMatch(text,/홍길동|010-1234|@bank\.test/,'no depositor name, receipt number or email');
+ const [opened]=await events('bank_transfer.opened',pay.id);assert.ok(opened,'alert on every new deposit wait');assert.deepEqual(Object.keys(opened.data).sort(),['amount','dueAt','kind','productName','targetId']);assert.equal(opened.data.productName,product.name,'2026-11-17: the product name is included');assert.equal(opened.data.amount,5000);assert.equal(opened.data.kind,'ai-shop');
+ const text=operationsAlertText(opened,'test','secret');assert.match(text,/무통장 입금 대기 주문 접수/);assert.match(text,/kind: AI 이용권/);assert.match(text,/amount: 5,000원/);assert.match(text,new RegExp('상품: '+product.name));
+ // 2026-11-17 user decision: '입금했어요' alerts operators once per order; another member cannot report it.
+ await assert.rejects(transfers.reportDeposit(randomUUID(),'ai-shop',o.id),code('BANK_TRANSFER_NOT_FOUND'));
+ const first=await transfers.reportDeposit(creator,'ai-shop',o.id),again=await transfers.reportDeposit(creator,'ai-shop',o.id);assert.equal(first.reported,true);assert.equal(again.reported,true);
+ const reported=await events('bank_transfer.deposit_reported',pay.id);assert.equal(reported.length,1,'one alert per order');assert.match(operationsAlertText(reported[0],'test','secret'),/구매자가 입금했다고 알림/);assert.deepEqual(Object.keys(reported[0].data).sort(),['amount','dueAt','kind','targetId']);assert.doesNotMatch(text,/홍길동|010-1234|@bank\.test/,'no depositor name, receipt number or email');
  assert.equal(await transfers.remind(),0,'more than 6 hours left: no reminder');
  await db.bankTransferPayment.update({where:{id:pay.id},data:{expires_at:new Date(Date.now()+5*3600000)}});
  await transfers.remind();await transfers.remind();assert.equal((await events('bank_transfer.expiring',pay.id)).length,1,'one reminder per order');
@@ -132,5 +136,5 @@ test('operator Telegram outbox: deposit wait, 6 hours left (once), expiry and re
  const p=await shop.create(creator,{productId:product.id,version:product.version,termsVersion:AI_SHOP_TERMS,requestId:randomUUID(),...order});await transfers.confirm(admin,(await paymentOf('ai-shop',p.id)).id,{amount:5000,receivedAt:new Date().toISOString(),reference:'기업 0010'});
  await shop.refund(creator,p.id,{refundAccount});const m=await db.manualRefund.findFirstOrThrow({where:{kind:'ai-shop',order_id:p.id}});
  const [refund]=await events('manual_refund.requested',m.id);assert.ok(refund);assert.equal(refund.data.amount,5000);assert.equal(refund.data.dueAt,m.due_at.toISOString());assert.doesNotMatch(JSON.stringify(refund.data),/국민은행|123456789012|홍길동/);
- await db.platformOperationalEvent.deleteMany({where:{type:{in:['bank_transfer.opened','bank_transfer.expiring','bank_transfer.expired','manual_refund.requested']},data:{path:'$.kind',equals:'ai-shop'}}}).catch(()=>{});
+ await db.platformOperationalEvent.deleteMany({where:{type:{in:['bank_transfer.opened','bank_transfer.expiring','bank_transfer.expired','manual_refund.requested','bank_transfer.deposit_reported']},data:{path:'$.kind',equals:'ai-shop'}}}).catch(()=>{});
 });
