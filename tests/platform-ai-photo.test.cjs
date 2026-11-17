@@ -191,11 +191,11 @@ test('Seedream uses its own key, JSON reference order and one base64 output; mod
   const request=base({sourceId:id,mode:'cosplay',kind:'outfit',style:'cosplay',costumeIds:['blue-shiroko']});
   const r=await photos.edit(user,request,await mask());assert.equal(r.images.length,1);assert.equal(payload.model,'dola-seedream-5-5-261028');assert.equal(payload.image.length,3);assert.notEqual(payload.image[0],payload.image[1]);
   const ref=await require('../dist/src/platform/ai-photo-costume-references').readCostumeReference('blue-shiroko');assert.equal(payload.image[2],'data:image/webp;base64,'+ref.toString('base64'));
-  assert.equal(payload.size,'1024x1536');assert.equal(payload.response_format,'b64_json');assert.equal(payload.watermark,false);assert.equal(payload.background,'opaque');assert.match(payload.prompt,/Images 3 through 3/);
+  assert.equal(payload.size,'1024x1536');assert.equal(payload.response_format,'b64_json');assert.equal(payload.watermark,false);assert.equal(payload.background,'opaque');assert.match(payload.prompt,/Images 3 through 3/);assert.ok(payload.prompt.includes(require('../dist/src/platform/ai-photo').COSTUME_DETAIL_RULE),'costume fidelity rule from the first request');
   for(const unsupported of ['n','mask','quality','moderation','sequential_image_generation'])assert.equal(unsupported in payload,false);
   assert.equal(calls.filter(c=>c.kind==='moderation').length,3);
   assert.equal((await db.media.findUniqueOrThrow({where:{id:r.images[0].id}})).metadata.aiModel,'dola-seedream-5-5-261028');
-  reset();await photos.edit(user,base({sourceId:id,mode:'cosplay',kind:'outfit',style:'photo'}),await mask());assert.equal(payload.image.length,2);assert.match(payload.prompt,/pink clothing-region guide/);assert.doesNotMatch(payload.prompt,/transparent masked area/);
+  reset();await photos.edit(user,base({sourceId:id,mode:'cosplay',kind:'outfit',style:'photo'}),await mask());assert.equal(payload.image.length,2);assert.doesNotMatch(payload.prompt,/Costume fidelity/,'plain outfit edits without references keep the old prompt');assert.match(payload.prompt,/pink clothing-region guide/);assert.doesNotMatch(payload.prompt,/transparent masked area/);
   reset();payload=null;flags=[true];await assert.rejects(photos.edit(user,request,await mask()),code('UNSAFE_INPUT'));assert.equal(payload,null);
   reset();flags=[false,false,true];await assert.rejects(photos.edit(user,request,await mask()),code('UNSAFE_OUTPUT'));
   reset();const left=(await photos.quota(user)).remaining;photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response('{}',{status:503});await assert.rejects(photos.edit(user,request,await mask()),code('PROVIDER_ERROR'));assert.equal((await photos.quota(user)).remaining,left);
