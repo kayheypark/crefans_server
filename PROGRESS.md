@@ -1,3 +1,8 @@
+## 2026-11-17 텔레그램 주문·입금 알림 보강 (feat/order-telegram, 운영 crefans-api:ordertg-20261117)
+- 사용자 결정: 무통장 주문 접수 알림(bank_transfer.opened)에 상품명(productName, 상품 카탈로그 문구 60자, 개인정보 아님) 추가 — AI 이용권 상품명·광고상품명·'콩 N개'. 알림 본문 '상품: …'.
+- 사용자 결정: 구매자 '입금했어요' → POST payments/bank-transfer/:kind/:orderId/deposited, 본인 입금 대기 주문만, 주문당 1회(dedupe) 텔레그램 'bank_transfer.deposit_reported'(이름·계좌 없음). 은행 자동 입금 확인은 없음(운영자 콘솔 확인 그대로).
+- 검증: platform-bank-transfer 8/8(상품명·1회 알림·타인 거부), ai-shop·advertising 16/16, OpenAPI 부팅 검사 통과.
+
 ## 2026-11-17 비회원 AI 체험 횟수 전체 초기화 (feat/guest-quota-reset, 운영 crefans-api:guestreset-20261117)
 - 사용자 결정: 운영 콘솔에서 모든 비회원의 AI 체험 횟수를 한 번에 초기화. 횟수 버킷 id가 해시라 행 삭제 대신 platform_settings 'guest_ai_quota_epoch'를 올려 방문자별·IP별 키를 바꿈(0=기존 키 유지). 비회원 전체 하루 한도(ai-photo:guest-total)는 비용 보호로 유지.
 - API: GET admin/ai-photo-guest-quota(members.view), POST admin/ai-photo-guest-quota/reset(members.update, 확인 문구 '전체 초기화', 사유 2~500자, 감사 admin.guest_ai_quota_reset). 마이그레이션 없음.
