@@ -1,3 +1,8 @@
+## 2026-11-17 비회원 AI 체험 횟수 전체 초기화 (feat/guest-quota-reset, 운영 crefans-api:guestreset-20261117)
+- 사용자 결정: 운영 콘솔에서 모든 비회원의 AI 체험 횟수를 한 번에 초기화. 횟수 버킷 id가 해시라 행 삭제 대신 platform_settings 'guest_ai_quota_epoch'를 올려 방문자별·IP별 키를 바꿈(0=기존 키 유지). 비회원 전체 하루 한도(ai-photo:guest-total)는 비용 보호로 유지.
+- API: GET admin/ai-photo-guest-quota(members.view), POST admin/ai-photo-guest-quota/reset(members.update, 확인 문구 '전체 초기화', 사유 2~500자, 감사 admin.guest_ai_quota_reset). 마이그레이션 없음.
+- 검증: platform-ai-photo 44/44(3회 사용→7, 확인 문구 오류·권한 거부, 초기화 후 10), 관리자 라우트 권한 테스트 통과.
+
 ## 2026-11-17 AI 프리셋 사용 집계 (feat/preset-usage-stats, 미배포)
 - 사용자 결정: HOT 배지·정렬(프론트 하드코딩)용 집계. 표 ai_preset_usage_daily(day KST DATE, kind, preset_key, count) — 회원·방문자·IP·요청 ID를 저장하지 않는 집계라 개인정보 아님. 마이그레이션 20261117030000_ai_preset_usage(추가만).
 - 생성 성공 후에만 +1(src/platform/ai-preset-usage.ts, ai-photo.ts edit 성공 경로). 의상·참조 배경은 서버가 검증한 ID, 그 밖(메이크업·표정·포즈·구도·촬영컨셉·신체·텍스트 배경)은 프론트가 보낸 카드 제목 presetKeys. 최대 20개, 중복·모르는 종류 제외. 기록 실패는 생성 결과에 영향 없음.
