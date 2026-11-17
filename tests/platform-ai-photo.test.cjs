@@ -211,9 +211,9 @@ test('Seedream uses its own key, JSON reference order and one base64 output; mod
   assert.equal((await photos.quota(user)).remaining,before,'still not used up after both blocks');
   reset();prompts=[];photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);prompts.push(JSON.parse(init.body).prompt);return prompts.length===1?blocked():new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));};
   const ok=await photos.edit(user,stocking,await mask());assert.equal(ok.images.length,1,'the rewritten retry result reaches the member');assert.equal(prompts.length,2);
-  // wardrobe picks send only the costume ID: catalog stocking costumes are recognised by ID (6ee320 = 미츠리 하오리)
+  // wardrobe picks send only the costume ID: catalog stocking costumes are recognised by ID (0069c9, a catalog stocking costume; 6ee320 미츠리 is hidden since 2026-11-17)
   reset();prompts=[];photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);prompts.push(JSON.parse(init.body).prompt);return blocked();};
-  await assert.rejects(photos.edit(user,{...request,prompt:'의상 참조 사진 1의 코디를 적용해줘.',costumeIds:['6ee320']},await mask()),code('OUTPUT_MATERIAL_BLOCKED'));assert.equal(prompts.length,2);assert.ok(prompts[1].includes(STOCKING_CLAUSE));
+  await assert.rejects(photos.edit(user,{...request,prompt:'의상 참조 사진 1의 코디를 적용해줘.',costumeIds:['0069c9']},await mask()),code('OUTPUT_MATERIAL_BLOCKED'));assert.equal(prompts.length,2);assert.ok(prompts[1].includes(STOCKING_CLAUSE));
   // 네 after a refusal: one request, already with the improved wording (and the stocking clause when it applies)
   const {IMPROVED_PHOTO_CLAUSE}=require('../dist/src/platform/ai-photo');reset();prompts=[];
   await assert.rejects(photos.edit(user,{...request,retryImproved:'true'},await mask()),code('PROVIDER_OUTPUT_BLOCKED'));assert.equal(prompts.length,1,'no extra automatic retry');assert.ok(prompts[0].includes(IMPROVED_PHOTO_CLAUSE));assert.ok(!prompts[0].includes(STOCKING_CLAUSE));
@@ -315,7 +315,8 @@ test('six-character costume IDs map to identical assets and normalize legacy ali
  const {AI_PHOTO_COSTUME_IDS,costumeReferenceIds,readCostumeReference}=require('../dist/src/platform/ai-photo-costume-references');
  assert.equal(AI_PHOTO_COSTUME_IDS.length,353);assert.equal(new Set(AI_PHOTO_COSTUME_IDS).size,353);for(const id of AI_PHOTO_COSTUME_IDS)assert.match(id,/^[a-f0-9]{6}$/);
  const mapping={"maid": "773106", "sailor": "80974e", "gothic": "ffb58f", "mage": "666147", "cyber": "b4bf5d", "idol": "e614f6", "cheer": "190513", "beach": "ab36e8", "nikke-rapi": "313a28", "nikke-anis": "1947f3", "nikke-helm": "173f1e", "nikke-noir": "ce1f18", "overwatch-dva": "70219a", "overwatch-mercy": "7281fe", "overwatch-widow": "8971c9", "overwatch-ashe": "9a01b2", "diablo-sorcerer": "da6901", "diablo-necromancer": "87ad51", "diablo-rogue": "72db9a", "diablo-barbarian": "b3bfdd", "aot-scout": "1a73b4", "aot-captain": "3e20e3", "aot-police": "556b2b", "aot-final": "8f1113", "demon-giyu": "c65204", "demon-shinobu": "9e6184", "demon-rengoku": "8d3d3e", "demon-mitsuri": "6ee320", "jjk-gojo": "07c722", "jjk-nanami": "edf3b8", "jjk-geto": "6c9ecb", "jjk-toji": "a77dd5", "genshin-raiden": "b516a6", "genshin-jean": "752866", "genshin-zhongli": "2056e8", "genshin-diluc": "d69be9", "blue-shiroko": "80bdd0", "blue-hoshino": "4298dc", "blue-yuuka": "c7289e", "blue-aris": "29581e"};
- for(const [old,id] of Object.entries(mapping)){assert.deepEqual(costumeReferenceIds([old],['outfit'],'cosplay'),[id]);assert.deepEqual(costumeReferenceIds([id],['outfit'],'cosplay'),[id]);assert.deepEqual(await readCostumeReference(id),await readCostumeReference(old));assert.throws(()=>costumeReferenceIds([old,id],['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));}
+ const {HIDDEN_COSTUME_IDS}=require('../dist/src/platform/ai-photo-costume-references');
+ for(const [old,id] of Object.entries(mapping)){if(HIDDEN_COSTUME_IDS.has(id)){assert.throws(()=>costumeReferenceIds([old],['outfit'],'cosplay'),code('COSTUME_UNAVAILABLE'));continue;}assert.deepEqual(costumeReferenceIds([old],['outfit'],'cosplay'),[id]);assert.deepEqual(costumeReferenceIds([id],['outfit'],'cosplay'),[id]);assert.deepEqual(await readCostumeReference(id),await readCostumeReference(old));assert.throws(()=>costumeReferenceIds([old,id],['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));}
  for(const id of ['ffffff','__proto__','constructor','../maid']){assert.throws(()=>costumeReferenceIds([id],['outfit'],'cosplay'),code('INVALID_COSTUME_REFERENCES'));await assert.rejects(readCostumeReference(id),code('INVALID_COSTUME_REFERENCES'));}
 });
 
@@ -472,4 +473,11 @@ test('two concurrent paid reservations by a non-creator member use one remaining
  const results=await Promise.allSettled([reservePaidPhoto(db,id),reservePaidPhoto(db,id)]);
  assert.equal(results.filter(r=>r.status==='fulfilled').length,1,'exactly one reservation succeeds');
  assert.equal((await db.aiShopOrder.findUniqueOrThrow({where:{id:order.id}})).remaining,0,'the balance never goes below zero');
+});
+
+// 2026-11-17 user decision: the hidden 미츠리 하오리 is refused before any provider or moderation call.
+test('hidden costume IDs are refused without calling the provider',async()=>{
+ const {costumeReferenceIds,HIDDEN_COSTUME_IDS}=require('../dist/src/platform/ai-photo-costume-references');
+ assert.ok(HIDDEN_COSTUME_IDS.has('6ee320'));assert.throws(()=>costumeReferenceIds(['6ee320'],['outfit'],'cosplay'),code('COSTUME_UNAVAILABLE'));
+ assert.deepEqual(costumeReferenceIds(['0069c9'],['outfit'],'cosplay'),['0069c9']);
 });
