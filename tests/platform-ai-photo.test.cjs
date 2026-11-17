@@ -211,6 +211,13 @@ test('Seedream uses its own key, JSON reference order and one base64 output; mod
   assert.equal((await photos.quota(user)).remaining,before,'still not used up after both blocks');
   reset();prompts=[];photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);prompts.push(JSON.parse(init.body).prompt);return prompts.length===1?blocked():new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));};
   const ok=await photos.edit(user,stocking,await mask());assert.equal(ok.images.length,1,'the rewritten retry result reaches the member');assert.equal(prompts.length,2);
+  // wardrobe picks send only the costume ID: catalog stocking costumes are recognised by ID (6ee320 = 미츠리 하오리)
+  reset();prompts=[];photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);prompts.push(JSON.parse(init.body).prompt);return blocked();};
+  await assert.rejects(photos.edit(user,{...request,prompt:'의상 참조 사진 1의 코디를 적용해줘.',costumeIds:['6ee320']},await mask()),code('OUTPUT_MATERIAL_BLOCKED'));assert.equal(prompts.length,2);assert.ok(prompts[1].includes(STOCKING_CLAUSE));
+  // 네 after a refusal: one request, already with the improved wording (and the stocking clause when it applies)
+  const {IMPROVED_PHOTO_CLAUSE}=require('../dist/src/platform/ai-photo');reset();prompts=[];
+  await assert.rejects(photos.edit(user,{...request,retryImproved:'true'},await mask()),code('PROVIDER_OUTPUT_BLOCKED'));assert.equal(prompts.length,1,'no extra automatic retry');assert.ok(prompts[0].includes(IMPROVED_PHOTO_CLAUSE));assert.ok(!prompts[0].includes(STOCKING_CLAUSE));
+  reset();prompts=[];await assert.rejects(photos.edit(user,{...stocking,retryImproved:true},await mask()),code('OUTPUT_MATERIAL_BLOCKED'));assert.equal(prompts.length,1);assert.ok(prompts[0].includes(STOCKING_CLAUSE)&&prompts[0].includes(IMPROVED_PHOTO_CLAUSE));
   reset();const ids=require('../dist/src/platform/ai-photo-costume-references').AI_PHOTO_COSTUME_IDS.slice(0,9);await assert.rejects(photos.edit(user,{...request,costumeIds:ids},await mask()),code('INVALID_COSTUME_REFERENCES'));assert.equal(calls.length,0);
   photos.settings.seedreamKey='';assert.equal((await photos.quota(user)).allowed,false);await assert.rejects(photos.edit(user,request,await mask()),code('PROVIDER_NOT_CONFIGURED'));
  }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;}
