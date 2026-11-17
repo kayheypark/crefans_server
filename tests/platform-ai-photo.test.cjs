@@ -427,9 +427,10 @@ test('third public background batch sends all six packaged reference files',asyn
 
 test('every public background reference id resolves to a 1024x1536 WebP, including the X-likes batch',async()=>{
  const {readBackgroundReference,backgroundReferenceId}=require('../dist/src/platform/ai-photo-background-references');
- const ids=['b7a101','b7a102','b7a103','b7a104','b7a105','b7a106','b7a107','c8b201','c8b202','c8b203','c8b204','c8b205','c8b206','c8b207','c8b208','c8b209','d9c301','d9c302','d9c303','d9c304','d9c305','d9c306',...Array.from({length:16},(_,i)=>'ead4'+String(i+1).padStart(2,'0'))];
+ const ids=['b7a101','b7a102','b7a103','b7a104','b7a105','b7a106','b7a107','c8b201','c8b202','c8b203','c8b204','c8b205','c8b206','c8b207','c8b208','c8b209','d9c301','d9c302','d9c303','d9c304','d9c305','d9c306',...Array.from({length:16},(_,i)=>'ead4'+String(i+1).padStart(2,'0')),...Array.from({length:94},(_,i)=>'fb50'+String(i+1).padStart(2,'0'))];
+ assert.equal(ids.length,132);
  for(const id of ids){const m=await sharp(await readBackgroundReference(id)).metadata();assert.equal(m.format,'webp');assert.equal(m.width,1024);assert.equal(m.height,1536);}
- assert.throws(()=>backgroundReferenceId('ead417',['background']),/배경을 다시 선택/);
+ assert.throws(()=>backgroundReferenceId('ead417',['background']),/배경을 다시 선택/);assert.throws(()=>backgroundReferenceId('fb5095',['background']),/배경을 다시 선택/);
 });
 
 test('heart rewards stop at 100 hearts per member per KST day (2026-11-15 ask-me)',async()=>{
