@@ -499,3 +499,19 @@ test('preset usage is counted per day and preset only after a successful generat
   const row=await db.aiPresetUsageDaily.findUnique({where:{day_kind_preset_key:{day,kind:'pose',preset_key:key}}});assert.deepEqual(Object.keys(row).sort(),['count','day','kind','preset_key','updated_at'],'no person or request column');
  }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;await db.aiPresetUsageDaily.deleteMany({where:{preset_key:key}});}
 });
+
+// 2026-11-17 user decision: operators reset every signed-out visitor's AI tries at once (guest quota epoch).
+test('console reset gives every visitor a fresh 10 tries and keeps the guests daily budget',async()=>{
+ const {resetGuestAiQuota,guestAiQuotaStatus}=require('../dist/src/platform/ai-photo-grants'),{GUEST_QUOTA_EPOCH_SETTING}=require('../dist/src/platform/guest-policy');
+ const prior=await db.platformSetting.findUnique({where:{key:GUEST_QUOTA_EPOCH_SETTING}});
+ const admin={id:crypto.randomUUID(),role:'SUPER_ADMIN',is_active:true},viewer={id:crypto.randomUUID(),role:'VIEWER',is_active:true,permissions:{members:['view']}};
+ const visitor='guest:'+crypto.randomBytes(20).toString('hex'),{guestQuotaEpoch,guestQuotaKey}=require('../dist/src/platform/guest-policy');
+ try{
+  const epoch=await guestQuotaEpoch(db);for(let n=0;n<3;n++)await photos.limiter.limit(guestQuotaKey('ai-photo:guest:',visitor,epoch),10,3650*86400);
+  assert.equal(await photos.guestRemaining(visitor),7);
+  await assert.rejects(resetGuestAiQuota(db,admin,{reason:'테스트 초기화',confirm:'틀림'}),code('CONFIRMATION_REQUIRED'));
+  await assert.rejects(resetGuestAiQuota(db,viewer,{reason:'테스트 초기화',confirm:'전체 초기화'}));
+  const r=await resetGuestAiQuota(db,admin,{reason:'테스트 초기화',confirm:'전체 초기화'});assert.equal(r.epoch,epoch+1);
+  assert.equal(await photos.guestRemaining(visitor),10,'fresh tries after the reset');assert.equal((await guestAiQuotaStatus(db,admin)).epoch,epoch+1);
+ }finally{if(prior)await db.platformSetting.update({where:{key:GUEST_QUOTA_EPOCH_SETTING},data:{value:prior.value}});else await db.platformSetting.deleteMany({where:{key:GUEST_QUOTA_EPOCH_SETTING}});}
+});

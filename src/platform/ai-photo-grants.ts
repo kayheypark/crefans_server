@@ -8,6 +8,7 @@ import {reject,text} from './http';
 import {digest} from '../auth/local/credentials';
 import {randomUUID} from 'crypto';
 import {ticketCounts} from './ai-photo-tickets';
+import {GUEST_QUOTA_EPOCH_SETTING,guestQuotaEpoch} from './guest-policy';
 
 export const reasonOf=(value:unknown)=>{const reason=typeof value==='string'?value.trim():'';if(reason.length<2||reason.length>500)reject(400,'INVALID_REASON','사유를 2~500자로 입력해주세요.');return reason;};
 const handleOf=(value:unknown)=>{const handle=typeof value==='string'?value.trim().replace(/^@/,'').toLowerCase():'';if(!/^[a-z0-9_.]{2,30}$/.test(handle))reject(400,'INVALID_HANDLE','크리에이터 핸들을 확인해주세요.');return handle;};
@@ -110,4 +111,19 @@ export async function resetAllAiPhotoQuota(db:PrismaClient,admin:any,input:any){
   return reset.length;
  });
  return{message:count?`크리에이터 ${count}명의 오늘 사용 횟수를 초기화했습니다.`:'오늘 사용한 크리에이터가 없어 초기화할 것이 없습니다.',resetCount:count};
+}
+
+/** 2026-11-17 user decision: reset every signed-out visitor's AI tries (per visitor and per IP) by bumping the guest quota epoch. */
+export async function guestAiQuotaStatus(db:any,admin:any){requirePermission(admin,'members','view');const row=await db.platformSetting.findUnique({where:{key:GUEST_QUOTA_EPOCH_SETTING}});return{epoch:await guestQuotaEpoch(db),resetAt:row?.updated_at??null};}
+export async function resetGuestAiQuota(db:any,admin:any,input:any){
+ requirePermission(admin,'members','update');const reason=reasonOf(input?.reason);
+ if(input?.confirm!==AI_PHOTO_RESET_ALL_PHRASE)reject(400,'CONFIRMATION_REQUIRED',`확인 문구 '${AI_PHOTO_RESET_ALL_PHRASE}'를 정확히 입력해주세요.`);
+ return db.$transaction(async(tx:any)=>{
+  await tx.$executeRaw`INSERT IGNORE INTO platform_settings (\`key\`,value,updated_by,updated_at) VALUES (${GUEST_QUOTA_EPOCH_SETTING},${JSON.stringify({epoch:0})},${admin.id},NOW(3))`;
+  await tx.$queryRaw`SELECT \`key\` FROM platform_settings WHERE \`key\`=${GUEST_QUOTA_EPOCH_SETTING} FOR UPDATE`;
+  const epoch=await guestQuotaEpoch(tx)+1;
+  await tx.platformSetting.update({where:{key:GUEST_QUOTA_EPOCH_SETTING},data:{value:{epoch},updated_by:admin.id}});
+  await appendAudit(tx,{category:'admin',action:'admin.guest_ai_quota_reset',data:{changedBy:admin.id,epoch,reasonDigest:contentDigest(reason)}});
+  return{epoch,message:'모든 비회원의 AI 체험 횟수를 초기화했어요. 하루 전체 체험 한도는 그대로예요.'};
+ });
 }

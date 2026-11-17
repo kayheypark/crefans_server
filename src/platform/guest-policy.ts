@@ -18,3 +18,10 @@ export function guestProfile(id:string){return{id,name:'체험 사용자',handle
 function guestIpKey(config:ConfigService){const key=config.get<string>('LOCAL_AUTH_SECRET');if(!key||key.length<64)throw new Error('LOCAL_AUTH_SECRET must contain at least 64 random characters');return key;}
 export function guestIpHash(config:ConfigService,ip?:string|null){return createHmac('sha256',guestIpKey(config)).update('guest-ip:'+(ip||'unknown')).digest('hex').slice(0,32);}
 
+
+// 2026-11-17 user decision: operators can reset every visitor's AI tries at once from the console. Guest quota buckets are
+// hashed, so instead of deleting rows the reset bumps an epoch that is part of each per-visitor and per-IP key (0 = original
+// keys, so counts before the first reset are kept). The guests' service-wide daily budget (ai-photo:guest-total) is not reset.
+export const GUEST_QUOTA_EPOCH_SETTING='guest_ai_quota_epoch';
+export async function guestQuotaEpoch(db:any):Promise<number>{const row=await db.platformSetting.findUnique({where:{key:GUEST_QUOTA_EPOCH_SETTING}});const n=Number((row?.value as any)?.epoch??row?.value);return Number.isSafeInteger(n)&&n>0?n:0;}
+export const guestQuotaKey=(prefix:'ai-photo:guest:'|'ai-photo:guest-ip:',id:string,epoch:number)=>prefix+(epoch?epoch+':':'')+id;
