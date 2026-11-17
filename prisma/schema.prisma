@@ -2280,3 +2280,14 @@ model PhoneVerification {
   @@index([member_id, created_at])
   @@map("phone_verifications")
 }
+
+/// 2026-11-17: daily AI photo preset usage (aggregate only, no person or request is stored).
+model AiPresetUsageDaily {
+  day        DateTime @db.Date
+  kind       String   @db.VarChar(16)
+  preset_key String   @db.VarChar(64)
+  count      Int      @default(0)
+  updated_at DateTime @default(now()) @updatedAt
+  @@id([day, kind, preset_key])
+  @@map("ai_preset_usage_daily")
+}
