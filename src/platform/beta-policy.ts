@@ -4,6 +4,9 @@ import {reject} from './http';
 // User selections of 2026-10-25; minimum KRW withdrawal raised to 100,000 on 2026-10-27. Financial fee/hold values remain versioned in DB.
 export const betaPolicy=Object.freeze({version:'2026-10-25',days:14,platformFeeBps:2000,settlementHoldDays:7,refundDays:7,minimumWithdrawal:100000,retries:3,retryHours:24});
 export const isBeta=(config:ConfigService)=>config.get('BETA_MODE')==='true';
+// 2026-11-17 user decision: adult (is_sensitive) content is blocked by its own switch, not by BETA_MODE (terms 7 / adult.1).
+// Unset means blocked; only ADULT_CONTENT_BLOCKED=false would open it.
+export const adultContentBlocked=(config:ConfigService)=>config.get('ADULT_CONTENT_BLOCKED')!=='false';
 // 2026-10-31 user decision: beta stays (invites, general content) while real payments and operator-recorded payouts open by switch.
 export const livePayments=(config:ConfigService)=>config.get('LIVE_PAYMENTS_ENABLED')==='true';
 export const manualPayouts=(config:ConfigService)=>config.get('MANUAL_PAYOUTS_ENABLED')==='true';

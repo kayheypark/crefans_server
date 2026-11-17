@@ -7,7 +7,7 @@ import {categoryView,categoryOrder} from './category-catalog';
 import {notifyPost} from './post-notices';
 import {postSupporterCount} from './post-supporters';
 import {recordMarketingChoice} from './marketing.service';
-import {isBeta,livePayments,manualPayouts} from './beta-policy';
+import {adultContentBlocked,isBeta,livePayments,manualPayouts} from './beta-policy';
 import {LegalDocumentsService} from './legal-documents';
 import {ConfigService} from '@nestjs/config';
 import {signupPolicy} from './signup-policy';
@@ -30,6 +30,7 @@ export class PlatformService {
  claimBadge(member:string,input:any){return claimFoundingBadge(this.db,member,input);}
  badgeVisibility(member:string,input:any){return setFoundingBadgeVisibility(this.db,member,input);}
  beta(){return isBeta(this.config);}
+ adultBlocked(){return adultContentBlocked(this.config);}
  paymentSwitches(){return{livePayments:livePayments(this.config),manualPayouts:manualPayouts(this.config)};}
  async creator(id:string){const c=await this.db.creator.findFirst({where:{OR:[{user_id:id},{id},{handle:id}]}});if(!c)reject(404,'CREATOR_NOT_FOUND','크리에이터를 찾을 수 없습니다.');return c;}
  // Profile post lists accept a creator id/handle or, since 2026-11-15, a member id/handle (members may post).
@@ -41,7 +42,7 @@ export class PlatformService {
  async access(post:any,viewer?:string,db:any=this.db){
    // Operator-hidden posts (terms §8) stay visible only to their author.
    if(post.hidden_at)return viewer===post.user_sub;
-   if(isBeta(this.config)&&post.is_sensitive)return false;if(viewer===post.user_sub)return true;
+   if(adultContentBlocked(this.config)&&post.is_sensitive)return false;if(viewer===post.user_sub)return true;
    // Guest posts (2026-11-15): public for 24 hours after publishing, then closed to everyone but the same browser.
    if(isGuestId(post.user_sub))return post.status==='PUBLISHED'&&!post.is_deleted&&post.is_public&&!post.is_membership&&!post.is_sensitive&&!!post.published_at&&post.published_at>guestCutoff();if(post.is_sensitive){if(!viewer)return false;const member=await db.member.findUnique({where:{id:viewer}});if(!member?.identity_hash||!await db.identityProof.findFirst({where:{identity_hash:member.identity_hash,adult_verified:true,consumed_at:{not:null}}}))return false;}
    const creator=await db.creator.findUnique({where:{user_id:post.user_sub}});
