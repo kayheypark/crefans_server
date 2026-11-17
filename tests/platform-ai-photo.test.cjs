@@ -199,7 +199,18 @@ test('Seedream uses its own key, JSON reference order and one base64 output; mod
   reset();payload=null;flags=[true];await assert.rejects(photos.edit(user,request,await mask()),code('UNSAFE_INPUT'));assert.equal(payload,null);
   reset();flags=[false,false,true];await assert.rejects(photos.edit(user,request,await mask()),code('UNSAFE_OUTPUT'));
   reset();const left=(await photos.quota(user)).remaining;photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response('{}',{status:503});await assert.rejects(photos.edit(user,request,await mask()),code('PROVIDER_ERROR'));assert.equal((await photos.quota(user)).remaining,left);
-  reset();photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response(JSON.stringify({error:{code:'OutputImageSensitiveContentDetected.PolicyViolation'}}),{status:400});await assert.rejects(photos.edit(user,request,await mask()),code('UNSAFE_OUTPUT'));
+  // 2026-11-17: a Seedream output block gives the try back and offers a retry; requests naming stocking/see-through materials
+  // are retried once with the approved stocking wording before that.
+  const blocked=()=>new Response(JSON.stringify({error:{code:'OutputImageSensitiveContentDetected.PolicyViolation'}}),{status:400});let prompts=[];
+  reset();let before=(await photos.quota(user)).remaining;photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);prompts.push(JSON.parse(init.body).prompt);return blocked();};
+  await assert.rejects(photos.edit(user,request,await mask()),code('PROVIDER_OUTPUT_BLOCKED'));assert.equal(prompts.length,1,'no stocking words: no rewritten retry');assert.equal((await photos.quota(user)).remaining,before,'the try is given back');
+  const {STOCKING_CLAUSE}=require('../dist/src/platform/ai-photo'),stocking={...request,prompt:'검정 시스루 전신 슈트와 흰 사이하이 스타킹으로 바꿔줘'};
+  reset();prompts=[];before=(await photos.quota(user)).remaining;
+  await assert.rejects(photos.edit(user,stocking,await mask()),code('OUTPUT_MATERIAL_BLOCKED'));assert.equal(prompts.length,2,'one rewritten retry');
+  assert.doesNotMatch(prompts[0],/25데니어/);assert.ok(prompts[1].includes(STOCKING_CLAUSE));assert.doesNotMatch(prompts[1],/시스루/);assert.match(prompts[1],/반투명 나일론 전신 슈트/);
+  assert.equal((await photos.quota(user)).remaining,before,'still not used up after both blocks');
+  reset();prompts=[];photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);prompts.push(JSON.parse(init.body).prompt);return prompts.length===1?blocked():new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));};
+  const ok=await photos.edit(user,stocking,await mask());assert.equal(ok.images.length,1,'the rewritten retry result reaches the member');assert.equal(prompts.length,2);
   reset();const ids=require('../dist/src/platform/ai-photo-costume-references').AI_PHOTO_COSTUME_IDS.slice(0,9);await assert.rejects(photos.edit(user,{...request,costumeIds:ids},await mask()),code('INVALID_COSTUME_REFERENCES'));assert.equal(calls.length,0);
   photos.settings.seedreamKey='';assert.equal((await photos.quota(user)).allowed,false);await assert.rejects(photos.edit(user,request,await mask()),code('PROVIDER_NOT_CONFIGURED'));
  }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;}
