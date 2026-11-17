@@ -481,3 +481,21 @@ test('hidden costume IDs are refused without calling the provider',async()=>{
  assert.ok(HIDDEN_COSTUME_IDS.has('6ee320'));assert.throws(()=>costumeReferenceIds(['6ee320'],['outfit'],'cosplay'),code('COSTUME_UNAVAILABLE'));
  assert.deepEqual(costumeReferenceIds(['0069c9'],['outfit'],'cosplay'),['0069c9']);
 });
+
+// 2026-11-17 user decision: successful requests add one to an aggregate per KST day, kind and preset (no person is stored).
+test('preset usage is counted per day and preset only after a successful generation',async()=>{
+ const {presetUsageKeys,kstDay}=require('../dist/src/platform/ai-preset-usage');
+ assert.deepEqual(presetUsageKeys({costumeIds:'["4a0c8f","bad"]',backgroundId:'fb5001',presetKeys:JSON.stringify([{kind:'makeup',key:'지뢰계 메이크업'},{kind:'pose',key:'의자에 앉기'},{kind:'outfit',key:'forged'},{kind:'nope',key:'x'},{kind:'pose',key:'의자에 앉기'}])}),
+  [{kind:'outfit',key:'4a0c8f'},{kind:'background',key:'fb5001'},{kind:'makeup',key:'지뢰계 메이크업'},{kind:'pose',key:'의자에 앉기'}],'outfit/background only from validated IDs, duplicates and unknown kinds dropped');
+ assert.equal(kstDay(new Date('2026-11-17T15:30:00Z')).toISOString(),'2026-11-18T00:00:00.000Z','KST calendar day');
+ const saved={...photos.settings},previous=photos.fetcher,user=await makeCreator('aiusage_'+tag),id=await media(user),key='사용량 테스트 '+tag,day=kstDay();
+ const count=async()=>(await db.aiPresetUsageDaily.findUnique({where:{day_kind_preset_key:{day,kind:'pose',preset_key:key}}}))?.count||0;
+ try{
+  Object.assign(photos.settings,{seedreamKey:'seedream-test-key'});const request=base({sourceId:id,mode:'cosplay',kind:'outfit',style:'cosplay',costumeIds:['blue-shiroko'],presetKeys:JSON.stringify([{kind:'pose',key}])});
+  photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response(JSON.stringify({error:{code:'OutputImageSensitiveContentDetected.PolicyViolation'}}),{status:400});
+  reset();await assert.rejects(photos.edit(user,request,await mask()));assert.equal(await count(),0,'failures are not counted');
+  photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));
+  reset();await photos.edit(user,request,await mask());reset();await photos.edit(user,request,await mask());assert.equal(await count(),2);
+  const row=await db.aiPresetUsageDaily.findUnique({where:{day_kind_preset_key:{day,kind:'pose',preset_key:key}}});assert.deepEqual(Object.keys(row).sort(),['count','day','kind','preset_key','updated_at'],'no person or request column');
+ }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;await db.aiPresetUsageDaily.deleteMany({where:{preset_key:key}});}
+});
