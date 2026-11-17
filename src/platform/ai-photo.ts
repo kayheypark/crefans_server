@@ -22,7 +22,7 @@ import {reject} from './http';
 import {contentDigest} from './audit';
 import {requestContext} from './request-context';
 import {PlatformOperationsService} from './operations.service';
-import {GUEST_AI_LIMIT,GUEST_DAILY_TOTAL,GUEST_IP_DAILY} from './guest-policy';
+import {GUEST_AI_LIMIT,GUEST_DAILY_TOTAL,GUEST_IP_DAILY,guestQuotaEpoch,guestQuotaKey} from './guest-policy';
 const GUEST_LIFETIME=3650*86400;
 import {aiFailureTrace,diagnosticId,recordAiFailure,recordAiRequest,traceAiEvent,AiFailureTrace} from './ai-photo-failures';
 import {aiPhotoAllowed} from './ai-photo-grants';
@@ -88,11 +88,11 @@ export class AiPhotoService{
  fetcher:typeof fetch=fetch;
  constructor(private configService:ConfigService,private service:PlatformService,private storage:PlatformMediaStorage,private limiter:LocalMemberService,private operations:PlatformOperationsService){this.settings=aiPhotoConfig(configService);}
  // Guest trial (2026-11-15): 10 per visitor for good, 10 per IP per day, 200 for all visitors per day. No hearts, tickets or library.
- private guestKeys(sub:string,guest:{ipHash:string}){return[{key:'ai-photo:guest:'+sub,max:GUEST_AI_LIMIT,seconds:GUEST_LIFETIME,code:'GUEST_AI_LIMIT',message:'체험 AI 사진 10회를 모두 썼어요. 회원가입하면 계속 이용할 수 있어요.'},{key:'ai-photo:guest-ip:'+guest.ipHash,max:GUEST_IP_DAILY,seconds:DAY,code:'GUEST_IP_LIMIT',message:'이 네트워크에서는 오늘 체험 횟수를 모두 썼어요. 회원가입하면 계속 이용할 수 있어요.'},{key:'ai-photo:guest-total',max:GUEST_DAILY_TOTAL,seconds:DAY,code:'GUEST_DAILY_CLOSED',message:'오늘 비회원 체험이 마감됐어요. 회원가입 후 이용해 주세요.'}];}
+ private guestKeys(sub:string,guest:{ipHash:string},epoch=0){return[{key:guestQuotaKey('ai-photo:guest:',sub,epoch),max:GUEST_AI_LIMIT,seconds:GUEST_LIFETIME,code:'GUEST_AI_LIMIT',message:'체험 AI 사진 10회를 모두 썼어요. 회원가입하면 계속 이용할 수 있어요.'},{key:guestQuotaKey('ai-photo:guest-ip:',guest.ipHash,epoch),max:GUEST_IP_DAILY,seconds:DAY,code:'GUEST_IP_LIMIT',message:'이 네트워크에서는 오늘 체험 횟수를 모두 썼어요. 회원가입하면 계속 이용할 수 있어요.'},{key:'ai-photo:guest-total',max:GUEST_DAILY_TOTAL,seconds:DAY,code:'GUEST_DAILY_CLOSED',message:'오늘 비회원 체험이 마감됐어요. 회원가입 후 이용해 주세요.'}];}
  private bucket(key:string,seconds:number){return digest(`${key}:${Math.floor(Date.now()/(seconds*1000))}`);}
  private async usedIn(key:string,seconds:number){const row=await this.service.db.authRateBucket.findUnique({where:{id:this.bucket(key,seconds)}});return row?.count??0;}
  private async giveBackIn(key:string,seconds:number){await this.service.db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${this.bucket(key,seconds)}`;}
- async guestRemaining(id:string){return Math.max(0,GUEST_AI_LIMIT-await this.usedIn('ai-photo:guest:'+id,GUEST_LIFETIME));}
+ async guestRemaining(id:string){return Math.max(0,GUEST_AI_LIMIT-await this.usedIn(guestQuotaKey('ai-photo:guest:',id,await guestQuotaEpoch(this.service.db)),GUEST_LIFETIME));}
  // 2026-11-16 user decision: every AI photo failure goes to Telegram (operations alert queue), user-caused ones included.
  // Codes and stage only: no prompt, photo, member id or IP leaves the service; operators find the request by its record/request id.
  private async failureAlert(sub:string,error:any,trace:AiFailureTrace,started:number,guest:boolean){try{
@@ -249,7 +249,7 @@ export class AiPhotoService{
   await this.stage('quota');
   const key=this.creatorKey(sub);
   let paidUse:any=null,rewardUse:any=null;const guestTaken:{key:string;seconds:number}[]=[];
-  if(guest){for(const item of this.guestKeys(sub,guest)){try{await this.limiter.limit(item.key,item.max,item.seconds);guestTaken.push(item);}catch(error){if(error?.getStatus?.()!==429)throw error;await this.giveBackIn(item.key,item.seconds);for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(item.code==='GUEST_DAILY_CLOSED')await this.guestUsageAlert(true);reject(429,item.code,item.message);}}}
+  if(guest){for(const item of this.guestKeys(sub,guest,await guestQuotaEpoch(this.service.db))){try{await this.limiter.limit(item.key,item.max,item.seconds);guestTaken.push(item);}catch(error){if(error?.getStatus?.()!==429)throw error;await this.giveBackIn(item.key,item.seconds);for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(item.code==='GUEST_DAILY_CLOSED')await this.guestUsageAlert(true);reject(429,item.code,item.message);}}}
   else try{await this.limiter.limit(key,this.settings.perDay,DAY);}catch(error){if(error?.getStatus?.()!==429)throw error;rewardUse=await reserveHeartCredit(this.service.db,sub,aiFailureTrace.getStore()?.requestId||randomUUID());if(!rewardUse)paidUse=await reservePaidPhoto(this.service.db,sub,aiFailureTrace.getStore()?.requestId);}
   // 2026-11-15 user decision: guests have their own daily budget (ai-photo:guest-total), so they never use up the members' service-wide cap.
   if(!guest)try{await this.limiter.limit('ai-photo:total',this.settings.dailyTotal,DAY);}catch{for(const taken of guestTaken)await this.giveBackIn(taken.key,taken.seconds);if(rewardUse)await finishHeartCredit(this.service.db,rewardUse.id,false);else if(paidUse)await finishPaidPhoto(this.service.db,paidUse.id,false);else if(!guest)await this.giveBack(key);reject(429,'SERVICE_BUSY','오늘은 AI 사진 편집 요청이 많아 잠시 쉬고 있어요. 내일 다시 이용해 주세요.');}
