@@ -1,3 +1,8 @@
+## 2026-11-17 공용 배경 참조 94종 추가 (feat/x-likes-backgrounds2, 미배포)
+- 프론트 X 좋아요 2차 배치 배경 fb5001~fb5094를 허용 ID와 src/platform/ai-photo-backgrounds/에 추가(프론트와 SHA-256 동일). 총 132종.
+- 검증: npm run build, CREFANS_E2E platform-ai-photo 39/39(132개 ID 1024×1536 WebP, fb5095 거절). ID 목록 되돌림 시 실패 대조. 증거는 프론트 docs/audit/x-likes-presets-20261117.json.
+- 배포 순서: 이 서버를 먼저 배포해야 프론트 새 카드 선택 시 '배경을 다시 선택' 오류가 안 난다.
+
 ## 2026-11-17 Seedream 출력 거절 시 스타킹 문구 1회 재요청·횟수 반환·다시 시도 (feat/stocking-retry, 운영 crefans-api:stocking-20261117, front-stocking-20261117)
 - 사용자 결정: 요청에 스타킹·시스루·망사·타이츠가 있고 Seedream이 출력을 거절(OutputImageSensitiveContentDetected)하면 STOCKING_CLAUSE(밀착 나일론·25데니어 스모키 반투명·광택, 몸통 불투명 이너)로 한 번만 재요청, 성공 결과를 그대로 전달. 최종 거절은 OUTPUT_MATERIAL_BLOCKED/PROVIDER_OUTPUT_BLOCKED, 무료횟수·하트·이용권 반환(공급사 미과금), 앱은 [닫기][다시 시도].
 - 정정: 이전에는 이 거절에도 횟수가 차감됐다(charged=false). OpenAI 출력 안전검사 차단(UNSAFE_OUTPUT)은 기존대로 차감.
