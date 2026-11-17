@@ -2,6 +2,7 @@
 - 사용자 결정: 운영 콘솔에서 모든 비회원의 AI 체험 횟수를 한 번에 초기화. 횟수 버킷 id가 해시라 행 삭제 대신 platform_settings 'guest_ai_quota_epoch'를 올려 방문자별·IP별 키를 바꿈(0=기존 키 유지). 비회원 전체 하루 한도(ai-photo:guest-total)는 비용 보호로 유지.
 - API: GET admin/ai-photo-guest-quota(members.view), POST admin/ai-photo-guest-quota/reset(members.update, 확인 문구 '전체 초기화', 사유 2~500자, 감사 admin.guest_ai_quota_reset). 마이그레이션 없음.
 - 검증: platform-ai-photo 44/44(3회 사용→7, 확인 문구 오류·권한 거부, 초기화 후 10), 관리자 라우트 권한 테스트 통과.
+- 첫 배포 실패(자동 롤백): 새 관리자 라우트 2개가 openapi-contract.ts에 없어 installPlatformOpenApi가 시작 시 'Missing OpenAPI contract'로 멈춤. 계약 추가 후 로컬 부팅 확인(계약 제거 시 같은 오류 대조). 새 라우트는 openapi-contract.ts 등록 + .local/oa-check.cjs 부팅 확인 필수.
 
 ## 2026-11-17 AI 프리셋 사용 집계 (feat/preset-usage-stats, 미배포)
 - 사용자 결정: HOT 배지·정렬(프론트 하드코딩)용 집계. 표 ai_preset_usage_daily(day KST DATE, kind, preset_key, count) — 회원·방문자·IP·요청 ID를 저장하지 않는 집계라 개인정보 아님. 마이그레이션 20261117030000_ai_preset_usage(추가만).
