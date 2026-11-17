@@ -769,3 +769,5 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 | POST | /admin/bank-transfer/refunds/:id/complete | 이체 완료 기록 |
 | POST | /admin/bank-transfer/refunds/:id/reject | 환불 반려(구매 복원) |
 
+
+- 2026-11-17 AI 사진 Seedream 출력 거절(OutputImageSensitiveContentDetected): 요청에 스타킹·시스루·망사·타이츠가 있으면 승인된 스타킹 문구(STOCKING_CLAUSE)로 한 번만 다시 요청. 최종 거절은 400 OUTPUT_MATERIAL_BLOCKED(소재 문구) 또는 PROVIDER_OUTPUT_BLOCKED이며 이용 횟수·하트·이용권을 되돌린다(공급사 미과금). 앱은 '다시 시도/닫기'를 보여 준다. OpenAI 출력 안전검사 차단(UNSAFE_OUTPUT)은 기존대로 차감.
