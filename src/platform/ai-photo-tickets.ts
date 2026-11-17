@@ -38,7 +38,7 @@ export async function grantAiPhotoTickets(db:PrismaClient,admin:any,creatorId:st
  if(!Number.isSafeInteger(quantity)||quantity<1||quantity>AI_PHOTO_TICKET_MAX_GRANT)reject(400,'INVALID_QUANTITY',`지급 수량은 1~${AI_PHOTO_TICKET_MAX_GRANT}장으로 입력해주세요.`);
  const now=new Date(),expiresAt=new Date(now.getTime()+AI_PHOTO_TICKET_DAYS*86400000);
  await db.$transaction(async tx=>{
-  await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${creatorId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT id FROM members WHERE id=${creatorId} FOR UPDATE`;
   if(!await tx.aiPhotoGrant.findUnique({where:{creator_user_id:creatorId}}))reject(404,'GRANT_NOT_FOUND','AI 사진 편집 허용 목록에 있는 크리에이터에게만 지급할 수 있습니다.');
   const t=await tx.aiPhotoResetTicket.create({data:{creator_user_id:creatorId,quantity,remaining:quantity,reason,granted_by:admin.id,expires_at:expiresAt,created_at:now}});
   await tx.aiPhotoGrantChange.create({data:{creator_user_id:creatorId,action:'ticket_granted',reason:`리셋권 ${quantity}장 지급: ${reason}`.slice(0,500),changed_by:admin.id}});
@@ -50,7 +50,7 @@ export async function grantAiPhotoTickets(db:PrismaClient,admin:any,creatorId:st
 export async function revokeAiPhotoTickets(db:PrismaClient,admin:any,creatorId:string,ticketId:string,input:any){
  requirePermission(admin,'members','update');const reason=reasonOf(input?.reason),now=new Date();
  const count=await db.$transaction(async tx=>{
-  await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${creatorId} FOR UPDATE`;// same lock as useAiPhotoTicket
+  await tx.$queryRaw`SELECT id FROM members WHERE id=${creatorId} FOR UPDATE`;// same lock as useAiPhotoTicket
   const t=await tx.aiPhotoResetTicket.findUnique({where:{id:ticketId}});
   if(!t||t.creator_user_id!==creatorId)reject(404,'TICKET_NOT_FOUND','리셋권 지급 내역을 찾을 수 없습니다.');
   if(status(t,now)!=='active')reject(409,'TICKET_NOT_ACTIVE','남은 리셋권이 없는 지급분입니다(사용 완료·만료·회수).');
@@ -66,7 +66,7 @@ export async function revokeAiPhotoTickets(db:PrismaClient,admin:any,creatorId:s
 export async function useAiPhotoTicket(db:PrismaClient,creatorId:string){
  const now=new Date();
  return db.$transaction(async tx=>{
-  await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${creatorId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT id FROM members WHERE id=${creatorId} FOR UPDATE`;
   if(!await aiPhotoAllowed(tx,creatorId))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집을 사용할 수 없는 계정이에요.');
   const used=(await usedToday(tx,[creatorId])).get(creatorId)??0;
   if(used<=0)reject(409,'NOTHING_TO_RESET','오늘은 아직 사용한 횟수가 없어 리셋권을 쓸 필요가 없어요.');

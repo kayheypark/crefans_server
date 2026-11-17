@@ -445,3 +445,31 @@ test('heart rewards stop at 100 hearts per member per KST day (2026-11-15 ask-me
  const yesterday=new Date(Date.now()-36*3600000);await db.aiHeartGame.updateMany({where:{user_id:member},data:{created_at:yesterday}});assert.equal((await play(30)).earned,30,'a new KST day starts fresh');
  await db.aiHeartGame.deleteMany({where:{user_id:member}});await db.aiHeartWallet.deleteMany({where:{user_id:member}});await db.creator.deleteMany({where:{user_id:member}}).catch(()=>{});
 });
+
+// 2026-11-17 user decision: blocked outputs give the try back at most BLOCKED_GIVEBACK_DAILY times a day per member; the next
+// block counts the try and says so, so a refused request cannot be repeated without limit on the provider.
+test('blocked-output give-backs stop after the daily cap and the next block uses the try',async()=>{
+ const saved={...photos.settings},previous=photos.fetcher,{BLOCKED_GIVEBACK_DAILY}=require('../dist/src/platform/ai-photo');
+ const user=await makeCreator('aicap_'+tag);const id=await media(user);
+ try{
+  Object.assign(photos.settings,{seedreamKey:'seedream-test-key'});
+  photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response(JSON.stringify({error:{code:'OutputImageSensitiveContentDetected.PolicyViolation'}}),{status:400});
+  const request=base({sourceId:id,mode:'cosplay',kind:'outfit',style:'cosplay',costumeIds:['blue-shiroko']});
+  const start=(await photos.quota(user)).remaining;assert.equal(BLOCKED_GIVEBACK_DAILY,5);
+  for(let n=0;n<BLOCKED_GIVEBACK_DAILY;n++){reset();await assert.rejects(photos.edit(user,request,await mask()),code('PROVIDER_OUTPUT_BLOCKED'));}
+  assert.equal((await photos.quota(user)).remaining,start,'the first five blocks give the try back');
+  reset();await assert.rejects(photos.edit(user,request,await mask()),code('OUTPUT_BLOCKED_LIMIT'));
+  assert.equal((await photos.quota(user)).remaining,start-1,'past the cap the try is used');
+ }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;}
+});
+
+// 2026-11-17: paid uses are serialized on the member row, so a member without a creators row cannot spend one balance twice.
+test('two concurrent paid reservations by a non-creator member use one remaining count once',async()=>{
+ const {reservePaidPhoto}=require('../dist/src/platform/ai-shop');const id=crypto.randomUUID();members.push(id);
+ await db.member.create({data:{id,email:id+'@ai-photo-edit.test.invalid',name:'AI 동시성 QA',nickname:'AI 동시성 QA',preferred_username:'aiconc_'+tag,password_hash:'unused',email_verified:true,status:'CONFIRMED'}});
+ assert.equal(await db.creator.findUnique({where:{user_id:id}}),null);
+ const order=await db.aiShopOrder.create({data:{creator_id:id,product_id:'fixture',request_key:crypto.randomUUID(),name:'동시성 1회',amount:100,quantity:1,validity_days:30,terms:'test',environment:'test',status:'paid',remaining:1,paid_at:new Date(),expires_at:new Date(Date.now()+86400000)}});
+ const results=await Promise.allSettled([reservePaidPhoto(db,id),reservePaidPhoto(db,id)]);
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1,'exactly one reservation succeeds');
+ assert.equal((await db.aiShopOrder.findUniqueOrThrow({where:{id:order.id}})).remaining,0,'the balance never goes below zero');
+});

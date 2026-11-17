@@ -7,7 +7,7 @@ import {purgeWithdrawnMembers} from './member-purge';
 import {announcePost} from './post-notices';
 import {BeansService} from './beans.service';
 import {MarketingService} from './marketing.service';
-import {isBeta,payoutQueue,manualPayouts} from './beta-policy';
+import {adultContentBlocked,isBeta,payoutQueue,manualPayouts} from './beta-policy';
 import {pruneAuditLogs} from './audit-retention';
 import {pruneModerationRecords} from './moderation-retention';
 import {randomUUID} from 'node:crypto';
@@ -39,7 +39,7 @@ export class PlatformJobsService {
  }
  private async execute(now:Date,failures:Record<string,number>,activity:Record<string,number>){
   const run=async(name:string,work:()=>Promise<unknown>)=>{try{const count=await work();if(typeof count==='number'&&count>0)activity[name]=(activity[name]||0)+count;}catch(error){failures[name]=(failures[name]||0)+1;await this.operations?.error('worker.error',error,{job:name});}};
-  await run('scheduled-publication',async()=>{let count=0;const active=await this.db.creator.findMany({where:{is_active:true},select:{user_id:true}});const posts=await this.db.posting.findMany({where:{user_sub:{in:active.map(c=>c.user_id)},status:'DRAFT',is_deleted:false,...(isBeta(this.config)?{is_sensitive:false}:{}),scheduled_at:{lte:now}},select:{id:true}});for(const p of posts){await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM postings WHERE id=${p.id} FOR UPDATE`;const current=await tx.posting.findUniqueOrThrow({where:{id:p.id}});if(current.status!=='DRAFT'||current.is_deleted||!current.scheduled_at||current.scheduled_at>now)return;const published=await tx.posting.update({where:{id:p.id},data:{status:'PUBLISHED',published_at:now,scheduled_at:null}});await announcePost(tx,published);await enqueueOperation(tx,'content.updated',{memberId:current.user_sub,creatorId:current.user_sub,postId:p.id,status:'PUBLISHED',previousStatus:'DRAFT'},`content.published:${p.id}`);count++;});}return count;});
+  await run('scheduled-publication',async()=>{let count=0;const active=await this.db.creator.findMany({where:{is_active:true},select:{user_id:true}});const posts=await this.db.posting.findMany({where:{user_sub:{in:active.map(c=>c.user_id)},status:'DRAFT',is_deleted:false,...(adultContentBlocked(this.config)?{is_sensitive:false}:{}),scheduled_at:{lte:now}},select:{id:true}});for(const p of posts){await this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT id FROM postings WHERE id=${p.id} FOR UPDATE`;const current=await tx.posting.findUniqueOrThrow({where:{id:p.id}});if(current.status!=='DRAFT'||current.is_deleted||!current.scheduled_at||current.scheduled_at>now)return;const published=await tx.posting.update({where:{id:p.id},data:{status:'PUBLISHED',published_at:now,scheduled_at:null}});await announcePost(tx,published);await enqueueOperation(tx,'content.updated',{memberId:current.user_sub,creatorId:current.user_sub,postId:p.id,status:'PUBLISHED',previousStatus:'DRAFT'},`content.published:${p.id}`);count++;});}return count;});
   await run('ai-photo-failure-retention',()=>pruneAiFailureDetails(this.db,now));
   await run('audit-retention',()=>pruneAuditLogs(this.db,now));
   await run('moderation-retention',()=>pruneModerationRecords(this.db,now));
@@ -95,6 +95,8 @@ export class PlatformJobsService {
    const medias=await this.db.media.findMany({where:{OR:[{s3_upload_key:{startsWith:'local/'}},{s3_upload_key:{startsWith:'platform/'}}],created_at:{lt:new Date(now.getTime()-grace*86400000)}},orderBy:{id:'asc'},...(cursor?{cursor:{id:cursor},skip:1}:{}),take:500});if(!medias.length)break;cursor=medias[medias.length-1].id;
    for(const media of medias){const removable=await this.db.$transaction(async tx=>{
     await tx.$queryRaw`SELECT id FROM medias WHERE id=${media.id} FOR UPDATE`;const current=await tx.media.findUniqueOrThrow({where:{id:media.id}});if(current.is_deleted)return true;
+    // 2026-11-17 user decision: photos kept in the AI photo library (내 보관함) are in use, never orphan-cleaned.
+    if((current.metadata as any)?.aiLibrary?.active===true)return false;
     const referenced=await tx.mediaWatermarkJob.count({where:{OR:[{source_id:media.id},{target_id:media.id}],status:{in:['pending','processing','failed']}}})||await tx.postingMedia.count({where:{media_id:media.id,is_deleted:false}})||await tx.membershipVersion.count({where:{snapshot:{path:'$.image',equals:media.original_url}}})||await tx.membershipItem.count({where:{image:media.original_url}})||await tx.creator.count({where:{OR:[{avatar:media.original_url},{cover:media.original_url}]}})||await tx.member.count({where:{picture:media.original_url}})||await tx.userProfile.count({where:{cover:media.original_url}});
     if(referenced)return false;candidates++;if(enabled)await tx.media.update({where:{id:media.id},data:{is_deleted:true,deleted_at:now}});return enabled;
    });
