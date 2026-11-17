@@ -1,3 +1,8 @@
+## 2026-11-17 미츠리 하오리 숨김 (fix/hide-mitsuri, 운영 crefans-api:mitsuri-20261117)
+- 사용자 결정(/ask-me): Seedream이 저작권 사유로 매번 거부(5/5, 참조 재작성도 거부)한 6ee320을 숨김. HIDDEN_COSTUME_IDS로 공급사 호출 전에 COSTUME_UNAVAILABLE 거절, 참조 파일은 보존.
+- 같은 /ask-me 결정: 무통장 계좌는 사용자가 콘솔에서 직접 등록, 랜딩 모더니아 홍보물은 현행 유지(위험 인지), 복구 묶음 24개(약 13.1GB) 삭제(RETENTION.md 기록).
+- 검증: platform-ai-photo 43/43(숨김 거절 테스트, 스타킹 ID 테스트는 0069c9로 교체).
+
 ## 2026-11-17 night-work 후속 수정 (fix/night-findings-20261117, 운영 crefans-api:night-20261117)
 - 조사 문서: front .local/night-work/2026-11-17-1418.md(70건, 상위 10). 사용자 결정으로 아래 4건을 반영.
 - 내 보관함(metadata.aiLibrary.active) 사진은 미디어 정리 대상에서 제외(jobs.service.ts). 대조: 제외 줄을 빼면 platform-jobs 새 테스트 실패.
