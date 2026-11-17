@@ -27,7 +27,7 @@ const GUEST_LIFETIME=3650*86400;
 import {aiFailureTrace,diagnosticId,recordAiFailure,recordAiRequest,traceAiEvent,AiFailureTrace} from './ai-photo-failures';
 import {aiPhotoAllowed} from './ai-photo-grants';
 import {backgroundReferenceId,readBackgroundReference} from './ai-photo-background-references';
-import {costumeReferenceIds,readCostumeReference} from './ai-photo-costume-references';
+import {costumeReferenceIds,readCostumeReference,STOCKING_COSTUME_IDS} from './ai-photo-costume-references';
 import {ticketSummary,useAiPhotoTicket} from './ai-photo-tickets';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
@@ -66,7 +66,9 @@ export function aiPhotoPrompt(kind:string,style:string,request:string,kinds:stri
 // for these materials; a second block goes back to the member, who may choose to try again (the try is not used up).
 export const STOCKING_TERMS=/스타킹|시스루|망사|타이츠/;
 export const STOCKING_CLAUSE='스타킹·반투명 소재는 쫀쫀하게 몸에 밀착되어 착용자와 간극이 느껴지지 않는 나일론 소재로, 원래 색을 유지한 25데니어 스모키 스타킹처럼 반투명해서 따뜻한 피부 톤과 라인이 고르게 비쳐 보이고 빛 받는 부분이 은은하게 반사되는 수분감 있는 광택으로 표현해줘. 가슴·몸통·골반은 불투명 이너와 의상 패널로 가리고, 의상이 덮지 않는 부분은 원래 피부 그대로 둬.';
-export function stockingRewrite(request:string){return STOCKING_TERMS.test(request)?request.replace(/시스루|망사/g,'반투명 나일론')+'\n'+STOCKING_CLAUSE:null;}
+export function stockingRewrite(request:string,costumeIds:string[]=[]){return STOCKING_TERMS.test(request)||costumeIds.some(id=>STOCKING_COSTUME_IDS.has(id))?request.replace(/시스루|망사/g,'반투명 나일론')+'\n'+STOCKING_CLAUSE:null;}
+// 2026-11-17 user decision: after a refusal the member may answer 네 to regenerate with the improved wording from the first attempt.
+export const IMPROVED_PHOTO_CLAUSE='실제 원단과 소품으로 만든 코스튬을 입고 스튜디오에서 찍은 자연스러운 사진처럼 표현해줘.';
 const OUTPUT_BLOCKED='OutputImageSensitiveContentDetected.PolicyViolation';
 const RATIO_SIZES:Record<string,string>={'1:1':'1024x1024','4:5':'1024x1280','3:4':'960x1280','9:16':'864x1536','16:9':'1536x864'};
 const sizeFor=(width:number,height:number)=>{const ratio=Math.max(1/16,Math.min(16,width/height)),h=Math.min(Math.sqrt(1572864/ratio),4096/Math.max(1,ratio));return `${Math.round(h*ratio)}x${Math.round(h)}`;};
@@ -266,8 +268,8 @@ export class AiPhotoService{
     return requestPrompt;};
     const requestBodyFor=(requestPrompt:string)=>JSON.stringify({model,prompt:requestPrompt,image:[data(image!,'image/png'),...(guide?[data(guide,'image/png')]:[]),...references.map(b=>data(b,'image/webp'))],size:aspectRatio==='original'?sizeFor(width!,height!):RATIO_SIZES[aspectRatio],output_format:'png',response_format:'b64_json',background:'opaque',watermark:false});
    await this.stage('generation','seedream');
-   const rewritten=stockingRewrite(prompt);let res:Response,body:any;
-   for(let attempt=0;;attempt++){
+   const improved=input?.retryImproved===true||input?.retryImproved==='true',stocking=stockingRewrite(prompt,referenceIds),rewritten=improved?(stocking||prompt)+'\n'+IMPROVED_PHOTO_CLAUSE:stocking;let res:Response,body:any;
+   for(let attempt=improved?1:0;;attempt++){
    const requestBody=requestBodyFor(buildPrompt(attempt===0?prompt:rewritten!));
    try{({res,body}=await this.providerRequest(url,{method:'POST',signal:AbortSignal.timeout(this.settings.timeoutMs),headers,body:requestBody},'generation','seedream',model));}
    catch(error){const timeout=['TimeoutError','AbortError'].includes(error?.name);this.report('generation',diagnosticId(error?.cause?.code)||(timeout?'PROVIDER_TIMEOUT':'PROVIDER_CONNECTION_ERROR'));reject(timeout?504:502,timeout?'PROVIDER_TIMEOUT':'PROVIDER_CONNECTION_ERROR',timeout?'사진을 만드는 데 시간이 너무 오래 걸렸어요. 다시 시도해 주세요.':'AI 제공사에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');}
@@ -277,7 +279,7 @@ export class AiPhotoService{
    if(!res.ok){const code=body?.error?.code,stage=body?.error?.moderation_details?.moderation_stage;this.report(code==='moderation_blocked'&&['input','output'].includes(stage)?stage:'provider',code,res);
     // 2026-11-17 user decision: Seedream refused to return an image (and does not bill it), so the member's try is given back
     // (charged stays true) and the app offers to try again.
-    if(code===OUTPUT_BLOCKED){if(rewritten)reject(400,'OUTPUT_MATERIAL_BLOCKED','의상 소재가 이미지 서버에서 허용되지 않을 수 있어요. 기회는 차감되지 않았어요. 다시 시도해 볼까요?');reject(400,'PROVIDER_OUTPUT_BLOCKED','만든 사진이 이미지 서버의 정책에 걸렸어요. 기회는 차감되지 않았어요. 다시 시도해 볼까요?');}
+    if(code===OUTPUT_BLOCKED){if(stocking)reject(400,'OUTPUT_MATERIAL_BLOCKED','의상 소재가 이미지 서버에서 허용되지 않을 수 있어요. 기회는 차감되지 않았어요. 다시 시도해 볼까요?');reject(400,'PROVIDER_OUTPUT_BLOCKED','만든 사진이 이미지 서버의 정책에 걸렸어요. 기회는 차감되지 않았어요. 다시 시도해 볼까요?');}
     if(code==='moderation_blocked'){charged=false;if(stage==='output')reject(400,'UNSAFE_OUTPUT','생성된 사진이 AI 제공사의 안전 검사를 통과하지 못했어요. 요청 내용을 확인해 주세요.');reject(400,'UNSAFE_INPUT',stage==='input'?'사진 또는 요청이 AI 제공사의 안전 검사에서 차단됐어요. 사진과 요청 내용을 확인해 주세요.':'AI 제공사의 안전 검사로 만들지 못했어요. 사진과 요청 내용을 확인해 주세요.');}
     if(res.status>=400&&res.status<500&&body?.error?.type==='image_generation_user_error')reject(400,'PROVIDER_INPUT_ERROR','사진 요청을 처리하지 못했어요. 선택한 옵션과 입력 사진을 확인해 주세요.');
     reject(502,'PROVIDER_ERROR','사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');}
