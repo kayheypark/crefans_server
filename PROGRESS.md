@@ -1,3 +1,9 @@
+## 2026-11-17 AI 프리셋 사용 집계 (feat/preset-usage-stats, 미배포)
+- 사용자 결정: HOT 배지·정렬(프론트 하드코딩)용 집계. 표 ai_preset_usage_daily(day KST DATE, kind, preset_key, count) — 회원·방문자·IP·요청 ID를 저장하지 않는 집계라 개인정보 아님. 마이그레이션 20261117030000_ai_preset_usage(추가만).
+- 생성 성공 후에만 +1(src/platform/ai-preset-usage.ts, ai-photo.ts edit 성공 경로). 의상·참조 배경은 서버가 검증한 ID, 그 밖(메이크업·표정·포즈·구도·촬영컨셉·신체·텍스트 배경)은 프론트가 보낸 카드 제목 presetKeys. 최대 20개, 중복·모르는 종류 제외. 기록 실패는 생성 결과에 영향 없음.
+- 조회 예: SELECT kind,preset_key,SUM(count) FROM ai_preset_usage_daily WHERE day>=CURDATE()-INTERVAL 7 DAY GROUP BY kind,preset_key ORDER BY 3 DESC;
+- 검증: platform-ai-photo 43/43(실패 미집계·성공 2회=2·컬럼에 개인 식별 없음).
+
 ## 2026-11-17 미츠리 하오리 숨김 (fix/hide-mitsuri, 운영 crefans-api:mitsuri-20261117)
 - 사용자 결정(/ask-me): Seedream이 저작권 사유로 매번 거부(5/5, 참조 재작성도 거부)한 6ee320을 숨김. HIDDEN_COSTUME_IDS로 공급사 호출 전에 COSTUME_UNAVAILABLE 거절, 참조 파일은 보존.
 - 같은 /ask-me 결정: 무통장 계좌는 사용자가 콘솔에서 직접 등록, 랜딩 모더니아 홍보물은 현행 유지(위험 인지), 복구 묶음 24개(약 13.1GB) 삭제(RETENTION.md 기록).
