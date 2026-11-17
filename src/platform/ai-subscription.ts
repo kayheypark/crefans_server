@@ -46,7 +46,7 @@ export class AiSubscriptionService{
  private async remaining(row:any){const charge=await this.db.aiSubscriptionCharge.findFirst({where:{subscription_id:row.id,status:'paid'},orderBy:{period_start:'desc'}});if(!charge?.order_id)return 0;const o=await this.db.aiShopOrder.findUnique({where:{id:charge.order_id}});return o&&o.status==='paid'&&o.expires_at>new Date()?o.remaining:0;}
  /** Step 1: a pending subscription for the chosen plan; the PG window then issues the billing key for it. */
  async start(member:string,input:any){await this.allowed(member);this.requireProvider();if(input?.termsVersion!==AI_SHOP_TERMS)reject(400,'PAYMENT_TERMS_REQUIRED','구독 조건을 다시 확인해 주세요.');
-  return this.db.$transaction(async(tx:any)=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${member} FOR UPDATE`;
+  return this.db.$transaction(async(tx:any)=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;
    const p=await tx.aiShopProduct.findUnique({where:{id:String(input?.productId)}});if(!p||p.deleted_at||!p.visible||!p.on_sale||p.kind!=='subscription')reject(409,'PRODUCT_UNAVAILABLE','판매 중인 구독 상품이 아닙니다.');if(p.version!==input.version)reject(409,'PRODUCT_CHANGED','상품 조건이 변경되었습니다. 다시 확인해 주세요.');if(p.amount/p.quantity<AI_SHOP_MIN_UNIT_KRW)reject(409,'PRODUCT_UNAVAILABLE','판매 조건을 확인 중인 상품입니다.');
    if(await tx.aiSubscription.count({where:{creator_id:member,status:{in:['active','past_due','cancel_scheduled']}}}))reject(409,'SUBSCRIPTION_EXISTS','이미 이용 중인 AI 이용권 구독이 있어요. 해지 예약 후 기간이 끝나면 다시 신청할 수 있어요.');
    await tx.aiSubscription.deleteMany({where:{creator_id:member,status:'pending',created_at:{lt:new Date(Date.now()-3600000)}}});
@@ -99,7 +99,7 @@ export class AiSubscriptionService{
  /** Refund of the current period: unused uses × unit price via PG partial cancel; the subscription ends immediately. */
  async refund(member:string,id:string){const provider=this.requireProvider();const row=await this.db.aiSubscription.findFirst({where:{id,creator_id:member}});if(!row)reject(404,'SUBSCRIPTION_NOT_FOUND','구독을 찾을 수 없어요.');
   const charge=await this.db.aiSubscriptionCharge.findFirst({where:{subscription_id:id,status:'paid'},orderBy:{period_start:'desc'}});if(!charge?.order_id)reject(409,'NO_REFUNDABLE_USES','환불할 남은 횟수가 없어요.');
-  const reserved=await this.db.$transaction(async(tx:any)=>{await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${member} FOR UPDATE`;await tx.$queryRaw`SELECT id FROM ai_shop_orders WHERE id=${charge!.order_id} FOR UPDATE`;const o=await tx.aiShopOrder.findUniqueOrThrow({where:{id:charge!.order_id}});
+  const reserved=await this.db.$transaction(async(tx:any)=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;await tx.$queryRaw`SELECT id FROM ai_shop_orders WHERE id=${charge!.order_id} FOR UPDATE`;const o=await tx.aiShopOrder.findUniqueOrThrow({where:{id:charge!.order_id}});
    if(o.status!=='paid'||o.remaining<=0||o.expires_at<=new Date())reject(409,'NO_REFUNDABLE_USES','환불할 남은 횟수가 없어요.');if(await tx.aiShopUse.count({where:{order_id:o.id,status:'reserved'}}))reject(409,'GENERATION_IN_PROGRESS','사진 생성이 끝난 뒤 환불해 주세요.');
    const amount=Math.floor(o.amount/o.quantity)*o.remaining;await tx.aiShopOrder.update({where:{id:o.id},data:{status:'refunding',refund_quantity:o.remaining,refund_amount:amount}});return{o,amount};});
   try{await provider.cancel({tid:charge!.provider_tid!,amount:reserved.amount,remainingAmount:charge!.amount-reserved.amount,reason:'AI 이용권 구독 남은 횟수 환불',moid:charge!.moid});}

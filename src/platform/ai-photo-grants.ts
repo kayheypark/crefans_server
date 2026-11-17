@@ -57,7 +57,9 @@ export async function grantAiPhoto(db:PrismaClient,admin:any,input:any){
   const member=found?null:await tx.member.findFirst({where:{preferred_username:handle,enabled:true},select:{id:true}});
   if(found?!found.is_active:!member)reject(404,'CREATOR_NOT_FOUND','활성 크리에이터나 회원을 찾을 수 없습니다. 핸들을 확인해주세요.');
   const creator={user_id:found?.user_id??member!.id};
-  if(found)await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${creator.user_id} FOR UPDATE`;else await tx.$queryRaw`SELECT id FROM members WHERE id=${creator.user_id} FOR UPDATE`;
+  // 2026-11-17: AI photo per-user state (tries, tickets, hearts, paid uses) is serialized on the member row, which every
+  // member has — the creators row lock let two concurrent requests of a non-creator member both spend the same balance.
+  await tx.$queryRaw`SELECT id FROM members WHERE id=${creator.user_id} FOR UPDATE`;
   if(await tx.aiPhotoGrant.findUnique({where:{creator_user_id:creator.user_id}}))reject(409,'ALREADY_GRANTED','이미 허용된 회원입니다.');
   await tx.aiPhotoGrant.create({data:{creator_user_id:creator.user_id,reason,granted_by:admin.id}});
   await tx.aiPhotoGrantChange.create({data:{creator_user_id:creator.user_id,action:'granted',reason,changed_by:admin.id}});
@@ -70,7 +72,7 @@ export async function grantAiPhoto(db:PrismaClient,admin:any,input:any){
 export async function revokeAiPhoto(db:PrismaClient,admin:any,creatorId:string,input:any){
  requirePermission(admin,'members','update');const reason=reasonOf(input?.reason);
  await db.$transaction(async tx=>{
-  await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${creatorId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT id FROM members WHERE id=${creatorId} FOR UPDATE`;
   const before=await tx.aiPhotoGrant.findUnique({where:{creator_user_id:creatorId}});
   if(!before)reject(404,'GRANT_NOT_FOUND','허용 목록에 없는 크리에이터입니다. 목록을 새로 불러와주세요.');
   await tx.aiPhotoGrant.delete({where:{creator_user_id:creatorId}});
@@ -83,7 +85,7 @@ export async function revokeAiPhoto(db:PrismaClient,admin:any,creatorId:string,i
 export async function resetAiPhotoQuota(db:PrismaClient,admin:any,creatorId:string,input:any){
  requirePermission(admin,'members','update');const reason=reasonOf(input?.reason);
  const handle=await db.$transaction(async tx=>{
-  await tx.$queryRaw`SELECT id FROM creators WHERE user_id=${creatorId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT id FROM members WHERE id=${creatorId} FOR UPDATE`;
   if(!await tx.aiPhotoGrant.findUnique({where:{creator_user_id:creatorId}}))reject(404,'GRANT_NOT_FOUND','허용 목록에 없는 크리에이터입니다. 목록을 새로 불러와주세요.');
   const used=(await usedToday(tx,[creatorId])).get(creatorId)??0;
   if(used<=0)reject(409,'NOTHING_TO_RESET','오늘 사용한 횟수가 없어 초기화할 것이 없습니다.');

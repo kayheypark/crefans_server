@@ -1,3 +1,11 @@
+## 2026-11-17 night-work 후속 수정 (fix/night-findings-20261117, 운영 crefans-api:night-20261117)
+- 조사 문서: front .local/night-work/2026-11-17-1418.md(70건, 상위 10). 사용자 결정으로 아래 4건을 반영.
+- 내 보관함(metadata.aiLibrary.active) 사진은 미디어 정리 대상에서 제외(jobs.service.ts). 대조: 제외 줄을 빼면 platform-jobs 새 테스트 실패.
+- 성인(is_sensitive) 차단을 BETA_MODE에서 분리해 ADULT_CONTENT_BLOCKED(미설정·true=차단, false만 개방)로. 동작은 현행(차단) 유지, 거절 문구에서 '베타' 제거.
+- AI 사진 사용자 상태 잠금을 creators 행 → members 행으로(ai-photo-grants/hearts/tickets, ai-shop, ai-subscription). 일반 회원 동시 요청 이중 차감 재현 테스트: 이전 코드 3/3 실패, 수정 후 통과.
+- 출력 차단(OutputImageSensitiveContentDetected) 시 횟수 반환은 회원·방문자당 하루 5회(BLOCKED_GIVEBACK_DAILY), 넘으면 차감하고 OUTPUT_BLOCKED_LIMIT 안내.
+- 검증: platform-ai-photo 42/42, jobs·beta-policy·ai-shop·ai-subscription 포함 69/69, 전체 770 중 실패 68(기존 환경 실패 수준; AI 허용 테스트 1건은 prod 코드에서도 실패 확인).
+
 ## 2026-11-17 공용 배경 참조 94종 추가 (feat/x-likes-backgrounds2, 미배포)
 - 프론트 X 좋아요 2차 배치 배경 fb5001~fb5094를 허용 ID와 src/platform/ai-photo-backgrounds/에 추가(프론트와 SHA-256 동일). 총 132종.
 - 검증: npm run build, CREFANS_E2E platform-ai-photo 39/39(132개 ID 1024×1536 WebP, fb5095 거절). ID 목록 되돌림 시 실패 대조. 증거는 프론트 docs/audit/x-likes-presets-20261117.json.
