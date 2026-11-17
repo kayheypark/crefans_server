@@ -771,3 +771,4 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 
 
 - 2026-11-17 AI 사진 Seedream 출력 거절(OutputImageSensitiveContentDetected): 요청에 스타킹·시스루·망사·타이츠가 있으면 승인된 스타킹 문구(STOCKING_CLAUSE)로 한 번만 다시 요청. 최종 거절은 400 OUTPUT_MATERIAL_BLOCKED(소재 문구) 또는 PROVIDER_OUTPUT_BLOCKED이며 이용 횟수·하트·이용권을 되돌린다(공급사 미과금). 앱은 '다시 시도/닫기'를 보여 준다. OpenAI 출력 안전검사 차단(UNSAFE_OUTPUT)은 기존대로 차감.
+- 2026-11-17 후속: 의상장 선택은 프리셋 문구 대신 costumeIds만 오므로 STOCKING_COSTUME_IDS(프론트 카탈로그의 스타킹·시스루·망사·타이츠 의상 65종)로도 스타킹 재요청을 판단. retryImproved=true(앱의 '네')면 첫 요청부터 개선 문구(스타킹 문구+실제 코스튬 촬영 문구 IMPROVED_PHOTO_CLAUSE)로 한 번 요청하고 자동 재요청은 하지 않음.

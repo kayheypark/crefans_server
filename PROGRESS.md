@@ -1,3 +1,10 @@
+## 2026-11-17 Seedream 출력 거절 시 스타킹 문구 1회 재요청·횟수 반환·다시 시도 (feat/stocking-retry, 운영 crefans-api:stocking-20261117, front-stocking-20261117)
+- 사용자 결정: 요청에 스타킹·시스루·망사·타이츠가 있고 Seedream이 출력을 거절(OutputImageSensitiveContentDetected)하면 STOCKING_CLAUSE(밀착 나일론·25데니어 스모키 반투명·광택, 몸통 불투명 이너)로 한 번만 재요청, 성공 결과를 그대로 전달. 최종 거절은 OUTPUT_MATERIAL_BLOCKED/PROVIDER_OUTPUT_BLOCKED, 무료횟수·하트·이용권 반환(공급사 미과금), 앱은 [닫기][다시 시도].
+- 정정: 이전에는 이 거절에도 횟수가 차감됐다(charged=false). OpenAI 출력 안전검사 차단(UNSAFE_OUTPUT)은 기존대로 차감.
+- 모더니아(4a0c8f) 최종 문구(사용자 확정) 배포 후 프론트 카탈로그 테스트 2건 실패 발견 → 머리장식 필드를 문구와 일치, 프리셋 문구 상한 300→450자.
+- 원인 기록: 모더니아 실패는 Seedream '저작권 제한' 판정이 확률적으로 발생(같은 요청도 통과/거절 반복). 자동 재시도로 저작권 판정을 우회하지 않는다(스타킹 문구 1회 재요청만).
+- 검증: ai-photo 39/39(대조: 재요청 끄면 실패), 프론트 711/18(기준선 동일). 운영 API·프론트 배포 PASS. 실제 Seedream 끝까지·앱 버튼 화면은 미확인.
+
 ## 2026-11-17 KG이니시스 심사용 결제경로 PDF (단건·빌링) + 심사 계정 + AI 랜딩 하단 사업자 정보
 - 심사 계정 inicis@crefans.com 운영 생성(.local/review-account-20261117 스크립트, 비밀번호는 사용자 직접 입력, 휴대폰 확인 면제, 현행 약관 동의 기록).
 - AI 랜딩(/service/landing-ai-image-generation)에 사업자 정보 하단 추가·배포(front-footer-20261117). 심사 하단 정보 캡처 출처.

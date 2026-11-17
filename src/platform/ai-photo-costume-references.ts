@@ -377,3 +377,7 @@ export async function readCostumeReference(id:string):Promise<Buffer>{
  try{return await readFile(join(__dirname,'ai-photo-costumes',COSTUME_ASSETS[canonical]+'-v2.webp'));}
  catch{reject(503,'COSTUME_REFERENCE_UNAVAILABLE','의상 사진을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');}
 }
+
+// 2026-11-17: catalog costumes whose material includes stockings/see-through/mesh/tights (from the front catalog text; the wardrobe
+// sends only the costume ID, so the server needs this list to apply the stocking wording). Update together with the front catalog.
+export const STOCKING_COSTUME_IDS=new Set<string>(["0069c9", "0439d3", "08d28d", "0ffbe3", "11be11", "15500b", "173f1e", "1e6f3a", "2c67c2", "2cbd4b", "2dc234", "313a28", "3ae52a", "416978", "426b99", "439d13", "46ce6a", "4970eb", "4a0c8f", "4ce772", "4e1336", "5392da", "6d8acf", "6e548b", "6ee320", "6f71bd", "761c54", "764bd5", "79bdbe", "7a16e3", "7b7593", "7d9ee0", "8c0623", "935146", "97cb42", "9aa271", "a1338d", "a14064", "a305ae", "a41b8d", "ad67a7", "b1c8b7", "b218e1", "b516a6", "b5b81b", "bbaa21", "c0ab9e", "c7289e", "cbe05e", "ce1f18", "d2de2f", "d7648f", "d92341", "dc8746", "df51ea", "df831f", "e299c4", "e62219", "e7b33f", "e80560", "eef222", "f350a0", "f3a1a1", "f63378", "f79ded"]);
