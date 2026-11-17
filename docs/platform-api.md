@@ -699,6 +699,8 @@ AI 이용권 구독형/횟수형 (2026-11-16 사용자 결정)
 | POST | /admin/ai-photo-grants/:creatorId/tickets/:ticketId/revoke | members.update: 기존 무료 리셋권 회수 |
 | POST | /admin/ai-photo-grants/:creatorId/quota-reset | members.update: 대상 무료 일일 횟수 초기화 |
 | POST | /admin/ai-photo-grants/quota-reset | members.update: 허용 대상 무료 일일 횟수 초기화 |
+| GET | /admin/ai-photo-guest-quota | members.view: 비회원 AI 체험 횟수 초기화 회차·마지막 초기화 시각(2026-11-17) |
+| POST | /admin/ai-photo-guest-quota/reset | members.update: 모든 비회원 AI 체험 횟수(방문자별·IP별) 초기화. 확인 문구 '전체 초기화'·사유 필요, 비회원 전체 하루 한도는 유지(2026-11-17) |
 | POST | /studio/ai-photo/reset-ticket | 본인 무료 리셋권 사용, 유료 횟수권과 별도 |
 
 ### AI 하트 보상 (2026-11-14)
@@ -751,6 +753,7 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 | --- | --- | --- |
 | GET | /payments/methods | 결제 방식(bankTransfer, card, 기한 24시간, 환불 3영업일) |
 | GET | /payments/bank-transfer/:kind/:orderId | 본인 주문 입금 안내(계좌·금액·입금자명·기한·상태) |
+| POST | /payments/bank-transfer/:kind/:orderId/deposited | 본인 입금 대기 주문의 '입금했어요' — 운영 텔레그램에 주문당 1회 알림(이름·계좌 없음), 확인된 주문은 그대로 성공, 기한 지남·취소는 409(2026-11-17) |
 | POST | /beans/charges | method=bank_transfer + depositorName(+cashReceipt) 시 24시간 입금 대기 |
 | POST | /beans/charges/:id/refund | 무통장입금 충전은 refundAccount 필수, 운영자 이체 후 완료 |
 | POST | /studio/shop/orders | method=bank_transfer 시 입금 대기, 확인 시점부터 유효기간 |
