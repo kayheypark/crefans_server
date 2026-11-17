@@ -364,11 +364,15 @@ function canonicalId(id:string):string|undefined{
  // Already-open clients may still send the previous catalog names.
  return AI_PHOTO_COSTUME_IDS.find(key=>COSTUME_ASSETS[key]===id);
 }
+// 2026-11-17 user decision: 미츠리 하오리(6ee320) is hidden — Seedream refused every request on copyright grounds (5/5, and the
+// redrawn reference too). The reference file stays for history; requests naming it are refused before any provider call.
+export const HIDDEN_COSTUME_IDS=new Set<string>(['6ee320']);
 export function costumeReferenceIds(value:unknown,kinds:string[],style:string):string[]{
  if(value===undefined)return [];
  let ids:unknown=value;try{if(typeof ids==='string')ids=JSON.parse(ids);}catch{reject(400,'INVALID_COSTUME_REFERENCES','의상을 다시 선택해 주세요.');}
  if(!Array.isArray(ids)||ids.length<1||ids.length>14||ids.some(id=>typeof id!=='string'||!canonicalId(id))||!kinds.includes('outfit')||style!=='cosplay')reject(400,'INVALID_COSTUME_REFERENCES','의상을 다시 선택해 주세요.');
  const canonical=(ids as string[]).map(id=>canonicalId(id)!);
+ if(canonical.some(id=>HIDDEN_COSTUME_IDS.has(id)))reject(400,'COSTUME_UNAVAILABLE','이 의상은 지금 만들 수 없어요. 다른 의상을 골라 주세요.');
  if(new Set(canonical).size!==canonical.length)reject(400,'INVALID_COSTUME_REFERENCES','의상을 다시 선택해 주세요.');
  return canonical;
 }
