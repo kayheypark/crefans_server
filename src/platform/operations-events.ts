@@ -11,6 +11,8 @@ export async function enqueueOperation(tx:Prisma.TransactionClient,type:string,d
  for(const key of metadataKeys){const value=data[key];if(typeof value==='string'&&/^[a-zA-Z0-9_.:-]{1,191}$/.test(value))metadata[key]=value;}
  // 2026-11-16 무통장 알림: a whole-won amount is the only numeric field (no names, accounts or emails).
  if(Number.isSafeInteger(data.amount)&&(data.amount as number)>=0)(metadata as any).amount=data.amount;
+ // 2026-11-17 user decision: order alerts name the product (catalog text, not personal data); control characters are removed.
+ if(typeof data.productName==='string'){const name=data.productName.replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,60);if(name)(metadata as any).productName=name;}
  const context=requestContext.getStore();
  const event={type,data:metadata,ip:context?.ip||null,peer_ip:context?.peerIp||null,request_id:context?.requestId||null,dedupe_key:dedupeKey||null};
  if(!dedupeKey){const saved=await tx.platformOperationalEvent.create({data:event});await auditOperation(tx,saved,auditData);return saved;}

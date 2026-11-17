@@ -32,7 +32,7 @@ export class AdvertisingPurchaseService{
    if(p.version!==input.version)reject(409,'PRODUCT_CHANGED','상품 조건이 변경되었습니다. 다시 확인해 주세요.');
    if(await tx.adPurchase.count({where:{creator_id:creatorId,status:'pending'}})>=3)reject(429,'OPEN_ORDER_LIMIT','입금 대기 중인 광고 주문을 먼저 확인해 주세요.');
    const o=await tx.adPurchase.create({data:{creator_id:creatorId,product_id:p.id,request_key:key,payment_method:'bank_transfer',name:p.name,terms:p.terms,amount:p.amount,duration_days:p.duration_days,placement:p.placement,status:'pending'}});
-   await this.transfers.open(tx,'ad',o.id,creatorId,o.amount,input,account);
+   await this.transfers.open(tx,'ad',o.id,creatorId,o.amount,input,account,p.name);
    await appendAudit(tx,{category:'finance',action:'advertising.order_created',entityId:o.id,data:{amount:o.amount,creatorId}});
    return adPurchaseView(o);
   });

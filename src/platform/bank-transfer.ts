@@ -58,17 +58,26 @@ export class BankTransferService{
  async methods(){return{bankTransfer:!!await this.account(),card:livePayments(this.config),deadlineHours:BANK_TRANSFER_HOURS,refundBusinessDays:REFUND_BUSINESS_DAYS};}
  async requireOpen(){const account=await this.account();if(!account)reject(503,'BANK_TRANSFER_UNAVAILABLE','무통장입금 계좌를 준비 중이에요. 잠시 후 다시 시도해 주세요.');return account;}
  /** Creates the deposit wait for a just-created order inside the caller's transaction. */
- async open(tx:any,kind:BankTransferKind,orderId:string,member:string,amount:number,input:any,account:{bankName:string;accountNumber:string;holder:string}){
+ async open(tx:any,kind:BankTransferKind,orderId:string,member:string,amount:number,input:any,account:{bankName:string;accountNumber:string;holder:string},productName?:string){
   const name=depositorName(input?.depositorName),receipt=cashReceiptInput(input?.cashReceipt);
   const row=await tx.bankTransferPayment.create({data:{kind,order_id:orderId,member_id:member,amount,depositor_name:name,account_snapshot:account,cash_receipt_type:receipt?.type??null,cash_receipt_number_encrypted:receipt?this.provider.encrypt(receipt.number):null,expires_at:new Date(Date.now()+BANK_TRANSFER_HOURS*3600000)}});
   await appendAudit(tx,{category:'finance',action:'bank_transfer.opened',entityId:row.id,data:{kind,orderId,amount,cashReceipt:receipt?.type||'none'}});
   // 2026-11-16: operators learn of every deposit wait right away (Telegram outbox, same transaction; no depositor name or account).
-  await enqueueOperation(tx,'bank_transfer.opened',{targetId:row.id,kind,amount,dueAt:row.expires_at.toISOString()});
+  await enqueueOperation(tx,'bank_transfer.opened',{targetId:row.id,kind,amount,dueAt:row.expires_at.toISOString(),productName});
   return row;
  }
  view(row:any){if(!row)return null;return{id:row.id,kind:row.kind,orderId:row.order_id,amount:row.amount,status:row.status,statusLabel:statusLabels[row.status]||row.status,depositorName:row.depositor_name,account:row.account_snapshot,expiresAt:row.expires_at,confirmedAt:row.confirmed_at,cashReceipt:row.cash_receipt_type?{type:row.cash_receipt_type,issued:!!row.cash_receipt_issued_at}:null};}
  /** The buyer's own deposit instructions for one order. */
  async forMember(member:string,kind:string,orderId:string){if(!BANK_TRANSFER_KINDS.includes(kind as BankTransferKind))reject(404,'BANK_TRANSFER_NOT_FOUND','입금 안내를 찾을 수 없어요.');const row=await this.db.bankTransferPayment.findFirst({where:{kind,order_id:orderId,member_id:member}});if(!row)reject(404,'BANK_TRANSFER_NOT_FOUND','입금 안내를 찾을 수 없어요.');return this.view(row);}
+ /** 2026-11-17 user decision: the buyer taps '입금했어요' and operators get one Telegram alert per order (no name or account). */
+ async reportDeposit(member:string,kind:string,orderId:string){
+  if(!BANK_TRANSFER_KINDS.includes(kind as BankTransferKind))reject(404,'BANK_TRANSFER_NOT_FOUND','입금 안내를 찾을 수 없어요.');
+  const row=await this.db.bankTransferPayment.findFirst({where:{kind,order_id:orderId,member_id:member}});if(!row)reject(404,'BANK_TRANSFER_NOT_FOUND','입금 안내를 찾을 수 없어요.');
+  if(row.status==='confirmed')return{reported:true,message:'이미 입금이 확인됐어요.'};
+  if(row.status!=='awaiting')reject(409,'BANK_TRANSFER_CLOSED','기한이 지났거나 취소된 주문이에요.');
+  await this.db.$transaction(async(tx:any)=>enqueueOperation(tx,'bank_transfer.deposit_reported',{targetId:row.id,kind:row.kind,amount:row.amount,dueAt:row.expires_at.toISOString()},`bank-transfer-deposit-reported:${row.id}`));
+  return{reported:true,message:'입금했다고 운영팀에 알렸어요. 입금이 확인되면 바로 지급돼요.'};
+ }
  async paymentFor(kind:BankTransferKind,orderId:string){return this.db.bankTransferPayment.findUnique({where:{kind_order_id:{kind,order_id:orderId}}});}
  /** Opens a manual refund (account encrypted) inside the product's refund transaction. */
  async openRefund(tx:any,kind:BankTransferKind,refundId:string,orderId:string,member:string,amount:number,input:any,actor:string){
