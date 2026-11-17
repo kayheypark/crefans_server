@@ -19,6 +19,8 @@
 | POST | `/api/v1/admin/ai-photo-grants/:creatorId/tickets` | `src/platform/admin.controller.ts::grantAiPhotoTickets` |
 | POST | `/api/v1/admin/ai-photo-grants/:creatorId/tickets/:ticketId/revoke` | `src/platform/admin.controller.ts::revokeAiPhotoTickets` |
 | POST | `/api/v1/admin/ai-photo-grants/quota-reset` | `src/platform/admin.controller.ts::resetAllAiPhotoQuota` |
+| GET | `/api/v1/admin/ai-photo-guest-quota` | `src/platform/admin.controller.ts::guestAiQuota` |
+| POST | `/api/v1/admin/ai-photo-guest-quota/reset` | `src/platform/admin.controller.ts::resetGuestAiQuota` |
 | POST | `/api/v1/admin/auth/login` | `src/platform/admin-auth.ts::login` |
 | POST | `/api/v1/admin/auth/logout` | `src/platform/admin-auth.ts::logout` |
 | POST | `/api/v1/admin/auth/refresh` | `src/platform/admin-auth.ts::refresh` |
@@ -210,6 +212,7 @@
 | PUT | `/api/v1/members/:id/messages/read` | `src/platform/controller.ts::readMessages` |
 | PUT | `/api/v1/notifications/read` | `src/platform/controller.ts::read` |
 | GET | `/api/v1/payments/bank-transfer/:kind/:orderId` | `src/platform/bank-transfer.controller.ts::instructions` |
+| POST | `/api/v1/payments/bank-transfer/:kind/:orderId/deposited` | `src/platform/bank-transfer.controller.ts::deposited` |
 | GET | `/api/v1/payments/methods` | `src/platform/bank-transfer.controller.ts::methods` |
 | GET | `/api/v1/posts` | `src/platform/controller.ts::posts` |
 | GET | `/api/v1/posts/:id` | `src/platform/controller.ts::post` |
