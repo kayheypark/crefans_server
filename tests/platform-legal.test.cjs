@@ -66,7 +66,7 @@ test('privacy policy and signup notice name the CI value explicitly (KG Inicis K
 });
 test('creator terms let an individual agreement override the default fee and payout terms without retroactive effect',()=>{
  const body=new LegalDocumentsService().catalog().documents.terms.sections.find(s=>s.title.startsWith('6.')).body;
- assert.match(body,/개별로 합의한 경우 그 합의가 이 조의 기본 기준보다 우선합니다/);assert.match(body,/소급하지 않습니다/);assert.match(body,/총 공제율은20%/);
+ assert.match(body,/개별로 합의한 경우 그 합의가 이 조의 기본 기준보다 우선합니다/);assert.match(body,/소급하지 않습니다/);assert.match(body,/총 공제율은 20%/);
 });
 test('privacy policy describes the actual withdrawal purge: 30-day grace, erased fields, deleted posts, anonymized comments',()=>{
  const body=new LegalDocumentsService().catalog().documents.privacy.sections.find(s=>s.title.startsWith('7.')).body;
@@ -92,7 +92,7 @@ test('2026-11-11 payout revision: article 6 states the company transfer from the
 test('2026-11-13 partner revision: article 6 limits withdrawals to partner creators and keeps the account/PIN and hold rules',()=>{
  const legal=new LegalDocumentsService(),{PARTNER_TERMS_DATE}=require('../dist/src/platform/legal-documents');assert.equal(PARTNER_TERMS_DATE,'2026-11-13');
  const before=legal.catalog(new Date('2026-11-12T23:59:00+09:00')).documents.terms,after=legal.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;
- assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-17.adult.1');
+ assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-18.beans.1');
  const six=after.sections.find(s=>s.title==='6. 크리에이터 수수료·정산·출금').body;
  assert.match(six,/파트너십 계약을 맺은 크리에이터\(프로필에 인증 배지 표시\)만 신청할 수 있습니다/);assert.match(six,/정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다/);
  assert.match(six,/인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다/);assert.match(six,/출금에는 본인 명의 정산 계좌의 확인과 별도 출금 인증이 필요합니다/);
@@ -281,7 +281,7 @@ test('2026-11-18 posthog.1: privacy 7-10 disclose PostHog analytics and replay; 
  assert.equal(legal.catalog(new Date('2026-11-17T23:59:00+09:00')).documents.privacy.version,'2026-11-17.phone.3','the previous day keeps phone.3');
  for(const day of ['2026-11-18T12:00:00+09:00','2027-01-01T12:00:00+09:00'])assert.equal(legal.catalog(new Date(day)).documents.privacy.version,'2026-11-18.posthog.1');
  const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-18\.posthog\.1:[0-9a-f]{64}$/);assert.match(JSON.stringify(signup.documents.privacy),/PostHog/);
- assert.equal(c.documents.terms.version,'2026-11-17.adult.1','terms unchanged');assert.equal(c.documents.policy.version,'2026-11-18.franchise.1','policy: only the franchise clause (separate test)');
+ assert.equal(c.documents.terms.version,'2026-11-18.beans.1','terms: only the bean revision (separate test)');assert.equal(c.documents.policy.version,'2026-11-18.franchise.1','policy: only the franchise clause (separate test)');
  const body=title=>d.sections.find(s=>s.title.startsWith(title)).body;
  // PIPA 28-8(2) items: what, country, when/how, recipient + contact, purpose + retention, how to refuse.
  assert.match(body('9. '),/④ PostHog, Inc\.\(미국, privacy@posthog\.com\): 서비스 화면을 이용할 때마다 다음 정보가 HTTPS로/);
@@ -303,7 +303,7 @@ test('2026-11-18 reward.1: advertising consent names the sender and the first-co
  for(const phrase of ['좋아하는일해야지(크레팬스)','광고성 정보를 이메일로','프로모션 콩 10개','30일','처음 한 번','이 혜택을 받을 수 없을 뿐 그 밖의 불이익은 없습니다','회수하지 않으며','추가로 드리지 않습니다','출금·환불되지 않으며'])assert.ok(body.includes(phrase),phrase);
  assert.deepEqual(d.sections[2],before.sections[1],'withdrawal/retention section unchanged');
  const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:[0-9a-f]{64}$/);
- const now=legal.catalog(new Date('2026-11-18T00:00:00+09:00')),prior=legal.catalog(new Date('2026-11-17T23:59:00+09:00'));assert.deepEqual(now.documents.terms,prior.documents.terms);assert.deepEqual(now.documents.policy.sections.slice(0,prior.documents.policy.sections.length),prior.documents.policy.sections);assert.equal(now.documents.privacy.version,'2026-11-18.posthog.1');assert.deepEqual(now.collection,prior.collection);
+ const now=legal.catalog(new Date('2026-11-18T00:00:00+09:00')),prior=legal.catalog(new Date('2026-11-17T23:59:00+09:00'));assert.equal(now.documents.terms.version,'2026-11-18.beans.1');assert.deepEqual(now.documents.policy.sections.slice(0,prior.documents.policy.sections.length),prior.documents.policy.sections);assert.equal(now.documents.privacy.version,'2026-11-18.posthog.1');assert.deepEqual(now.collection,prior.collection);
 });
 // 2026-11-18 user approval: operating-policy clause for AI photos with costumes modelled on third-party works (code already enforces it).
 test('2026-11-18 franchise.1: operating policy adds the third-party-work costume clause from 2026-11-18 only; other documents unchanged',()=>{
@@ -318,7 +318,28 @@ test('2026-11-18 franchise.1: operating policy adds the third-party-work costume
  for(const phrase of ['① 적용 대상: AI 사진 편집(비회원 체험 포함)','상업적 이용 권한이 확보되지 않은 의상','게임·애니메이션 분류','1. 게시물 후원(콩 후원)을 받을 수 없습니다(크리에이터 프로필 후원은 영향 없음).','전체 공개로만 게시할 수 있습니다','3. 이미 유료 공개 범위로 게시된 게시물에 제한 사진을 추가할 수 없습니다.','회수·환불하지 않습니다','④ 판정 기준','의상 정보가 기록되지 않은 이전 사진은 제한하지 않습니다','내려받아 다시 올린 경우 포함',"'신고와 이의제기' 절차를 따릅니다","⑥ 기본 의상: '기본' 분류 의상으로 만든 사진은 이 조항의 제한을 받지 않습니다."])assert.ok(sec.body.includes(phrase),phrase);
  for(const n of ['①','②','③','④','⑤','⑥'])assert.equal(sec.body.split(n).length,2,n);
  // Terms, privacy, collection and the advertising consent stay the versions already served on 2026-11-18.
- assert.equal(now.documents.terms.version,'2026-11-17.adult.1');assert.deepEqual(now.documents.terms,before.documents.terms);
+ assert.equal(now.documents.terms.version,'2026-11-18.beans.1','terms: only the bean revision (separate test)');
  assert.deepEqual(now.documents.privacy,POSTHOG_PRIVACY);assert.deepEqual(now.marketing,MARKETING_REWARD_CONSENT);assert.deepEqual(now.collection,before.collection);
- const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-18\.posthog\.1:/);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:/);assert.match(signup.versions.terms,/^2026-11-17\.adult\.1:/);
+ const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-18\.posthog\.1:/);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:/);assert.match(signup.versions.terms,/^2026-11-18\.beans\.1:/);
+});
+// 2026-11-18 user decision (/pilot-work): terms 6 states the bean withdrawal fee/minimum, terms 11 the consent-reward lot; immediate effect.
+test('2026-11-18 beans.1: terms 6 bean withdrawal fee 20% and 1,000 beans, terms 11 reward beans 30 days with a 7-day notice; nothing else changes',()=>{
+ const {BEAN_TERMS:d,FRANCHISE_POLICY,POSTHOG_PRIVACY,MARKETING_REWARD_CONSENT}=require('../dist/src/platform/legal-documents'),{beanPolicy}=require('../dist/src/platform/bean-policy'),{MARKETING_REWARD}=require('../dist/src/platform/marketing-reward');
+ const legal=new LegalDocumentsService(),before=legal.catalog(new Date('2026-11-17T23:59:00+09:00')),old=before.documents.terms;
+ assert.equal(old.version,'2026-11-17.adult.1','the previous day keeps adult.1');
+ assert.equal(d.version,'2026-11-18.beans.1');assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-18');assert.equal(d.effectiveAt,'2026-11-18');assert.equal(d.updatedAt,'2026-11-18');
+ assert.match(d.notice,/^2026년 11월 18일부터 적용합니다\..*제6조.*제11조/);
+ for(const day of ['2026-11-18T00:00:00+09:00','2026-11-18T19:30:00+09:00','2027-01-01T12:00:00+09:00'])assert.deepEqual(legal.catalog(new Date(day)).documents.terms,d,day);
+ const by=(doc,x)=>doc.sections.find(s=>s.title.startsWith(x)).body,s6=by(d,'6. '),s11=by(d,'11. ');
+ // Values come from the code that computes payouts and expiry.
+ assert.equal(beanPolicy.withdrawalFeeBps,2000);assert.equal(beanPolicy.minimumWithdrawalBeans,1000);assert.equal(beanPolicy.krwPerBean,100);assert.equal(MARKETING_REWARD.validDays,30);assert.equal(MARKETING_REWARD.beans,10);assert.equal(beanPolicy.expiryNoticeDays,30);
+ for(const phrase of ['후원받은 콩을 출금할 때는 1콩당 100원으로 계산한 금액에서 출금 수수료 20%를 공제하고 지급하며','80,000원 지급','최소 1,000콩부터 출금을 신청할 수 있습니다','멤버십 수익을 출금할 때는 별도 출금 수수료가 없습니다','은행 이체 수수료는 초기에는 멤버십 수익과 콩 출금 모두 플랫폼이 부담하며 지급액에서 빼지 않습니다','총 공제율은 20%이며','정산 보류기간은 7일입니다','최소 10만원부터','화요일 23:59'])assert.ok(s6.includes(phrase),phrase);
+ assert.doesNotMatch(s6,/초기 이체 수수료는 플랫폼이 부담합니다/);assert.doesNotMatch(s6,/[은는]\d/);
+ for(const phrase of ['일반 프로모션콩은 지급일로부터 1년간','만료 30일 전에 알리고','받은 때부터 30일(720시간) 동안 쓸 수 있고 만료 7일 전에 알립니다','프로모션 100콩 이벤트의 신규 지급분','광고성 정보 수신에 계정에서 처음 동의할 때 받는 프로모션 10콩','해당 미사용 콩만 소멸하며'])assert.ok(s11.includes(phrase),phrase);
+ assert.deepEqual(d.sections.map(s=>s.title),old.sections.map(s=>s.title));
+ d.sections.forEach((s,i)=>{if(!/^(6|11)\. /.test(s.title))assert.deepEqual(s,old.sections[i],s.title);});
+ const now=legal.catalog(new Date('2026-11-18T12:00:00+09:00'));
+ assert.deepEqual(now.documents.privacy,POSTHOG_PRIVACY);assert.deepEqual(now.documents.policy,FRANCHISE_POLICY);assert.deepEqual(now.marketing,MARKETING_REWARD_CONSENT);assert.deepEqual(now.collection,before.collection);
+ const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.terms,/^2026-11-18\.beans\.1:[0-9a-f]{64}$/);assert.match(signup.versions.privacy,/^2026-11-18\.posthog\.1:/);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:/);
+ assert.match(JSON.stringify(signup.documents.terms),/출금 수수료 20%/);
 });

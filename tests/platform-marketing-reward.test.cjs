@@ -91,4 +91,7 @@ test('the 30-day reward lot gets the 7-day event expiry notice, not one right af
  assert.equal(await db.memberNotice.count({where:{dedupe_key:{contains:lot.id}}}),0);
  await beans.expireLots(new Date(expires-7*day+60000));
  assert.equal(await db.memberNotice.count({where:{dedupe_key:'event-bean-expiry:'+lot.id}}),1);assert.equal(await db.memberNotice.count({where:{dedupe_key:'bean-expiry:'+lot.id}}),0);
+ // 2026-11-18 /pilot-work: the notice names the consent reward, not the open event.
+ const notice=await db.memberNotice.findUniqueOrThrow({where:{dedupe_key:'event-bean-expiry:'+lot.id}}),alert=await db.memberNotification.findFirstOrThrow({where:{member_id:member,type:'event-bean-expiry'}});
+ assert.match(alert.text,/^광고성 정보 수신 동의 혜택으로 받은 콩 10개의 사용기한이/);assert.doesNotMatch(alert.text,/이벤트/);assert.equal(notice.rows[0][1],'10개 (광고성 정보 수신 동의 혜택 프로모션콩)');assert.match(notice.note,/출금·환불되지 않습니다/);assert.doesNotMatch(notice.note,/이벤트/);
 });

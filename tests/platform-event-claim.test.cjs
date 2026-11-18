@@ -36,7 +36,7 @@ test('30-day expiry removes only the unused event portion; ordinary grants and r
  assert.equal(await db.memberNotice.count({where:{member_id:fan,kind:{in:['bean-expiry','event-bean-expiry']},dedupe_key:{contains:lot.id}}}),0,'no notice right after the claim');
  await beans.expireLots(new Date(expires-7*day+60000));await beans.expireLots(new Date(Date.parse(receipt.expiresAt)-1));
  assert.equal((await db.beanLot.findUniqueOrThrow({where:{id:lot.id}})).available,70);
- const notice=await db.memberNotice.findUniqueOrThrow({where:{dedupe_key:'event-bean-expiry:'+lot.id}});assert.equal(notice.kind,'event-bean-expiry');assert.doesNotMatch(notice.note,/5년/);assert.match(notice.note,/출금·환불되지 않습니다/);
+ const notice=await db.memberNotice.findUniqueOrThrow({where:{dedupe_key:'event-bean-expiry:'+lot.id}});assert.equal(notice.kind,'event-bean-expiry');assert.doesNotMatch(notice.note,/5년/);assert.match(notice.note,/출금·환불되지 않습니다/);assert.equal(notice.rows[0][1],'70개 (이벤트 프로모션콩)','the event lot keeps the event wording (2026-11-18)');
  assert.equal(await db.memberNotice.count({where:{dedupe_key:'bean-expiry:'+lot.id}}),0,'no generic notice for the event lot');
  assert.equal(await db.memberNotification.count({where:{member_id:fan,type:'event-bean-expiry'}}),1);
  assert.equal(await db.memberNotice.count({where:{dedupe_key:'bean-expiry:'+ordinary.id}}),0,'the five-year grant is not noticed');
