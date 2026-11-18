@@ -431,12 +431,30 @@ export const FRANCHISE_POLICY:LegalDocument={...adultPolicy,version:'2026-11-18.
  notice:'2026년 11월 18일부터 적용합니다. 애니메이션·게임 등 제3자의 작품을 모티프로 한 의상으로 만든 AI 사진이 들어간 게시물은 게시물 후원을 받을 수 없고 전체 공개로만 게시할 수 있다는 조항(제3자 작품 모티프 의상을 사용한 AI 사진의 이용 제한)을 추가했습니다. 기존 조항은 바뀌지 않았습니다.',
  sections:[...adultPolicy.sections,FRANCHISE_POLICY_SECTION]};
 const franchiseCatalog:LegalCatalog={...rewardCatalog,documents:{...rewardCatalog.documents,policy:FRANCHISE_POLICY}};
+// 2026-11-18 user decision (/pilot-work): terms article 6 states the bean withdrawal fee and minimum (bean-policy.ts withdrawalFeeBps 2000,
+// minimumWithdrawalBeans 1000, krwPerBean 100; bean-ledger beanCashQuote) and keeps the bank transfer fee sentence true for both payouts
+// (finance.service and beans payouts deduct no transfer fee). Article 11 adds the advertising-consent reward lot (marketing-reward.ts
+// MARKETING_REWARD 10 beans, validDays 30) and the 7-day expiry notice that beans.service expireLots sends for the event and reward lots.
+// The user chose immediate effect on 2026-11-18 (no advance notice period) against the advisory; actual effect = API deploy time.
+export const BEAN_TERMS_DATE='2026-11-18';
+const BEAN_T6_SWAPS:[string,string][]=[
+ ['총 공제율은20%이며','총 공제율은 20%이며'],
+ ['정산 보류기간은7일입니다. PG 실제 입금 대사까지 완료한 수익에서 최소10만원부터','정산 보류기간은 7일입니다. PG 실제 입금 대사까지 완료한 수익에서 최소 10만원부터'],
+ ['초기 이체 수수료는 플랫폼이 부담합니다. 후원받은 콩은 후원 후 7일이 지나야 출금을 신청할 수 있고, 일반콩은 충전 대금의 실제 입금 확인도 필요합니다.',
+  '멤버십 수익을 출금할 때는 별도 출금 수수료가 없습니다. 후원받은 콩을 출금할 때는 1콩당 100원으로 계산한 금액에서 출금 수수료 20%를 공제하고 지급하며(예: 1,000콩 출금 시 100,000원에서 20,000원을 공제한 80,000원 지급), 최소 1,000콩부터 출금을 신청할 수 있습니다. 은행 이체 수수료는 초기에는 멤버십 수익과 콩 출금 모두 플랫폼이 부담하며 지급액에서 빼지 않습니다. 후원받은 콩은 후원 후 7일이 지나야 출금을 신청할 수 있고, 일반콩은 충전 대금의 실제 입금 확인도 필요합니다.'],
+];
+const BEAN_T11_FROM='충전콩은 결제일, 일반 프로모션콩은 지급일로부터 1년간 쓸 수 있으며, 만료 30일 전에 알리고 만료되면 남은 콩은 소멸합니다. 단, 전체 회원이 계정당 한 번 받는 프로모션 100콩 이벤트의 신규 지급분은 받기 전에 안내한 대로 수령 시점부터 30일(720시간) 동안 사용할 수 있습니다. 사용기한이 지나면 미사용 이벤트 콩만 소멸하며,';
+const BEAN_T11_TO='충전콩은 결제일, 일반 프로모션콩은 지급일로부터 1년간 쓸 수 있으며, 만료 30일 전에 알리고 만료되면 남은 콩은 소멸합니다. 단, 다음 프로모션콩은 받은 때부터 30일(720시간) 동안 쓸 수 있고 만료 7일 전에 알립니다: 전체 회원이 계정당 한 번 받는 프로모션 100콩 이벤트의 신규 지급분(받기 전에 안내한 대로), 광고성 정보 수신에 계정에서 처음 동의할 때 받는 프로모션 10콩. 사용기한이 지나면 해당 미사용 콩만 소멸하며,';
+export const BEAN_TERMS:LegalDocument={...adultTerms,version:'2026-11-18.beans.1',updatedAt:BEAN_TERMS_DATE,publishedAt:BEAN_TERMS_DATE,effectiveAt:BEAN_TERMS_DATE,status:'published',
+ notice:'2026년 11월 18일부터 적용합니다. 제6조에 후원받은 콩의 출금 수수료(20%)와 최소 출금 수량(1,000콩)을 적고 이체 수수료 문장을 멤버십 수익·콩 출금 기준으로 정리했으며, 제11조에 광고성 정보 수신 동의 혜택으로 받은 프로모션 10콩의 사용기한(30일)과 30일 기한 프로모션콩의 만료 7일 전 안내를 적었습니다. 그 밖의 조항은 바뀌지 않았습니다. 이전 개정 내역은 이전 버전에서 볼 수 있습니다.',
+ sections:adultTerms.sections.map(sec=>sec.title.startsWith('6. ')?{...sec,body:BEAN_T6_SWAPS.reduce((body,[from,to])=>swapIn(sec.title,body,from,to),sec.body)}:sec.title.startsWith('11. ')?{...sec,body:swapIn(sec.title,sec.body,BEAN_T11_FROM,BEAN_T11_TO)}:sec)};
+const beanTermsCatalog:LegalCatalog={...franchiseCatalog,documents:{...franchiseCatalog.documents,terms:BEAN_TERMS}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)
