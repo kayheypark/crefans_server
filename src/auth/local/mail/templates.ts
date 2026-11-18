@@ -29,9 +29,10 @@ const clean = (value: string) => String(value).replace(/\u2014/g, ', ');
 const escape = (value: string) => clean(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const security = '본인이 요청하지 않았다면 이 메일을 무시하셔도 됩니다. 인증 코드는 다른 사람에게 알려주지 마세요.';
 const linkStyle = 'display:inline-block;background:transparent;border:0;border-radius:0;padding:0;color:#1746C7;font-size:14px;line-height:1.8;font-weight:bold;text-decoration:underline;text-underline-offset:5px';
-function render(subject: string, title: string, intro: string, body: string, plain: string, note: string) {
+// hero: optional image shown between the logo and the title (welcome mail popper icon, 2026-11-18).
+function render(subject: string, title: string, intro: string, body: string, plain: string, note: string, hero = '') {
   const text = clean(`${title}\n\n${intro}\n\n${plain}\n\n${note}\n\n© CREFANS\n이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.`);
-  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#fff;color:#262832;font-family:Arial,'Apple SD Gothic Neo',sans-serif"><div style="display:none;max-height:0;overflow:hidden">${escape(intro)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:540px;background:white;border:0;border-radius:0;border-spacing:0"><tr><td style="padding:24px 16px 0"><img src="cid:crefans-logo@crefans.com" width="112" alt="crefans" style="display:block;border:0;max-width:100%;height:auto"><h1 style="font-size:22px;line-height:1.45;letter-spacing:-.6px;margin:30px 0 12px;color:#262832">${escape(title)}</h1><p style="font-size:14px;line-height:1.8;color:#616875;margin:0;word-break:keep-all;overflow-wrap:anywhere">${escape(intro)}</p>${body}<p style="font-size:12px;line-height:1.8;color:#7a818d;border:0;padding:0;margin:30px 0 0;word-break:keep-all;overflow-wrap:anywhere">${escape(note)}</p></td></tr><tr><td style="padding:22px 16px 24px;background:white;border:0;font-size:11px;line-height:1.8;color:#8b929c">© CREFANS<br>이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.</td></tr></table></td></tr></table></body></html>`;
+  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#fff;color:#262832;font-family:Arial,'Apple SD Gothic Neo',sans-serif"><div style="display:none;max-height:0;overflow:hidden">${escape(intro)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:540px;background:white;border:0;border-radius:0;border-spacing:0"><tr><td style="padding:24px 16px 0"><img src="cid:crefans-logo@crefans.com" width="112" alt="crefans" style="display:block;border:0;max-width:100%;height:auto">${hero}<h1 style="font-size:22px;line-height:1.45;letter-spacing:-.6px;margin:${hero?'16px':'30px'} 0 12px;color:#262832">${escape(title)}</h1><p style="font-size:14px;line-height:1.8;color:#616875;margin:0;word-break:keep-all;overflow-wrap:anywhere">${escape(intro)}</p>${body}<p style="font-size:12px;line-height:1.8;color:#7a818d;border:0;padding:0;margin:30px 0 0;word-break:keep-all;overflow-wrap:anywhere">${escape(note)}</p></td></tr><tr><td style="padding:22px 16px 24px;background:white;border:0;font-size:11px;line-height:1.8;color:#8b929c">© CREFANS<br>이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다.</td></tr></table></td></tr></table></body></html>`;
   return {subject: `[크레팬스] ${clean(subject)}`, text, html, attachments: [{filename:'crefans-logo.png',content:mailLogo,cid:'crefans-logo@crefans.com',contentType:'image/png',contentDisposition:'inline' as const}]};
 }
 export function codeMail(code: string, purpose: CodePurpose) {
@@ -70,4 +71,32 @@ export function noticeMail(kind: keyof typeof noticeCopy, rows: Array<[string,st
   const table = rows.map(([label,value])=>`<tr><td style="${rowStyle};color:#626b7c">${escape(label)}</td><td align="right" style="${rowStyle}">${escape(value)}</td></tr>`).join('');
   const notice = sellerKinds.has(kind) ? `<p data-notice="intermediary" style="font-size:13px;line-height:1.8;color:#262832;margin:0 0 24px;word-break:keep-all;overflow-wrap:anywhere">${escape(intermediaryNotice)}</p>` : '';
   return render(subject,title,intro,`<table role="presentation" width="100%" style="font-size:13px;margin:24px 0">${table}</table>${notice}<a href="${escape(url.href)}" style="${linkStyle}">${escape(action)}</a>`,rows.map(([k,v])=>`${k}: ${v}`).join('\n')+(notice?`\n${intermediaryNotice}`:'')+`\n${action}: ${url.href}`,note);
+}
+
+// Welcome mail, informational version only (user decision 2026-11-18; approved mockup .local/welcome-mail-ai-mockup.html).
+// No benefits, events, prices or tickets: those would make it advertising (정보통신망법 제50조, KISA 2026 guide; see the
+// front night-work notes 2026-11-18). Images are mail-only JPEG/PNG copies served by the front at /brand/mail/ on the same
+// allow-listed https origin as the button, so remote-image blocking clients still read every step as text.
+const mailOrigins = ['crefans.com','beta.crefans.com'];
+export const welcomeSubject = '가입을 축하해요, 사진 한 장으로 시작해 보세요';
+const welcomeExamples: Array<[string,string,string]> = [['welcome-base-v1.jpg','원본 사진','원본'],['welcome-maid-v1.jpg','메이드 코스튬 결과','메이드'],['welcome-gothic-v1.jpg','고딕 코스튬 결과','고딕'],['welcome-idol-v1.jpg','아이돌 코스튬 결과','아이돌']];
+const welcomeSteps = ['얼굴이 잘 보이는 사진을 올려요.','코스튬·배경·포즈 프리셋을 골라요.','완성된 사진을 게시물로 바로 올려요.'];
+export function welcomeMail(data: {nickname: string; email: string; joinedAt: string}, actionUrl: string) {
+  const url = new URL(actionUrl);
+  if (url.protocol !== 'https:' || !mailOrigins.includes(url.hostname) || url.username || url.password || url.port || url.pathname !== '/service/landing-ai-image-generation') throw new Error('Invalid mail action URL');
+  const asset = (name: string) => escape(`${url.origin}/brand/mail/${name}`);
+  const name = String(data.nickname || '').trim() || '회원';
+  const title = `가입을 축하해요, ${name}님`;
+  const intro = '크레팬스에서는 내 사진 한 장으로 코스튬·배경·포즈를 바꾼 화보를 만들 수 있어요. 얼굴은 그대로, 분위기만 새롭게요.';
+  const hero = `<img src="${asset('welcome-popper-v1.png')}" width="88" height="88" alt="" style="display:block;border:0;margin:28px 0 0">`;
+  const cell = ([file,alt,label]: [string,string,string], left: boolean) => `<td width="50%" style="padding:${left?'0 5px 12px 0':'0 0 12px 5px'};vertical-align:top"><img src="${asset(file)}" alt="${escape(alt)}" width="250" height="313" style="max-width:100%;display:block;width:100%;height:auto;border:0;border-radius:8px"><p style="margin:6px 0 0;font-size:11px;color:#7a818d;text-align:center">${escape(label)}</p></td>`;
+  const grid = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:24px 0 0;table-layout:fixed"><tr>${cell(welcomeExamples[0],true)}${cell(welcomeExamples[1],false)}</tr><tr>${cell(welcomeExamples[2],true)}${cell(welcomeExamples[3],false)}</tr></table><p style="font-size:11px;line-height:1.7;color:#8b929c;margin:0 0 24px">예시는 AI로 만든 가상 인물입니다.</p>`;
+  const steps = `<p style="font-size:14px;line-height:1.8;color:#262832;margin:0 0 6px;font-weight:bold">3단계면 끝나요</p><ol style="font-size:14px;line-height:1.9;color:#616875;margin:0 0 24px;padding-left:20px;word-break:keep-all">${welcomeSteps.map(step=>`<li>${escape(step)}</li>`).join('')}</ol>`;
+  const button = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:8px 0 0"><tr><td align="center" bgcolor="#2563eb" style="border-radius:10px;background:#2563eb"><a href="${escape(url.href)}" style="display:block;padding:16px 20px;color:#ffffff;font-size:17px;line-height:1.4;font-weight:bold;text-decoration:none;border-radius:10px">AI 사진 편집 시작하기</a></td></tr></table>`;
+  const note = `가입 이메일 ${data.email} · 가입일 ${data.joinedAt}\n본인이 가입하지 않았다면 고객센터(khpark@crefans.com)로 알려 주세요.`;
+  const plain = `예시: 원본·메이드·고딕·아이돌 (예시는 AI로 만든 가상 인물입니다.)\n\n3단계면 끝나요\n${welcomeSteps.map((step,i)=>`${i+1}. ${step}`).join('\n')}\n\nAI 사진 편집 시작하기: ${url.href}`;
+  const result = render(welcomeSubject, title, intro, grid + steps + button, plain, note, hero);
+  // The note keeps its line break in HTML (escape() runs first, so the break cannot come from member input).
+  result.html = result.html.replace(escape(note), escape(note).replace('\n', '<br>'));
+  return result;
 }

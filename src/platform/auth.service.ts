@@ -1,6 +1,7 @@
 import {lockHandlePolicy,availableSignupHandle} from './handles';
 import {ensureBeanWallet} from './bean-ledger';
 import {recordMarketingChoice} from './marketing.service';
+import {enqueueWelcome,welcomeMailEnabled} from './member-notices';
 import {PhoneVerificationService} from './phone-verification';
 import {LegalDocumentsService} from './legal-documents';
 import {INVITE_REQUIRED_MESSAGE,signupPolicy} from './signup-policy';
@@ -93,6 +94,8 @@ export class PlatformAuthService {
      if(this.config.get('BEAN_LEDGER_ENABLED')==='true')await ensureBeanWallet(tx,member.id);
      await tx.accountPreference.create({data:{member_id:member.id,marketing_alert:false}});
      await tx.memberConsent.createMany({data:consents.filter(c=>c.kind!=='marketing').map(c=>({...c,member_id:member.id}))});if(input.marketing===true)await recordMarketingChoice(tx,member.id,true,'signup',this.legal.signup().documents.marketing);await tx.signupChallenge.delete({where:{email}});await enqueueOperation(tx,'member.signup',{memberId:member.id},`member.signup:${member.id}`);
+     // 2026-11-18: informational welcome mail, queued once per member and sent later by the member-notices job.
+     if(welcomeMailEnabled(this.config))await enqueueWelcome(tx,member.id);
    });return{message:'회원가입이 완료되었습니다.'};
  }
  async logout(access?:string,refresh?:string){if(access){try{actorContext(await this.local.validateToken(access));}catch{}}if(access)await this.local.signOut(access);if(refresh){const session=await this.db.memberSession.findUnique({where:{refresh_hash:digest(refresh)}});if(session)await this.db.memberSession.deleteMany({where:{member_id:session.member_id}});}await observeAudit(this.db,{category:'auth',action:'auth.logout',data:{outcome:'completed'}});return{message:'로그아웃했습니다.'};}

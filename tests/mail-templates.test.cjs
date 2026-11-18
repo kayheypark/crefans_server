@@ -1,6 +1,6 @@
 require('ts-node/register/transpile-only');
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {codeMail,noticeMail,noticeCopy,marketingMail,intermediaryNotice}=require('../src/auth/local/mail/templates');
+const {codeMail,noticeMail,noticeCopy,marketingMail,intermediaryNotice,welcomeMail}=require('../src/auth/local/mail/templates');
 for(const purpose of ['verify','reset','email-change'])test('code template '+purpose,()=>{const m=codeMail('012345',purpose);assert.match(m.html,/012345/);assert.match(m.text,/012345/);assert.match(m.html,/cid:crefans-logo@crefans.com/);assert.equal(m.attachments[0].content.subarray(1,4).toString(),'PNG');assert.doesNotMatch(m.subject+m.text+m.html,/\u2014/);assert.doesNotMatch(m.html,/<script|<a /);assert.match(m.text,/10분/);});
 test('invalid codes and unknown purposes rejected',()=>{for(const c of ['12345','1234567','<script>','１２３４５６'])assert.throws(()=>codeMail(c,'verify'));assert.throws(()=>codeMail('123456','unknown'));});
 for(const kind of Object.keys(noticeCopy))test('notice template '+kind,()=>{const m=noticeMail(kind,[['판매자','<script>alert(1)</script>\u2014하늘']], 'https://crefans.com/service/me','검증 안내');assert.doesNotMatch(m.subject+m.text+m.html,/\u2014/);assert.doesNotMatch(m.html,/<script>/);assert.match(m.html,/&lt;script&gt;/);assert.match(m.html,/https:\/\/crefans.com/);});
@@ -44,4 +44,25 @@ test('membership payment mail names the seller and the intermediary notice, noti
 });
 test('non-membership notices carry no intermediary notice',()=>{
  for(const kind of ['bean-expiry','withdrawal-completed','account-changed']){const m=noticeMail(kind,[],'https://crefans.com/service/me','');assert.ok(!m.html.includes(NOTICE)&&!m.text.includes(NOTICE),kind);}
+});
+
+// 2026-11-18 informational welcome mail (no advertising markers, escaped nickname, allow-listed links and images).
+const cta='https://crefans.com/service/landing-ai-image-generation';
+test('welcome mail: approved copy, informational footer, mail-only images on the same origin',()=>{
+ const m=welcomeMail({nickname:'하늘',email:'fan@example.invalid',joinedAt:'2026년 11월 18일'},cta);
+ assert.equal(m.subject,'[크레팬스] 가입을 축하해요, 사진 한 장으로 시작해 보세요');
+ for(const part of [m.html,m.text]){assert.match(part,/가입을 축하해요, 하늘님/);assert.match(part,/예시는 AI로 만든 가상 인물입니다\./);assert.match(part,/AI 사진 편집 시작하기/);assert.match(part,/가입 이메일 fan@example\.invalid · 가입일 2026년 11월 18일/);assert.match(part,/고객센터\(khpark@crefans\.com\)로 알려 주세요\./);assert.match(part,/이 메일은 계정 및 서비스 이용에 관한 자동 안내 메일입니다\./);assert.match(part,/landing-ai-image-generation/);}
+ assert.doesNotMatch(m.subject+m.html+m.text,/\(광고\)|수신거부|광고성 정보|콩|이벤트|할인|이용권/);assert.equal(m.headers,undefined);
+ const images=[...m.html.matchAll(/<img src="([^"]+)"/g)].map(x=>x[1]);
+ assert.deepEqual(images,['cid:crefans-logo@crefans.com','https://crefans.com/brand/mail/welcome-popper-v1.png','https://crefans.com/brand/mail/welcome-base-v1.jpg','https://crefans.com/brand/mail/welcome-maid-v1.jpg','https://crefans.com/brand/mail/welcome-gothic-v1.jpg','https://crefans.com/brand/mail/welcome-idol-v1.jpg']);
+ assert.doesNotMatch(m.html,/\.webp|시안/);for(const label of ['원본','메이드','고딕','아이돌'])assert.match(m.html,new RegExp('>'+label+'</p>'));
+});
+test('welcome mail escapes the nickname and email and falls back when the nickname is blank',()=>{
+ const m=welcomeMail({nickname:'<script>alert(1)</script><img src=x onerror=alert(1)>',email:'a"<b>@example.invalid',joinedAt:'2026년 11월 18일'},cta);
+ assert.doesNotMatch(m.html,/<script>|<img src=x|<b>/);assert.match(m.html,/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);assert.match(m.html,/a&quot;&lt;b&gt;@example\.invalid/);
+ assert.match(welcomeMail({nickname:'  ',email:'a@example.invalid',joinedAt:'x'},cta).html,/가입을 축하해요, 회원님/);
+});
+test('welcome mail rejects button URLs outside the allow-list (images follow the same origin)',()=>{
+ for(const u of ['javascript:alert(1)','https://evil.example/service/landing-ai-image-generation','https://crefans.com.evil.example/service/landing-ai-image-generation','http://crefans.com/service/landing-ai-image-generation','https://user:pass@crefans.com/service/landing-ai-image-generation','https://crefans.com:444/service/landing-ai-image-generation','https://crefans.com/service/feed'])assert.throws(()=>welcomeMail({nickname:'a',email:'a@example.invalid',joinedAt:'x'},u),/Invalid mail action URL/);
+ assert.match(welcomeMail({nickname:'a',email:'a@example.invalid',joinedAt:'x'},'https://beta.crefans.com/service/landing-ai-image-generation').html,/https:\/\/beta\.crefans\.com\/brand\/mail\/welcome-base-v1\.jpg/);
 });
