@@ -1,3 +1,11 @@
+## 2026-11-18 AI 사진 원가 통제 (feat/ai-cost-caps, 미배포)
+- 사용자 결정 1: 유료 이용권·AI 구독(paidUse)은 서비스 전체 하루 한도 ai-photo:total(300)에 막히지 않고 세지도 않음. 무료·하트 보상은 그대로 셈. 전체가 찼을 때 무료/하트 시도는 반환하고 남은 유료 횟수가 있으면 그것으로 진행, 없으면 SERVICE_BUSY. 실패 시 전체 한도 반환은 실제로 센 경우(totalTaken)만.
+- 사용자 결정 2: Seedream 실제 호출을 한국 시간 하루 900회로 제한(src/platform/ai-photo-cost.ts, auth_rate_buckets 'ai-photo:provider-calls:<KST 날짜>'). 스타킹 문구 자동 재요청·차단 반환·타임아웃 포함 모든 호출을 셈. OpenAI 안전검사(무료)는 세지 않음. 도달 시 호출 전에 503 AI_PROVIDER_DAILY_CAP('…이번 시도는 차감되지 않았어요…'), 무료·하트·유료·비회원 횟수 반환, 텔레그램 'ai-photo.provider_cap' 하루 1회(dedupe), 건별 실패 알림은 생략.
+- 사용자 결정 3: 호출마다 예상 원가(입력 장수×$0.008+출력 $0.020, 공식 단가 https://ai.byteplus.com/ark/region:ap-southeast-1/docs/model-pricing 2026-11-18 확인, 타임아웃·차단도 과금된 것으로 보수 추정)를 KST 하루 합산. $30 넘으면 'ai-photo.cost_warning'(주의), $60 넘으면 'ai-photo.cost_critical'(위험) 각 하루 1회. 알림에는 금액·기준·호출 수만, IP·회원 정보 없음.
+- 마이그레이션·새 라우트 없음. 기존 한도(무료 10, 하트, 비회원 10/10/200)는 UTC 창(오전 9시) 그대로이고 새 상한·원가만 KST 자정 기준.
+- 검증(로컬 격리 e2e DB, 공급사 대역만, 실제 Seedream 호출 없음): platform-ai-photo 47/47(유료는 전체 한도 소진 시에도 생성·무료는 SERVICE_BUSY 후 반환, 재요청 2회 집계·901번째 호출 안 함·무료/유료 미차감·알림 1건, $30·$60 각 1회만), guest·guest-caption·ai-photo-grants 22/22, operations 3종 26/26, tsc 통과. 대조: 유료 우회를 원래 코드로 되돌리면 유료 테스트가 SERVICE_BUSY로 실패. test:openapi는 기존 수치 불일치(281/107 vs 284/108, 이번 변경과 무관)로 2건 실패 그대로.
+- 미확인: 차단·타임아웃 요청의 실제 BytePlus 과금 여부(콘솔 대조 필요). 다른 테스트 파일(guest 등)은 실제 KST 날짜 카운터를 쓰므로 e2e DB에서 하루 900회 넘게 돌리면 막힐 수 있음(ai-photo 테스트는 실행별 키 사용).
+
 ## 2026-11-17 텔레그램 주문·입금 알림 보강 (feat/order-telegram, 운영 crefans-api:ordertg-20261117)
 - 사용자 결정: 무통장 주문 접수 알림(bank_transfer.opened)에 상품명(productName, 상품 카탈로그 문구 60자, 개인정보 아님) 추가 — AI 이용권 상품명·광고상품명·'콩 N개'. 알림 본문 '상품: …'.
 - 사용자 결정: 구매자 '입금했어요' → POST payments/bank-transfer/:kind/:orderId/deposited, 본인 입금 대기 주문만, 주문당 1회(dedupe) 텔레그램 'bank_transfer.deposit_reported'(이름·계좌 없음). 은행 자동 입금 확인은 없음(운영자 콘솔 확인 그대로).
