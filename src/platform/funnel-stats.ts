@@ -44,17 +44,18 @@ export function funnelRateLimit(ip:string|undefined,now=Date.now()){
 // 2026-11-18 user decision (랜딩 방문 텔레그램 알림): landing_view may also carry the external referrer host and utm_source.
 // Anything that fails the pattern is silently dropped (the count still happens); other fields stay a 400.
 // 2026-11-18 user decision (당근 캠페인): utmMedium and utmCampaign follow the same rule so the alert shows the campaign.
-const OPTIONAL_FIELDS=new Set(['referrerHost','utmSource','utmMedium','utmCampaign']),HOST=/^[a-z0-9.-]{1,253}$/,UTM=/^[A-Za-z0-9_.-]{1,40}$/;
-type LandingSource={referrerHost?:string;utmSource?:string;utmMedium?:string;utmCampaign?:string};
+// 2026-11-18 user decision (당근 광고 3개): utmContent tells the ads of one campaign apart; same rule.
+const OPTIONAL_FIELDS=new Set(['referrerHost','utmSource','utmMedium','utmCampaign','utmContent']),HOST=/^[a-z0-9.-]{1,253}$/,UTM=/^[A-Za-z0-9_.-]{1,40}$/;
+type LandingSource={referrerHost?:string;utmSource?:string;utmMedium?:string;utmCampaign?:string;utmContent?:string};
 const utm=(value:unknown)=>typeof value==='string'&&UTM.test(value)?value:undefined;
 export function landingSource(input:any):LandingSource{
- return{referrerHost:typeof input?.referrerHost==='string'&&HOST.test(input.referrerHost)?input.referrerHost:undefined,utmSource:utm(input?.utmSource),utmMedium:utm(input?.utmMedium),utmCampaign:utm(input?.utmCampaign)};
+ return{referrerHost:typeof input?.referrerHost==='string'&&HOST.test(input.referrerHost)?input.referrerHost:undefined,utmSource:utm(input?.utmSource),utmMedium:utm(input?.utmMedium),utmCampaign:utm(input?.utmCampaign),utmContent:utm(input?.utmContent)};
 }
 // Readable names for the sources the operator uses in links (2026-11-18). Unknown sources show the raw value only.
 const SOURCE_NAMES:Record<string,string>={daangn:'당근',x:'X',instagram:'인스타그램'};
 export function landingFrom(source:LandingSource){
  const name=source.utmSource?SOURCE_NAMES[source.utmSource.toLowerCase()]:undefined;
- return[name,source.referrerHost,...(['utmSource','utmMedium','utmCampaign'] as const).map(key=>source[key]?`utm_${key.slice(3).toLowerCase()}=${source[key]}`:undefined)].filter(Boolean).join(' · ')||'직접 방문 또는 알 수 없음';
+ return[name,source.referrerHost,...(['utmSource','utmMedium','utmCampaign','utmContent'] as const).map(key=>source[key]?`utm_${key.slice(3).toLowerCase()}=${source[key]}`:undefined)].filter(Boolean).join(' · ')||'직접 방문 또는 알 수 없음';
 }
 
 // Alert limits (2026-11-18 user decision "같은 아이피알림도 계속 알려줘": no per-IP quiet window):

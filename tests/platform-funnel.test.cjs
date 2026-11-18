@@ -78,9 +78,9 @@ test('landing alert: an accepted landing_view queues one immediate alert with th
  assert.equal(funnel.landingAlertAllowed,undefined,'no per-IP throttle');
 });
 test('landing alert: invalid referrer host / utm are dropped, unknown fields still 400, bots skipped, daily cap sends one cap alert then counts only',async()=>{
- assert.deepEqual(funnel.landingSource({referrerHost:'https://evil.example/path?q=1',utmSource:'a b'}),{referrerHost:undefined,utmSource:undefined,utmMedium:undefined,utmCampaign:undefined});
- assert.deepEqual(funnel.landingSource({referrerHost:'Evil.COM',utmSource:'x'.repeat(41)}),{referrerHost:undefined,utmSource:undefined,utmMedium:undefined,utmCampaign:undefined});
- assert.deepEqual(funnel.landingSource({referrerHost:'l.instagram.com',utmSource:'ig_story-1',utmMedium:undefined,utmCampaign:undefined}),{referrerHost:'l.instagram.com',utmSource:'ig_story-1',utmMedium:undefined,utmCampaign:undefined});
+ assert.deepEqual(funnel.landingSource({referrerHost:'https://evil.example/path?q=1',utmSource:'a b'}),{referrerHost:undefined,utmSource:undefined,utmMedium:undefined,utmCampaign:undefined,utmContent:undefined});
+ assert.deepEqual(funnel.landingSource({referrerHost:'Evil.COM',utmSource:'x'.repeat(41)}),{referrerHost:undefined,utmSource:undefined,utmMedium:undefined,utmCampaign:undefined,utmContent:undefined});
+ assert.deepEqual(funnel.landingSource({referrerHost:'l.instagram.com',utmSource:'ig_story-1',utmMedium:undefined,utmCampaign:undefined,utmContent:undefined}),{referrerHost:'l.instagram.com',utmSource:'ig_story-1',utmMedium:undefined,utmCampaign:undefined,utmContent:undefined});
  for(const body of [{step:'landing_view',referrer:'https://x.com'},{step:'signup_view',referrerHost:'x.com'},{step:'landing_view',ip:'1.2.3.4'}]){const res=await send(body);assert.equal(res.status,400,JSON.stringify(body));}
  const prior=await count('landing_view'),res=await send({step:'landing_view',referrerHost:'bad host!'});assert.equal(res.status,201,'an invalid source is dropped, the visit still counts');assert.equal(await count('landing_view'),prior+1);
  let ops=fakeOps();
@@ -96,8 +96,8 @@ test('landing alert: invalid referrer host / utm are dropped, unknown fields sti
 });
 // 2026-11-18 당근 캠페인: utm_medium·utm_campaign are accepted, shown in the alert with a readable source name, and dropped when invalid.
 test('landing alert: utm_medium and utm_campaign reach the alert; known sources get a readable name',async()=>{
- assert.deepEqual(funnel.landingSource({utmSource:'daangn',utmMedium:'cpc',utmCampaign:'daangn_202611'}),{referrerHost:undefined,utmSource:'daangn',utmMedium:'cpc',utmCampaign:'daangn_202611'});
- assert.deepEqual(funnel.landingSource({utmMedium:'c pc',utmCampaign:'a'.repeat(41)}),{referrerHost:undefined,utmSource:undefined,utmMedium:undefined,utmCampaign:undefined});
+ assert.deepEqual(funnel.landingSource({utmSource:'daangn',utmMedium:'cpc',utmCampaign:'daangn_202611'}),{referrerHost:undefined,utmSource:'daangn',utmMedium:'cpc',utmCampaign:'daangn_202611',utmContent:undefined});
+ assert.deepEqual(funnel.landingSource({utmMedium:'c pc',utmCampaign:'a'.repeat(41)}),{referrerHost:undefined,utmSource:undefined,utmMedium:undefined,utmCampaign:undefined,utmContent:undefined});
  assert.equal(funnel.landingFrom({utmSource:'daangn',utmMedium:'cpc',utmCampaign:'daangn_202611'}),'당근 · utm_source=daangn · utm_medium=cpc · utm_campaign=daangn_202611');
  assert.equal(funnel.landingFrom({referrerHost:'t.co',utmSource:'x',utmMedium:'social'}),'X · t.co · utm_source=x · utm_medium=social');
  assert.equal(funnel.landingFrom({utmSource:'insta_bio'}),'utm_source=insta_bio','unknown source: raw value only');
@@ -105,7 +105,11 @@ test('landing alert: utm_medium and utm_campaign reach the alert; known sources 
  assert.equal(res.status,201);assert.deepEqual(await res.json(),{recorded:true});
  let row;for(let i=0;i<40&&!row;i++){row=(await landingRows(since)).find(r=>r.ip==='198.51.100.24'&&r.data['유입']?.startsWith('당근'));if(!row)await new Promise(r=>setTimeout(r,50));}assert.ok(row,'alert queued');assert.equal(row.data['유입'],'당근 · utm_source=daangn · utm_medium=cpc · utm_campaign=daangn_202611');
  assert.match(operationsAlertText(row,'test','k'.repeat(32)),/유입: 당근 · utm_source=daangn · utm_medium=cpc · utm_campaign=daangn_202611/);
- for(const body of [{step:'signup_view',utmCampaign:'x'},{step:'landing_view',utmTerm:'x'}]){const r=await send(body);assert.equal(r.status,400,JSON.stringify(body));}
+ assert.deepEqual(funnel.landingSource({utmSource:'daangn',utmContent:'2'}).utmContent,'2');assert.equal(funnel.landingSource({utmContent:'a b'}).utmContent,undefined);
+ assert.equal(funnel.landingFrom({utmSource:'daangn',utmMedium:'cpc',utmCampaign:'daangn_202611',utmContent:'2'}),'당근 · utm_source=daangn · utm_medium=cpc · utm_campaign=daangn_202611 · utm_content=2');
+ const r2=await fetch(base+'/api/v1/telemetry/funnel',{method:'POST',headers:{'content-type':'application/json','user-agent':IPHONE,'x-crefans-client-ip':'198.51.100.25'},body:JSON.stringify({step:'landing_view',utmSource:'daangn',utmCampaign:'daangn_202611',utmContent:'3'})});assert.equal(r2.status,201);
+ let row2;for(let i=0;i<40&&!row2;i++){row2=(await landingRows(since)).find(r=>r.ip==='198.51.100.25');if(!row2)await new Promise(r=>setTimeout(r,50));}assert.equal(row2?.data['유입'],'당근 · utm_source=daangn · utm_campaign=daangn_202611 · utm_content=3');
+ for(const body of [{step:'signup_view',utmContent:'1'},{step:'signup_view',utmCampaign:'x'},{step:'landing_view',utmTerm:'x'}]){const r=await send(body);assert.equal(r.status,400,JSON.stringify(body));}
 });
 test('landing alert: a failing outbox or database never fails the telemetry request',async()=>{
  const throwing={record:async()=>{throw Error('outbox down');}};
