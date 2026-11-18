@@ -789,10 +789,11 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 ## 랜딩 방문 텔레그램 알림 (2026-11-18)
 
 - 사용자 지시 "랜딩페이지에 누가 들어오면 텔레그램으로 알림": `POST /telemetry/funnel`이 `landing_view`를 집계하면 운영 outbox에 즉시 알림 `funnel.landing_view`(라벨 '랜딩 방문')를 넣는다. 요청은 기다리지 않으며 알림 실패는 응답(201)을 바꾸지 않는다(로그 `funnel.landing_alert_failed`). 요약·중복 제거 목록(`operations-alert-policy.ts`)에 넣지 않아 바로 보낸다.
-- 내용: 방문 시각(KST), 랜딩(AI 사진 랜딩), 유입(외부 referrer 호스트 이름·utm_source, 없으면 '직접 방문 또는 알 수 없음'), 기기(모바일/데스크톱, User-Agent로 대략 판단), 오늘 랜딩 방문 누적(`funnel_step_daily`). 접속·연결 IP는 행에도 알림에도 넣지 않으며(NO_IP_TYPES) User-Agent 문자열·쿠키·세션 ID도 보내지 않는다. 요청 감사 원장은 기존 규칙대로 요청 IP를 보관한다.
+- 내용: 방문 시각(KST), 랜딩(AI 사진 랜딩), 유입(외부 referrer 호스트 이름·utm_source, 없으면 '직접 방문 또는 알 수 없음'), 기기(모바일/데스크톱, User-Agent로 대략 판단), 오늘 랜딩 방문 누적(`funnel_step_daily`). 2026-11-18 사용자 지시로 신뢰 프록시 기준 접속 IP(`X-Crefans-Client-IP`)를 행에 저장하고 알림에 `접속 IP: <ip>`로 보낸다(연결 IP 줄은 없음). `OWNER_HOME_IPS`(runtime.env, 쉼표 구분, 기본 빈 값)에 있는 IP면 ` (집)`을 붙인다. User-Agent 문자열·쿠키·세션 ID는 보내지 않는다. 상한 알림(`funnel.landing_cap`)은 IP 없음 유지. 요청 감사 원장은 기존 규칙대로 요청 IP를 보관한다.
 - 입력 검사: referrerHost `^[a-z0-9.-]{1,253}$`, utmSource `^[A-Za-z0-9_.-]{1,40}$`. 다르면 버린다. 프론트(`lib/api/funnel.ts`)는 외부 referrer일 때 `new URL(document.referrer).hostname`만 보낸다.
+- 배포 후 테스트(2026-11-18): utmSource가 대소문자 무관 `deploy_test`로 시작하면 `funnel.landing_test`(라벨 '랜딩 방문') 알림 첫 줄에 `사유: 배포 후 테스트`를 넣고, `funnel_step_daily`와 오늘 누적·하루 100건 상한에서 제외한다(응답 `recorded:false`).
 - 남용 방지: 같은 접속 IP도 방문마다 알림(2026-11-18 사용자 지시 "같은 아이피알림도 계속 알려줘"로 IP당 30분 1회 제한 제거), KST 하루 100건. 100건이 넘으면 `funnel.landing_cap`(오늘 랜딩 알림 상한 도달) 1회만 보내고 이후는 집계만. 봇·자동화 User-Agent(빈 값, bot·crawl·headless·curl 등)는 알림 제외(집계는 함).
-- 검증: `tests/platform-funnel.test.cjs` 랜딩 알림 3개 테스트(격리 e2e DB).
+- 검증: `tests/platform-funnel.test.cjs` 랜딩 알림 5개 테스트(격리 e2e DB).
 
 
 ## 게임·애니메이션 의상 AI 사진 상업적 이용 제한 (2026-11-18)

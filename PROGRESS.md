@@ -1,3 +1,10 @@
+## 2026-11-18 랜딩 방문 알림 접속 IP·집 표시·배포 후 테스트 사유 (feat/landing-alert-ip-test)
+- 사용자 지시(2026-11-18, 운영 배포 승인 포함): 랜딩 방문 알림에 `접속 IP: <ip>`(감사와 같은 신뢰 프록시 X-Crefans-Client-IP), 대표 집 IP면 ` (집)`. 집 IP는 하드코딩하지 않고 runtime.env `OWNER_HOME_IPS`(쉼표, 기본 빈 값). utmSource가 `deploy_test`로 시작(대소문자 무관)하면 첫 줄 `사유: 배포 후 테스트`, funnel_step_daily·오늘 누적·하루 100건 상한에서 제외.
+- 개인정보 근거 확인: `src/platform/legal-documents.ts` 38행 처리방침 9조 ③ Telegram — "운영 오류·보안 알림을 보낼 때마다 접속 IP와 요청·기록·거래 식별자…운영자 전용 채널로 전송"(운영 공개본 2026-11-18.posthog.1에서도 동일 확인). 주의: 문구 범위가 '운영 오류·보안 알림'이라 랜딩 방문(비회원 포함) 알림이 명시적으로 포함되는지는 해석 여지 — 문구 보강 여부는 사용자 결정 필요(이번 작업에서 처리방침은 바꾸지 않음).
+- 변경: `funnel-stats.ts` isDeployTest·테스트 방문은 집계 없이 `funnel.landing_test` 알림(상한 카운트는 funnel.landing_view만 셈), 방문 알림 omitIp 제거. `operations.service.ts` NO_IP_TYPES에서 landing_view 제거(landing_cap은 IP 없음 유지), LANDING_TYPES는 `접속 IP` 한 줄(연결 IP 줄 없음)+OWNER_HOME_IPS 정확 일치 시 ` (집)`, data `사유`가 있으면 맨 첫 줄. openapi 설명·docs/platform-api.md·runtime.env.example 갱신.
+- 검증(로컬 3307 격리 crefans_platform_e2e, CREFANS_E2E=true, 순차, 2026-11-18 18:35~18:40 KST): tsc 0, build 0, test:openapi 14/14, platform-funnel 11/11(테스트 앱에 main.ts와 같은 보안 미들웨어·TRUSTED_PROXY_IPS=127.0.0.1을 넣어 헤더 IP가 행·알림에 들어감 확인), test:operations 62/62.
+- 대조: funnel-stats.ts·operations.service.ts만 origin/prod로 되돌려 빌드 → funnel 7·8·10·11 실패(4건), 원복 후 11/11.
+
 ## 2026-11-18 18:24~18:41 KST 운영 배포 — 게임·애니 의상 제한 (API franchise-20261118, 프론트 franchise-r2-20261118)
 - 통합: feat → dev 19441fc(server)·085b22a(front), devbox Jenkins 성공(deploy-logs/20261118-182102.log 실패 0, .last-success 일치). dev 확인(dev API 컨테이너, 임시 테스트 행 생성 후 삭제): 멤버십·상품 전용 생성/수정/기존 레벨 글에 추가 400, 의상 게시물 후원 403, 일반 게시물·프로필 후원은 잔액 단계(409); HTTP GET 의상 글 commercialRestricted true·tipsEnabled false, 일반 글 false·true. dev 보정 대상 0(AI 미디어 0).
 - prod: origin/prod가 다른 작업에 의해 dev 커밋(19441fc / front 085b22a)으로 빨리감기됨 — 코디네이터 확인 결과 직전 prod 대비 코드 차이는 이 기능뿐이라 되돌리지 않고 진행(강제 푸시 없음).
