@@ -56,16 +56,21 @@ export const isBotAgent=(ua:unknown)=>typeof ua!=='string'||!ua.trim()||BOT.test
 const device=(ua:string)=>/Mobi|Android|iPhone|iPad|iPod/i.test(ua)?'모바일':'데스크톱';
 const kstTime=(d:Date)=>new Date(+d+9*3600000).toISOString().slice(0,16).replace('T',' ');
 
-/** Queues the immediate 랜딩 방문 alert. Never throws; the caller does not await it. */
+// 2026-11-18 user decision: utm_source starting with deploy_test marks the operator's post-deploy check. It is alerted with a 사유 line
+// but is not a real visitor: not counted in funnel_step_daily and not counted toward the daily alert cap (own event type).
+export const isDeployTest=(source:{utmSource?:string})=>/^deploy_test/i.test(source.utmSource||'');
+
+/** Queues the immediate 랜딩 방문 alert. Never throws; the caller does not await it.
+ * 2026-11-18 user decision: the alert carries the trusted client IP (privacy policy 9조 Telegram 접속 IP), so the row keeps it. */
 export async function landingVisitAlert(db:any,operations:{record:Function},source:{referrerHost?:string;utmSource?:string},userAgent:unknown,now=new Date()){
  try{
   if(isBotAgent(userAgent))return'skipped';
-  const day=kstDay(now),start=new Date(+day-9*3600000);
+  const day=kstDay(now),start=new Date(+day-9*3600000),test=isDeployTest(source);
   const sent=await db.platformOperationalEvent.count({where:{type:'funnel.landing_view',created_at:{gte:start}}});
-  if(sent>=ALERT_DAILY_CAP){await operations.record('funnel.landing_cap',{limit:ALERT_DAILY_CAP},`funnel.landing_cap:${day.toISOString().slice(0,10)}`,{omitIp:true});return'capped';}
+  if(!test&&sent>=ALERT_DAILY_CAP){await operations.record('funnel.landing_cap',{limit:ALERT_DAILY_CAP},`funnel.landing_cap:${day.toISOString().slice(0,10)}`,{omitIp:true});return'capped';}
   const today=(await db.funnelStepDaily.findUnique({where:{day_step:{day,step:'landing_view'}}}))?.count||0;
   const from=[source.referrerHost,source.utmSource?`utm_source=${source.utmSource}`:undefined].filter(Boolean).join(' · ')||'직접 방문 또는 알 수 없음';
-  await operations.record('funnel.landing_view',{'방문 시각(KST)':kstTime(now),'랜딩':'AI 사진 랜딩','유입':from,'기기':device(String(userAgent)),'오늘 랜딩 방문':today},undefined,{omitIp:true});
+  await operations.record(test?'funnel.landing_test':'funnel.landing_view',{...(test?{'사유':'배포 후 테스트'}:{}),'방문 시각(KST)':kstTime(now),'랜딩':'AI 사진 랜딩','유입':from,'기기':device(String(userAgent)),'오늘 랜딩 방문':today});
   return'queued';
  }catch{console.error(JSON.stringify({event:'funnel.landing_alert_failed'}));return'failed';}
 }
@@ -75,6 +80,7 @@ export async function reportFunnelStep(db:any,input:any,alert?:{operations:{reco
  if(typeof step!=='string'||!CLIENT_FUNNEL_STEPS.has(step)||Object.keys(input).some(k=>k!=='step'&&!(step==='landing_view'&&OPTIONAL_FIELDS.has(k))))reject(400,'INVALID_FUNNEL_STEP','알 수 없는 단계예요.');
  const ip=requestContext.getStore()?.ip;
  if(!funnelRateLimit(ip))reject(429,'RATE_LIMITED','잠시 후 다시 시도해주세요.');
+ if(step==='landing_view'&&isDeployTest(landingSource(input))){if(alert)void landingVisitAlert(db,alert.operations,landingSource(input),alert.userAgent);return{recorded:false};}
  const recorded=await recordFunnelStep(db,step as FunnelStep);
  if(recorded&&step==='landing_view'&&alert)void landingVisitAlert(db,alert.operations,landingSource(input),alert.userAgent);
  return{recorded};
