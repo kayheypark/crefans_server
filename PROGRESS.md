@@ -1,3 +1,17 @@
+## 2026-11-18 랜딩 방문 텔레그램 알림 (feat/landing-visit-alert)
+- 사용자 지시 "랜딩페이지에 누가 들어오면 텔레그램으로 알림 쏴줘" + "배포해"(운영 배포 승인).
+- 변경: funnel-stats.ts — landing_view 집계 성공 시 `funnel.landing_view`('랜딩 방문') 즉시 알림을 operations.record(omitIp)로 outbox에 넣음(await 안 함, 실패는 로그 `funnel.landing_alert_failed`만, 응답 201 불변). 내용: 방문 시각(KST)·랜딩(AI 사진 랜딩)·유입(referrerHost `^[a-z0-9.-]{1,253}$`·utmSource `^[A-Za-z0-9_.-]{1,40}$`, 불일치는 버림)·기기(모바일/데스크톱)·오늘 랜딩 방문 누적. IP·UA 문자열·쿠키·세션 ID 없음(NO_IP_TYPES에 funnel.landing_view·funnel.landing_cap 추가, 행의 ip/peer_ip도 null). 접속 IP당 30분 1회(메모리, 프로세스 salt 해시), KST 하루 100건 후 `funnel.landing_cap` 1회(dedupe 키 일자)·이후 집계만, 봇·빈 UA·bare 'node' 제외. telemetry.controller에 user-agent 헤더·PlatformOperationsService 주입. 요약·중복 제거 목록에는 넣지 않음(즉시). openapi-contract·docs/platform-api.md 갱신.
+- 검증(로컬 3307 격리 crefans_platform_e2e, CREFANS_E2E=true, 순차): tsc 0, build 0, platform-funnel 9/9(새 3: 1회 알림·IP/UA/URL 없음·같은 IP 30분 무알림, 잘못된 출처 버림·추가 필드 400·봇 제외·상한 1회, outbox/DB 오류에도 201), test:openapi 14/14, test:operations 62/1skip/0fail, operations 11·events 15·http 1·alerts 7, guest 10, auth 3. 대조(dist 변형 후 원복): NO_IP 제거·30분 제한 제거·알림 호출 제거·catch 제거·호스트 검사 제거·일일 상한 제거 각각 해당 테스트 실패.
+- 참고: 요청 감사 원장(platform_audit_logs)은 기존 규칙대로 요청 IP를 보관(알림·outbox 행에는 없음).
+
+## 2026-11-18 14:57 KST 운영 API 배포 posthog-20261118 — 개인정보처리방침 2026-11-18.posthog.1 공개·시행
+- prod 3f1f8a1(Merge feat/posthog-policy into prod, origin/prod 924a3a5 포함) 오버레이 이미지 crefans-api:posthog-20261118(FROM today-20261118, LABEL revision 3f1f8a1, APP_RELEASE=posthog-20261118). 차이는 legal-documents.ts/.js/.d.ts/.map뿐(release-today-20261118 문맥과 diff 확인), 이미지 안 legal-documents.js·ts SHA-256이 prod 트리와 일치.
+- 스크립트: crefans_server-nightfix/.local/release-posthog-20261118/(ship.log). today 스크립트 복사 후 경로·태그 변경, WELCOME_MAIL_ENABLED=true 존재를 필수 검사로 바꾸고(이전 '없음' 검사 대체), 처리방침 검사를 posthog.1(status published, effectiveAt 2026-11-18, 'PostHog, Inc.'·'ph_로 시작하는 이름' 포함)로 교체.
+- 결과(14:54:56~14:59:22 KST, exit 0): 배포 전 DB 덤프 → 새 마이그레이션 없음 → api·worker 교체 healthy → WELCOME_MAIL_ENABLED=true 유지, .env·runtime.env는 API_IMAGE·APP_RELEASE 외 동일, 다른 컨테이너 불변, 약관·정책 adult.1, 보호 경로 401/404, telemetry 400, privacy posthog.1 ok. 배포 표식 2026-11-18T05:57:14Z(=14:57:14 KST) → 이 시각이 처리방침 공개·시행 시각.
+- 공개 확인: GET https://crefans.com/api/v1/common privacy 2026-11-18.posthog.1(publishedAt·effectiveAt 2026-11-18), https://crefans.com/service/legal/privacy 렌더링에 'PostHog, Inc.'·'ph_로 시작하는 이름'·'2026.11.18 시행' 표시(헤드리스 Chrome).
+- 복구본: /Users/ethan/crefans-recovery/20261118/posthog-20261118-api/(이전 이미지 today-20261118 api-prev.tar.gz·database-prev.sql.gz·settings-prev.tar·IMAGE_ID, SHA256SUMS 검증·이미지 ID 대조). 서버 /opt/crefans-backup-posthog-20261118·/tmp 사본·이전 태그 삭제.
+- dev: Jenkins crefans-dev-deploy #38 SUCCESS(deploy-logs/20261118-145102.log, 스모크 실패 0, server 2bec901·front 491b252), dev 처리방침 posthog.1 응답 확인.
+
 ## 2026-11-18 14:4x KST dev 통합 — feat/posthog-policy (처리방침 2026-11-18.posthog.1)
 - 사용자 승인(2026-11-18) 직접 통합. origin/dev 311af28에서 분리 HEAD 작업 트리(crefans_server-dev-posthog)로 --no-ff 병합(d04ee06). PROGRESS 충돌만(양쪽 절 모두 유지).
 - 검증(2026-11-18 14:45 KST, 로컬 3307 격리 crefans_platform_e2e, CREFANS_E2E=true, 순차): tsc --noEmit 0, build 0, test:openapi 14/14, platform-legal 32/32, auth·auth-hardening·signup-mode·signup-invites·signup-welcome 26/26. 프론트 docs:contracts(변경 없음)·docs:record·check:docs PASS(라우트 286).

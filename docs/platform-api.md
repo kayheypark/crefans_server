@@ -318,7 +318,7 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | GET | /admin/logs/:id | 동일 권한. 상세·동일 요청/대상/배치의 최근100건 타임라인·outbox 발송 상태, 미존재404 |
 | POST | /admin/client-errors | 활성 관리자. 비신뢰 브라우저 오류 종류·정적 JS 위치 보고, IP별10회/분 |
 | POST | /telemetry/browser-errors | 선택 인증. 서비스 브라우저 오류 보고, 동일 제한·허용 목록 재검증 |
-| POST | /telemetry/funnel | 선택 인증. 유입 단계 화면 방문(landing_view·guest_consent_view·signup_view)만 허용, 그 외 400. IP당 분당 30회(메모리, IP 미저장). KST 일자·단계·횟수만 저장(2026-11-18) |
+| POST | /telemetry/funnel | 선택 인증. 유입 단계 화면 방문(landing_view·guest_consent_view·signup_view)만 허용, 그 외 400. IP당 분당 30회(메모리, IP 미저장). KST 일자·단계·횟수만 저장(2026-11-18). landing_view만 선택 필드 referrerHost·utmSource 허용(형식 불일치는 버림)하고 랜딩 방문 텔레그램 알림을 큐에 넣음(아래 절) |
 | POST | /guide/advisor | 비로그인·쿠키 없음. CORS는 `GUIDE_ORIGINS`(기본 guide.crefans.com)만 허용하고, Origin 검사는 `GUIDE_ORIGINS`와 서비스 출처(`FRONTEND_ORIGINS`에서 `ADMIN_ORIGINS` 제외; 2026-11-08 고객센터 AI 가이드가 같은 출처로 호출)를 허용한다. 콘솔 출처는 거부. `{question}` 1~500자, 이메일·10자리 이상 숫자 400 PERSONAL_DATA, 역할 변경·지침/모델 요구 400 OUT_OF_SCOPE(공급사 호출 전), 근거가 있을 때만 Moderation(omni-moderation-latest) 유해 400 UNSAFE_INPUT·판정 불가 502. 가이드 색인+현행 약관 3종에서 글자 일치 검색과 의미 검색(Embeddings `text-embedding-3-small`, 코사인 ≥ `GUIDE_ADVISOR_MIN_SIMILARITY`)을 순위 융합(RRF)해 근거를 찾고 OpenAI Responses API(store=false)로 평문 답변 `{answer,sources,found}`; 근거 없으면 답변·Moderation 호출 없이 고정 안내(질문은 의미 검색에만 전송). 의미 검색 실패 시 글자 검색만 사용. 키 없음 503 PROVIDER_NOT_CONFIGURED, 선택 `client`(브라우저 익명 ID 16~64자, 없거나 형식 오류면 IP) 15회/일 429 DAILY_LIMIT(UTC 일 단위, 09:00 KST 초기화), IP별 5회/분·50회/일·전체 1000회/일 429; Responses 요청에 safety_identifier=익명 ID 해시. 답변에 공급사·모델명·지침/태그·링크·HTML·개인정보가 있거나 Moderation 플래그·판정 불가면 고정 안내로 교체, 시간 초과 504, 공급사 오류 502. 모델명 비노출, 질문 원문 미저장. 구현 `src/platform/guide-advisor.ts` |
 
 응답 envelope 4개 필드는 유지하며 `X-Request-ID` 응답 헤더를 추가했다. 클라이언트 입력 ID는 신뢰하지 않는다. 로그 API는 수정/삭제를 제공하지 않는다. 수집·보관·감사/외부 공급사 실패 경계·공식 근거는 [운영 사고 추적 로그](./operational-logging.md)를 따른다. 운영 배포 상태는 PROGRESS 최신 기록과 실행 증거를 확인한다.
@@ -784,3 +784,12 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 - 서버가 직접 세는 단계: 체험 동의 완료(`POST /guest/session` 성공), AI 생성 시작·성공(비회원/회원, `ai-photo.ts` edit), 글 자동 작성(`POST /guest/content/caption` 응답), 게시(비회원 `POST /guest/content`, 회원 `POST /studio/content`의 새 글 바로 게시만), 회원가입 완료(`POST /auth/signup` 트랜잭션 후).
 - 브라우저가 보내는 단계: 랜딩 방문(`/service/landing-ai-image-generation`), 체험 동의 화면, 회원가입 화면. 탭(sessionStorage)당 한 번만 보내므로 대략값이다. 개인을 구분하지 않아 같은 사람이 여러 번 셀 수 있고, 전환율은 단계 합계 비율일 뿐 같은 사람의 이동을 뜻하지 않는다.
 - 집계 실패는 원래 요청을 바꾸지 않는다(로그 `funnel.record_failed`만). 콘솔은 대시보드(overview.view)에서 최근 14일 표를 읽기 전용으로 본다.
+
+## 랜딩 방문 텔레그램 알림 (2026-11-18)
+
+- 사용자 지시 "랜딩페이지에 누가 들어오면 텔레그램으로 알림": `POST /telemetry/funnel`이 `landing_view`를 집계하면 운영 outbox에 즉시 알림 `funnel.landing_view`(라벨 '랜딩 방문')를 넣는다. 요청은 기다리지 않으며 알림 실패는 응답(201)을 바꾸지 않는다(로그 `funnel.landing_alert_failed`). 요약·중복 제거 목록(`operations-alert-policy.ts`)에 넣지 않아 바로 보낸다.
+- 내용: 방문 시각(KST), 랜딩(AI 사진 랜딩), 유입(외부 referrer 호스트 이름·utm_source, 없으면 '직접 방문 또는 알 수 없음'), 기기(모바일/데스크톱, User-Agent로 대략 판단), 오늘 랜딩 방문 누적(`funnel_step_daily`). 접속·연결 IP는 행에도 알림에도 넣지 않으며(NO_IP_TYPES) User-Agent 문자열·쿠키·세션 ID도 보내지 않는다. 요청 감사 원장은 기존 규칙대로 요청 IP를 보관한다.
+- 입력 검사: referrerHost `^[a-z0-9.-]{1,253}$`, utmSource `^[A-Za-z0-9_.-]{1,40}$`. 다르면 버린다. 프론트(`lib/api/funnel.ts`)는 외부 referrer일 때 `new URL(document.referrer).hostname`만 보낸다.
+- 남용 방지: 접속 IP당 30분 1회(프로세스 메모리, 무작위 salt 해시 키, 저장 안 함), KST 하루 100건. 100건이 넘으면 `funnel.landing_cap`(오늘 랜딩 알림 상한 도달) 1회만 보내고 이후는 집계만. 봇·자동화 User-Agent(빈 값, bot·crawl·headless·curl 등)는 알림 제외(집계는 함).
+- 검증: `tests/platform-funnel.test.cjs` 랜딩 알림 3개 테스트(격리 e2e DB).
+
