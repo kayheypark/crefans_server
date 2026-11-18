@@ -22,8 +22,9 @@ const labels:Record<string,string>={'creator.partner_requested':'파트너 계�
  'media.watermark_failed':'워터마크 변환 실패 건 남아 있음','media.watermark_stuck':'워터마크 변환 멈춤','media.watermark_skipped':'워터마크 건너뜀(핸들 형식 확인 필요)','media.transcode_stuck':'아이폰 영상 변환 30분 넘게 대기','media.transcode_failed':'아이폰 영상 변환 실패(최근 1시간)',
  'audit.retention_lagging':'요청 감사 로그 보관기한 파기 지연','alerts.backlog':'운영 알림 15분 넘게 미전송','worker.stalled':'배치 15분 넘게 멈춤 — 프로세스 재시작',
  'admin.inquiry_replied':'운영자 문의 답변','admin.report_resolved':'운영자 신고 처리','admin.document_saved':'운영자 공지·FAQ 저장','operations.daily_digest':'운영 일일 요약',
+ 'funnel.landing_view':'랜딩 방문','funnel.landing_cap':'오늘 랜딩 알림 상한 도달(100건) — 오늘 남은 방문은 집계만 하고 알림 안 보냄',
 };
-const allowed=new Set(['limit','calls','estimatedUsd','thresholdUsd','ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','mode','style','kinds','presets','references','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각']);
+const allowed=new Set(['limit','calls','estimatedUsd','thresholdUsd','ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','mode','style','kinds','presets','references','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각','방문 시각(KST)','랜딩','유입','기기','오늘 랜딩 방문']);
 function metadata(data:Record<string,unknown>){
  const result:Record<string,any>={};
  for(const [key,value] of Object.entries(data)){
@@ -39,7 +40,8 @@ function metadata(data:Record<string,unknown>){
 /** Telegram is outside the service (overseas transfer): member identifiers leave only as a keyed hash (2026-11-02 user decision).
  * Operators find the raw value through 기록 ID in the console log. */
 // 2026-11-18 user decision: bank transfer alerts (bank_transfer.*) do not carry the buyer's IP either; the console log keeps it.
-const NO_IP_TYPES=new Set(['ai-photo.failed','ai-photo.succeeded','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
+// 2026-11-18 랜딩 방문 알림: visitor alerts never carry an IP (it is not even stored on the row).
+const NO_IP_TYPES=new Set(['ai-photo.failed','ai-photo.succeeded','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical','funnel.landing_view','funnel.landing_cap']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
 const KIND_LABELS:Record<string,string>={bean:'콩 충전','ai-shop':'AI 이용권',ad:'광고상품'};
 export function operationsAlertText(row:{type:string;ip:string|null;peer_ip:string|null;created_at:Date;id:string;request_id:string|null;data:unknown},env:string,secret?:string){
  const hidden=(value:unknown)=>secret?'h:'+createHmac('sha256',secret).update(`operations-alert:${String(value)}`).digest('hex').slice(0,12):'(숨김)';
