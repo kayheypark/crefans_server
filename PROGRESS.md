@@ -1,3 +1,9 @@
+## 2026-11-19 00:00~00:51 KST 공유 버튼 알림·이탈 분석 자동화·랜딩 말풍선 — 운영 API share-20261119, 프론트 hint-20261119
+- 공유 버튼 알림(사용자 지시 "공유하기 버튼 누른 것도 텔레그램으로 추적"): 서버 src/platform/share-alert.ts + POST /telemetry/share(허용 라벨만, 봇 제외, IP당 분당 30, 하루 200건 상한), 운영 알림 share.clicked(위치·방식·결과·게시물·기기·오늘 공유·접속 IP, 랜딩처럼 (집) 표시). 프론트 lib/api/share-report.ts를 AiPhotoDialog 공유(native|download)·usePostShare(kakao|copy|more)에 연결. 테스트 server platform-share 3/3·openapi 14/14·operations 11/11, front share-report 2/2·post-share 10/10. 대조: 컨트롤러 라우트 제거 시 2건 실패. 개발·운영 각각 복사 1회로 알림 행 확인, 운영 텔레그램 전달(00:45).
+- 프론트(사용자 지시): 랜딩 결과 순서 모더니아·고딕·메이드·아이돌·마법사(아이돌 4번째). 의상 카테고리 선택 위 말풍선 "니케, 원신, 블루아카이브, 진격거"(AI_PHOTO_COSTUME_HINT, 랜딩·편집기, 떠오르는 애니메이션, reduced-motion이면 정지). PostHog capture_dead_clicks 켬(클릭 범위, 텍스트·속성 가림 유지). 예외(capture_exceptions)는 처리방침 PostHog 항목에 오류 정보가 없어 끔 — 켜려면 처리방침 개정 필요(사용자 결정 대기). 운영 랜딩에서 순서·말풍선 애니메이션 확인.
+- prod 병합은 확인한 dev 커밋(3962a0d)만 사용(자동 수정 커밋이 섞이지 않게).
+- 이탈 분석 자동화(devbox ~/crefans-replay, 사용자 결정: 개발까지 자동·Claude Code·매일 09:00+즉시·30일 보관): fetch.py(PostHog 의미 있는 세션, blob_v2 압축 해제), render.js(Playwright 도커 webm), summarize.py(클릭 문구는 프론트 UI 문구만), Claude 분석(읽기 전용)→텔레그램, fix.sh(작은 수정→tsc·기준선 대비 새 실패 없음→replay-fix 브랜치·dev→개발 서버), 30일 삭제. GitLab replay-bot(Developer)+쓰기 키, prod 보호(Maintainer·강제 푸시 금지) — 실제 푸시로 prod 거부 확인. 즉시 실행 스킬 ~/.claude/skills/posthog-report. 첫 실행 보고 전달, 첫 자동 수정은 작업 폴더 권한 문제로 0건 → --add-dir로 고쳐 재실행 중.
+- 개발 PC: 운영 AI 키 3개·텔레그램 키를 devbox ~/.crefans(600)로 복사(값 미출력). deploy-dev.sh 잠금 대기.
 ## 2026-11-18 22:30~23:35 KST AI 생성 실패 알림 접속 IP·utm_content·개발 서버 AI 키 — 운영 API failip-20261118, 프론트 utmcontent-20261118
 - 사용자 지시: "광고 3개" → utm_content(광고 구분)도 알림 표시, "이미지 생성 실패 모두 아이피를 텔레그램으로 받아볼 수 있게 하고 운영배포", "실제 키를 개발에도 넣어라", 개발 서버 즉시 배포("5분마다 감지 말고 요청하면 즉시").
 - utm_content: landingSource·landingFrom·openapi·프론트 funnel.ts에 utmContent(같은 패턴). 운영 확인: deploy_test 방문 utm_content=2 행·텔레그램 전달, 실제 방문자 utm_content=3 알림도 확인.
