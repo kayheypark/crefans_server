@@ -97,11 +97,11 @@ export class AiPhotoService{
  private async giveBackIn(key:string,seconds:number){await this.service.db.$executeRaw`UPDATE auth_rate_buckets SET count=GREATEST(count-1,0) WHERE id=${this.bucket(key,seconds)}`;}
  async guestRemaining(id:string){return Math.max(0,GUEST_AI_LIMIT-await this.usedIn(guestQuotaKey('ai-photo:guest:',id,await guestQuotaEpoch(this.service.db)),GUEST_LIFETIME));}
  // 2026-11-16 user decision: every AI photo failure goes to Telegram (operations alert queue), user-caused ones included.
- // Codes and stage only: no prompt, photo, member id or IP leaves the service; operators find the request by its record/request id.
+ // Codes and stage plus the client IP (2026-11-18 user decision): no prompt, photo or member id leaves the service; operators find the request by its record/request id.
  private async failureAlert(sub:string,error:any,trace:AiFailureTrace,started:number,guest:boolean){try{
   const code=diagnosticId(error?.getResponse?.()?.code||error?.code||error?.cause?.code)||'INTERNAL_ERROR';
   if(code==='AI_PROVIDER_DAILY_CAP')return;// Alerted once per day by providerCall instead of on every refused request.
-  await this.operations.record('ai-photo.failed',{errorCode:code,status:error?.getStatus?.()||500,stage:diagnosticId(trace.stage)||'unknown',provider:diagnosticId(trace.provider)||'unknown',errorType:diagnosticId(trace.providerCode)||'none',actor:guest||sub.startsWith('guest:')?'guest':'member',durationMs:Date.now()-started},undefined,{omitIp:true});
+  await this.operations.record('ai-photo.failed',{errorCode:code,status:error?.getStatus?.()||500,stage:diagnosticId(trace.stage)||'unknown',provider:diagnosticId(trace.provider)||'unknown',errorType:diagnosticId(trace.providerCode)||'none',actor:guest||sub.startsWith('guest:')?'guest':'member',durationMs:Date.now()-started});
  }catch{this.logger.warn({event:'ai-photo.failure_alert_failed',requestId:trace.requestId});}}
  // 2026-11-18 user decision: early stage, so every successful generation is also sent at once (never deduped or digested).
  // Categories, preset keys and counts only: no prompt, photo, member id, email or IP leaves the service.

@@ -41,14 +41,16 @@ function metadata(data:Record<string,unknown>){
  * Operators find the raw value through 기록 ID in the console log. */
 // 2026-11-18 user decision: bank transfer alerts (bank_transfer.*) do not carry the buyer's IP either; the console log keeps it.
 // 2026-11-18 랜딩 방문 알림 상한 알림은 IP 없음. 방문 알림 자체는 같은 날 사용자 지시로 접속 IP 포함(아래 LANDING_TYPES).
-const NO_IP_TYPES=new Set(['ai-photo.failed','ai-photo.succeeded','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical','funnel.landing_cap']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
+const NO_IP_TYPES=new Set(['ai-photo.succeeded','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical','funnel.landing_cap']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
 // 2026-11-18 user decision: landing alerts show only the trusted client IP, marked (집) when it is in OWNER_HOME_IPS (comma-separated).
-const LANDING_TYPES=new Set(['funnel.landing_view','funnel.landing_test']);
+// 2026-11-18 user decision ("이미지 생성 실패 모두 아이피를 텔레그램으로"): every ai-photo.failed shows the client IP the same way
+// (privacy policy 9조: 운영 오류 알림에 접속 IP 포함). Success and cost alerts still carry none.
+const CLIENT_IP_TYPES=new Set(['funnel.landing_view','funnel.landing_test','ai-photo.failed']);
 const KIND_LABELS:Record<string,string>={bean:'콩 충전','ai-shop':'AI 이용권',ad:'광고상품'};
 export function operationsAlertText(row:{type:string;ip:string|null;peer_ip:string|null;created_at:Date;id:string;request_id:string|null;data:unknown},env:string,secret?:string,homeIps=''){
  const hidden=(value:unknown)=>secret?'h:'+createHmac('sha256',secret).update(`operations-alert:${String(value)}`).digest('hex').slice(0,12):'(숨김)';
  const home=!!row.ip&&homeIps.split(',').map(s=>s.trim()).includes(row.ip),data=row.data as Record<string,unknown>,reason=typeof data?.['사유']==='string'?data['사유']:'';
- const ipLines=LANDING_TYPES.has(row.type)?[`접속 IP: ${row.ip||'알 수 없음'}${home?' (집)':''}`]:noIp(row.type)?['접속 IP: 보내지 않음']:[`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`];
+ const ipLines=CLIENT_IP_TYPES.has(row.type)?[`접속 IP: ${row.ip||'알 수 없음'}${home?' (집)':''}`]:noIp(row.type)?['접속 IP: 보내지 않음']:[`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`];
  const lines=[...(reason?[`사유: ${reason}`]:[]),`[crefans] ${labels[row.type]||row.type}`,`환경: ${env}`,...ipLines,`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
  for(const [key,value] of Object.entries(data))if(key!=='사유')lines.push(`${key==='productName'?'상품':key}: ${key==='kind'&&typeof value==='string'&&KIND_LABELS[value]?KIND_LABELS[value]:key==='amount'&&typeof value==='number'?`${value.toLocaleString('ko-KR')}원`:['memberId','creatorId'].includes(key)?hidden(value):typeof value==='object'?JSON.stringify(value):String(value)}`);
  return lines.join('\n').slice(0,3800);
