@@ -2291,3 +2291,13 @@ model AiPresetUsageDaily {
   @@id([day, kind, preset_key])
   @@map("ai_preset_usage_daily")
 }
+
+/// 2026-11-18: daily AI photo trial funnel step counts (aggregate only, no person, IP or cookie is stored).
+model FunnelStepDaily {
+  day        DateTime @db.Date
+  step       String   @db.VarChar(32)
+  count      Int      @default(0)
+  updated_at DateTime @default(now()) @updatedAt
+  @@id([day, step])
+  @@map("funnel_step_daily")
+}

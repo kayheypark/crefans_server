@@ -19,6 +19,7 @@ import {MemberMailService} from '../auth/local/member-mail.service';
 import {assertNewPassword,digest,hashPassword,normalizeEmail} from '../auth/local/credentials';
 import {reject,text} from './http';
 import {assertReferralCode,linkReferralSignup,referralCodeInput,referralOn,REFERRAL_DISCLOSURE,REFERRAL_DISCLOSURE_KIND} from './referrals';
+import {recordFunnelStep} from './funnel-stats';
 // Sign-in accepts any value a past contract could have stored (reset allowed up to 256 characters).
 const signInPassword=(value:unknown)=>{if(typeof value!=='string'||!value||value.length>256)reject(400,'INVALID_INPUT','입력값을 확인해주세요.');return value as string;};
 @Injectable()
@@ -93,7 +94,7 @@ export class PlatformAuthService {
      if(this.config.get('BEAN_LEDGER_ENABLED')==='true')await ensureBeanWallet(tx,member.id);
      await tx.accountPreference.create({data:{member_id:member.id,marketing_alert:false}});
      await tx.memberConsent.createMany({data:consents.filter(c=>c.kind!=='marketing').map(c=>({...c,member_id:member.id}))});if(input.marketing===true)await recordMarketingChoice(tx,member.id,true,'signup',this.legal.signup().documents.marketing);await tx.signupChallenge.delete({where:{email}});await enqueueOperation(tx,'member.signup',{memberId:member.id},`member.signup:${member.id}`);
-   });return{message:'회원가입이 완료되었습니다.'};
+   });await recordFunnelStep(this.db,'signup_completed');return{message:'회원가입이 완료되었습니다.'};
  }
  async logout(access?:string,refresh?:string){if(access){try{actorContext(await this.local.validateToken(access));}catch{}}if(access)await this.local.signOut(access);if(refresh){const session=await this.db.memberSession.findUnique({where:{refresh_hash:digest(refresh)}});if(session)await this.db.memberSession.deleteMany({where:{member_id:session.member_id}});}await observeAudit(this.db,{category:'auth',action:'auth.logout',data:{outcome:'completed'}});return{message:'로그아웃했습니다.'};}
  async login(input:any){try{const tokens=await this.local.signIn(this.email(input.email),signInPassword(input.password),async()=>null,async()=>null,async()=>null);actorContext(await this.local.validateToken(tokens.accessToken));await observeAudit(this.db,{category:'auth',action:'auth.login',data:{outcome:'success'}});return tokens;}catch(error){await observeAudit(this.db,{category:'auth',action:'auth.login',level:'warning',data:{outcome:'failure',...safeError(error)}});throw error;}}
