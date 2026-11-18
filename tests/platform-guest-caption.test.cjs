@@ -53,13 +53,13 @@ test('no key, nothing chosen or the daily limit never blocks publishing: the fix
  assert.equal(parseCaption('```json\n{"title":"'+'가'.repeat(80)+'","body":"본문"}\n```').title.length,CAPTION_LIMITS.title);
 });
 
-test('every AI photo failure is queued for Telegram with codes only: no IP, prompt, photo or member id',async()=>{
+test('every AI photo failure is queued for Telegram with codes and the client IP: no prompt, photo or member id',async()=>{
  const recorded=[];const photos=Object.create(AiPhotoService.prototype);photos.operations={record:async(...args)=>recorded.push(args)};photos.logger={warn(){}};
  const error=new Error('x');error.getStatus=()=>400;error.getResponse=()=>({code:'MODERATION_BLOCKED'});
  await photos.failureAlert('guest:abc',error,{requestId:'r1',stage:'moderation',provider:'openai',providerCode:'moderation_blocked'},Date.now()-1200,true);
  await photos.failureAlert('member-1',new Error('boom'),{requestId:'r2',stage:'generation',provider:'seedream'},Date.now(),false);
  assert.equal(recorded.length,2);
- const [type,data,dedupe,options]=recorded[0];assert.equal(type,'ai-photo.failed');assert.equal(dedupe,undefined);assert.deepEqual(options,{omitIp:true});
+ const [type,data,dedupe,options]=recorded[0];assert.equal(type,'ai-photo.failed');assert.equal(dedupe,undefined);assert.equal(options,undefined,'2026-11-18: the client IP is kept');
  assert.deepEqual({...data,durationMs:undefined},{errorCode:'MODERATION_BLOCKED',status:400,stage:'moderation',provider:'openai',errorType:'moderation_blocked',actor:'guest',durationMs:undefined});
  assert.deepEqual([recorded[1][1].errorCode,recorded[1][1].status,recorded[1][1].actor],['INTERNAL_ERROR',500,'member']);
  assert.doesNotMatch(JSON.stringify(recorded),/guest:abc|member-1/);
@@ -67,15 +67,15 @@ test('every AI photo failure is queued for Telegram with codes only: no IP, prom
  photos.operations={record:async()=>{throw new Error('down');}};await photos.failureAlert('member-1',error,{requestId:'r3',stage:'x',provider:'y'},Date.now(),false);
 });
 
-test('the stored alert row and the Telegram text carry no IP for AI photo failures, while other alerts keep it',async()=>{
+test('2026-11-18: the stored alert row and the Telegram text carry the client IP for AI photo failures (no connection IP), (집) for the home IP',async()=>{
  const rows=[];const job={},tx={platformOperationalEvent:{create:async({data})=>{rows.push(data);return{id:'e1',...data,created_at:new Date()};}},platformAuditLog:{create:async()=>({})},$queryRaw:async()=>[],platformJob:{createMany:async({data})=>{job[data[0].id]??=data[0];},findUniqueOrThrow:async({where})=>job[where.id],update:async({where,data})=>Object.assign(job[where.id],data)}};// error alerts take the hourly dedupe lock
  const ops=new PlatformOperationsService({$transaction:async fn=>fn(tx)},config({}));
- await requestContext.run({requestId:'q1',ip:'203.0.113.9',peerIp:'10.0.0.1'},()=>ops.record('ai-photo.failed',{errorCode:'X',stage:'generation',provider:'seedream',actor:'guest',status:502},undefined,{omitIp:true}));
+ await requestContext.run({requestId:'q1',ip:'203.0.113.9',peerIp:'10.0.0.1'},()=>ops.record('ai-photo.failed',{errorCode:'X',stage:'generation',provider:'seedream',actor:'guest',status:502}));
  await requestContext.run({requestId:'q2',ip:'203.0.113.9',peerIp:'10.0.0.1'},()=>ops.record('http.error',{errorCode:'Y',status:500}));
- assert.equal(rows[0].ip,null);assert.equal(rows[0].peer_ip,null);assert.deepEqual(rows[0].data,{errorCode:'X',stage:'generation',provider:'seedream',actor:'guest',status:502});
+ assert.equal(rows[0].ip,'203.0.113.9');assert.deepEqual(rows[0].data,{errorCode:'X',stage:'generation',provider:'seedream',actor:'guest',status:502});
  assert.equal(rows[1].ip,'203.0.113.9');
- const row={id:'e1',type:'ai-photo.failed',ip:'203.0.113.9',peer_ip:null,created_at:new Date('2026-11-16T00:00:00Z'),request_id:'q1',data:rows[0].data};
- const text=operationsAlertText(row,'production','secret');assert.match(text,/AI 사진 편집 실패/);assert.match(text,/접속 IP: 보내지 않음/);assert.doesNotMatch(text,/203\.0\.113\.9/);assert.match(text,/errorCode: X/);
+ const row={id:'e1',type:'ai-photo.failed',ip:'203.0.113.9',peer_ip:'10.0.0.1',created_at:new Date('2026-11-16T00:00:00Z'),request_id:'q1',data:rows[0].data};
+ const text=operationsAlertText(row,'production','secret');assert.match(text,/AI 사진 편집 실패/);assert.ok(text.split('\n').includes('접속 IP: 203.0.113.9'),text);assert.doesNotMatch(text,/보내지 않음|연결 IP|10\.0\.0\.1|\(집\)/);assert.match(operationsAlertText(row,'production','secret','198.51.100.1, 203.0.113.9'),/접속 IP: 203\.0\.113\.9 \(집\)/);assert.match(text,/errorCode: X/);
  assert.match(operationsAlertText({...row,type:'http.error'},'production','secret'),/203\.0\.113\.9/);
 });
 
