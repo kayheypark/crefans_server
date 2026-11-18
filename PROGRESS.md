@@ -1,3 +1,9 @@
+## 2026-11-18 13:3x KST 운영 API 배포 시도 → 자동 롤백 (today-20261118, 운영은 ordertg-20261117 유지)
+- 이미지 crefans-api:today-20261118(prod dade06d 오버레이, FROM ordertg-20261117). 스크립트 crefans_server-nightfix/.local/release-today-20261118/(ship.log 포함).
+- 진행: 배포 전 DB 덤프 → migrate deploy로 20261118010000_funnel_step_daily 적용(추가만, 'Database schema is up to date') → api·worker 교체 → 약관·guest/claim·studio 401·휴대폰 GET 404 통과 → 휴대폰 POST 검사가 401 대신 403(ORIGIN_REQUIRED: 검사 curl에 Origin 헤더 없음, 앱의 출처 검사 동작)이라 스크립트 실패 → 자동 롤백. 롤백 후 api·worker ordertg-20261117 healthy, .env·runtime.env 원복 확인. funnel_step_daily 표는 남음(구 이미지는 사용 안 함).
+- 원인은 검사 스크립트 결함(앱 결함 아님)으로 판단되나, 지시('실패 시 중단·보고')에 따라 재시도·관리자·가이드 배포·가입 축하 메일 켜기는 하지 않음. 재시도용 deploy-api.sh는 POST 검사에 Origin 헤더를 넣도록 수정해 둠(미실행).
+- 배포 전 DB 덤프·설정: /Users/ethan/crefans-recovery/20261118/today-20261118-api-failed/(database-prev.sql.gz sha256 d8ba757a…, 서버 사본과 일치·Dump completed, SHA256SUMS). 서버 /opt/crefans-backup-today-20261118·/tmp 압축본 삭제. 서버에 새 이미지 태그 today-20261118은 재시도용으로 남김. WELCOME_MAIL_ENABLED 없음(꺼짐) 유지.
+
 ## 2026-11-18 13:2x KST prod 승격 — 오늘 서버 작업 6개 (미배포 시점 기록)
 - 사용자 승인(2026-11-18, dev 서버 검증·Jenkins #13 통과 후). origin/prod d0637d3에서 분리 HEAD 작업 트리(crefans_server-prod-20261118)로 --no-ff 병합: purge-library-ip → ai-cost-caps → funnel-stats → phone-reveal-audit → alert-dedupe-digest → signup-autologin-welcome.
 - dev에 직접 들어간 fc401f3(AI 성공 알림 예상 원가)는 원가 모듈 의존이라 feat/alert-dedupe-digest에 feat/ai-cost-caps를 먼저 병합(2e9638c)한 뒤 체리픽(ceda72f)해 브랜치 경유로 반영.
