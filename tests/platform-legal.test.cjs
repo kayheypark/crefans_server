@@ -15,7 +15,7 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-17');assert.equal(p.effectiveAt,'2026-11-17');assert.equal(p.version,'2026-11-17.phone.3');assert.match(JSON.stringify(p),/16\. 대표 기능: AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-18');assert.equal(p.effectiveAt,'2026-11-18');assert.equal(p.version,'2026-11-18.posthog.1');assert.match(JSON.stringify(p),/16\. 대표 기능: AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -137,7 +137,7 @@ test('guide AI privacy notice distinguishes optional requests, provider retentio
 });
 test('privacy article 8 discloses Modusign as the e-contract processor (2026-11-12 ask-me)',()=>{
  const p=new LegalDocumentsService().catalog().documents.privacy;
- assert.equal(p.version,'2026-11-17.phone.3');assert.equal(p.effectiveAt,'2026-11-17');assert.equal(p.status,'published');
+ assert.equal(p.version,'2026-11-18.posthog.1');assert.equal(p.effectiveAt,'2026-11-18');assert.equal(p.status,'published');
  const s8=p.sections.find(s=>s.title==='8. 처리 위탁과 제3자 제공');
  assert.match(s8.body,/전자계약 체결·보관을 주식회사 모두싸인에 위탁/);
  assert.ok(s8.links.some(l=>l.href==='https://support.modusign.co.kr/ko/articles/9ae892d6'),'links to Modusign privacy policy');
@@ -179,7 +179,7 @@ test('2026-11-15 sync revision: article 11 states bean charge limits and article
 
 // 2026-11-15 user decision: signed-out AI photo trial is disclosed before it ships (section 17 + cookie note in section 10).
 test('privacy 2026-11-15.guest.1 discloses the signed-out AI photo trial: cookie, IP hash, limits, 24h public, claim, retention, transfer',async()=>{
- const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-17.phone.3');
+ const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-18.posthog.1');
  const guest=p.sections.find(s=>s.title==='17. 대표 기능: 비회원 AI 사진 체험');assert.ok(guest);
  for(const phrase of ['cf_guest','최대 30일','서버 보안키로 변환','감사 기록 기준(2년)','AI로 만든 사진만','브라우저당 10회','하루 10회','하루 200회','24시간','비공개','같은 브라우저','게시 후 30일','16항과 같습니다','동의'])assert.ok(guest.body.includes(phrase),phrase);
  assert.match(p.sections.find(s=>s.title==='10. 쿠키와 자동 수집').body,/cf_guest를 최대 30일/);
@@ -272,11 +272,15 @@ test('2026-11-17 adult.1: terms/policy carry no beta wording, forbid adult conte
  assert.match(by('4. '),/첫 갱신 실패 후 24시간 간격으로 최대 3회/);assert.match(by('4. '),/멤버십 카드 결제로는 실제 청구를 하지 않습니다/,'test-card wording kept without beta');
  assert.equal(legal.catalog(new Date('2026-11-16T12:00:00+09:00')).documents.terms.version,'2026-11-16.ai.1','the previous day keeps ai.1');
 });
-test('2026-11-18 PostHog privacy draft stays out of force until the user approves it',()=>{
- const {POSTHOG_PRIVACY_DRAFT:d}=require('../dist/src/platform/legal-documents'),legal=new LegalDocumentsService();
- assert.equal(d.status,'draft');assert.equal(d.effectiveAt,null);assert.equal(d.publishedAt,undefined);
- for(const day of ['2026-11-18T12:00:00+09:00','2027-01-01T12:00:00+09:00'])assert.equal(legal.catalog(new Date(day)).documents.privacy.version,'2026-11-17.phone.3');
- assert.doesNotMatch(JSON.stringify(legal.signup()),/PostHog/);
+// 2026-11-18 user approval: the PostHog revision is published and in force from its deploy day (notice-based overseas transfer).
+test('2026-11-18 posthog.1: privacy 7-10 disclose PostHog analytics and replay; in force from 2026-11-18 and used for signup',()=>{
+ const {POSTHOG_PRIVACY:d}=require('../dist/src/platform/legal-documents'),legal=new LegalDocumentsService(),c=legal.catalog(new Date('2026-11-18T00:00:00+09:00'));
+ assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-18');assert.equal(d.effectiveAt,'2026-11-18');assert.equal(d.version,'2026-11-18.posthog.1');
+ assert.deepEqual(c.documents.privacy,d,'KST midnight of 2026-11-18 serves posthog.1');assert.match(d.notice,/2026-11-18 개정: 7항·8항·9항·10항/);
+ assert.equal(legal.catalog(new Date('2026-11-17T23:59:00+09:00')).documents.privacy.version,'2026-11-17.phone.3','the previous day keeps phone.3');
+ for(const day of ['2026-11-18T12:00:00+09:00','2027-01-01T12:00:00+09:00'])assert.equal(legal.catalog(new Date(day)).documents.privacy.version,'2026-11-18.posthog.1');
+ const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-18\.posthog\.1:[0-9a-f]{64}$/);assert.match(JSON.stringify(signup.documents.privacy),/PostHog/);
+ for(const kind of ['terms','policy'])assert.equal(c.documents[kind].version,'2026-11-17.adult.1','terms and policy unchanged');
  const body=title=>d.sections.find(s=>s.title.startsWith(title)).body;
  // PIPA 28-8(2) items: what, country, when/how, recipient + contact, purpose + retention, how to refuse.
  assert.match(body('9. '),/④ PostHog, Inc\.\(미국, privacy@posthog\.com\): 서비스 화면을 이용할 때마다 다음 정보가 HTTPS로/);
@@ -285,6 +289,6 @@ test('2026-11-18 PostHog privacy draft stays out of force until the user approve
  assert.match(body('8. '),/PostHog, Inc\.에 위탁합니다/);assert.match(body('7. '),/9조 ④를 따릅니다/);
  assert.match(body('10. '),/ph_로 시작하는 이름.*최대 1년.*추적 안 함\(Do Not Track\)/s);
  // Everything else is the phone.3 text unchanged.
- const current=legal.catalog().documents.privacy;
+ const current=legal.catalog(new Date('2026-11-17T12:00:00+09:00')).documents.privacy;
  for(const s of current.sections.filter(s=>!/^(7|8|9|10)\. /.test(s.title)))assert.deepEqual(d.sections.find(x=>x.title===s.title),s);
 });

@@ -1,3 +1,9 @@
+## 2026-11-18 개인정보처리방침 2026-11-18.posthog.1 공개·시행 연결 (feat/posthog-policy)
+- 사용자 승인(2026-11-18): 현재 초안 문안 그대로, 국외 이전은 고지 방식(별도 동의 배너 없음). PostHog 프로젝트 'IP data capture = Discard' 설정은 사용자가 완료했다고 확인.
+- 변경: `POSTHOG_PRIVACY_DRAFT` → `POSTHOG_PRIVACY`(status published, publishedAt·effectiveAt·updatedAt '2026-11-18'), `posthogCatalog`를 catalog()의 첫 단계로 연결(KST 2026-11-18부터). 공지 끝에 '2026-11-18 개정: 7항·8항·9항·10항 — …' 추가. 약관·운영정책(adult.1)과 7~10항 외 조항 불변. 14항은 이전 개정들(11-03~11-17)과 같이 수정하지 않음(변경 이력은 notice에 누적).
+- 시행 시각: 코드의 effectiveAt는 signup()의 `effectiveAt<=kstDate()`(YYYY-MM-DD 문자열 비교) 때문에 날짜만 둔다(시각을 넣으면 당일 가입이 막힘). 실제 공개 시각 = 운영 API 배포 시각(아래 배포 기록).
+- 검증: tsc --noEmit 0, build 0, platform-legal 32/32(11-17 23:59 phone.3, 11-18 00:00 이후 posthog.1, signupReady true, 가입 동의 버전 posthog.1 해시, 약관·정책 불변, 나머지 조항 phone.3과 동일), test:openapi 14/14. 대조: dist에서 catalog 연결을 빼면 4건 실패 확인 후 원복.
+
 ## 2026-11-18 개인정보처리방침 PostHog 개정 초안 (feat/posthog-policy, 미공개)
 - 사용자 결정(11-18): PostHog Cloud US 이용 분석·세션 리플레이(front feat/posthog). 수집은 처리방침 문안 승인·공개 후 시작.
 - `src/platform/legal-documents.ts`에 `POSTHOG_PRIVACY_DRAFT`(2026-11-18.posthog.1, status draft, effectiveAt null) 추가. catalog() 미연결이라 공개 문서·가입 동의본(2026-11-17.phone.3)은 그대로. 7·8·10항 문장 추가, 9항 ④ PostHog(이전 항목·국가·일시/방법·받는 자/연락처·목적·보유기간)와 ④ 거부 시 불이익 없음, 기존 거부 문장의 범위를 ①~③으로 좁힘.
