@@ -412,12 +412,31 @@ export const MARKETING_REWARD_CONSENT:LegalDocument={...marketing,title:'광고�
   marketing.sections[1],
  ]};
 const rewardCatalog:LegalCatalog={...posthogCatalog,marketing:MARKETING_REWARD_CONSENT};
+// 2026-11-18 user approval ("추천안으로 해"): operating-policy clause for AI photos made with costumes modelled on third-party works
+// (game/anime catalog categories, anything but 'general'). Effective the same day because the code already enforces it
+// (feat/franchise-costume-commercial-block: POST_COMMERCIAL_RESTRICTED, FRANCHISE_COSTUME_PUBLIC_ONLY, metadata.aiFranchiseCostume).
+export const FRANCHISE_POLICY_DATE='2026-11-18';
+export const FRANCHISE_POLICY_SECTION:LegalSection={title:'제3자 작품 모티프 의상을 사용한 AI 사진의 이용 제한',body:[
+ "① 적용 대상: AI 사진 편집(비회원 체험 포함)에서 애니메이션·게임 등 제3자의 작품을 모티프로 한 의상 프리셋을 사용해 만든 사진(이하 \"제한 사진\")에 적용합니다. 이 의상은 상업적 이용 권한이 확보되지 않은 의상입니다. 편집 화면에서 '기본' 분류가 아닌 작품 의상(게임·애니메이션 분류)이 이에 해당하며, 대상 의상을 고르면 안내 문구가 표시됩니다.",
+ '② 상업적 이용 제한: 제한 사진이 하나라도 포함된 게시물은 다음과 같이 이용이 제한됩니다.',
+ '1. 게시물 후원(콩 후원)을 받을 수 없습니다(크리에이터 프로필 후원은 영향 없음).',
+ '2. 멤버십 전용·특정 상품 전용 등 유료 공개 범위로 설정할 수 없으며 전체 공개로만 게시할 수 있습니다.',
+ '3. 이미 유료 공개 범위로 게시된 게시물에 제한 사진을 추가할 수 없습니다.',
+ '③ 기존 게시물: 시행 전에 게시된 게시물에도 시행일부터 적용합니다. 시행 전 이미 완료된 후원은 회수·환불하지 않습니다. 시행 전부터 유료 공개 범위로 설정된 제한 게시물은 회사가 개별 안내한 뒤 공개 범위 변경 등 필요한 조치를 할 수 있습니다.',
+ '④ 판정 기준: 제한 여부는 서비스가 AI 사진을 만들 때 기록한 의상 정보로 판단합니다. 의상 정보가 기록되지 않은 이전 사진은 제한하지 않습니다. 다만 권리자의 요청이나 신고로 제한 사진임이 확인되면(내려받아 다시 올린 경우 포함) 같은 기준을 적용할 수 있습니다.',
+ "⑤ 회원의 책임과 권리자 보호: 제한 사진을 전체 공개로 게시하는 경우에도 작품·브랜드를 사칭하는 표현, 별도 판매·대가 수수 등 제3자의 권리를 침해하는 방식으로 이용해서는 안 됩니다. 권리자의 삭제 요청이나 권리침해 신고가 접수되면 회사는 해당 게시물을 비공개 처리하거나 삭제할 수 있으며, 이의제기는 '신고와 이의제기' 절차를 따릅니다.",
+ "⑥ 기본 의상: '기본' 분류 의상으로 만든 사진은 이 조항의 제한을 받지 않습니다.",
+].join('\n')};
+export const FRANCHISE_POLICY:LegalDocument={...adultPolicy,version:'2026-11-18.franchise.1',updatedAt:FRANCHISE_POLICY_DATE,publishedAt:FRANCHISE_POLICY_DATE,effectiveAt:FRANCHISE_POLICY_DATE,status:'published',
+ notice:'2026년 11월 18일부터 적용합니다. 애니메이션·게임 등 제3자의 작품을 모티프로 한 의상으로 만든 AI 사진이 들어간 게시물은 게시물 후원을 받을 수 없고 전체 공개로만 게시할 수 있다는 조항(제3자 작품 모티프 의상을 사용한 AI 사진의 이용 제한)을 추가했습니다. 기존 조항은 바뀌지 않았습니다.',
+ sections:[...adultPolicy.sections,FRANCHISE_POLICY_SECTION]};
+const franchiseCatalog:LegalCatalog={...rewardCatalog,documents:{...rewardCatalog.documents,policy:FRANCHISE_POLICY}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

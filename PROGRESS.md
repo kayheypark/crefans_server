@@ -9,6 +9,12 @@
 - 운영 확인: 18:53:21 deploy_test_ip 방문 1회 → funnel.landing_test, ip 121.140.82.62, 사유 '배포 후 테스트', 텔레그램 전송 Y, landing_view 집계 35 그대로. 운영 컨테이너에서 렌더한 본문 첫 줄 '사유: 배포 후 테스트', '접속 IP: 121.140.82.62 (집)'(텔레그램 화면 자체는 사용자 확인 필요).
 - 복구: /Users/ethan/crefans-recovery/20261118/landingip-20261118-api(이전 이미지 franchise-20261118·DB 덤프·설정, settings-prev의 runtime.env에는 OWNER_HOME_IPS 없음=변경 전 사본), finalize로 운영 이전 이미지·백업 삭제. 오늘 랜딩 요청 목록(읽기 전용 SELECT, IP 포함)은 .local/landingip-deploy-20261118/(커밋 안 함).
 
+## 2026-11-18 운영정책 2026-11-18.franchise.1 — 제3자 작품 모티프 의상 AI 사진 이용 제한 조항 (feat/policy-franchise-costume)
+- 사용자 승인(2026-11-18 "추천안으로 해", 운영 반영 포함): 시행일 2026-11-18(코드가 이미 같은 날 제한 시행), 문구 '제3자의 작품을 모티프로 한 의상으로, 상업적 이용 권한이 확보되지 않은 의상', ④ 신고 기반 판정 포함.
+- 변경: `legal-documents.ts` FRANCHISE_POLICY(adultPolicy + 3번째 절 '제3자 작품 모티프 의상을 사용한 AI 사진의 이용 제한' ①~⑥, publishedAt·effectiveAt·updatedAt 2026-11-18, notice 갱신), catalog()가 2026-11-18(KST)부터 franchiseCatalog(rewardCatalog 기반: 약관 adult.1·개인정보 posthog.1·광고성 동의 reward.1·수집안내 그대로). 이전 날은 adult.1.
+- 테스트: platform-legal 새 테스트(11-17 23:59 adult.1·11-18 00:00/12:00·2027 franchise.1, 기존 2절 불변, 문구, 다른 문서·signup 버전 불변), 기존 posthog/reward 테스트의 '정책 불변' 단언을 약관 불변·정책 앞 2절 불변으로 조정.
+- 검증(로컬, CREFANS_E2E=true, .local/platform.env→3307 격리): tsc 0, build 0, platform-legal 34/34, test:openapi 14/14, marketing-reward·signup-mode·beta-policy·auth·franchise-costume 33/0fail. 대조: catalog 분기 제거→posthog·franchise 테스트 2건 실패, 새 절 제거→franchise 테스트 실패(원복 후 34/34).
+
 ## 2026-11-18 18:24~18:41 KST 운영 배포 — 게임·애니 의상 제한 (API franchise-20261118, 프론트 franchise-r2-20261118)
 - 통합: feat → dev 19441fc(server)·085b22a(front), devbox Jenkins 성공(deploy-logs/20261118-182102.log 실패 0, .last-success 일치). dev 확인(dev API 컨테이너, 임시 테스트 행 생성 후 삭제): 멤버십·상품 전용 생성/수정/기존 레벨 글에 추가 400, 의상 게시물 후원 403, 일반 게시물·프로필 후원은 잔액 단계(409); HTTP GET 의상 글 commercialRestricted true·tipsEnabled false, 일반 글 false·true. dev 보정 대상 0(AI 미디어 0).
 - prod: origin/prod가 다른 작업에 의해 dev 커밋(19441fc / front 085b22a)으로 빨리감기됨 — 코디네이터 확인 결과 직전 prod 대비 코드 차이는 이 기능뿐이라 되돌리지 않고 진행(강제 푸시 없음).
