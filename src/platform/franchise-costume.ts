@@ -37,8 +37,9 @@ export async function franchiseBackfill(db:any,decrypt:(value:string)=>string,ap
  for(const log of await db.aiPhotoFailureDetail.findMany({select:{payload_encrypted:true}})){
   let payload:any;try{payload=JSON.parse(decrypt(log.payload_encrypted));}catch{unreadable++;continue;}
   if(payload?.outcome!=='succeeded'||typeof payload.targetId!=='string'||!byId.has(payload.targetId))continue;logs++;
-  const ids=Array.isArray(payload.options?.costumeIds)?payload.options.costumeIds:[];
-  const franchise=ids.map((id:unknown)=>typeof id==='string'?costumeCategory(id):undefined).find((c:string|undefined)=>c&&c!=='general');
+  // Multipart edits send costumeIds as a JSON string, so the request log keeps that string (found on production 2026-11-18).
+  let ids:unknown=payload.options?.costumeIds;if(typeof ids==='string'){try{ids=JSON.parse(ids);}catch{ids=[];}}if(!Array.isArray(ids))ids=[];
+  const franchise=(ids as unknown[]).map((id:unknown)=>typeof id==='string'?costumeCategory(id):undefined).find((c:string|undefined)=>c&&c!=='general');
   if(franchise&&!category.has(payload.targetId))category.set(payload.targetId,franchise);else if(!franchise)proven.add(payload.targetId);
  }
  const fromLog=category.size-already;
