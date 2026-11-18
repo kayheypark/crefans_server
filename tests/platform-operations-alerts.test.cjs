@@ -65,7 +65,7 @@ test('ai-photo.failed is never deduped: ten identical failures send ten alerts; 
  assert.ok(!policy.DEDUPE_TYPES.has('ai-photo.failed')&&!policy.DIGEST_TYPES.has('ai-photo.failed'));assert.ok(!policy.DIGEST_TYPES.has('member.signup')&&!policy.DEDUPE_TYPES.has('member.signup'));
  assert.ok(!policy.DIGEST_TYPES.has('ai-photo.succeeded')&&!policy.DEDUPE_TYPES.has('ai-photo.succeeded'));
  const data={errorCode:'SYNTH_'+scope.slice(0,8).toUpperCase(),status:502,stage:'generation',provider:'seedream',errorType:'none',actor:'member',durationMs:10};
- for(let i=0;i<10;i++){const row=track(await ops.record('ai-photo.failed',data,undefined,{omitIp:true}));assert.equal(row.delivered_at,null);assert.equal(row.last_error_code,null);}
+ for(let i=0;i<10;i++){const row=track(await ops.record('ai-photo.failed',data));assert.equal(row.delivered_at,null);assert.equal(row.last_error_code,null);}
  assert.equal(await db.platformJob.count({where:{id:policy.dedupeGroup('ai-photo.failed',data)}}),0,'no dedupe lock row');
  const signup=track(await db.$transaction(tx=>enqueueOperation(tx,'member.signup',{memberId:scope})));assert.equal(signup.delivered_at,null);assert.equal(signup.last_error_code,null);
  const success=track(await ops.record('ai-photo.succeeded',{actor:'guest',mode:'general',style:'photo',kinds:'pose',presets:'없음',references:0,durationMs:5,prompt:'x',email:'a@b.c',memberId:scope},undefined,{omitIp:true}));
