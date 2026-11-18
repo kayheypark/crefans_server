@@ -449,12 +449,21 @@ export const BEAN_TERMS:LegalDocument={...adultTerms,version:'2026-11-18.beans.1
  notice:'2026년 11월 18일부터 적용합니다. 제6조에 후원받은 콩의 출금 수수료(20%)와 최소 출금 수량(1,000콩)을 적고 이체 수수료 문장을 멤버십 수익·콩 출금 기준으로 정리했으며, 제11조에 광고성 정보 수신 동의 혜택으로 받은 프로모션 10콩의 사용기한(30일)과 30일 기한 프로모션콩의 만료 7일 전 안내를 적었습니다. 그 밖의 조항은 바뀌지 않았습니다. 이전 개정 내역은 이전 버전에서 볼 수 있습니다.',
  sections:adultTerms.sections.map(sec=>sec.title.startsWith('6. ')?{...sec,body:BEAN_T6_SWAPS.reduce((body,[from,to])=>swapIn(sec.title,body,from,to),sec.body)}:sec.title.startsWith('11. ')?{...sec,body:swapIn(sec.title,sec.body,BEAN_T11_FROM,BEAN_T11_TO)}:sec)};
 const beanTermsCatalog:LegalCatalog={...franchiseCatalog,documents:{...franchiseCatalog.documents,terms:BEAN_TERMS}};
+// 2026-11-19 user decision ("응 허용", 이탈 분석): PostHog also receives screen error information (exceptions) so drop-offs caused by
+// broken screens can be found. Added to 9조 ④ items; the front strips URL query/hash, e-mails and long digit runs from messages first.
+// In force from its deploy day (same as posthog.1); the front must not send exceptions before this is served.
+export const POSTHOG_ERRORS_DATE='2026-11-19';
+const POSTHOG_ERRORS_ITEM='화면 오류 정보(화면에서 난 오류의 종류·메시지와 오류가 난 서비스 코드 위치. 주소 뒤 검색어·인증값, 이메일 주소, 긴 숫자는 지우고 보냄)';
+export const POSTHOG_ERRORS_PRIVACY:LegalDocument={...POSTHOG_PRIVACY,version:'2026-11-19.posthog.2',updatedAt:POSTHOG_ERRORS_DATE,publishedAt:POSTHOG_ERRORS_DATE,effectiveAt:POSTHOG_ERRORS_DATE,status:'published',
+ notice:POSTHOG_PRIVACY.notice+' 2026-11-19 개정: 9항 ④ — PostHog로 보내는 항목에 화면 오류 정보(오류 종류·메시지·코드 위치)를 추가했습니다.',
+ sections:POSTHOG_PRIVACY.sections.map(sec=>sec.title.startsWith('9. ')?{...sec,body:swapIn(sec.title,sec.body,'AI 사진 체험·게시·회원가입 단계 도달 기록, ','AI 사진 체험·게시·회원가입 단계 도달 기록, '+POSTHOG_ERRORS_ITEM+', ')}:sec)};
+const posthogErrorsCatalog:LegalCatalog={...beanTermsCatalog,documents:{...beanTermsCatalog.documents,privacy:POSTHOG_ERRORS_PRIVACY}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)
