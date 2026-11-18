@@ -1,7 +1,7 @@
 // 2026-11-18 user decision ("방법 1 서버 집계"): count how many visits reach each step of the AI photo trial funnel.
 // Aggregate only — KST day, step key, count. No member, guest id, IP, cookie or user agent is stored, so it is not personal data.
 // Server steps are counted where they happen; the browser may only report the three view steps below (once per tab session, approximate).
-import {createHash,randomBytes} from 'node:crypto';
+import {createHash} from 'node:crypto';
 import {kstDay} from './ai-preset-usage';
 import {reject} from './http';
 import {requestContext} from './request-context';
@@ -48,25 +48,18 @@ export function landingSource(input:any){
  return{referrerHost:typeof input?.referrerHost==='string'&&HOST.test(input.referrerHost)?input.referrerHost:undefined,utmSource:typeof input?.utmSource==='string'&&UTM.test(input.utmSource)?input.utmSource:undefined};
 }
 
-// Alert limits: one alert per client IP per 30 minutes (hashed with a per-process salt, memory only, never stored),
+// Alert limits (2026-11-18 user decision "같은 아이피알림도 계속 알려줘": no per-IP quiet window):
 // at most 100 landing alerts per KST day; the 100th is followed by one cap alert and then counting only. Obvious bots are skipped.
-const ALERT_WINDOW_MS=30*60000,ALERT_DAILY_CAP=100,SALT=randomBytes(16).toString('hex');
-let alerted=new Map<string,number>();
-export function landingAlertAllowed(ip:string|undefined,now=Date.now()){
- if(alerted.size>MAX_KEYS)alerted=new Map([...alerted].filter(([,at])=>now-at<ALERT_WINDOW_MS));
- const key=createHash('sha256').update(SALT+(ip||'unknown')).digest('hex').slice(0,32),last=alerted.get(key);
- if(last!==undefined&&now-last<ALERT_WINDOW_MS)return false;
- alerted.set(key,now);return true;
-}
+const ALERT_DAILY_CAP=100;
 const BOT=/^node$|undici|bot|crawl|spider|slurp|headless|lighthouse|preview|facebookexternalhit|embedly|curl|wget|python|httpclient|okhttp|go-http|axios|node-fetch|java\/|monitor|scan/i;
 export const isBotAgent=(ua:unknown)=>typeof ua!=='string'||!ua.trim()||BOT.test(ua);
 const device=(ua:string)=>/Mobi|Android|iPhone|iPad|iPod/i.test(ua)?'모바일':'데스크톱';
 const kstTime=(d:Date)=>new Date(+d+9*3600000).toISOString().slice(0,16).replace('T',' ');
 
 /** Queues the immediate 랜딩 방문 alert. Never throws; the caller does not await it. */
-export async function landingVisitAlert(db:any,operations:{record:Function},source:{referrerHost?:string;utmSource?:string},userAgent:unknown,ip:string|undefined,now=new Date()){
+export async function landingVisitAlert(db:any,operations:{record:Function},source:{referrerHost?:string;utmSource?:string},userAgent:unknown,now=new Date()){
  try{
-  if(isBotAgent(userAgent)||!landingAlertAllowed(ip,+now))return'skipped';
+  if(isBotAgent(userAgent))return'skipped';
   const day=kstDay(now),start=new Date(+day-9*3600000);
   const sent=await db.platformOperationalEvent.count({where:{type:'funnel.landing_view',created_at:{gte:start}}});
   if(sent>=ALERT_DAILY_CAP){await operations.record('funnel.landing_cap',{limit:ALERT_DAILY_CAP},`funnel.landing_cap:${day.toISOString().slice(0,10)}`,{omitIp:true});return'capped';}
@@ -83,7 +76,7 @@ export async function reportFunnelStep(db:any,input:any,alert?:{operations:{reco
  const ip=requestContext.getStore()?.ip;
  if(!funnelRateLimit(ip))reject(429,'RATE_LIMITED','잠시 후 다시 시도해주세요.');
  const recorded=await recordFunnelStep(db,step as FunnelStep);
- if(recorded&&step==='landing_view'&&alert)void landingVisitAlert(db,alert.operations,landingSource(input),alert.userAgent,ip);
+ if(recorded&&step==='landing_view'&&alert)void landingVisitAlert(db,alert.operations,landingSource(input),alert.userAgent);
  return{recorded};
 }
 
