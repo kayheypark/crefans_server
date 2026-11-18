@@ -1,3 +1,11 @@
+## 2026-11-18 14:57 KST 운영 API 배포 posthog-20261118 — 개인정보처리방침 2026-11-18.posthog.1 공개·시행
+- prod 3f1f8a1(Merge feat/posthog-policy into prod, origin/prod 924a3a5 포함) 오버레이 이미지 crefans-api:posthog-20261118(FROM today-20261118, LABEL revision 3f1f8a1, APP_RELEASE=posthog-20261118). 차이는 legal-documents.ts/.js/.d.ts/.map뿐(release-today-20261118 문맥과 diff 확인), 이미지 안 legal-documents.js·ts SHA-256이 prod 트리와 일치.
+- 스크립트: crefans_server-nightfix/.local/release-posthog-20261118/(ship.log). today 스크립트 복사 후 경로·태그 변경, WELCOME_MAIL_ENABLED=true 존재를 필수 검사로 바꾸고(이전 '없음' 검사 대체), 처리방침 검사를 posthog.1(status published, effectiveAt 2026-11-18, 'PostHog, Inc.'·'ph_로 시작하는 이름' 포함)로 교체.
+- 결과(14:54:56~14:59:22 KST, exit 0): 배포 전 DB 덤프 → 새 마이그레이션 없음 → api·worker 교체 healthy → WELCOME_MAIL_ENABLED=true 유지, .env·runtime.env는 API_IMAGE·APP_RELEASE 외 동일, 다른 컨테이너 불변, 약관·정책 adult.1, 보호 경로 401/404, telemetry 400, privacy posthog.1 ok. 배포 표식 2026-11-18T05:57:14Z(=14:57:14 KST) → 이 시각이 처리방침 공개·시행 시각.
+- 공개 확인: GET https://crefans.com/api/v1/common privacy 2026-11-18.posthog.1(publishedAt·effectiveAt 2026-11-18), https://crefans.com/service/legal/privacy 렌더링에 'PostHog, Inc.'·'ph_로 시작하는 이름'·'2026.11.18 시행' 표시(헤드리스 Chrome).
+- 복구본: /Users/ethan/crefans-recovery/20261118/posthog-20261118-api/(이전 이미지 today-20261118 api-prev.tar.gz·database-prev.sql.gz·settings-prev.tar·IMAGE_ID, SHA256SUMS 검증·이미지 ID 대조). 서버 /opt/crefans-backup-posthog-20261118·/tmp 사본·이전 태그 삭제.
+- dev: Jenkins crefans-dev-deploy #38 SUCCESS(deploy-logs/20261118-145102.log, 스모크 실패 0, server 2bec901·front 491b252), dev 처리방침 posthog.1 응답 확인.
+
 ## 2026-11-18 개인정보처리방침 2026-11-18.posthog.1 공개·시행 연결 (feat/posthog-policy)
 - 사용자 승인(2026-11-18): 현재 초안 문안 그대로, 국외 이전은 고지 방식(별도 동의 배너 없음). PostHog 프로젝트 'IP data capture = Discard' 설정은 사용자가 완료했다고 확인.
 - 변경: `POSTHOG_PRIVACY_DRAFT` → `POSTHOG_PRIVACY`(status published, publishedAt·effectiveAt·updatedAt '2026-11-18'), `posthogCatalog`를 catalog()의 첫 단계로 연결(KST 2026-11-18부터). 공지 끝에 '2026-11-18 개정: 7항·8항·9항·10항 — …' 추가. 약관·운영정책(adult.1)과 7~10항 외 조항 불변. 14항은 이전 개정들(11-03~11-17)과 같이 수정하지 않음(변경 이력은 notice에 누적).
