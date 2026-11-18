@@ -1,3 +1,33 @@
+## 2026-11-18 개인정보처리방침 2026-11-18.posthog.1 공개·시행 연결 (feat/posthog-policy)
+- 사용자 승인(2026-11-18): 현재 초안 문안 그대로, 국외 이전은 고지 방식(별도 동의 배너 없음). PostHog 프로젝트 'IP data capture = Discard' 설정은 사용자가 완료했다고 확인.
+- 변경: `POSTHOG_PRIVACY_DRAFT` → `POSTHOG_PRIVACY`(status published, publishedAt·effectiveAt·updatedAt '2026-11-18'), `posthogCatalog`를 catalog()의 첫 단계로 연결(KST 2026-11-18부터). 공지 끝에 '2026-11-18 개정: 7항·8항·9항·10항 — …' 추가. 약관·운영정책(adult.1)과 7~10항 외 조항 불변. 14항은 이전 개정들(11-03~11-17)과 같이 수정하지 않음(변경 이력은 notice에 누적).
+- 시행 시각: 코드의 effectiveAt는 signup()의 `effectiveAt<=kstDate()`(YYYY-MM-DD 문자열 비교) 때문에 날짜만 둔다(시각을 넣으면 당일 가입이 막힘). 실제 공개 시각 = 운영 API 배포 시각(아래 배포 기록).
+- 검증: tsc --noEmit 0, build 0, platform-legal 32/32(11-17 23:59 phone.3, 11-18 00:00 이후 posthog.1, signupReady true, 가입 동의 버전 posthog.1 해시, 약관·정책 불변, 나머지 조항 phone.3과 동일), test:openapi 14/14. 대조: dist에서 catalog 연결을 빼면 4건 실패 확인 후 원복.
+
+## 2026-11-18 개인정보처리방침 PostHog 개정 초안 (feat/posthog-policy, 미공개)
+- 사용자 결정(11-18): PostHog Cloud US 이용 분석·세션 리플레이(front feat/posthog). 수집은 처리방침 문안 승인·공개 후 시작.
+- `src/platform/legal-documents.ts`에 `POSTHOG_PRIVACY_DRAFT`(2026-11-18.posthog.1, status draft, effectiveAt null) 추가. catalog() 미연결이라 공개 문서·가입 동의본(2026-11-17.phone.3)은 그대로. 7·8·10항 문장 추가, 9항 ④ PostHog(이전 항목·국가·일시/방법·받는 자/연락처·목적·보유기간)와 ④ 거부 시 불이익 없음, 기존 거부 문장의 범위를 ①~③으로 좁힘.
+- 근거(확인일 2026-11-18): 이벤트 보존 https://posthog.com/docs/data/events-retention (무료 1년, 2026-11-05 이후 신규 유료 기본 2년), 리플레이 보존 https://posthog.com/docs/session-replay/data-retention (무료 최대 30일, 종량제 최대 90일), IP https://posthog.com/docs/privacy/data-collection (Discard IP data, GeoIP는 폐기 전 실행), 쿠키 365일(posthog-js 1.445.1 cookie_expiration 기본). 법령: law.go.kr 제28조의8(시행 2026-09-11) 제1항·제3호 일부만 확인, 제2항 각 호 원문 미확인. PostHog 우편 주소·US 호스팅 리전 미확인.
+- 미결정: ① 국외 이전 근거(제3호 계약이행+고지 vs 제1호 별도 동의 배너) — 분석은 필수 처리가 아니고 비회원에게도 적용되어 법률 검토 필요 ② 요금제·IP 설정에 따라 보유기간·IP 문구 조정 ③ 리플레이에 다른 회원 닉네임·글 텍스트 노출 허용 여부. 승인용 요약: `.local/posthog-policy-draft.md`(커밋 제외).
+- 순서 주의: 공개 키가 ~/.crefans/frontend-build.env에 있으므로 front feat/posthog 배포 전에 이 처리방침을 공개·시행해야 한다.
+- 검증 2026-11-18: `npx tsc --noEmit` 0, `npm run build` 0, `node --test tests/platform-legal.test.cjs` 32/32(초안 비시행·항목·나머지 조항 불변 검사 추가). 대조: dist에서 초안을 published로 바꾸거나 ①~③ 문구를 되돌리면 각각 실패 확인 후 원복.
+
+## 2026-11-18 13:3x KST 운영 API 배포 시도 → 자동 롤백 (today-20261118, 운영은 ordertg-20261117 유지)
+- 이미지 crefans-api:today-20261118(prod dade06d 오버레이, FROM ordertg-20261117). 스크립트 crefans_server-nightfix/.local/release-today-20261118/(ship.log 포함).
+- 진행: 배포 전 DB 덤프 → migrate deploy로 20261118010000_funnel_step_daily 적용(추가만, 'Database schema is up to date') → api·worker 교체 → 약관·guest/claim·studio 401·휴대폰 GET 404 통과 → 휴대폰 POST 검사가 401 대신 403(ORIGIN_REQUIRED: 검사 curl에 Origin 헤더 없음, 앱의 출처 검사 동작)이라 스크립트 실패 → 자동 롤백. 롤백 후 api·worker ordertg-20261117 healthy, .env·runtime.env 원복 확인. funnel_step_daily 표는 남음(구 이미지는 사용 안 함).
+- 원인은 검사 스크립트 결함(앱 결함 아님)으로 판단되나, 지시('실패 시 중단·보고')에 따라 재시도·관리자·가이드 배포·가입 축하 메일 켜기는 하지 않음. 재시도용 deploy-api.sh는 POST 검사에 Origin 헤더를 넣도록 수정해 둠(미실행).
+- 배포 전 DB 덤프·설정: /Users/ethan/crefans-recovery/20261118/today-20261118-api-failed/(database-prev.sql.gz sha256 d8ba757a…, 서버 사본과 일치·Dump completed, SHA256SUMS). 서버 /opt/crefans-backup-today-20261118·/tmp 압축본 삭제. 서버에 새 이미지 태그 today-20261118은 재시도용으로 남김. WELCOME_MAIL_ENABLED 없음(꺼짐) 유지.
+
+## 2026-11-18 13:2x KST prod 승격 — 오늘 서버 작업 6개 (미배포 시점 기록)
+- 사용자 승인(2026-11-18, dev 서버 검증·Jenkins #13 통과 후). origin/prod d0637d3에서 분리 HEAD 작업 트리(crefans_server-prod-20261118)로 --no-ff 병합: purge-library-ip → ai-cost-caps → funnel-stats → phone-reveal-audit → alert-dedupe-digest → signup-autologin-welcome.
+- dev에 직접 들어간 fc401f3(AI 성공 알림 예상 원가)는 원가 모듈 의존이라 feat/alert-dedupe-digest에 feat/ai-cost-caps를 먼저 병합(2e9638c)한 뒤 체리픽(ceda72f)해 브랜치 경유로 반영.
+- 충돌은 dev 해결과 동일(라벨·allowed·NO_IP_TYPES 합집합, auth 가입 완료는 축하 메일 큐잉+signup_completed, openapi 286/109/127). git diff origin/dev HEAD: 코드 차이 0(PROGRESS만).
+- 검증(로컬 3307 격리 crefans_platform_e2e, CREFANS_E2E=true, 순차): tsc 0, build 0, test:openapi 14/14, jobs 4, operations 11, operations-events 15, operations-http 1, operations-alerts 7, ai-photo 48, ai-photo-grants 5, funnel 6, member-phone-reveal 5, auth 3, auth-hardening 4, signup-mode 6, signup-invites 9, signup-welcome 4, guest 10, guest-caption 7, bank-transfer 8 — 실패 0. docs/current-contracts.md는 프론트 docs:contracts로 재생성.
+
+## 2026-11-18 AI 성공 알림 예상 원가 (fc401f3 체리픽, feat/alert-dedupe-digest)
+- dev에 직접 들어간 통합 커밋 fc401f3을 prod 승격용으로 이 브랜치에 옮김. 원가 모듈(feat/ai-cost-caps)에 의존하므로 먼저 그 브랜치를 이 브랜치에 병합(충돌은 dev 통합과 같은 합집합).
+- 내용: providerCall마다 estimateMilliUsd(입력 장수)를 trace에 합산, ai-photo.succeeded에 estimatedUsd(소수 3자리). 테스트 기대값 0.044(원본+가이드+참고 1장).
+
 ## 2026-11-18 dev 통합 — 오늘 서버 작업 6개 병합 + AI 성공 알림 예상 원가 (dev, 미배포·prod 미반영)
 - 병합 순서(--no-ff): feat/purge-library-ip → feat/ai-cost-caps → feat/funnel-stats → feat/phone-reveal-audit → feat/alert-dedupe-digest → feat/signup-autologin-welcome.
 - 충돌 해결: PROGRESS 상단 기록 모두 유지. operations.service.ts 라벨·allowed·NO_IP_TYPES는 합집합(원가 알림 3종·무통장 noIp·AI 성공 알림). ai-photo.ts는 원가 통제·유입 집계·성공 알림 모두 유지. auth.service.ts 가입 완료는 축하 메일 큐잉+signup_completed 집계 함께. test:openapi 수치는 병합 후 실제 값 286/109/127(+2 유입 집계, 휴대폰 보기 GET→POST는 개수 변화 없음).
@@ -274,6 +304,7 @@
 - 처리방침 2026-11-15.guest.1: 17항 '선택 기능: 비회원 AI 사진 체험' 추가(항목·목적·24시간 공개·연결·보유·국외 이전은 16항과 같음·동의), 10항 쿠키에 cf_guest 30일. 약관은 미개정(사용자: 약관은 나중에).
 - 검증: build 0. 새 tests/platform-guest.test.cjs 5/5(동의·쿠키 해시, 게시 규칙·피드 24시간·검색 제외·404, 계정 연결·지난 글 비공개, AI 10회·IP 10회·반환·보관함/하트 불가, 스팸 가드). 대조: 24시간 닫힘을 끄면 2 fail. platform-legal 22/22(판 번호 갱신+17항 테스트), openapi 14/14(운영 경로 243→249, 사용자 문서 90→96), member-posts 5, ai-photo 39, beans 43, payment-lifecycle 69 등 통과.
 - 운영 배포(2026-11-15 14:52 KST): prod 94e5cea(회원 글쓰기+체험) → API/worker crefans-api:guest-trial-20261115(직전 이미지 위 src·dist, 해시 로컬 빌드와 일치, ship-api PASS, 복구 crefans-recovery/20261115/guest-trial-api). 재시작 0, 운영 GET /api/v1/guest/session active:false·limit 10, /api/v1/common 처리방침 2026-11-15.guest.1·17항 확인. 프론트 front-guest-trial-20261115 함께 배포. 운영 실제 체험 AI 생성(BytePlus·OpenAI 호출)·텔레그램 사용량 알림은 미실행(50회 도달 전 발생 안 함).
+
 ## 2026-11-15 크리에이터가 아닌 회원도 글쓰기 (서버, 운영 배포 완료)
 - 사용자 지시: "크리에이터가 아닌 사람들도 글을 작성할 수 있게… 어떠한 형태로든 후원은 못받는다 멤버십도못하고". 결정(AskUserQuestion): 전체 피드에도 노출 / 스튜디오 작성 화면 재사용 / AI 사진 편집 일반 회원도 허용(허용 목록 방식 유지) / 약관·처리방침은 나중에(현재 약관 7조 "크리에이터는 게시물…", 처리방침 표식 "활성 크리에이터 게시물" 문구와 어긋남 — 미결).
 - saveContent: 크리에이터가 아니면 회원 활성만 확인, 상품·레벨 지정은 MEMBER_POST_PUBLIC_ONLY, tipsEnabled true는 MEMBER_POST_NO_TIPS, 저장 시 allow_tips=false·is_membership=false 강제.
@@ -295,6 +326,7 @@
 - night-work(.local/night-work/2026-11-14-2343) 결정(/ask-me): 처리방침 BytePlus 개정안 작성 후 확인·배포, 미성년·학생 캐릭터 의상 프리셋 현행 유지, 하트 보상 회원당 하루 상한 추가(기본값 제안 후 확인), 콩 대사 버그 수정(배포는 미선택).
 - reconcileCharge가 판매 승인(BEAN_LIVE_PAYMENTS_APPROVED)까지 검사하는 environment() 대신 keyEnvironment()를 쓰도록 변경. 환불과 같은 원칙(판매 중지가 이미 진행된 결제의 대사·환불을 막지 않음). 원장 전체 비활성(BEAN_LEDGER_ENABLED)은 기존대로 막음.
 - 검증: build 0, platform-beans 43/43(판매 중지 상태에서 진행 중 충전 대사 회귀 테스트 추가), environment()로 되돌린 대조 실행에서 해당 테스트 실패 확인.
+
 ## 2026-11-15 약관·화면·가이드 동기화 운영 배포 완료 (/pilot-work)
 - 결정: 콩 한도·AI 사진 이용조건을 약관·화면·가이드에 지금 반영(배포 승인), 결제 조건 버전 유지, 계약 초안은 코드에 맞춤(종료 후 출금 불가·30일 협의·미합의 시 전액 지급), 서명 완료 계약 없음.
 - 배포: server prod 85523e9 → crefans-api:terms-sync-20261115(legal-documents.js 해시 로컬 prod 빌드와 일치), front prod 1f8606a → crefans-front:front-terms-sync-20261115, 가이드 docs/sync-20261115(3cab2db, 운영 소스 2daf72b 기반) 정적 109파일 교체.
@@ -329,6 +361,7 @@
 - night-work 결정(/ask-me): 하트 게임 보상이 생성마다 최대 3회분을 다시 채워 무료 생성이 순환하던 문제. 회원당 한국 시간 하루 100하트(=최대 10회분) 상한.
 - settleHeartGame이 같은 날 정산된 게임의 적립 합계를 보고 남은 만큼만 적립(초과분 미적립), 정산된 게임의 score는 실제 적립량으로 기록, 감사 로그에 played·dailyCap 추가, 응답에 capped 추가.
 - 검증: build 0, platform-ai-photo 39/39(30·30·30·10 이후 0, 다음날 초기화 테스트 추가), 상한을 크게 바꾼 대조 실행에서 신규 테스트 실패 확인.
+
 ## 2026-11-15 처리방침 BytePlus 처리위탁·국외 이전 개정안 (사용자 확인 대기, 미배포)
 - night-work 결정(/ask-me): 개정안 작성 → 사용자 확인 → 배포. 버전 2026-11-15.byteplus.1(공개·시행 2026-11-15).
 - 8항: "사진 편집·유해성 검사를 OpenAI" → "사진 생성을 Byteplus Pte. Ltd.(BytePlus ModelArk)에, 요청 문구·사진의 유해성 검사를 OpenAI OpCo, LLC에 위탁".
@@ -685,6 +718,7 @@
 - 배포(사용자 승인): DB 덤프 14MB 후 마이그레이션 적용·새 테이블 2개 확인, api/worker=crefans-api:ai-photo-tickets-20261113(맥북 linux/amd64 오버레이 빌드, prisma generate 포함, 이미지 dist 205개가 로컬 d03a3d8 빌드와 동일, 마이그레이션 목록 일치), 비로그인 tickets/reset-ticket 401, worker 오류 0. 이전 API·콘솔 이미지와 배포 전 DB 덤프는 /Users/ethan/crefans-recovery/20261113/ai-photo-tickets/(이미지 ID·덤프 SHA 대조). 스크립트·로그 crefans_server/.local/ai-photo-tickets-20261113/.
 - 미확인: 운영 콘솔 로그인 후 실제 지급·크리에이터 실사용.
 - 남은 일: 통합·운영 배포(DB 마이그레이션 포함)는 사용자 승인 후.
+
 ## 2026-11-13 코스프레 전체 코디 로컬 검증 완료
 - 카탈로그32종에 wig/headwear/accessories/footwear 및 버전2 이미지 경로 추가, 동일 항목이 내부 생성문구에 포함된다. 머리 없는 기존v1은 보존. image_gen 각1회32개 생성,512px WebP489628bytes. 전신 마네킹 가발/소품/신발 육안검토·해시기록.
 - cosplay+outfit은 원본+분홍 가이드로 전달, 가발·헤어·머리장식·소품·신발의 명시적 변경을 옷 영역 밖에서도 허용. 일반 photo outfit은 hard mask 유지. 원본구도 가시범위·얼굴/정체성·미요청부분 보존 지시. 의상 선택 후 옷장 닫기/다른탭 이동에도 cosplay 유지.
@@ -963,6 +997,7 @@
 - 검증(2026-11-07 09:52~09:54 KST, 로컬 3307 crefans_platform_dev, CREFANS_E2E=true, --test-concurrency=1, HEAD cfdfffb+미커밋): nest build 0, tsc 오류 0(기준선 0). `tests/platform-disk-alert.test.cjs` 5/5. `npm run test:operations`(신규 포함) 54 통과·0 실패·1 skip(기존 선택 MySQL). audit·audit-export·external-monitor·log-config·jobs 14 통과·2 실패 — platform-audit의 watchdog 2건은 origin/prod 원본 빌드에서도 같은 2건 실패(테스트 가짜 DB에 mediaWatermarkJob 없음, 기존 문제).
 - 대조(소스 변형→빌드→실행→원복, SHA 8580dcb2… 원복 확인 후 5/5): 비교 반전(>=→<) 3실패, 경계(>=→>) 1실패, 하루 1회 제한 제거 1실패, 회복 알림 제거 1실패.
 - 미실행: 실제 Telegram 발송, 운영 배포, 운영 컨테이너에서 새 코드 실행. 배포 시 worker 이미지만 교체하면 되며(마이그레이션 없음) 환경변수는 기본값이면 추가 불필요. 문서: infra/platform/README.md 디스크 절, resilience-runbook.md 3절, runtime.env.example.
+
 ## 2026-11-07 10:44~10:50 KST 로컬 dev DB 마이그레이션 적용 후 기존 미공개 회귀 재검사 (사용자 승인 "적용하고 재검사")
 - 사용자 결정: 운영 is_public=false 건수 확인 없이 진행 / 미공개 글은 작성자 본인 프로필 목록에서도 제외(현행) / 미공개로 처음 발행한 글은 첫 공개 때 팔로워 알림 1회(현행).
 - dev DB(127.0.0.1:3307 crefans_platform_dev) 백업: crefans_server/.local/devdb-backup-20261107/crefans_platform_dev.sql.gz(CREATE TABLE 88·INSERT 30, gzip -t OK, SHA256SUMS; PROCESS 권한 없음 경고는 테이블스페이스만). `prisma migrate deploy` 9건(20261103010000~20261107120000) 적용 → up to date.
@@ -1012,6 +1047,7 @@
 - 동반: 가이드 fix/promo-bean-wording 6565387(가이드 4곳·소개서 PDF). 프론트 `creator-payout-policy.ts:27-29`·`events.ts` 는 이미 코드와 일치해 수정 없음.
 - 배포(사용자 승인 "둘 다 배포", 공지 문구 추가 없음): api·worker crefans-api:promo-terms-20261107, 09:03:23~55 KST 종료0. 기록 `.local/promo-terms-deploy-20261107/deployment.md`. 공개 약관 API v2026-11-06.4 확인. 가이드 09:05 동반 배포.
 - 같은 날 이어서 결정: 결제 완료 메일·영수증 중개자 고지 추가, 출금·환불 공백(processing 차지백·음수 출금 반려·원장 대사) 코드 수정, 복구 저장소 보관 규칙(이미지 직전 3회+7일, 나머지 30일, 삭제 전 목록 승인) — 각각 진행 중/미배포.
+
 ## 2026-11-07 10:00 KST 콩 수동 반려 사유 길이 (fix/payout-refund-gaps, 배포 보류)
 - 사용자 결정(2026-11-07): 콩 수동 결과 기록 사유를 접두어 포함 저장 칸에 맞춤. bean_payouts.note VARCHAR(500) − '수동 이체 반려 · '(11자) = 사유 489자(서버 검증·OpenAPI·platform-api.md). 콘솔 입력칸은 crefans_admin fix/withdrawal-reject.
 - 실제 재현(옛 한도 500, 490자 사유): Prisma P2000 'value too long … Column: note'. 원장 반영(finishPayout)이 먼저 커밋돼 **상태는 rejected, note는 '은행 반려', 감사 기록 0건으로 반쯤 적용**된 채 오류. 수정 후에는 입력 단계에서 400 INVALID_INPUT, 아무것도 적용되지 않음.
@@ -1268,6 +1304,7 @@
 - 최초 실패는 OpenAPI 경로 수 기대값(186→191, 콘솔82→87)과 팬 API 테스트 Origin을 수정하여 재검증. 콘솔 PC Chromium2/모바일 WebKit2=4/4 통과, 등록·새로고침 지속·예약·동시 수정 충돌·삭제 직접 입력·삭제 필터/이력/복구·권한/빈 결과 확인. API 대역은 읽기 전용·무권한 UI 검사2건뿐이며 변경 생애주기2건은 실제 격리 DB 사용.
 - 증거: [검증 기록](docs/reserved-handles-20261103.json), 상세 .local/reserved-handles-20261103/. 문서 계약·manifest를 짝 프론트에서 갱신·검증한다. 운영/물리 iPhone/부하·외부 공급사는 미실행이며 출시 전체 검증을 뜻하지 않는다.
 - 다음: 배포 요청 시 feature→dev 검증→prod 승격. DB 백업 후 migration→API/worker→콘솔 순서로 함께 적용하고 초기103개·기존 보유자·운영 차단을 재검증한다. 현재 미푸시·미통합·미배포. 회원 핸들 강제 변경 없음.
+
 ## 2026-11-03 계약서 v2.40 — 애플 고딕 PDF 완료
 - 요청: 계약서 폰트 애플 고딕. 기존 명함과 같은 Apple SD Gothic Neo Regular/Bold를 제목·본문·표·쪽번호에 적용. 글자 크기·여백·계약 문구·별지 입력란은 유지한다.
 - 최신origin/prod d4238d9에서 feat/contract-apple-gothic 생성. 이전 계약서2d187de(v2.39)의 승인된 제목/별지/통지 제한 수정4파일을 먼저 보존했다. 원래feat/contract-notice-limits 브랜치와 기본 체크아웃의 미커밋 자료는 유지.
@@ -1301,7 +1338,6 @@
 - 브랜치: origin/prod → feat/creator-media-watermark → dev 통합 검사 → prod 승격·push 완료. 코드 기준 server ead6288, front4360c2e. [검증 증거](docs/watermark-20261101.json), 상세 계약은 docs/private-media.md.
 - 경계: 실기기 iPhone 업로드→게시 전 과정과 장시간 영상/동시 부하는 미실시. 운영 시험은 계정·공개 글을 만들지 않은 비공개 미디어 큐 시험이며, 실사용자 E2E 전체 통과로 확대하지 않는다.
 
-
 ## 2026-11-01 저녁 /pilot-work 결정 동기화 (커밋 완료·배포 대기)
 - 결정(클릭 답): 보상 출금 불가·남은 만큼 회수·일부 환불 전체 회수(약관 명시 예정)·비활성 소멸·상한 초과 종결·내역 고지·부정 문구 완화, 원천징수는 회사가 플랫폼 수수료 안에서 부담, 가이드 틀린3+누락5, SEO 새 주소+301·www→apex, 로딩 일괄 정리, 업로드 상한+감시, 재시도+안내, 오프사이트 백업 나중에, 관리자 수수료 그대로.
 - 커밋: 서버 ebb3406(레퍼럴 출금 불가)·46fe73e(관리자 소멸 상태)·b65f083(API 설명 7건·설계 문서)·384f5ea(Caddy www 301), 프론트 d2af2a6(초대 카드·내역)·0c1d481(이벤트 주소 301), 관리자 93f4c28, 가이드 ee0aed7·053ac97. 미커밋 유지: 계약 폴더(docs/contracts 전체가 미추적), 프론트 docs/audit manifest·evidence(다른 세션 변경과 섞임).
@@ -1313,7 +1349,6 @@
 - 로딩 규칙 12곳(서브에이전트): 프론트 fd3fba7, 관리자 b04aaf7. 스냅숏 474 pass, ApiState 되돌리면 2 fail. 프론트 e2e/advertising 문구는 미실행.
 - 약관: 사용자 결정 '별도 개정으로 새로 공지' — 레퍼럴 조항·원천징수 회사 부담 문구를 담은 새 개정본(30일 전 공지)을 준비할 차례. 공지 게시·시행일은 사용자 확인 필요.
 - 19:25 video-harden-20261101 운영 배포 완료(사용자 '배포' 승인): API·워커·프론트 교체, 관리자·DB·프록시 유지, 마이그레이션 없음. 배포 직전 기준선 API save-fix·프론트 message-read 일치, 진단 기동 성공. 배포 후 APP_RELEASE=video-harden-20261101, /service/feed·/api/v1/health 200, media status 무인증 401, api healthy, 워커 5분 로그 오류 0건. 이미지 정리 --keep 3(롤백용 save-fix·message-read·ad-form 보호) 로컬·원격 각 3개 삭제. 증거: crefans_front/.local/video-harden-deploy-20261101/. 실제 아이폰 영상 업로드·10분/4K 거부·재시도는 운영에서 직접 시험하지 않음.
-
 
 ## 2026-11-01 15:43 night-work 조사 문서
 
@@ -1352,7 +1387,6 @@
 - 배포: charge-expiry-20261031, 21:49:15 KST. 실제 운영 handle-check 소스236파일 중 beans.service.ts 1파일만 변경한 immutable amd64 이미지. 직전6컨테이너 ID/image 대조 후 API/worker만 교체, frontend(action-dialog)/admin/DB/proxy 동일 ID 보존. health200·인증 없는 handle 조회401·페이지200·재시작0·OOM없음. env는 API_IMAGE/APP_RELEASE만 변경, 자동 복구/직전 이미지 유지.
 - 운영 확인: 자연 배치가 문제3건을 failed로 종료하고 예약 재고20,010콩을 회사 stock으로 각1회 반환, 사용자 지급0·lot0. 연속2회 failures={} 확인. worker.completed(processed3) Telegram 전송은 21:49:18 KST 1회 성공(last_error=null). 두 번째 배치 전의 조기 확인은 횟수 부족으로 실패 기록 후 정상 시각에 재확인했다. 수신자 열람 여부와 실제 live 결제 검증으로 확대하지 않는다.
 - 보존/증거: 로컬·원격 이미지 keep3 계획 확인 후 미사용 API new-creators만 삭제, 현행과 직전2개 보존. 다른 미커밋 변경 보존, 이번 커밋/푸시 없음. [검증 증거](docs/bean-charge-expiry-20261031.json)에 HEAD·파일 SHA256·명령/시각/종료 코드·운영 결과·공식 Toss 근거 및 비공개 로그 위치 기록. 문서 현행화는 이 기록 검토 후 프론트 docs:record/check:docs로 검사하며 제품 검증과 구분한다.
-
 
 ## 2026-10-31 18:55 KST 프로필 핸들 중복 확인·설정 하단 스튜디오 링크 운영 배포
 - 요청/합격 조건: 프로필 수정에서 핸들 사용 가능 여부를 확인하고, 변경한 핸들은 최신 확인 성공 후에만 저장한다. 중복·잘못된 형식·요청 실패·늦은 응답·저장 직전 선점은 거부한다. 설정 하단에서 PC·모바일 모두 스튜디오로 이동한다. 앞선 사용자명/활동명/소개 우선순위 툴팁도 함께 배포한다.
@@ -1676,15 +1710,12 @@
 - docs/contracts/README.txt에 파일지도/재생성/검수/미결정/적용약관 주의사항 정리. 임시 생성기를 build-contract-html.py, build-contract-pdf.cjs, verify-contract-pdf.py로 영구화하고 layout/contract.css·parties.html 분리. 기기 고정 폰트경로는 형제리포 기본+환경변수로 교체.
 - 영구 소스에서 13조 HTML 재생성 확인. PDF는 기존 사용자 승인본 유지(내용/PDF 미수정). 검증 생성물이 법률검토를 대신하지 않는 점, TXT와 별도 표제·당사자·서명문구 동기화 위치 명시. 계약/배포/코드정책 변경 없음.
 
-
 ## 2026-10-31 계약서 공식 서식 참고 재편집
 - 서울시 공식 MCN 표준계약서 HWPX 원본 다운로드·XML에서 제목/조문/표 구조 확인. 플랫폼 계약 내용은 유지하고 중앙제목·당사자표·11pt본문/항들여쓰기·별지조건표·독립서명면으로 A4 7쪽 재편집. output/pdf/crefans-creator-agreement-draft.pdf 교체.
 - PyMuPDF 13조/별지2개/7쪽 및 전페이지 텍스트경계 검사, 전체페이지 렌더 시각검수. 증거 docs/contracts/contract-pdf-layout-20261031.json. 이전 원본 첨부 미검토 기록은 당시 범위이며 이번에는 서식 확인만 추가(내용 법률검토 완료 아님). 운영변경 없음.
 
-
 ## 2026-10-31 크리에이터 계약서 PDF 출력
 - 기존 초안 본문을 수정하지 않고 output/pdf/crefans-creator-agreement-draft.pdf로 A4 5쪽 생성. Pretendard 내장, 페이지 번호, 조항 제목·서명란 정리. PyMuPDF로 전페이지 렌더 및 13조·별지2개 텍스트 보존 검사 통과. 원본 검토용 상태 유지, 운영 변경 없음.
-
 
 ## 2026-10-31 오픈베타 역할별 QA 실행 (runId qa-20261030-2351, 테스트만 수정·미커밋)
 - 보고서·증거: `crefans_front/.local/qa-20261030-2351/`. 서버 49파일 410건: 405 PASS, 2 FAIL(QA-D03: platform.integration 6·13이 결제 키 부재 전제 — 환경별 분리 필요), NOT_RUN 2(local-members 구형 _test DB, media-cloud 실 AWS opt-in), skip 1.
@@ -1695,7 +1726,6 @@
 - docs/contracts/crefans-creator-agreement-draft-20261030.txt: 비독점 플랫폼 계약13조·조건별지·베타특약·서명란. 기본20%/보류7일/최소10만원/후원1000콩·수요일 기준 대조. 영업팬수 우대는 미결정 숫자 없이 별지로 확정. 권리귀속·서비스한정허락·환불/차지백·종료후구독·개인정보·책임 절차 포함.
 - 공식 서울시 MCN 표준계약서 배포페이지·약관법·전자상거래법·저작권법·개인정보법 조사. 첨부표준계약서 전문 미검토이며 정부인증/법률검토 완료 아님. 조사와 미결정 항목 docs/contracts/creator-agreement-research-20261030.txt, 해시/검증 creator-agreement-verification-20261030.json.
 - 현재/2026-11-30 약관개정예정 공존 확인. 서명 전 PG 판매자역할/세무/공휴일마감/적용버전/종료조건 결정 및 추천절차 구현대조 필요. 초안 자체는 운영약관·코드 변경 아님. 13조/별지2/서명/금액 대조 통과, 필수문서검사는 프론트에서 실행. 배포·외부발송·DB쓰기·커밋 없음.
-
 
 ## 2026-10-30 QA 이메일 최소 수 산정 (조사·설계만)
 - 기존0/2/10구독자와97개 출시시나리오/콩·콘솔 추가 기능을 대조. 신규 별칭16개=크리에이터3+팬13(12구독자/1비구독), 기존 최고 관리자 이메일 포함 고유 주소17개. 제한 운영자는 N0와 같은 이메일로 독립 Admin 계정 생성 가능(회원/관리자 테이블·인증 분리), 따라서 실제 로그인18계정. 기존17계정 표와 추가 운영자를 구분. 기존 별칭2개라면 총18/30,12개 여유.
@@ -1738,11 +1768,9 @@
 - 아바타 옆 이름에 공용 CreatorName 인증배지, 아래 @핸들에 공용 MarqueeText 적용. BeanTip creatorHandle/creatorIsVerified를 목업 초기내역·새후원 및 실제 서버 후원목록 응답에 연결. 미인증은 배지없음, 핸들없음은 행생략.
 - 단위9개·프론트typecheck·서버build 통과. 목업 PC/모바일 표시 검증은 front `.local/bean-history-edge-20261030/identity-*`. 운영 미배포·실API 응답 검증 미실행.
 
-
 ## 2026-10-30 보낸 후원 크리에이터 아바타
 - 공용 BeanHistoryView 크리에이터 링크에 공용 Avatar36px 추가. creatorAvatar 선택필드를 BeanTip 및 목업 초기내역/새후원 데이터에 연결. 서버 후원목록 creators조회에서 avatar를 선택해 creatorAvatar로 반환(미등록null), 기존권한/결제/후원처리 불변.
 - 검증: 프론트 bean-history/bean-wallet-pages 9검사·typecheck 종료0, 서버 npm run build 종료0. 목업 Chromium390/1280에서 각20항목 아바타20개·이미지로드·가로넘침없음 확인, 모바일 육안확인. 증거 front `.local/bean-history-edge-20261030/avatar-*`. 실API 수신 검증과 운영 배포는 미실행.
-
 
 ## 2026-10-30 콩 후원 시 크리에이터 제공 동의 (운영 배포 tip-consent-20261030, 커밋 완료·푸시 안 함)
 - 사용자 지시 "지금 하고": 받은 후원 목록에서 크리에이터가 후원자 닉네임·수량·메시지·일시·게시물을 보므로 구독과 같은 제3자 제공 동의를 받는다.
@@ -1750,6 +1778,7 @@
 - 검증: platform-beans 30/30(동의 없음·구버전 거부, 후원 0건, 동의 사본 확인 추가), platform-legal 10/10, openapi 11/11. 대조: 동의 확인 제거·동의 기록 제거 각각 1건 실패, 복원 30/30.
 
 - 운영 배포 2026-10-30 KST `tip-consent-20261030`(`crefans_front/.local/tip-consent-deploy-20261030/`): build·capture_before·ship exit 0, 마이그레이션 없음, 관리자 콘솔 소스 변경 없음. 배포 스크립트가 비로그인 후원 401/403, signupReady=true, 처리방침 2026-10-30.3을 확인. 외부 확인: signupReady True, 처리방침 2026-10-30.3에 후원 제공 문단, 비로그인 POST /creators/x/tips 401. 이미지 정리 로컬·운영 보존9·삭제3·오류0. 실제 회원 후원 1건은 미실행.
+
 ## 2026-10-30 초대 가입 개방: 법률문서 시행일·처리방침 보완·구독 시 크리에이터 제공 동의 (운영 배포 signup-open-20261030, 커밋 완료·푸시 안 함)
 - 계기: 사용자 회원가입 테스트에서 503 POLICY_NOT_PUBLISHED. 원인은 10-22부터 의도된 가입 차단(effectiveAt=null, blockers 3건).
 - 사용자 결정(클릭): 초대받은 이메일만 개방, 시행일 2026-10-30. 사용자 확인 사실: 국외이전 내용, 일반 콘텐츠 베타 검수 완료. Google Workspace는 직접 구매. 텔레그램 알림은 지금처럼 IP·식별자를 보내고 알려진 내용만 공개(국가·연락처 미공개라 제28조의8 항목을 완전히 채우지 못함, 사용자 수용). 파기 때 첨부 원본도 삭제. 구독 동의까지 만든 뒤 함께 개방.
@@ -1767,6 +1796,7 @@
 - 미확인: 운영 실데이터 삭제(사용자가 콘솔에서 직접 누름). 당사자 통지 없음(이메일 파기 대상이므로).
 
 - 배포(2026-10-30 KST): `crefans_front/.local/member-erase-deploy-20261030/` build→capture_before→ship 모두 exit 0, 마이그레이션 없음, 프론트 소스는 totp-pilot과 동일. 배포 후 health·admin login·feed 200, 비로그인 POST /admin/members/x/erase 401. 이미지 정리 로컬·운영 각각 보존9·삭제4·오류0.
+
 ## 2026-10-30 /pilot-work K2~K14 합의·반영 (운영 배포 totp-pilot-20261030 + 가이드, 커밋 완료·푸시 안 함)
 - 결정: 운영자 TOTP 즉시(미등록 7일 유예) / 세금 문구 중립("세금 처리 방식(원천징수 여부 포함)은 정식 정산 전에 안내합니다.") / 콩 10% 공제·만료 소멸은 현행 유지 / 처리방침 개정은 약관 초안에 묶음 / 탈퇴자 문의 3년 보존·DM 상대방 쪽 보존 / 콩 미수금만 콩 출금 차단 / 백업 최대 7일 / 탈퇴 시 충전콩은 지갑 환불 안내(프로모션콩 소멸) / 멤버십은 중개 구조 유지+고지 보강 / 다음: 요청량 제한 → 옛 경로 리다이렉트 → 덤프 정리 자동화·배포 전 테스트.
 - 반영: server TOTP(`admin-totp-core.ts`·`admin-totp.ts`, 마이그레이션 `20261030230000_admin_totp`, 로그인 2단계·복구코드·재사용 거부·5분 5회 제한·유예 후 self 경로만), 콩 미수금만 콩 출금 차단, 탈퇴 시 콩 버킷별 안내, 파기(DM 보존·문의 3년 후 삭제·CI 해시 삭제). admin TOTP 화면(로그인 2단계·등록·복구코드·유예 배너·403 이동). front 탈퇴 창(크리에이터 조건은 크리에이터에게만, 충전 내역 환불 링크), 콩 미수금 시 출금 버튼 비활성, 세금 문구. guide 콩 환불·유효기간, 미수금·탈퇴 전 출금, 저작권 수령인(전화·주소)·임시조치 안내, 세금 문구, 소개서 PDF 재생성. 덤프 정리 스크립트 `crefans_front/infra/platform/backup-retention.py`(운영 계획 실행: 21개 142MB 모두 7일 이내 → 삭제 0). 런북 백업 리전 서울. 약관 초안 13~18번·법령 원문 확인 절.
@@ -2058,7 +2088,6 @@
 - 검증: 프론트 `npm run check` 379/379(타입/레이어 포함), 서버 build 및 답글 HTTP·OpenAPI 16/16. 실제 로컬 격리 MySQL·회원 세션으로 타 계정/부모 불일치/삭제 대상/빈값 거절, 동시 삭제 200·404와 카운트 1회 감소 확인. Chromium 375/1280(모카), WebKit 375(하늘)에서 아바타 로드·등록→수정→삭제·취소 보존·팬 버튼 미노출·가로 넘침 없음·페이지 오류 없음 확인.
 - `feat/studio-comment-replies`에서 작업, 기존 미커밋 변경 보존. 운영 배포·커밋·푸시 미실행. 운영 반영 시 프론트와 신규 답글 API를 함께 반영해야 함. 근거·해시·범위: 프론트 `docs/audit/studio-comment-replies-20261028.json`, 각 리포 `.local/studio-replies-20261028/`. 문서 계약·표는 구현과 대조 후 갱신하며 docs:record는 문서 해시 기록일 뿐 제품 테스트 증명이 아님.
 
-
 ## guide.crefans.com 프록시 블록 (2026-10-28, 운영 반영)
 
 - `infra/platform/Caddyfile`에 `{$GUIDE_DOMAIN:guide.crefans.com}` 정적 사이트 블록 추가(`/data/sites/guide`, proxy caddy 볼륨). 운영 Caddyfile을 같은 내용으로 교체 후 caddy reload(validate 선행, 실패 시 원복, 컨테이너 재시작 없음). Route 53 A 레코드 추가. 원본·검증은 `crefans_guide/PROGRESS.md`. 다른 서비스 응답 유지 확인.
@@ -2085,10 +2114,6 @@
 - 검증: build, 새 `tests/platform-admin-operators.test.cjs` 6/6(라우트 전수 권한 선언+없는 경우 가드 거부 대조, 입력 검증, 강제 변경, 권한 즉시 반영, 세션 종료, 감사에 임시 비밀번호 없음), admin-console 12/12, financial-policy 8/8(확인 문구 누락·오타 5종 거부 추가), openapi 11/11(132개), beta-policy 11/11. 거부 코드가 SUPER_ADMIN_REQUIRED→ADMIN_PERMISSION_REQUIRED로 바뀐 테스트 기대값 갱신. platform-beans 20중 5 실패는 변경 전 운영 소스 사본에서도 같은 5건 실패(기존, 이번 변경과 무관). platform.integration/access는 로컬 API(3001) 미실행으로 미검증.
 - 운영 배포 `operators-20261028`(API·worker·admin). DB 덤프 백업 후 마이그레이션 1건 적용(총26), frontend/DB/proxy 컨테이너 유지. 새 경로 비로그인 401(없는 경로 404), API 이미지 `@Permit` 33곳 확인. 운영 DB의 기존 최고관리자(kayheypark 계정) 이름·전화번호 반영과 최고관리자·활성 확인(감사 기록 남김, 활성 운영자 1명). 이미지 보존으로 api tip-attribution·admin promotion-payout 삭제(운영 여유 34.3GB). 증거 front `.local/operators-deploy-20261028/`. commit/push 없음.
 
-
-
-
-
 ## 인프라·배포 현황 조사 (2026-10-28, 읽기 전용)
 
 - 구성: EC2 i-0c24409aae93555f2 t3a.medium(2vCPU/4GiB, ap-northeast-2a, 10-21 기동), EBS gp3 50GB 1개, EIP 15.164.140.26. Docker Compose `crefans-beta` 6컨테이너(proxy Caddy 128m, frontend 768m, api 512m, worker 384m(API 이미지), admin 384m, MySQL 8.0 1g), 로그 10MB 회전. 볼륨 database/media/caddy/private. DNS(Route53): beta→CloudFront(E2VCS3MVSGXSRC)→beta-origin(EC2), admin·business→EC2 직접. 미디어 S3 crefans-beta-media(인스턴스 역할). 외부 모니터 systemd timer.
@@ -2112,16 +2137,13 @@
 
 - 프론트 목업 로그인 배포 자동 검토가 클라이언트 비교값 공개를 거절해 서버 전용으로 변경. infra/platform/compose.yml에서 frontend에 CREFANS_PREVIEW_LOGIN_HASH만 선택 전달하고 runtime.env.example은 빈 자리와 설명 추가. API/worker에는 전달하지 않고 Nest 실제 회원 인증/DB 변경 없음. 비공개 설정 자체는 운영 .env에만 주입하고 로그/이미지에 포함하지 않음. 프론트 PROGRESS 및 docs/audit/moka-preview-deployment-20261027.json을 따른다. 운영 배포·목업 실로그인·공개 에셋 비밀값 미포함 검사 완료, Nest API/worker/admin/DB/proxy 유지 확인. 기존 미배포 출금/약관 변경 보존.
 
-
 ## 명함 재생 제어 배포 문서 (2026-10-27)
 
 - 프론트 명함의 계속 보기/연락처/입장 링크를 제거하고 반가워요+중지/재생/다시보기 아이콘으로 변경하여 infra/platform/README.md의 조작 안내만 현행화. 서버 API/DB/Caddy 설정 변경 없음. 배포 과정의 용량 검사 실패로 미사용 과거 프론트 이미지를 로컬 동일 레이어 복구본 확인 후 제한 정리, 현재·직전 및 모든 컨테이너 사용 이미지/DB/볼륨 보존. 프론트 PROGRESS ‘명함 최소 UI·재생 제어’와 docs/audit/card-controls-20261027.json 참조.
 
-
 ## 공개 명함 3D 연출 문서 반영 (2026-10-27)
 
 - 명함 프론트의 등장0.8초/뒷면1초/앞면 전환0.7초/이후 진행 막대5초 입장으로 변경되어 `infra/platform/README.md` 시간 안내만 현행화. 서버 런타임/API/DB/Caddy 설정 변경 없음. 프론트 배포·브라우저/시험 증거는 front PROGRESS의 ‘명함 3D 등장·뒤집기 및 진행 막대’ 및 `.local/business-card-animation-20261027/` 참조. 기존 미배포 출금 정책 작업 보존.
-
 
 ## 공개 명함 도메인 (2026-10-27)
 
@@ -2130,8 +2152,6 @@
 - 검증: front check360/360(타입·레이어 포함). 신규5검사에서5초/중지/unknown·중복/캐시 이미지 처리 확인, 캐시 감지 제거 시 해당 시험 실패·원복 확인. 첫 운영 WebKit 캐시 이미지 자동 이동 실패를 발견하여 수정했고 최종 운영 검증은 아래 증거로 보완한다. 최초 교체 중 health 재시도에서502 한 번 발생 후 정상화, 무중단 보장은 하지 않는다.
 - 배포 범위: 기존 운영 source `notice-category-20261026`에서 명함 관련7파일만 반영. 미커밋 출금 최소액/약관/QA 산출물 변경은 배포에서 제외했고 원본 작업 파일은 보존. 회원 DB/API/worker/admin 컨테이너 및 금융/가입 정책 유지. 커밋/푸시 없음.
 - 최종 상태: `business-card-fix-20261027` 운영 배포 완료. HTTPS12검사·Chromium390/1280·WebKit390에서 자동 이동5.1~5.3초/중지/즉시 이동/가로 넘침 없음·pageerror0 확인. API/worker/admin/DB/proxy5개 컨테이너ID·재시작 수 보존. 최종 증거 front `docs/audit/business-card-20261027.json`. macOS의 DNS 이전 음성 캐시로 최종 검사는 공개/권한 DNS의 A를 명시해 연결했고 TLS검증은 유지했다. 공개 DNS5개 정상 및 Route53 INSYNC. 비공개 실행·소스해시·로그는 front `.local/business-card-fix-20261027/`, 최초 배포 이력은 `.local/business-card-20261027/`. 실제 인쇄물의 휴대폰 QR 스캔은 별도.
-
-
 
 ## 출금 최소액 10만원 상향 (2026-10-27, 로컬)
 
@@ -2153,7 +2173,6 @@
 - 알려진 실제 비밀번호·개인키·AWS 액세스키·Telegram 토큰·Toss 운영 비밀키 패턴 검사에서 후보 없음(이 패턴 검사는 모든 비밀정보 부재의 보장이 아님). 검증 결과와 커밋 후 clean 확인은 /tmp/crefans-commit-cleanup-20261026에 저장.
 - 이번 정리 검증: npm run build: NestJS 빌드 통과. 추가 실금융/E2E 재실행은 하지 않음.
 - 이번 작업은 소스 보존/커밋 정리이며 운영 배포·원격 push·브랜치 병합을 수행하지 않음. 현재 기능/배포 상태와 미결정 정책은 아래 로그 유지. 다음: 운영 피드백 및 별도 요청 시 통합/푸시.
-
 
 ## 모든 프로모션 후원 수익 출금 (2026-10-26, 운영 배포 완료)
 
@@ -2255,18 +2274,15 @@
 - crefans-api:bean-vat-20261025(API/worker)와 같은 릴리스 프론트 배포.14HTTP·API196/프론트610실행SHA·새worker heartbeat/6컨테이너 정상. DB/admin/proxy ID·21migration·금융건수·20%/7일·live판매/송금gate 유지. runtime.env는 APP_RELEASE만 변경,집IP SSH 유지.
 - 상세/공식근거/복구/한계는 ../crefans_front/docs/audit/bean-vat-deployment-20261025.json 및 프론트 PROGRESS 최신 기록. 실결제/후원/지급/메일·commit/push 없음. 다음: 운영 화면 피드백, 실제판매 gate는 PG/세무·별도약관 미확정 해소 전 유지.
 
-
 ## 프론트 소프트3D 콩 이미지·배수 표기 운영 반영 (2026-10-25)
 
 - 프론트만 crefans-front:bean-soft3d-20261025로 교체. 공용 충전9카드 v5 PNG와 30/50/100의 동일 크기 ×10 적용. API/worker는 bean-wallet-20261025 유지, API/worker/admin/DB/proxy ID·runtime.env·21migration/금융건수·20%/7일·가입/실금융 gate 보존. 서버 변경/재배포·실금융/메일 없음.
 - front328검사/amd64빌드·602실행 SHA/9운영 PNG SHA·14HTTP·로컬/운영 각7브라우저 검사 통과. 증거 ../crefans_front/docs/audit/bean-soft3d-deployment-20261025.json, 상세와 복구는 프론트 PROGRESS 최신 기록. 미커밋 보존·commit/push 없음.
 
-
 ## 프론트 클레이 콩 충전 이미지 운영 반영 (2026-10-25)
 
 - 프론트만 crefans-front:bean-clay-20261025로 교체했다. API/worker는 기존 bean-wallet-20261025이며 API/worker/admin/DB/proxy ID·runtime.env 바이트·21migration/금융건수/수수료20%·보류7일/기존 가입·실금융 gate 유지. 서버 소스·스키마·정책 변경/재배포 없음.
 - 공용 충전9카드 이미지·중복 지갑 목업 안내 제거,10개 에셋 운영SHA·프론트563실행파일·14HTTP·로컬/운영 각7브라우저 검사 및 front328검사/amd64빌드 통과. 금융 실행/외부발송 없음. 증거 ../crefans_front/docs/audit/bean-clay-deployment-20261025.json. 프론트 상세/복구는 해당 PROGRESS 최신 기록을 따른다. 누적미커밋 보존,commit/push 없음.
-
 
 ## 지갑·충전·잔액 계층 운영 배포 (2026-10-25)
 
@@ -2277,7 +2293,6 @@
 - 신규 실제 지갑 필드의 인증 운영 호출은 미실행이며, 격리DB/공급사 대역29검사·프론트328검사와 실제 운영 소스/가드 검사를 구분한다. 가입 signupReady=false/빈 초대 명단, email-only/beta/live콩판매false/실출금false/광고메일false 유지.
 - 증거 front docs/audit/bean-wallet-deployment-20261025.json, 원본 server .local/bean-wallet-deploy-20261025. 두 리포 feat/bean-support 누적미커밋 보존·커밋/푸시 없음. 아래 미배포 로그는 이전 시점 기록이며 현재 배포 상태는 이 로그가 우선한다. 다음: 사용자 화면 확인·버그 대응.
 
-
 ## 콩 잔액 주요 지표·세부 계층 (2026-10-25, 운영 미배포)
 
 - 지갑/스튜디오 공용 BeanBalanceSummary에서 사용 가능한 콩·출금 가능한 콩 두 지표만 크게 표시한다. 일반/프로모션·출금조건충족 일반후원·사용보류/출금제외 후원/받은프로모션/출금처리중은 기존 AccordionItem의 기본 접힘 안 계층 리스트다. 총합과 하위 분류가 혼동되지 않게 출금 제외 그룹을 별도로 명시한다.
@@ -2286,12 +2301,10 @@
 - 처음 브라우저의 region 다중일치 locator를 명시 패널로 수정했고, 펼침 중 캡처는 애니메이션 최종 높이를 기다려 다시 생성했다. 증거 docs/audit/bean-balance-hierarchy-20261025.json, 원본 양 리포 .local/bean-balance-hierarchy-20261025. 실금융/외부발송·운영배포·커밋 없음.
 - 다음: 요청 시 서버 추가 응답과 직전 충전/지갑 UI를 함께 배포. 운영 신규 필드 미반영 상태에서 합계를 임의 추정하지 않는다. 기존 가입/실금융 차단·외부 준비 미완료는 유지한다.
 
-
 ## 프론트 콩 충전 전용 화면 계약 반영 (2026-10-25, 운영 미배포)
 
 - 프론트 공용 /preview/beans/charge·/service/beans/charge 추가로 docs/current-contracts.md의 화면 카탈로그를45→46으로 재생성했다. 서버 API123개·DB73모델/21migration·주문 금액산출/결제/원장/정산 로직은 변경하지 않았다. 기존 PG 결과 success/fail 경로 유지.
 - UI는9개 수량3열·1콩100원, 선택 전 제출 차단/같은 주문 재시도. 프론트325검사·로컬 브라우저11개 및 키보드검사 통과. 증거 front docs/audit/bean-charge-page-20261025.json. 실제 PG/DB 공급사 E2E 재실행·금융 실행·배포 없음. 프론트와 직전 지갑 UI 변경은 사용자 요청 시 배포할 상태다.
-
 
 ## 잔여 미배포 대조·PASS 보류 설정 반영 (2026-10-25)
 
@@ -2300,7 +2313,6 @@
 - 운영 HTTP16개, 브라우저8개(기존 콩6개와390/1280 실제 가입 화면 PASS 미노출·연령 확인·약관 차단2개), 서버196/프론트551 실행 파일 SHA·3이미지 전체 RootFS, 6컨테이너 restart0/OOMfalse 및 배치 failures={}를 재검사했다. DB/프록시 ID 유지, 실제 원장 균형·회사1억·정책 version2 수수료20%/보류7일 확인. 캡처 직접 확인.
 - 가입은 빈 초대 명단·signupReady=false로 아직 닫혀 있다. 실결제·은행출금·광고메일 비활성화 유지. 이메일 연령 체크를 본인/성인인증으로 간주하지 않는다. 실제 금융·프로모션·메일·별도봇 테스트 발송 없음. 실PG 승인/은행 bridge·실제 개인정보 처리 사실/시행일·초대 명단 및 부하/복원 검수는 남아 있다.
 - 증거: front docs/audit/release-completeness-20261025.json, 원본 server .local/release-completeness-20261025. 문서에 남아 있던 PASS 미적용·DB정책/결제migration 미적용 현재 설명을 갱신했다. 과거 실행 기록은 당시 상태로 보존한다. 세 리포 feat/bean-support의 누적 미커밋 보존, 커밋/푸시 없음.
-
 
 ## 콩 기능 운영 테스트 배포 (2026-10-25)
 
@@ -2313,7 +2325,6 @@
 - 복구: API/worker post-views-20261025, frontend gallery-close-soft-20261025, admin creator-verification-20261024와 백업설정으로 앱4개만 복구한다. 추가 DB테이블·원장·정책감사이력은 보존한다. down/볼륨삭제/seed/DB reset 금지. 집IP SSH 지속규칙 유지. 커밋/푸시 없음, 누적미커밋보존.
 - 증거 front docs/audit/bean-deployment-20261025.json, 원본 server .local/bean-deploy-20261025. 다음은 사용자 실제화면 확인·버그수정이며 실PG 업종승인·법정환급/충전동의·은행연동/실입금·실출금 및 운영 부하/복원 검수는 별도다. 이번 배포검사에서 실제 사용자 충전/후원/프로모션/출금·메일·별도봇테스트 발송은 수행하지 않았다.
 
-
 ## 콩 상품 전체 연결·배포 준비 (2026-10-25, 운영 미배포)
 
 - 팬 지갑/충전·결과/보낸 후원, 프로필·게시물·갤러리의 후원 레이어, 스튜디오 받은 후원·출금/PIN·내역, 독립 관리자 콩 지표·프로모션 지급·원주문 실입금 대사·출금 승인/사유 반려·개인지갑 출처 추적을 연결했다. BeanContext/BeanPages는 preview/service 공유, 기존 목업 URL 유지. 새 카탈로그 /preview/beans와 /preview/studio/beans, 실제 /service/beans 및 /service/studio/beans.
@@ -2324,14 +2335,12 @@
 - feature BEAN_LEDGER_ENABLED/live 판매 BEAN_LIVE_PAYMENTS_APPROVED 기본false, actual 환경 미활성화. beta 은행송금 차단과 테스트콩 실제출금 금지를 유지한다. 실제 PG 충전/후원/환금성 업종 승인·판매약관/충전동의·법정 환급/유효기간·일한도, 은행/계좌검증 bridge·실입금 대사/실송금, 운영 migration/배포·부하/장애복구 검수는 남아 있다. 이 조건 없이 실금융 개방 완료/출시 무결함을 주장하지 않는다.
 - 증거: 프론트 docs/audit/bean-product-20261025.json, 의미/근거/배포 순서는 서버 docs/platform-api.md·docs/platform-implementation.md·infra/platform/README.md 및 별도 콘솔 README. 세 리포 feat/bean-support의 기존 누적 미커밋 보존, 커밋/푸시·운영배포 없음. 과거 아래의 상품 미연결/정책 답변대기 기록은 이 로그와 정책 확정 기록으로 대체한다.
 
-
 ## 콩 정책 확정·최소 출금10만원 (2026-10-25)
 
 - 사용자가 권장3안을 수락: 프로모션콩 우선 사용, 프로모션콩 후원 가능/현금출금 불가, 본인 구매콩 출금 불가·후원받은 일반콩만 수익출금. 콩 최소 출금은 수수료 차감 전 신청액100,000원=1,000콩으로 해석·안내했다. 수수료20% 20,000원/실지급80,000원. 기존 멤버십 원화 출금 정책은 이번 콩 정책 변경에 자동 합치지 않는다.
 - `server/src/platform/bean-policy.ts`에 정책을 모으고 `beanWithdrawalQuote`가 받은일반콩 계정/최소1,000콩을 검사한다. 999콩 거부,1,000콩/1,001콩 견적, 구매·프로모션·프로모션수익·예약/회사지갑 거부를 검사했다. 일반 가치계산 beanCashQuote는 최소 출금액과 분리한다.
 - 상세 설계의 답변대기/최소액 미정 부분을 확정값으로 갱신했다. 상품 충전/후원/은행 API·UI·집계는 여전히 후속 구현이며 운영 배포/DB/외부 금융 변경은 없다. 다음: 확정 정책에 따라 충전주문/재고예약/출처lot→후원/프로모션 우선 소비→출금/은행→공용UI·스튜디오/콘솔·대사 순서. PG/법정환급 조건과 실금융 검증은 별도다.
 - 증거: front `docs/audit/bean-policy-confirmed-20261025.json`. 이전 로그의 답변대기는 이 기록으로 해소한다. 기존 미커밋과 feat/bean-support 유지.
-
 
 ## 콩 후원 설계·원장 기반 (2026-10-25, 상품 기능 미연결)
 
@@ -2341,7 +2350,6 @@
 - **답변 대기:** 프로모션콩 현금화/회사부담, 구매자 자기충전잔액 출금 범위, 사용순서. 권장 묶음을 질문했으며 임의 채택하지 않는다. 후원 취소 UI 미제공과 법정 충전금 환급·오결제·차지백을 분리해야 한다. PG 충전/후원/환금성 계약 및 법적 분류 미확인. 출금 최소액 총액/실지급액 기준 등도 결정 필요.
 - 새 migration은 격리 E2E DB만 적용, 운영/개발 DB·환경·배포·외부 발송/결제/지급 없음. 원장 코드에는 공개 API/기존 수익원 연결이 없어 기존 매출을 늘리지 않는다. 검증: 서버 build·Prisma validate, 원장4+OpenAPI11개와 실제 격리API/DB 가입 Chromium1개(지갑1/계정5) 통과. 증거 front docs/audit/bean-support-20261025.json. 다음: 답변 확정 후 충전주문/회사재고예약/출처lot→후원→출금예약/은행→공용UI/콘솔/3Swagger→기존구독회귀 순서.
 
-
 ## 확정 베타 정책 구현·검증 (2026-10-25, 운영 미배포)
 
 - 사용자 선택7.C/10.C/13.B/16.C·나머지A를 구현했다. 베타 빈 초대명단 거부·일반 콘텐츠·테스트 키만 허용·실송금 차단, 신규 미사용7일 환불과 기존 계약 보존,24시간 간격 추가3회 갱신, 테스트→실과금 차단, PG 입금 대사/미확인잔액 제외·최소1만원·수요일 신규 지급(기처리 송금 확인은 매일)을 적용했다. 수수료/보류 원본은 기존 DB version/감사 경로이며 운영 선택값2000bps/7일 적용은 배포 단계에서 수행한다.
@@ -2350,7 +2358,6 @@
 - 새 migration2개는 전용 crefans_platform_e2e에만 적용했다. 개발/운영 DB migration·환경값 변경·배포·실외부발송·커밋/푸시는 없다. 두 리포 feat/beta-signup의 누적 미커밋 변경을 보존했다. 테스트 통과를 실서비스 개방/무결함 보장으로 보고하지 않는다.
 - **개방 전 남음:** 초대 이메일·베타 시작일, 실제 탈퇴/항목별 보유·파기, AWS/Google/Telegram 계약·국가·보유기간, 사업자/PG·세무 사실 확인. 법률문서 effectiveAt=null/signupReady=false 유지. 광고 서명키/발송 활성화·실SMTP/DKIM, 실제 PG/은행·수요일 공휴일/마감은 별도 확인한다. 실제17명 동시 사용·운영 부하는 미검증이다.
 - 최신 근거는 front `docs/audit/beta-policy-implementation-20261025.json`, 선택표/개방 조건은 front `docs/beta-role-test-plan.md`, 적용 절차는 server `docs/platform-api.md`의 확정 베타 정책 절이다. 문서 계약104 API(유저58/스튜디오37/콘솔28),43화면,19migration·60문서 검증과 잘못된 링크/누락/변경 탐지 대조 검사도 통과했다. 다음은 실제 처리 사실·초대명단 준비와 가입 시행본 확인 후 별도 운영 적용이다.
-
 
 ## 정책 결정 당시 기록 (2026-10-25, 아래 구현 대기는 상단 최신 로그로 대체)
 
@@ -2386,7 +2393,6 @@
 - 서버 Creator.is_verified 기본 false + migration, 활성 ADMIN/SUPER_ADMIN 전용 PUT /api/v1/admin/creators/:id/verification, 수정 필드 허용목록, 트랜잭션/행 잠금/변경 이력과 공개 isVerified 응답을 연결했다. 별도 관리자 콘솔에서 부여/해제 확인, 저장 실패 표시와 재조회. 일반 회원/PASS/광고 상태로 자동 부여되지 않는다.
 - 검증 범위: 프론트300검사, API/권한/감사/Swagger23검사, 관리자5검사, 실제 API·격리 DB 관리자 E2E1 및 프론트 PC/모바일 Chromium·WebKit 6개. 화면·긴 이름·미인증·해제·실패/취소·권한 거부·중복 해제 감사 이력 대조. 문서 계약은 API100개(유저56/스튜디오37/콘솔26), migration17개. 증거는 front/docs/audit/creator-verification-20261024.json.
 - 로컬 개발 DB와 격리 테스트 DB에 새 migration을 적용했다. 운영 DB/앱 미배포, 커밋·푸시 없음. 기존 모바일 댓글 입력바 등 미커밋 작업 보존. 운영 배포는 migration → API·콘솔·프론트 순서이며 기존 화면 인증 상태는 다음 조회 시 갱신된다. 실제 기기 검수·인증 판정 정책 자체는 검증 범위 밖이다.
-
 
 ## 최신 운영 배포 (2026-10-24) — 홈 검색·카테고리 및 메시지·알림 미확인 표시
 
@@ -2805,7 +2811,6 @@
 
 - 사용자 정정으로 독립관리자 운영설정의 개인정보·운영정책 섹션 전체를 제거. 정책 문서는 서비스 코드에서 직접 관리하는 방향으로 관리자 AGENTS에 기록. 금융정책/이력과 고객지원 공지·FAQ는 유지. 백엔드 런타임/공개문서/API/DB 변경 없음. 단순 관리자 UI 변경이므로 관리자 타입+단위3·주요경로E2E1 검사만 실행하며 기존백엔드전체검증을재실행했다고주장하지않는다. 운영 admin이미지 교체 후 결과는 관리자 docs/no-policy-20261022.json 및PROGRESS 참고.
 
-
 ## 2026-10-22 사고 추적 로그 구현 및 로컬 검증
 
 - 요구 합격 조건: 구현 전 logging-inventory의 가능한 공백을 코드로 보완하고, DB/HTTP/금융/SMTP/브라우저/Caddy의 성공·실패·권한·마스킹·동시성을 실제 검사한다. 목업 유지, 운영 콘솔 분리. 기존 미커밋 작업은 보존했다.
@@ -2816,7 +2821,6 @@
 - local3307 dev/E2E에만 migration 적용. 운영 DB·이미지·보안그룹·외부 발송 변경 없음. 실제 PG/은행/Workspace SMTP·CloudWatch 수신·독립 감시 호스트·보유기간 확정·운영 부하/복원/불변 보관은 미검증/미설정으로 명시. 로그가 모두 비즈니스 행위의 완전한 재현이나 무결성을 보장한다고 주장하지 않는다.
 - 상세 docs/operational-logging.md, 명령/시각/종료코드/파일SHA/초기실패와 최종결과는 docs/logging-implementation-20261022.json. 이후 배포 시 APP_RELEASE 지정과 감사 migration/새 API·worker·front·admin·Caddy 적용이 필요하다.
 
-
 ## 2026-10-22 분실·정지 카드 정기결제 복구 (진행 중)
 
 - 사용자 구현·배포 승인. 기존 운영 로그 미배포 변경을 보존하고 그 감사 migration과 함께 배포 준비. 합격 조건: 확정 카드 불능 시 같은 카드 추가 청구 0, 일시 실패 기존 한도/간격 유지, 미확정 결과 동일 주문 대사, 새 기본 카드로 한 번만 갱신, 해지/복구기한 후 재청구 0, 미결제 콘텐츠 권한 0, 안전한 인앱/SMTP outbox/운영 알림 및 실제 브라우저 흐름.
@@ -2825,7 +2829,6 @@
 - 실제 PG/실제 분실신고/외부 수신함 검증과 로컬 공급사 대역·SMTP 수신기는 구분. 검증 및 배포 결과는 후속 기록으로 남길 예정.
 
 - 운영 preflight에서 RENEWAL_MAX_RETRIES/RENEWAL_RETRY_HOURS가 모두 미설정으로 확인됨. 위 '기존 값 유지'는 값이 설정된 환경에 해당한다. 사용자 표준 대응·배포 위임에 따라 기존 release-test-scenarios 권장 수치 3회/24시간을 빈 운영 설정에만 적용하며, 보편 강제 표준으로 주장하지 않는다. 운영 복구기한 최대4일·무료 유예 없음.
-
 
 ## 2026-10-22 카드 불능 대응·갱신 복구 운영 배포 완료
 
@@ -2865,7 +2868,6 @@
 - 배포 전 롤백 시험의 Docker env-file 따옴표 해석 차이를 Compose 실행으로 수정. 운영 smoke의 테스트 토큰 형식 오류(hex→base64url)도 수정; 두 실패 시 이전 이미지 자동 복구. 최종 이전 이미지의 새 S3 읽기와 새 이미지의 HTTPS 업로드 모두 통과. 실제 회원 비밀번호/계정/결제 변경 없음.
 - 14:53 KST API/worker/frontend restart0/OOMfalse, API/feed/preview/정적이미지200, worker failures{}·37ms, 최종 배포 이후 감사 error0. 관찰 구간의 결과이며 무장애 보장 아님.
 - [미디어 운영 문서](docs/private-media.md), [실행 증거](docs/media-migration-20261022.json). 60초 bearer URL 한계·단일파일·실기기/부하/백업 미검증·기존 런타임 의존성 high12/moderate9/low2 잔여를 명시.
-
 
 ## 2026-10-22 공유 링크의 비구독 접근 차단 (진행 중)
 
@@ -3098,7 +3100,6 @@
 ## 2026-11-02 지갑 화면 명칭 계약 운영 소스 반영
 - 사용자 확정 사항 배포 지시로 feat/wallet-navigation-labels 22ffc56→dev7f961b7 통합→prod1f1a82f 승격 후 원격 dev/prod 동기화. docs/current-contracts.md의 화면명·순서와 작업 로그만 변경; 서버 런타임/API/worker/DB 배포·마이그레이션 없음.
 - 프론트 지갑 메뉴·새로고침 아이콘은 wallet-release-20261102로 04:42 KST 배포. 문서 계약75개 검사 통과, 운영6서비스 정상 및 서버·worker·DB ID 유지. 증거 ../crefans_front/.local/wallet-release-20261102/verification.json, deployment-git.json, runtime-after.json. 금융 동작 검증으로 확대하지 않음.
-
 
 ## 2026-11-03 짧은 프로필 소개 통합 — feat/shared-short-bio, 미배포
 - 최신 origin/prod9a76c9c에서 분기. 사용자 확정: 상단 120자 소개만 user_profiles.bio로 통합, creators.about 1,000자 상세 소개 유지. 기존 중단 작업트리 보존 후 최신 배지 로직과 병합.
