@@ -27,6 +27,8 @@ before(async()=>{
  const result=require('node:child_process').spawnSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy'],{env:process.env,encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);
  creator=await makeCreator('aiedit_'+tag);other=await makeCreator('aiother_'+tag);sourceId=await media(creator);otherSourceId=await media(other);
  app=await NestFactory.create(PlatformModule,{logger:false});await app.init();photos=app.get(AiPhotoService);photos.fetcher=stub;photos.logger={warn:value=>warnings.push(value)};
+ // 2026-11-18: provider-call cap/cost counters are per KST day in the shared e2e DB; each run counts under its own day key.
+ photos.costDay=()=>'run-'+tag;
 });
 after(async()=>{await app?.close();try{await db.aiHeartUse.deleteMany({where:{user_id:{in:members}}});await db.aiHeartGame.deleteMany({where:{user_id:{in:members}}});await db.aiHeartWallet.deleteMany({where:{user_id:{in:members}}});await db.aiShopUse.deleteMany({where:{creator_id:{in:members}}});await db.aiShopOrder.deleteMany({where:{creator_id:{in:members}}});const made=await db.media.findMany({where:{user_sub:{in:members}},select:{id:true}});await db.media.deleteMany({where:{id:{in:made.map(m=>m.id)}}});await db.aiPhotoGrant.deleteMany({where:{creator_user_id:{in:members}}});await db.creator.deleteMany({where:{user_id:{in:members}}});await db.member.deleteMany({where:{id:{in:members}}});fs.rmSync(mediaRoot,{recursive:true,force:true});}finally{await db.$disconnect();await release?.();}});
 
@@ -514,4 +516,61 @@ test('console reset gives every visitor a fresh 10 tries and keeps the guests da
   const r=await resetGuestAiQuota(db,admin,{reason:'테스트 초기화',confirm:'전체 초기화'});assert.equal(r.epoch,epoch+1);
   assert.equal(await photos.guestRemaining(visitor),10,'fresh tries after the reset');assert.equal((await guestAiQuotaStatus(db,admin)).epoch,epoch+1);
  }finally{if(prior)await db.platformSetting.update({where:{key:GUEST_QUOTA_EPOCH_SETTING},data:{value:prior.value}});else await db.platformSetting.deleteMany({where:{key:GUEST_QUOTA_EPOCH_SETTING}});}
+});
+
+// 2026-11-18 user decisions: AI photo cost controls (paid bypass of the service total, provider-call cap, cost alerts).
+const paidOrder=(user,remaining)=>db.aiShopOrder.create({data:{creator_id:user,product_id:'fixture',request_key:crypto.randomUUID(),name:'격리 대역',amount:100*remaining,quantity:remaining,validity_days:30,terms:'test',environment:'test',status:'paid',remaining,paid_at:new Date(),expires_at:new Date(Date.now()+86400000)}});
+test('2026-11-18: when the service-wide total is full, paid uses still generate while free tries are refused and given back',async()=>{
+ const saved={...photos.settings},free=await makeCreator('aitotf_'+tag),paid=await makeCreator('aitotp_'+tag),freeSrc=await media(free),paidSrc=await media(paid),order=await paidOrder(paid,2);
+ try{
+  photos.settings.dailyTotal=await photos.used('ai-photo:total');const total=await photos.used('ai-photo:total');
+  reset();await assert.rejects(photos.edit(free,base({sourceId:freeSrc})),code('SERVICE_BUSY'));assert.equal(calls.length,0,'no provider call');
+  assert.equal((await photos.quota(free)).remaining,10,'the free try is given back');assert.equal(await photos.used('ai-photo:total'),total);
+  // Free tries left: the free reservation is given back and the paid count is used instead.
+  reset();assert.equal((await photos.edit(paid,base({sourceId:paidSrc}))).images.length,1);
+  assert.equal((await db.aiShopOrder.findUnique({where:{id:order.id}})).remaining,1);assert.equal(await photos.used('ai-photo:creator-day:'+paid),0,'free try not used');
+  // Free tries used up: the paid count goes straight through without touching the total.
+  for(let i=0;i<10;i++)await photos.limiter.limit('ai-photo:creator-day:'+paid,10,86400);
+  reset();assert.equal((await photos.edit(paid,base({sourceId:paidSrc}))).images.length,1);
+  assert.equal((await db.aiShopOrder.findUnique({where:{id:order.id}})).remaining,0);assert.equal(await db.aiShopUse.count({where:{order_id:order.id,status:'consumed'}}),2);
+  assert.equal(await photos.used('ai-photo:total'),total,'paid uses do not count toward the service total');
+  // No paid count left: refused like a free user.
+  reset();await assert.rejects(photos.edit(paid,base({sourceId:paidSrc})),code('DAILY_LIMIT'));assert.equal(calls.length,0);
+ }finally{Object.assign(photos.settings,saved);}
+});
+test('2026-11-18: provider cap counts every Seedream call (retries too) and refuses the 901st before calling, without charging',async()=>{
+ const {AI_PROVIDER_DAILY_CALLS}=require('../dist/src/platform/ai-photo-cost'),{digest}=require('../dist/src/auth/local/credentials'),prev=photos.costDay,previous=photos.fetcher,day='cap-'+tag,counter=digest(`ai-photo:provider-calls:${day}`);
+ const user=await makeCreator('aipcap_'+tag),id=await media(user),order=await paidOrder(user,1),count=async()=>(await db.authRateBucket.findUnique({where:{id:counter}}))?.count??0;
+ try{photos.costDay=()=>day;assert.equal(AI_PROVIDER_DAILY_CALLS,900);
+  reset();await photos.edit(user,base({sourceId:id}));assert.equal(await count(),1);
+  let blocked=true;photos.fetcher=async(url,init)=>{if(url.endsWith('/images/generations')&&blocked){blocked=false;calls.push({kind:'edit'});return new Response(JSON.stringify({error:{code:'OutputImageSensitiveContentDetected.PolicyViolation'}}),{status:400});}return stub(url,init);};
+  reset();await photos.edit(user,base({sourceId:id,kind:'outfit',prompt:'검은 스타킹 코디'}));photos.fetcher=previous;
+  assert.equal(calls.filter(c=>c.kind==='edit').length,2);assert.equal(await count(),3,'the stocking-wording retry is a second counted call');
+  await db.authRateBucket.update({where:{id:counter},data:{count:AI_PROVIDER_DAILY_CALLS-1}});
+  reset();await photos.edit(user,base({sourceId:id}));assert.equal(calls.filter(c=>c.kind==='edit').length,1,'the 900th call is made');assert.equal(await count(),900);
+  const free=(await photos.quota(user)).remaining,total=await photos.used('ai-photo:total');
+  for(let i=0;i<2;i++){reset();await assert.rejects(photos.edit(user,base({sourceId:id})),code('AI_PROVIDER_DAILY_CAP'));assert.equal(calls.filter(c=>c.kind==='edit').length,0,'the 901st call is never made');}
+  assert.equal((await photos.quota(user)).remaining,free,'free try given back');assert.equal(await photos.used('ai-photo:total'),total);assert.equal(await count(),900);
+  for(let i=await photos.used('ai-photo:creator-day:'+user);i<10;i++)await photos.limiter.limit('ai-photo:creator-day:'+user,10,86400);
+  reset();await assert.rejects(photos.edit(user,base({sourceId:id})),code('AI_PROVIDER_DAILY_CAP'));
+  assert.equal((await db.aiShopOrder.findUnique({where:{id:order.id}})).remaining,1,'paid count released');assert.equal(await db.aiShopUse.count({where:{order_id:order.id,status:'released'}}),1);
+  const events=await db.platformOperationalEvent.findMany({where:{type:'ai-photo.provider_cap',dedupe_key:`ai-provider-cap:${day}`}});assert.equal(events.length,1,'one alert for the day');
+  assert.equal(await db.platformOperationalEvent.count({where:{type:'ai-photo.failed',data:{path:'$.errorCode',equals:'AI_PROVIDER_DAILY_CAP'}}}),0,'refusals do not alert one by one');
+  const {operationsAlertText}=require('../dist/src/platform/operations.service'),text=operationsAlertText(events[0],'test');assert.match(text,/공급사 호출 오늘 상한\(900회\)/);assert.match(text,/접속 IP: 보내지 않음/);assert.ok(!text.includes(user));
+ }finally{photos.costDay=prev;photos.fetcher=previous;}
+});
+test('2026-11-18: estimated cost alerts fire once when crossing $30 and once when crossing $60',async()=>{
+ const {digest}=require('../dist/src/auth/local/credentials'),{estimateMilliUsd}=require('../dist/src/platform/ai-photo-cost'),prev=photos.costDay,record=photos.operations.record,day='cost-'+tag,cost=digest(`ai-photo:provider-cost-milli:${day}`),seen=[];
+ const user=await makeCreator('aicost_'+tag),id=await media(user),set=value=>db.authRateBucket.update({where:{id:cost},data:{count:value}}),alerts=()=>seen.filter(t=>t.startsWith('ai-photo.cost'));
+ try{photos.costDay=()=>day;photos.operations.record=function(type,...rest){seen.push(type);return record.call(this,type,...rest);};
+  assert.equal(estimateMilliUsd(1),28,'one input $0.008 + one output $0.020');
+  reset();await photos.edit(user,base({sourceId:id}));assert.equal((await db.authRateBucket.findUnique({where:{id:cost}})).count,28);assert.deepEqual(alerts(),[]);
+  await set(30000-29);reset();await photos.edit(user,base({sourceId:id}));assert.deepEqual(alerts(),[],'below $30 no alert');
+  reset();await photos.edit(user,base({sourceId:id}));assert.deepEqual(alerts(),['ai-photo.cost_warning']);
+  reset();await photos.edit(user,base({sourceId:id}));assert.deepEqual(alerts(),['ai-photo.cost_warning'],'not repeated above $30');
+  await set(60000-1);reset();await photos.edit(user,base({sourceId:id}));assert.deepEqual(alerts(),['ai-photo.cost_warning','ai-photo.cost_critical']);
+  reset();await photos.edit(user,base({sourceId:id}));assert.deepEqual(alerts(),['ai-photo.cost_warning','ai-photo.cost_critical'],'not repeated above $60');
+  const warn=await db.platformOperationalEvent.findMany({where:{dedupe_key:`ai-photo.cost_warning:${day}`}}),crit=await db.platformOperationalEvent.findMany({where:{dedupe_key:`ai-photo.cost_critical:${day}`}});
+  assert.equal(warn.length,1);assert.equal(crit.length,1);assert.deepEqual([warn[0].data.thresholdUsd,crit[0].data.thresholdUsd,crit[0].data.estimatedUsd],[30,60,'60.03']);assert.equal(warn[0].ip,null);
+ }finally{photos.costDay=prev;photos.operations.record=record;}
 });
