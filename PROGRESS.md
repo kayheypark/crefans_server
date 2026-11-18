@@ -1,3 +1,11 @@
+## 2026-11-18 16:19 KST 운영 API 배포 nothrottle-20261118 — 랜딩 알림 같은 IP 제한 제거 + APP_ENV=prod
+- 통합: feat/landing-alert-no-throttle 3df35f8 → dev 50c7f31(Jenkins crefans-dev-deploy #55 SUCCESS, .last-success==50c7f31, deploy-logs/20261118-161602.log 실패 0) → prod 7b2ae6e(origin·github, HEAD==origin/prod).
+- API: crefans-api:nothrottle-20261118(FROM landingalert-20261118, revision 7b2ae6e, APP_RELEASE nothrottle-20261118; 이미지 안 funnel-stats.js·ts SHA-256이 prod 트리와 일치). 스크립트 crefans_server-nightfix/.local/release-nothrottle-20261118/(ship.log 16:17:09~16:21:48 KST exit 0): DB 덤프 → 새 마이그레이션 없음 → api·worker healthy → 배포 표식 2026-11-18T07:19:29Z(=16:19:29 KST).
+- 사용자 승인 설정 변경: runtime.env APP_ENV=beta → prod(텔레그램 '환경:' 줄·감사 환경 표시만; 코드 사용처 operations.service.ts·audit.ts 2곳). 스크립트가 배포 전 APP_ENV=beta 확인, .env·runtime.env는 API_IMAGE·APP_RELEASE·APP_ENV 외 동일 확인, api·worker printenv APP_ENV=prod·WELCOME_MAIL_ENABLED=true 확인. 다른 컨테이너 불변, 약관·정책 adult.1, 처리방침 posthog.1, 보호 경로 401/404, 컨테이너 안 landingAlertAllowed 없음.
+- 운영 실발송 확인: 16:20:20·16:20:23 KST 같은 맥북에서 POST https://crefans.com/api/v1/telemetry/funnel {landing_view, utmSource deploy_test2} 각 201 → outbox 5793718f…·87dd708c… funnel.landing_view 2건(ip·peer_ip null, 유입 'utm_source=deploy_test2', 오늘 16·17), delivered_at 16:20:23·16:20:25 KST(attempts 1, 오류 없음 = 텔레그램 API 수락). operationsAlertText(row, 컨테이너 APP_ENV) 결과 '환경: prod'. 실제 채팅 화면 수신은 사용자 확인 필요.
+- 복구본: /Users/ethan/crefans-recovery/20261118/nothrottle-20261118-api(api-prev landingalert-20261118·settings-prev(.env·APP_ENV=beta인 runtime.env)·DB 덤프, SHA256SUMS OK·이미지 ID 대조). 서버 /opt/crefans-backup-nothrottle-20261118·/tmp 사본·이전 태그 삭제.
+- 미처리: 서버의 이전 작업분 /opt/crefans-backup-admin-admin-today-20261118·/opt/crefans-backup-cancel-now-20261106·이미지 crefans-api:search-preview-20261111 남음(이번 작업 아님), 복구 저장소 이미지 묶음 구성요소별 3개 초과 — 삭제는 후보 목록 승인 후.
+
 ## 2026-11-18 랜딩 방문 알림 같은 IP 제한 제거 (feat/landing-alert-no-throttle)
 - 사용자 지시(16:09 KST) "같은 아이피알림도 계속 알려줘" + "둘다 진행 배포"(운영 배포 승인).
 - 변경: funnel-stats.ts — 접속 IP당 30분 1회 제한(landingAlertAllowed·salt·메모리 Map) 제거, landingVisitAlert의 ip 인자 제거. 유지: KST 하루 100건 후 `funnel.landing_cap` 1회, 봇·빈 UA 제외, IP 없는 내용(omitIp). 프론트는 그대로 탭(세션)당 1회 전송. openapi-contract·docs/platform-api.md 문구 갱신.
