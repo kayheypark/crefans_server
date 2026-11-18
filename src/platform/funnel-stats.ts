@@ -43,9 +43,18 @@ export function funnelRateLimit(ip:string|undefined,now=Date.now()){
 
 // 2026-11-18 user decision (랜딩 방문 텔레그램 알림): landing_view may also carry the external referrer host and utm_source.
 // Anything that fails the pattern is silently dropped (the count still happens); other fields stay a 400.
-const OPTIONAL_FIELDS=new Set(['referrerHost','utmSource']),HOST=/^[a-z0-9.-]{1,253}$/,UTM=/^[A-Za-z0-9_.-]{1,40}$/;
-export function landingSource(input:any){
- return{referrerHost:typeof input?.referrerHost==='string'&&HOST.test(input.referrerHost)?input.referrerHost:undefined,utmSource:typeof input?.utmSource==='string'&&UTM.test(input.utmSource)?input.utmSource:undefined};
+// 2026-11-18 user decision (당근 캠페인): utmMedium and utmCampaign follow the same rule so the alert shows the campaign.
+const OPTIONAL_FIELDS=new Set(['referrerHost','utmSource','utmMedium','utmCampaign']),HOST=/^[a-z0-9.-]{1,253}$/,UTM=/^[A-Za-z0-9_.-]{1,40}$/;
+type LandingSource={referrerHost?:string;utmSource?:string;utmMedium?:string;utmCampaign?:string};
+const utm=(value:unknown)=>typeof value==='string'&&UTM.test(value)?value:undefined;
+export function landingSource(input:any):LandingSource{
+ return{referrerHost:typeof input?.referrerHost==='string'&&HOST.test(input.referrerHost)?input.referrerHost:undefined,utmSource:utm(input?.utmSource),utmMedium:utm(input?.utmMedium),utmCampaign:utm(input?.utmCampaign)};
+}
+// Readable names for the sources the operator uses in links (2026-11-18). Unknown sources show the raw value only.
+const SOURCE_NAMES:Record<string,string>={daangn:'당근',x:'X',instagram:'인스타그램'};
+export function landingFrom(source:LandingSource){
+ const name=source.utmSource?SOURCE_NAMES[source.utmSource.toLowerCase()]:undefined;
+ return[name,source.referrerHost,...(['utmSource','utmMedium','utmCampaign'] as const).map(key=>source[key]?`utm_${key.slice(3).toLowerCase()}=${source[key]}`:undefined)].filter(Boolean).join(' · ')||'직접 방문 또는 알 수 없음';
 }
 
 // Alert limits (2026-11-18 user decision "같은 아이피알림도 계속 알려줘": no per-IP quiet window):
@@ -62,14 +71,14 @@ export const isDeployTest=(source:{utmSource?:string})=>/^deploy_test/i.test(sou
 
 /** Queues the immediate 랜딩 방문 alert. Never throws; the caller does not await it.
  * 2026-11-18 user decision: the alert carries the trusted client IP (privacy policy 9조 Telegram 접속 IP), so the row keeps it. */
-export async function landingVisitAlert(db:any,operations:{record:Function},source:{referrerHost?:string;utmSource?:string},userAgent:unknown,now=new Date()){
+export async function landingVisitAlert(db:any,operations:{record:Function},source:LandingSource,userAgent:unknown,now=new Date()){
  try{
   if(isBotAgent(userAgent))return'skipped';
   const day=kstDay(now),start=new Date(+day-9*3600000),test=isDeployTest(source);
   const sent=await db.platformOperationalEvent.count({where:{type:'funnel.landing_view',created_at:{gte:start}}});
   if(!test&&sent>=ALERT_DAILY_CAP){await operations.record('funnel.landing_cap',{limit:ALERT_DAILY_CAP},`funnel.landing_cap:${day.toISOString().slice(0,10)}`,{omitIp:true});return'capped';}
   const today=(await db.funnelStepDaily.findUnique({where:{day_step:{day,step:'landing_view'}}}))?.count||0;
-  const from=[source.referrerHost,source.utmSource?`utm_source=${source.utmSource}`:undefined].filter(Boolean).join(' · ')||'직접 방문 또는 알 수 없음';
+  const from=landingFrom(source);
   await operations.record(test?'funnel.landing_test':'funnel.landing_view',{...(test?{'사유':'배포 후 테스트'}:{}),'방문 시각(KST)':kstTime(now),'랜딩':'AI 사진 랜딩','유입':from,'기기':device(String(userAgent)),'오늘 랜딩 방문':today});
   return'queued';
  }catch{console.error(JSON.stringify({event:'funnel.landing_alert_failed'}));return'failed';}
