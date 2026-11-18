@@ -794,3 +794,12 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 - 남용 방지: 같은 접속 IP도 방문마다 알림(2026-11-18 사용자 지시 "같은 아이피알림도 계속 알려줘"로 IP당 30분 1회 제한 제거), KST 하루 100건. 100건이 넘으면 `funnel.landing_cap`(오늘 랜딩 알림 상한 도달) 1회만 보내고 이후는 집계만. 봇·자동화 User-Agent(빈 값, bot·crawl·headless·curl 등)는 알림 제외(집계는 함).
 - 검증: `tests/platform-funnel.test.cjs` 랜딩 알림 3개 테스트(격리 e2e DB).
 
+
+## 게임·애니메이션 의상 AI 사진 상업적 이용 제한 (2026-11-18)
+- 사용자 결정(2026-11-18): 게임·애니메이션 의상은 저작권 문제가 있을 수 있어 상업적 이용 불가. 기본(general) 외 카탈로그 의상(니케·오버워치·디아블로·진격의 거인·귀멸의 칼날·주술회전·원신·블루 아카이브)으로 만든 사진이 들어간 게시물은 게시물 콩 후원과 멤버십 전용(상품 accessPlanId·최소 레벨 accessLevel)을 쓸 수 없다. 프로필 후원은 영향 없음. 이미 받은 후원은 그대로 둔다(환불·회수 없음).
+- 기록: `POST /studio/ai-photo/edit`·`/guest/ai-photo/edit`가 서버 검증 costumeIds(`costumeCategory`, src/platform/ai-photo-costume-references.ts)로 결과 미디어 metadata에 `aiFranchiseCostume:true`·`aiCostumeCategory`(선택 순서상 첫 게임·애니 카테고리)를 넣는다. 원본(sourceId)이나 보관함 참조가 이미 표시된 사진이면 이어받고, 자르기·게시 워터마크 사본도 복사한다. 응답 이미지에 `franchiseCostume:true`.
+- 판정: 게시물의 삭제되지 않은 첨부 미디어 중 하나라도 표시가 있으면 제한(`src/platform/franchise-costume.ts`). 비회원 체험 글을 계정으로 옮겨도 미디어 metadata가 그대로라 동일하다.
+- 강제: 게시물 후원(`POST /creators/{id}/tips` + postId) → 403 `POST_COMMERCIAL_RESTRICTED` "게임·애니메이션 의상을 사용한 게시물은 저작권 문제로 후원을 받을 수 없어요." / 게시물 저장(`POST /studio/content`)에서 결과가 상품·레벨 지정이면(수정 시 accessLevel 생략으로 기존 레벨이 유지되는 경우 포함) 400 `FRANCHISE_COSTUME_PUBLIC_ONLY` "게임·애니메이션 의상을 사용한 게시물은 전체 공개로만 올릴 수 있어요."
+- 응답: Post `commercialRestricted`(제한이면 `tipsEnabled`도 false), 미디어 `franchiseCostume:true`, 스튜디오 콘텐츠 `commercialRestricted`.
+- 이전 생성분 보정: `node dist/src/platform/franchise-costume.js`(건수만) / `--apply`(metadata 두 키만 추가, 이미 있는 행은 건드리지 않아 반복 실행해도 같음). 근거는 30일 암호화 AI 요청 기록(2026-11-16부터 성공 요청의 costumeIds·결과 미디어 ID)과 표시된 사진에서 만든 사진(aiSourceId·croppedFrom·watermark.sourceId)뿐이며, 근거가 없는 AI 사진은 '알 수 없음'으로 세고 막지 않는다. 기존 비공개(상품·레벨) 게시물은 바꾸지 않고 게시물 ID·크리에이터 핸들·작성일만 출력한다.
+- 한계: 결과 사진을 내려받아 일반 업로드로 다시 올리면 표시가 없다(파일 내용 판별 안 함).
