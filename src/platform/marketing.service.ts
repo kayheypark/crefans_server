@@ -6,15 +6,18 @@ import {MemberMailService} from '../auth/local/member-mail.service';
 import {LegalDocumentsService} from './legal-documents';
 import {appendAudit} from './audit';
 import {reject,text} from './http';
+import {grantMarketingReward} from './marketing-reward';
 
-export async function recordMarketingChoice(tx:any,member:string,enabled:boolean,source:string,document:any,now=new Date()){
+// reward: the caller passes marketingRewardOn(config); only a member's first ever consent can receive it (marketing-reward.ts).
+export async function recordMarketingChoice(tx:any,member:string,enabled:boolean,source:string,document:any,now=new Date(),reward=false):Promise<{reward:{beans:number;expiresAt:string}|null}>{
  const before=await tx.accountPreference.findUnique({where:{member_id:member}});
- if(before?.marketing_alert===enabled&&(!enabled||before.marketing_consent_id))return;
+ if(before?.marketing_alert===enabled&&(!enabled||before.marketing_consent_id))return{reward:null};
  const event=await tx.memberConsent.create({data:{member_id:member,kind:enabled?'marketing':'marketing-withdrawn',accepted_at:now,document_id:document?.version||null,document_snapshot:{source,enabled,...(enabled?{document}:{}),at:now.toISOString()}}});
  await tx.accountPreference.upsert({where:{member_id:member},create:{member_id:member,marketing_alert:enabled,marketing_consent_id:enabled?event.id:null},update:{marketing_alert:enabled,marketing_consent_id:enabled?event.id:null}});
  if(!enabled)await tx.marketingDelivery.updateMany({where:{member_id:member,kind:'campaign',status:'queued'},data:{status:'suppressed',completed_at:now}});
  await tx.marketingDelivery.create({data:{member_id:member,kind:'choice',dedupe_key:`choice:${event.id}`,subject:'광고 메일 수신 설정 처리 결과',body:`좋아하는일해야지(크레팬스)\n요청일: ${now.toISOString()}\n광고 메일 ${enabled?'수신 동의':'수신거부'}를 처리했습니다.`}});
  await appendAudit(tx,{category:'auth',action:'marketing.preference_changed',entityId:event.id,data:{memberId:member,source,before:{marketing_alert:before?.marketing_alert??false},after:{marketing_alert:enabled}}});
+ return{reward:enabled&&reward?await grantMarketingReward(tx,member,event.id,now):null};
 }
 const twoYearsAfter=(value:Date)=>{const date=new Date(value);date.setUTCFullYear(date.getUTCFullYear()+2);return date;};
 @Injectable()

@@ -12,7 +12,8 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog(new Date('2026-11-16T12:00:00+09:00')).documents.policy]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-06');assert.equal(d.effectiveAt,'2026-11-06');assert.doesNotMatch(d.version,/draft/);}
  // 2026-11-13: the partner revision of article 6 (only partners withdraw) is in force from its deploy day.
  {const d=source.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-13');assert.equal(d.effectiveAt,'2026-11-13');assert.equal(d.version,'2026-11-13.partner.1');}
- for(const d of [source.catalog().collection,source.catalog().marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
+ // 2026-11-18: the advertising consent was revised (reward disclosure); before that day it is the 2026-10-30 release.
+ for(const d of [source.catalog().collection,source.catalog(new Date('2026-11-17T23:59:00+09:00')).marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
  const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-18');assert.equal(p.effectiveAt,'2026-11-18');assert.equal(p.version,'2026-11-18.posthog.1');assert.match(JSON.stringify(p),/16\. 대표 기능: AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
@@ -291,4 +292,16 @@ test('2026-11-18 posthog.1: privacy 7-10 disclose PostHog analytics and replay; 
  // Everything else is the phone.3 text unchanged.
  const current=legal.catalog(new Date('2026-11-17T12:00:00+09:00')).documents.privacy;
  for(const s of current.sections.filter(s=>!/^(7|8|9|10)\. /.test(s.title)))assert.deepEqual(d.sections.find(x=>x.title===s.title),s);
+});
+
+test('2026-11-18 reward.1: advertising consent names the sender and the first-consent reward; refusal loses only the reward',()=>{
+ const legal=new LegalDocumentsService(),before=legal.catalog(new Date('2026-11-17T23:59:00+09:00')).marketing,d=legal.catalog(new Date('2026-11-18T00:00:00+09:00')).marketing;
+ assert.equal(before.version,'2026-10-30.3');assert.equal(before.title,'마케팅 정보 수신 동의');
+ assert.equal(d.version,'2026-11-18.reward.1');assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-18');assert.equal(d.effectiveAt,'2026-11-18');
+ // KISA guide (7th revision): the consent must read as 광고성 정보 수신동의, not '마케팅 동의'.
+ assert.equal(d.title,'광고성 정보 수신 동의');const body=JSON.stringify(d.sections);
+ for(const phrase of ['좋아하는일해야지(크레팬스)','광고성 정보를 이메일로','프로모션 콩 10개','30일','처음 한 번','이 혜택을 받을 수 없을 뿐 그 밖의 불이익은 없습니다','회수하지 않으며','추가로 드리지 않습니다','출금·환불되지 않으며'])assert.ok(body.includes(phrase),phrase);
+ assert.deepEqual(d.sections[2],before.sections[1],'withdrawal/retention section unchanged');
+ const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:[0-9a-f]{64}$/);
+ const now=legal.catalog(new Date('2026-11-18T00:00:00+09:00')),prior=legal.catalog(new Date('2026-11-17T23:59:00+09:00'));assert.deepEqual(now.documents.terms,prior.documents.terms);assert.deepEqual(now.documents.policy,prior.documents.policy);assert.equal(now.documents.privacy.version,'2026-11-18.posthog.1');assert.deepEqual(now.collection,prior.collection);
 });

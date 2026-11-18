@@ -398,12 +398,26 @@ export const POSTHOG_PRIVACY:LegalDocument={...phoneStorePrivacy,version:'2026-1
   if(sec.title.startsWith('10. '))return{...sec,body:sec.body+'\n'+POSTHOG_COOKIE};
   return sec;})};
 const posthogCatalog:LegalCatalog={...adultCatalog,documents:{...adultCatalog.documents,privacy:POSTHOG_PRIVACY}};
+// 2026-11-18 advertising-consent reward (promotion beans 10, first consent per account). Sources (확인일 2026-11-18): KISA·방송미디어통신위원회
+// 「불법스팸 방지를 위한 정보통신망법 안내서」 7차 개정(KISA-GD-2025-0037, https://www.kisa.or.kr/2060301/form?postSeq=19) II-1-바: the consent must read as
+// "광고성 정보 수신동의" ('마케팅 동의' wording is not explicit consent), name the sender and content, never be pre-checked;
+// 개인정보 보호법 제15조제2항제4호(refusal right and any disadvantage of refusing) and 제22조제5항(no service refusal), law.go.kr 시행 2026-09-11.
+// No source found that forbids a benefit for consenting; the lost benefit is disclosed as the only disadvantage of refusing.
+export const MARKETING_REWARD_DATE='2026-11-18';
+export const MARKETING_REWARD_CONSENT:LegalDocument={...marketing,title:'광고성 정보 수신 동의',version:'2026-11-18.reward.1',updatedAt:MARKETING_REWARD_DATE,publishedAt:MARKETING_REWARD_DATE,effectiveAt:MARKETING_REWARD_DATE,status:'published',
+ notice:'2026-11-18 개정: 제목을 광고성 정보 수신 동의로 바꾸고 전송자·전송 매체, 처음 동의할 때의 혜택(프로모션 콩 10개)과 거부 시 불이익을 적었습니다.',
+ sections:[
+  {title:'선택 동의',body:'좋아하는일해야지(크레팬스)가 서비스 소식·이벤트·프로모션 등 광고성 정보를 이메일로 보내기 위해 이메일 주소, 닉네임과 수신 동의 이력을 이용합니다. 동의하면 이후 광고성 정보를 이메일로 받습니다. 동의하지 않아도 회원가입과 필수 서비스 이용에 영향을 주지 않습니다. 개인정보 보호법 제15조제1항제1호에 따른 선택 동의이며, 필수 계정·보안·결제 안내와 구분합니다.'},
+  {title:'처음 동의할 때의 혜택',body:'콩 기능을 제공하는 동안 계정마다 처음 한 번 이 동의를 하면 프로모션 콩 10개를 바로 넣어 드립니다. 받은 때부터 30일 동안 후원에 쓸 수 있고 출금·환불되지 않으며, 기간이 지나면 남은 콩은 소멸합니다. 이전에 동의한 적이 있는 계정은 받을 수 없습니다. 동의하지 않으면 이 혜택을 받을 수 없을 뿐 그 밖의 불이익은 없습니다. 나중에 동의를 철회해도 받은 콩은 회수하지 않으며, 다시 동의해도 추가로 드리지 않습니다.'},
+  marketing.sections[1],
+ ]};
+const rewardCatalog:LegalCatalog={...posthogCatalog,marketing:MARKETING_REWARD_CONSENT};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)
