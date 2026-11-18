@@ -5,6 +5,12 @@
 - 검증(로컬 3307 격리 crefans_platform_e2e, CREFANS_E2E=true, 순차, 2026-11-18 18:35~18:40 KST): tsc 0, build 0, test:openapi 14/14, platform-funnel 11/11(테스트 앱에 main.ts와 같은 보안 미들웨어·TRUSTED_PROXY_IPS=127.0.0.1을 넣어 헤더 IP가 행·알림에 들어감 확인), test:operations 62/62.
 - 대조: funnel-stats.ts·operations.service.ts만 origin/prod로 되돌려 빌드 → funnel 7·8·10·11 실패(4건), 원복 후 11/11.
 
+## 2026-11-18 운영정책 2026-11-18.franchise.1 — 제3자 작품 모티프 의상 AI 사진 이용 제한 조항 (feat/policy-franchise-costume)
+- 사용자 승인(2026-11-18 "추천안으로 해", 운영 반영 포함): 시행일 2026-11-18(코드가 이미 같은 날 제한 시행), 문구 '제3자의 작품을 모티프로 한 의상으로, 상업적 이용 권한이 확보되지 않은 의상', ④ 신고 기반 판정 포함.
+- 변경: `legal-documents.ts` FRANCHISE_POLICY(adultPolicy + 3번째 절 '제3자 작품 모티프 의상을 사용한 AI 사진의 이용 제한' ①~⑥, publishedAt·effectiveAt·updatedAt 2026-11-18, notice 갱신), catalog()가 2026-11-18(KST)부터 franchiseCatalog(rewardCatalog 기반: 약관 adult.1·개인정보 posthog.1·광고성 동의 reward.1·수집안내 그대로). 이전 날은 adult.1.
+- 테스트: platform-legal 새 테스트(11-17 23:59 adult.1·11-18 00:00/12:00·2027 franchise.1, 기존 2절 불변, 문구, 다른 문서·signup 버전 불변), 기존 posthog/reward 테스트의 '정책 불변' 단언을 약관 불변·정책 앞 2절 불변으로 조정.
+- 검증(로컬, CREFANS_E2E=true, .local/platform.env→3307 격리): tsc 0, build 0, platform-legal 34/34, test:openapi 14/14, marketing-reward·signup-mode·beta-policy·auth·franchise-costume 33/0fail. 대조: catalog 분기 제거→posthog·franchise 테스트 2건 실패, 새 절 제거→franchise 테스트 실패(원복 후 34/34).
+
 ## 2026-11-18 게임·애니메이션 의상 AI 사진 상업적 이용 제한 (feat/franchise-costume-commercial-block)
 - 사용자 결정(2026-11-18): "의상들은 저작권 이슈가 있을 수 있어 상업적 이용이 안 되므로, 기본옷이 아닌 애니메이션·게임 의상을 이용한 게시글은 후원받으면 안 된다." 범위: 게시물 콩 후원 차단 + 멤버십 전용(상품·레벨) 금지(전체 공개만). 기존 게시물 즉시 적용, 받은 후원은 그대로(환불·회수 없음). 기존 비공개 게시물은 자동 변경 없이 목록만 보고. 운영 배포 승인(dev 검증 후).
 - 변경: `ai-photo-costume-references.ts` costumeCategory·franchiseCostumeMeta(general 8개 외 = 게임·애니; 서버 353개 ID·카테고리가 프론트 카탈로그와 일치 확인), `ai-photo.ts` 결과 metadata `aiFranchiseCostume:true`·`aiCostumeCategory`(원본·보관함 참조가 표시된 사진이면 이어받음, 응답 `franchiseCostume:true`), `media-watermark.ts` 워터마크 사본에 복사, 신규 `franchise-costume.ts`(판정·403 POST_COMMERCIAL_RESTRICTED·400 FRANCHISE_COSTUME_PUBLIC_ONLY·보정 스크립트·비공개 게시물 목록), `beans.service.ts` 게시물 후원 검사, `studio.service.ts` 저장 트랜잭션 검사(수정 시 기존 레벨 유지 포함), `service.ts` Post `commercialRestricted`(제한이면 tipsEnabled false)·미디어 플래그, 스튜디오 콘텐츠 `commercialRestricted`. openapi-contract·docs/platform-api.md 갱신.
