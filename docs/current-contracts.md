@@ -292,6 +292,7 @@
 | POST | `/api/v1/subscriptions/:id/resume` | `src/platform/finance.controller.ts::resume` |
 | POST | `/api/v1/telemetry/browser-errors` | `src/platform/telemetry.controller.ts::report` |
 | POST | `/api/v1/telemetry/funnel` | `src/platform/telemetry.controller.ts::funnel` |
+| POST | `/api/v1/telemetry/share` | `src/platform/telemetry.controller.ts::share` |
 
 GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator 목록에 추가하지 않는다. 바이너리 미디어 예외와 권한 의미는 [API 계약](./platform-api.md)을 따른다.
 
