@@ -4,6 +4,7 @@ import {LocalMemberService} from '../auth/local/local-member.service';
 import {PlatformOptionalAuthGuard} from './platform-auth.guard';
 import {reportClientError} from './client-errors';
 import {reportFunnelStep} from './funnel-stats';
+import {reportShare} from './share-alert';
 import {PlatformOperationsService} from './operations.service';
 @Controller('telemetry') @UseGuards(PlatformOptionalAuthGuard)
 export class PlatformTelemetryController{
@@ -12,4 +13,6 @@ export class PlatformTelemetryController{
  // 2026-11-18: allow-listed funnel view steps only (aggregate count, nothing about the visitor is stored).
  // 2026-11-18: an accepted landing_view also queues the 랜딩 방문 Telegram alert (not awaited; the user agent is read, never stored).
  @Post('funnel') funnel(@Body() body:any,@Headers('user-agent') userAgent?:string){return reportFunnelStep(this.db,body,{operations:this.operations,userAgent});}
+ // 2026-11-19: every share button press → immediate 공유 Telegram alert (allow-listed labels only).
+ @Post('share') share(@Body() body:any,@Headers('user-agent') userAgent?:string){return reportShare(this.db,this.operations,body,userAgent);}
 }
