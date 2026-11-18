@@ -22,9 +22,9 @@ const labels:Record<string,string>={'creator.partner_requested':'파트너 계�
  'media.watermark_failed':'워터마크 변환 실패 건 남아 있음','media.watermark_stuck':'워터마크 변환 멈춤','media.watermark_skipped':'워터마크 건너뜀(핸들 형식 확인 필요)','media.transcode_stuck':'아이폰 영상 변환 30분 넘게 대기','media.transcode_failed':'아이폰 영상 변환 실패(최근 1시간)',
  'audit.retention_lagging':'요청 감사 로그 보관기한 파기 지연','alerts.backlog':'운영 알림 15분 넘게 미전송','worker.stalled':'배치 15분 넘게 멈춤 — 프로세스 재시작',
  'admin.inquiry_replied':'운영자 문의 답변','admin.report_resolved':'운영자 신고 처리','admin.document_saved':'운영자 공지·FAQ 저장','operations.daily_digest':'운영 일일 요약',
- 'funnel.landing_view':'랜딩 방문','funnel.landing_test':'랜딩 방문','funnel.landing_cap':'오늘 랜딩 알림 상한 도달(100건) — 오늘 남은 방문은 집계만 하고 알림 안 보냄',
+ 'funnel.landing_view':'랜딩 방문','share.clicked':'공유 버튼','share.cap':'오늘 공유 알림 상한 도달(200건) — 오늘 남은 공유는 알림 안 보냄','funnel.landing_test':'랜딩 방문','funnel.landing_cap':'오늘 랜딩 알림 상한 도달(100건) — 오늘 남은 방문은 집계만 하고 알림 안 보냄',
 };
-const allowed=new Set(['limit','calls','estimatedUsd','thresholdUsd','ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','mode','style','kinds','presets','references','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각','방문 시각(KST)','랜딩','유입','기기','오늘 랜딩 방문','사유']);
+const allowed=new Set(['limit','calls','estimatedUsd','thresholdUsd','ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','mode','style','kinds','presets','references','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각','방문 시각(KST)','랜딩','유입','기기','오늘 랜딩 방문','사유','시각(KST)','위치','방식','결과','게시물','오늘 공유']);
 function metadata(data:Record<string,unknown>){
  const result:Record<string,any>={};
  for(const [key,value] of Object.entries(data)){
@@ -41,11 +41,12 @@ function metadata(data:Record<string,unknown>){
  * Operators find the raw value through 기록 ID in the console log. */
 // 2026-11-18 user decision: bank transfer alerts (bank_transfer.*) do not carry the buyer's IP either; the console log keeps it.
 // 2026-11-18 랜딩 방문 알림 상한 알림은 IP 없음. 방문 알림 자체는 같은 날 사용자 지시로 접속 IP 포함(아래 LANDING_TYPES).
-const NO_IP_TYPES=new Set(['ai-photo.succeeded','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical','funnel.landing_cap']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
+const NO_IP_TYPES=new Set(['share.cap','ai-photo.succeeded','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical','funnel.landing_cap']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
 // 2026-11-18 user decision: landing alerts show only the trusted client IP, marked (집) when it is in OWNER_HOME_IPS (comma-separated).
 // 2026-11-18 user decision ("이미지 생성 실패 모두 아이피를 텔레그램으로"): every ai-photo.failed shows the client IP the same way
 // (privacy policy 9조: 운영 오류 알림에 접속 IP 포함). Success and cost alerts still carry none.
-const CLIENT_IP_TYPES=new Set(['funnel.landing_view','funnel.landing_test','ai-photo.failed']);
+// 2026-11-19: 공유 버튼 알림도 랜딩 알림처럼 접속 IP만 표시한다(같은 방문자를 랜딩 알림과 맞춰 보기 위해).
+const CLIENT_IP_TYPES=new Set(['funnel.landing_view','funnel.landing_test','ai-photo.failed','share.clicked']);
 const KIND_LABELS:Record<string,string>={bean:'콩 충전','ai-shop':'AI 이용권',ad:'광고상품'};
 export function operationsAlertText(row:{type:string;ip:string|null;peer_ip:string|null;created_at:Date;id:string;request_id:string|null;data:unknown},env:string,secret?:string,homeIps=''){
  const hidden=(value:unknown)=>secret?'h:'+createHmac('sha256',secret).update(`operations-alert:${String(value)}`).digest('hex').slice(0,12):'(숨김)';
