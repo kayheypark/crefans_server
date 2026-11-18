@@ -25,7 +25,8 @@ test('expiry notice uses the supplied deadline instead of a fixed lifetime',()=>
 });
 test('event bean expiry notice names event beans and does not offer a refund',()=>{
  const m=noticeMail('event-bean-expiry',[['콩','100개 (이벤트 프로모션콩)'],['사용기한','2026. 12. 3. 오후 2:15']],'https://crefans.com/service/beans','사용기한이 지나면 남은 이벤트 콩은 소멸합니다.');
- assert.match(m.subject,/이벤트 콩 사용기한/);
+ assert.match(m.subject,/프로모션 콩 사용기한/);// 2026-11-18: the same kind also covers the advertising-consent reward lot
+
  for(const body of [m.html,m.text]){assert.match(body,/이벤트 프로모션콩/);assert.match(body,/2026\. 12\. 3\./);assert.doesNotMatch(body,/환불을 신청/);assert.doesNotMatch(body,/5년/);}
 });
 // 2026-11-07 user decision: the membership payment mail is a written contract notice (전자상거래법 시행규칙 제11조의2),
