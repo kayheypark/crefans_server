@@ -1,3 +1,7 @@
+## 2026-11-18 14:4x KST dev 통합 — feat/posthog-policy (처리방침 2026-11-18.posthog.1)
+- 사용자 승인(2026-11-18) 직접 통합. origin/dev 311af28에서 분리 HEAD 작업 트리(crefans_server-dev-posthog)로 --no-ff 병합(d04ee06). PROGRESS 충돌만(양쪽 절 모두 유지).
+- 검증(2026-11-18 14:45 KST, 로컬 3307 격리 crefans_platform_e2e, CREFANS_E2E=true, 순차): tsc --noEmit 0, build 0, test:openapi 14/14, platform-legal 32/32, auth·auth-hardening·signup-mode·signup-invites·signup-welcome 26/26. 프론트 docs:contracts(변경 없음)·docs:record·check:docs PASS(라우트 286).
+
 ## 2026-11-18 개인정보처리방침 2026-11-18.posthog.1 공개·시행 연결 (feat/posthog-policy)
 - 사용자 승인(2026-11-18): 현재 초안 문안 그대로, 국외 이전은 고지 방식(별도 동의 배너 없음). PostHog 프로젝트 'IP data capture = Discard' 설정은 사용자가 완료했다고 확인.
 - 변경: `POSTHOG_PRIVACY_DRAFT` → `POSTHOG_PRIVACY`(status published, publishedAt·effectiveAt·updatedAt '2026-11-18'), `posthogCatalog`를 catalog()의 첫 단계로 연결(KST 2026-11-18부터). 공지 끝에 '2026-11-18 개정: 7항·8항·9항·10항 — …' 추가. 약관·운영정책(adult.1)과 7~10항 외 조항 불변. 14항은 이전 개정들(11-03~11-17)과 같이 수정하지 않음(변경 이력은 notice에 누적).
