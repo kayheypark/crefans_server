@@ -1,3 +1,10 @@
+## 2026-11-18 알림 정책 조정 — 가입 즉시·AI 실패 전건·AI 성공 알림 (feat/alert-dedupe-digest, 미배포)
+- 사용자 결정(2026-11-18): member.signup은 즉시 발송 유지(요약 전용 목록에서 제외). ai-photo.failed는 중복 제거하지 않고 실패마다 발송(DEDUPE_TYPES에서 제외, http.error·worker.error는 시간당 1회 유지).
+- 신규: AI 사진 생성 성공마다 ai-photo.succeeded 즉시 알림('AI 사진 생성 성공', 초기 단계라 성공/실패 모두 알림). 내용: actor(member/guest), mode, style, kinds(편집 항목), presets(종류:키 — 의상·배경은 서버 검증 ID, 그 외는 프론트 카드 제목 presetKeys), references(참고 이미지 수: 의상·보관함·배경, 원본·가이드 제외), durationMs. 프롬프트·이미지·회원 ID·이메일·IP 없음(omitIp + NO_IP_TYPES, allow-list로 다른 키 제거). 알림 기록 실패는 생성 결과에 영향 없음. 예상 원가는 이 브랜치에 없음(feat/ai-cost-caps 병합 후 dev 통합 커밋에서 추가 여부 판단).
+- 구현: operations-alert-policy.ts(목록 2줄), operations.service.ts(라벨·allowed mode/style/kinds/presets/references·NO_IP_TYPES), ai-photo.ts(successAlert, trace.referenceImages), ai-photo-failures.ts(trace 타입).
+- 검증(2026-11-18 로컬 3307 crefans_platform_e2e, 텔레그램 스텁): tsc 0, build 0, platform-operations-alerts 7/7·guest-caption 7/7, platform-ai-photo 45/45(성공 1건 알림·실패 0건·IP/프롬프트/회원 ID 없음), test:operations 61 pass/1 skip/0 fail. 대조(dist 변형 후 원복): ai-photo.failed를 DEDUPE에 되돌림→새 테스트 실패, member.signup을 요약 목록에 되돌림→2건 실패, allowed에 prompt 추가→실패, NO_IP_TYPES에서 succeeded 제거→성공 알림 테스트 실패, successAlert 호출 제거→실패. 원복 후 7/7.
+- 아래 11-18 기록 중 'ai-photo.failed 중복 제거', 'member.signup 요약 전용' 부분은 이 조정으로 대체됨.
+
 ## 2026-11-18 운영 텔레그램 알림 소음 줄이기 — 중복 제거 + 하루 요약 (feat/alert-dedupe-digest, 미배포)
 - 사용자 결정(2026-11-18): 중복 제거 + 하루 요약. 근거 조사: 프론트 .local/night-work/2026-11-18-1016/notes-operator.md 2절.
 - 중복 제거: http.error·worker.error·ai-photo.failed는 같은 유형+job/route/method/status+errorType/errorCode/fingerprint(+stage/provider/actor)가 1시간에 1번만 발송. 나머지는 outbox·감사 원장에 그대로 저장하되 delivered_at+last_error_code=SUPPRESSED_DUPLICATE(콘솔 로그 '텔레그램' 줄에 표시). 다음 발송 알림에 "반복: 직전 알림(시각 KST) 이후 N회 더 발생" 줄. 잠금은 platform_jobs `alert-dedupe:<type>:<sha256 32자>`(FOR UPDATE, 회원 식별자·IP 미포함, 30일 뒤 정리). process.error·worker.stale/stalled·watchdog 백로그는 대상 아님.

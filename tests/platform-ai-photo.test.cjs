@@ -500,6 +500,27 @@ test('preset usage is counted per day and preset only after a successful generat
  }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;await db.aiPresetUsageDaily.deleteMany({where:{preset_key:key}});}
 });
 
+// 2026-11-18 user decision: every successful generation sends an immediate ai-photo.succeeded alert (categories and counts only).
+test('every successful generation queues one immediate success alert without prompt, member id, email or IP; failures do not',async()=>{
+ const {requestContext}=require('../dist/src/platform/request-context');
+ const saved={...photos.settings},previous=photos.fetcher,user=await makeCreator('aisuccess_'+tag),id=await media(user),ok=crypto.randomUUID(),bad=crypto.randomUUID();
+ const prompt='성공알림프롬프트표식 벚꽃 아래 포즈';
+ try{
+  Object.assign(photos.settings,{seedreamKey:'seedream-test-key'});const request=base({sourceId:id,mode:'cosplay',kind:'outfit',style:'cosplay',prompt,costumeIds:['80bdd0'],presetKeys:JSON.stringify([{kind:'pose',key:'의자에 앉기'}])});
+  photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response(JSON.stringify({error:{code:'InternalServiceError'}}),{status:500});
+  reset();await assert.rejects(requestContext.run({requestId:bad,ip:'203.0.113.7',peerIp:'10.0.0.7'},async()=>photos.edit(user,request,await mask())));
+  assert.equal(await db.platformOperationalEvent.count({where:{request_id:bad,type:'ai-photo.succeeded'}}),0,'a failure is not a success alert');
+  photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));
+  reset();await requestContext.run({requestId:ok,ip:'203.0.113.7',peerIp:'10.0.0.7'},async()=>photos.edit(user,request,await mask()));
+  const rows=await db.platformOperationalEvent.findMany({where:{request_id:ok,type:'ai-photo.succeeded'}});assert.equal(rows.length,1);const [row]=rows;
+  assert.equal(row.delivered_at,null,'queued for Telegram now (not deduped or digested)');assert.equal(row.last_error_code,null);assert.equal(row.ip,null);assert.equal(row.peer_ip,null);
+  assert.deepEqual(Object.keys(row.data).sort(),['actor','durationMs','kinds','mode','presets','references','style']);
+  assert.deepEqual({...row.data,durationMs:0},{actor:'member',mode:'cosplay',style:'cosplay',kinds:'outfit',presets:'outfit:80bdd0, pose:의자에 앉기',references:1,durationMs:0});
+  const text=require('../dist/src/platform/operations.service').operationsAlertText(row,'synthetic','secret');assert.match(text,/^\[crefans\] AI 사진 생성 성공/);assert.match(text,/접속 IP: 보내지 않음/);
+  assert.doesNotMatch(JSON.stringify(row)+text,new RegExp(['성공알림프롬프트표식','@','203\\.0\\.113','10\\.0\\.0\\.7',user,'aisuccess_','base64'].join('|')));
+ }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;await db.platformOperationalEvent.deleteMany({where:{request_id:{in:[ok,bad]}}});}
+});
+
 // 2026-11-17 user decision: operators reset every signed-out visitor's AI tries at once (guest quota epoch).
 test('console reset gives every visitor a fresh 10 tries and keeps the guests daily budget',async()=>{
  const {resetGuestAiQuota,guestAiQuotaStatus}=require('../dist/src/platform/ai-photo-grants'),{GUEST_QUOTA_EPOCH_SETTING}=require('../dist/src/platform/guest-policy');

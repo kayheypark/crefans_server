@@ -59,6 +59,21 @@ test('money, bank transfer, order, payout, security and AI cost alerts are never
  const sent=await drain();assert.equal(sent.length,pending);assert.ok(!sent.some(t=>t.includes('콘텐츠 등록')));
 });
 
+// 2026-11-18 user decision (revised): signups stay immediate and every AI photo failure is sent, even when identical.
+test('ai-photo.failed is never deduped: ten identical failures send ten alerts; member.signup is sent immediately',async()=>{
+ const before=[...ids];for(const id of before)ids.delete(id);
+ assert.ok(!policy.DEDUPE_TYPES.has('ai-photo.failed')&&!policy.DIGEST_TYPES.has('ai-photo.failed'));assert.ok(!policy.DIGEST_TYPES.has('member.signup')&&!policy.DEDUPE_TYPES.has('member.signup'));
+ assert.ok(!policy.DIGEST_TYPES.has('ai-photo.succeeded')&&!policy.DEDUPE_TYPES.has('ai-photo.succeeded'));
+ const data={errorCode:'SYNTH_'+scope.slice(0,8).toUpperCase(),status:502,stage:'generation',provider:'seedream',errorType:'none',actor:'member',durationMs:10};
+ for(let i=0;i<10;i++){const row=track(await ops.record('ai-photo.failed',data,undefined,{omitIp:true}));assert.equal(row.delivered_at,null);assert.equal(row.last_error_code,null);}
+ assert.equal(await db.platformJob.count({where:{id:policy.dedupeGroup('ai-photo.failed',data)}}),0,'no dedupe lock row');
+ const signup=track(await db.$transaction(tx=>enqueueOperation(tx,'member.signup',{memberId:scope})));assert.equal(signup.delivered_at,null);assert.equal(signup.last_error_code,null);
+ const success=track(await ops.record('ai-photo.succeeded',{actor:'guest',mode:'general',style:'photo',kinds:'pose',presets:'없음',references:0,durationMs:5,prompt:'x',email:'a@b.c',memberId:scope},undefined,{omitIp:true}));
+ assert.equal(success.delivered_at,null);assert.deepEqual(Object.keys(success.data).sort(),['actor','durationMs','kinds','mode','presets','references','style'],'prompt, email and member id are dropped by the allow-list');
+ const sent=await drain();assert.equal(sent.length,12);assert.equal(sent.filter(t=>t.startsWith('[crefans] AI 사진 편집 실패')).length,10);assert.ok(!sent.some(t=>/반복/.test(t)));
+ assert.equal(sent.filter(t=>t.startsWith('[crefans] 회원가입')).length,1);assert.doesNotMatch(sent.find(t=>t.startsWith('[crefans] 회원가입')),new RegExp(scope),'member id leaves only as a keyed hash');
+});
+
 test('daily digest: one message at 09:00 KST for the previous 24h with correct counts, never twice',async()=>{
  const clock='worker-operations-digest',saved=await db.platformJob.findUnique({where:{id:clock}});
  const slot=new Date('2001-02-03T00:00:00Z'),inside=m=>new Date(+slot-m*60000);// 2001: no other rows in this window
@@ -79,7 +94,7 @@ test('daily digest: one message at 09:00 KST for the previous 24h with correct c
   assert.equal(await policy.runDailyDigest(db,new Date(+slot+90000)),undefined,'same slot: no second digest');
   assert.equal(await db.platformOperationalEvent.count({where:{type:'operations.daily_digest',dedupe_key:`operations-digest:${slot.toISOString()}`}}),1);
   const text=policy.digestText(first,'synthetic',{'worker.hourly':'배치 1시간 요약','member.signup':'회원가입','worker.error':'배치 오류','bank_transfer.opened':'무통장 입금 대기 주문 접수 (콘솔)','operations.daily_digest':'운영 일일 요약'});
-  assert.match(text,/^\[crefans\] 운영 일일 요약/);assert.match(text,/기간: 2001-02-02 09:00 ~ 2001-02-03 09:00 \(KST\)/);assert.match(text,/- 회원가입 \*: 2건/);assert.match(text,/- 무통장 입금 대기 주문 접수: 1건/);assert.match(text,/중복으로 생략된 오류 알림 \(총 4건\)/);assert.match(text,/- 배치 오류 syn-job X: 4회/);assert.match(text,/실행 2회 · 실패 포함 1회 · 처리 7건/);assert.doesNotMatch(text,/outside-window|after-slot/);
+  assert.match(text,/^\[crefans\] 운영 일일 요약/);assert.match(text,/기간: 2001-02-02 09:00 ~ 2001-02-03 09:00 \(KST\)/);assert.match(text,/- 배치 1시간 요약 \*: 3건/);assert.match(text,/- 회원가입: 2건/,'signup is an immediate alert, no digest-only mark');assert.match(text,/- 무통장 입금 대기 주문 접수: 1건/);assert.match(text,/중복으로 생략된 오류 알림 \(총 4건\)/);assert.match(text,/- 배치 오류 syn-job X: 4회/);assert.match(text,/실행 2회 · 실패 포함 1회 · 처리 7건/);assert.doesNotMatch(text,/outside-window|after-slot/);
   for(const id of[...ids])if(id!==first.id)ids.delete(id);const sent=await drain();assert.equal(sent.length,1);assert.match(sent[0],/^\[crefans\] 운영 일일 요약/);
   const next=track(await policy.runDailyDigest(db,new Date(+slot+86400000+5000)));assert.equal(next.dedupe_key,'operations-digest:2001-02-04T00:00:00.000Z','next day sends again');
  }finally{

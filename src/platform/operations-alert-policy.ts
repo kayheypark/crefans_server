@@ -3,9 +3,11 @@ import {auditOperation} from './audit';
 
 // 2026-11-18 user decision (중복 제거 + 하루 요약): informational events stay in the outbox/audit trail but are not sent one by one;
 // one 09:00 KST digest counts them. Money, security, bank transfer, order, deposit, payout and AI cost alerts are never listed here.
-export const DIGEST_TYPES=new Set(['worker.hourly','worker.completed','member.signup','content.created','content.updated','content.deleted','member.profile.updated','creator.profile.updated','admin.inquiry_replied','admin.report_resolved','admin.document_saved']);
+// 2026-11-18 user decision (revised): member.signup stays an immediate alert.
+export const DIGEST_TYPES=new Set(['worker.hourly','worker.completed','content.created','content.updated','content.deleted','member.profile.updated','creator.profile.updated','admin.inquiry_replied','admin.report_resolved','admin.document_saved']);
 // Same error (type + job/route + code/fingerprint) is sent at most once an hour; later occurrences are stored and counted.
-export const DEDUPE_TYPES=new Set(['http.error','worker.error','ai-photo.failed']);
+// 2026-11-18 user decision (revised): every ai-photo.failed is sent (not deduped) while the service is at an early stage.
+export const DEDUPE_TYPES=new Set(['http.error','worker.error']);
 export const DIGESTED='DIGESTED',SUPPRESSED='SUPPRESSED_DUPLICATE',DIGEST_TYPE='operations.daily_digest';
 const HOUR=3600000,DAY=86400000,KST=9*HOUR;
 
