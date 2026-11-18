@@ -1,3 +1,13 @@
+## 2026-11-18 22:30~23:35 KST AI 생성 실패 알림 접속 IP·utm_content·개발 서버 AI 키 — 운영 API failip-20261118, 프론트 utmcontent-20261118
+- 사용자 지시: "광고 3개" → utm_content(광고 구분)도 알림 표시, "이미지 생성 실패 모두 아이피를 텔레그램으로 받아볼 수 있게 하고 운영배포", "실제 키를 개발에도 넣어라", 개발 서버 즉시 배포("5분마다 감지 말고 요청하면 즉시").
+- utm_content: landingSource·landingFrom·openapi·프론트 funnel.ts에 utmContent(같은 패턴). 운영 확인: deploy_test 방문 utm_content=2 행·텔레그램 전달, 실제 방문자 utm_content=3 알림도 확인.
+- AI 실패 IP: operations.service.ts NO_IP_TYPES에서 ai-photo.failed 제거, CLIENT_IP_TYPES(랜딩과 같은 표시: 접속 IP만, OWNER_HOME_IPS면 (집), 연결 IP 없음). ai-photo.ts failureAlert의 omitIp 제거. 성공·비용 알림은 계속 IP 없음. 근거: 처리방침 9조 Telegram 운영 오류 알림 접속 IP. docs/platform-api.md 갱신.
+- 검증: tsc 0·build 0, guest-caption 7/7, operations-alerts 7/7, operations 11/11, ai-photo 48/48, funnel 12/12(격리 3307). 대조: 이전 operations.service·ai-photo로 되돌리면 새 테스트 3건 실패. 개발 서버: 변경 전 실패 행 ip NULL, 변경 후 ip 저장 확인.
+- 배포: server prod 4820ebb(dev 동일), front prod 8fbd0e4. 운영 api·worker failip-20261118 healthy, 이전 이미지 정리, 복구본 /Users/ethan/crefans-recovery/20261118/failip-20261118-api SHA-256 OK. 운영 실제 AI 실패 알림은 아직 발생 전이라 텔레그램 화면은 미확인.
+- 개발 즉시 배포: devbox ~/crefans-dev/deploy-dev.sh 잠금을 즉시 실패(3) → 최대 20분 대기로 변경(백업 deploy-dev.sh.bak-ondemand, README-deploy.md 기록). 대조: 이전 스크립트는 잠금 중 rc=3.
+- 개발 AI 키: 운영 runtime.env의 AI_PHOTO_OPENAI_API_KEY·AI_PHOTO_BYTEPLUS_API_KEY·AI_PHOTO_COSPLAY_PROVIDER를 devbox ~/crefans-dev/runtime.env(600)로 복사(값 미출력, 백업 runtime.env.bak-aikeys-20261118), api·worker 재생성. 개발 비용은 운영과 같은 계정에 청구되며 개발 DB의 900회 상한·비용 알림은 개발 사용분만 셈.
+- 시나리오(개발, 맥 Chrome): 랜딩 아이돌 무대복 → 이 프리셋으로 무료 체험 → 편집기 아이돌 선택됨 → (AI 키 없을 때) 생성 오류, 요청 costumeIds e614f6 → 고딕 오프숄더+의자에 앉기로 바꿔 재요청 costumeIds ffb58f·pose → (키 넣은 뒤) 실제 생성 결과 고딕 의상·의자 포즈 → AI 내용 작성 "고딕 무드로 담아본 오늘" → 게시 → 피드 노출. 실생성 2회+캡션 1회.
+- 발견: 체험 자동 샘플 원본이 초안에 남아 있어 게시 시 "체험 게시물에는 AI로 만든 사진만 올릴 수 있어요"로 막힘. 원본을 직접 지워야 게시됨(미수정, 사용자 결정 필요).
 ## 2026-11-18 21:3x~22:03 KST 랜딩 알림 utm_medium·utm_campaign 표시 (feat/landing-utm) — 운영 API·프론트 utm-20261118
 - 사용자 지시(2026-11-18): "당근에 새롭게 캠페인 시작…텔레그램 알림에서도 해당 파라미터 읽을 수 있게 개선", 운영 배포 승인(클릭 "지금 배포").
 - 링크 규칙(구글 GA 캠페인 URL 안내·PostHog UTM 문서 확인): 당근 `?utm_source=daangn&utm_medium=cpc&utm_campaign=daangn_202611`(무료 소식은 medium=social), X `utm_source=x&utm_medium=social&utm_campaign=launch_202611`, 인스타 `utm_source=instagram&utm_medium=social&utm_campaign=bio|launch_202611`. 소문자 고정.
