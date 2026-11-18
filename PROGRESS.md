@@ -1,3 +1,11 @@
+## 2026-11-18 운영 콘솔 회원 휴대폰 번호 전체 보기 강화 (feat/phone-reveal-audit, 미배포)
+- 사용자 결정(2026-11-18): 별도 권한 + 사유 + 감사. 기존 GET admin/members/:id/phone(members.view, 사유 없음) → POST 같은 경로, @Permit('super')(활성 SUPER_ADMIN만, 기존 권한 모델의 super 규칙), 본문 reason 앞뒤 공백 제외 5~200자(아니면 400 REVEAL_REASON_REQUIRED, URL/쿼리 사유 미사용), 운영자당 시간당 20회(429, LocalMemberService.limit), Cache-Control private, no-store.
+- 감사: platform_audit_logs admin.member_phone_revealed — entityId=회원, changedBy=운영자 id, after.contentHash=사유 sha256(기존 ai-photo 사유 해시 방식, safeAuditData 허용 키 변경 없음). 번호·사유 원문 미기록. 기존 data.adminId는 허용 목록 밖이라 저장되지 않던 값이라 changedBy로 교체.
+- 문서: openapi-contract.ts(post, body reason), docs/platform-api.md 행, docs/current-contracts.md 라우트 행(GET→POST, 프론트 docs:contracts 재생성은 미실행).
+- openapi 테스트 숫자 낡음 수정: 전체 281→284, user 107→108, console 124→126(실제 값, 이번 변경은 메서드만 바뀌어 개수 불변).
+- 검증(2026-11-18 11:2x KST, 기반 origin/prod d0637d3, 격리 crefans_platform_e2e DB): tsc --noEmit 0, 신규 tests/platform-member-phone-reveal.test.cjs 5/5(비최고관리자·부운영자 members.update도 403, 사유 없음/공백/4자/201자/숫자/쿼리 사유 400, 감사 행에 번호·사유 원문 없음+해시 일치, 구 GET 404, 미보관 404, 21번째 429·다른 운영자 통과), 대조: origin/prod 컨트롤러로 되돌리면 5/5 실패 후 복원. platform-admin-operators 7/7, test:openapi 14/14.
+- 미실행: dev/prod 통합, 배포, 운영 확인. 콘솔은 crefans_admin 같은 브랜치.
+
 ## 2026-11-17 텔레그램 주문·입금 알림 보강 (feat/order-telegram, 운영 crefans-api:ordertg-20261117)
 - 사용자 결정: 무통장 주문 접수 알림(bank_transfer.opened)에 상품명(productName, 상품 카탈로그 문구 60자, 개인정보 아님) 추가 — AI 이용권 상품명·광고상품명·'콩 N개'. 알림 본문 '상품: …'.
 - 사용자 결정: 구매자 '입금했어요' → POST payments/bank-transfer/:kind/:orderId/deposited, 본인 입금 대기 주문만, 주문당 1회(dedupe) 텔레그램 'bank_transfer.deposit_reported'(이름·계좌 없음). 은행 자동 입금 확인은 없음(운영자 콘솔 확인 그대로).

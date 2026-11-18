@@ -82,7 +82,7 @@
 | POST | `/api/v1/admin/me/totp/setup` | `src/platform/admin-totp.ts::setup` |
 | GET | `/api/v1/admin/members` | `src/platform/admin.controller.ts::members` |
 | POST | `/api/v1/admin/members/:id/erase` | `src/platform/moderation.ts::erase` |
-| GET | `/api/v1/admin/members/:id/phone` | `src/platform/admin.controller.ts::memberPhone` |
+| POST | `/api/v1/admin/members/:id/phone` | `src/platform/admin.controller.ts::memberPhone` |
 | POST | `/api/v1/admin/members/:id/referral` | `src/platform/admin.controller.ts::referralLink` |
 | GET | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::memberHistory` |
 | POST | `/api/v1/admin/members/:id/suspension` | `src/platform/moderation.ts::member` |
