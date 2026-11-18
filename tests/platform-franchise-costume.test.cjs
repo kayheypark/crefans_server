@@ -101,7 +101,8 @@ test('backfill: request log and source-chain evidence, unknown left alone, dry r
  const legacy=()=>media(creator,{aiGenerated:true,watermarkEligible:1});
  const [fromLog,fromLogGeneral,unknown]=[await legacy(),await legacy(),await legacy()];
  const crop=await media(creator,{aiGenerated:true,croppedFrom:fromLog}),copy=await media(creator,{aiGenerated:true,watermark:{version:1,sourceId:crop}});
- for(const [targetId,costumeIds] of [[fromLog,['773106','8971c9']],[fromLogGeneral,['773106']]]){const id=crypto.randomUUID();logIds.push(id);await db.aiPhotoFailureDetail.create({data:{request_id:id,payload_encrypted:crypt.encrypt(JSON.stringify({outcome:'succeeded',targetId,options:{costumeIds}})),expires_at:new Date(Date.now()+86400000)}});}
+ const fromString=await legacy();
+ for(const [targetId,costumeIds] of [[fromLog,['773106','8971c9']],[fromLogGeneral,['773106']],[fromString,'["773106","313a28"]']]){const id=crypto.randomUUID();logIds.push(id);await db.aiPhotoFailureDetail.create({data:{request_id:id,payload_encrypted:crypt.encrypt(JSON.stringify({outcome:'succeeded',targetId,options:{costumeIds}})),expires_at:new Date(Date.now()+86400000)}});}
  // An existing level-1 post that holds the legacy photo: listed for a decision, never changed.
  const p=await db.posting.create({data:{title:'예전 멤버 글 '+tag,content:'본문',user_sub:creator,status:'PUBLISHED',is_membership:true,membership_level:1,published_at:new Date(),allow_tips:true}});await db.postingMedia.create({data:{posting_id:p.id,media_id:copy,sort_order:0}});
  const decrypt=v=>crypt.decrypt(v);
@@ -109,6 +110,7 @@ test('backfill: request log and source-chain evidence, unknown left alone, dry r
  const applied=await franchiseBackfill(db,decrypt,true);assert.equal(applied.updated,applied.toUpdate);
  assert.deepEqual([(await meta(fromLog)).aiCostumeCategory,(await meta(crop)).aiCostumeCategory,(await meta(copy)).aiCostumeCategory],['overwatch','overwatch','overwatch']);
  assert.equal((await meta(copy)).watermark.sourceId,crop,'other metadata kept');
+ assert.equal((await meta(fromString)).aiCostumeCategory,'nikke','multipart JSON-string costumeIds in the request log count too');
  assert.equal((await meta(fromLogGeneral)).aiFranchiseCostume,undefined);assert.equal((await meta(unknown)).aiFranchiseCostume,undefined,'no evidence → not blocked');
  assert.ok(applied.unknownNoInfo>=1);assert.ok(applied.provenNoFranchise>=1);
  const again=await franchiseBackfill(db,decrypt,true);assert.equal(again.toUpdate,0);assert.equal(again.updated,0);
