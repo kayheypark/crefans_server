@@ -4,6 +4,7 @@ import {ConfigService} from '@nestjs/config';
 import {PrismaService} from '../prisma/prisma.service';
 import {requestContext} from './request-context';
 import {createHmac,randomUUID} from 'crypto';
+import {DEDUPE_TYPES,DIGEST_TYPE,digestOnly,digestText,runDailyDigest,throttleError} from './operations-alert-policy';
 
 const labels:Record<string,string>={'creator.partner_requested':'파트너 계약 요청(콘솔 로그에서 크리에이터 확인 후 모두싸인 발송)','guest.ai_usage':'비회원 AI 체험 사용량','ai-photo.failed':'AI 사진 편집 실패','guest.ai_closed':'비회원 AI 체험 오늘 상한 도달','auth.signup_mail_closed':'가입 인증 메일 오늘 상한 도달(SIGNUP_MAIL_DAILY_TOTAL)',
  'creator.partner_ended':'파트너 계약 종료 — 미정산·미수금 통지됨, 기한(dueAt)까지 협의 없으면 확정 미정산 수익 전액 지급(계약 12조②)','beans.hold_review':'분쟁 결제로 크리에이터 콩 출금 보류 — 기한(dueAt)까지 결과 확인 후 해제 또는 미수금 처리, 크리에이터에게 결과 안내',
@@ -14,8 +15,14 @@ const labels:Record<string,string>={'creator.partner_requested':'파트너 계�
  'process.error':'프로세스 치명 오류','worker.completed':'배치 처리 완료','worker.hourly':'배치 1시간 요약',
  'disk.warning':'디스크 사용률 경고','disk.critical':'디스크 사용률 위험','disk.recovered':'디스크 사용률 회복',
  'security.injection_detected':'인젝션 시도 감지','security.ip_blocked':'공격 IP 자동 차단','security.ip_released':'IP 차단 만료',
+ // 2026-11-18: types that used to show their raw English name.
+ 'payment.reconciliation_required':'결제 대사 필요 — PG 상태가 결제 완료와 다름(콘솔에서 확인)','payment.external_cancel':'PG에서 결제 취소 감지 — 환불 처리됨','payment.stuck':'결제 승인 처리 30분 넘게 멈춤','refund.stuck':'환불 처리 30분 넘게 멈춤','beans.charge_stuck':'콩 충전 처리 30분 넘게 멈춤','beans.refunded':'콩 충전 환불 완료',
+ 'referral.rewarded':'친구 초대 보상 지급','referral.clawed_back':'친구 초대 보상 회수','marketing.uncertain':'광고성 정보 발송 결과 불명확',
+ 'media.watermark_failed':'워터마크 변환 실패 건 남아 있음','media.watermark_stuck':'워터마크 변환 멈춤','media.watermark_skipped':'워터마크 건너뜀(핸들 형식 확인 필요)','media.transcode_stuck':'아이폰 영상 변환 30분 넘게 대기','media.transcode_failed':'아이폰 영상 변환 실패(최근 1시간)',
+ 'audit.retention_lagging':'요청 감사 로그 보관기한 파기 지연','alerts.backlog':'운영 알림 15분 넘게 미전송','worker.stalled':'배치 15분 넘게 멈춤 — 프로세스 재시작',
+ 'admin.inquiry_replied':'운영자 문의 답변','admin.report_resolved':'운영자 신고 처리','admin.document_saved':'운영자 공지·FAQ 저장','operations.daily_digest':'운영 일일 요약',
 };
-const allowed=new Set(['ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각']);
+const allowed=new Set(['ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','limit','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각']);
 function metadata(data:Record<string,unknown>){
  const result:Record<string,any>={};
  for(const [key,value] of Object.entries(data)){
@@ -80,7 +87,7 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
  async record(type:string,data:Record<string,unknown>,dedupeKey?:string,options:{omitIp?:boolean}={}){
   const stored=requestContext.getStore(),context=options.omitIp&&stored?{...stored,ip:'',peerIp:''}:stored,safe=metadata(data);
   console.log(JSON.stringify({event:type,...context,data:safe}));
-  try{return await this.db.$transaction(async tx=>{const row={type,data:safe,ip:context?.ip||null,peer_ip:context?.peerIp||null,request_id:context?.requestId||null,dedupe_key:dedupeKey||null};const saved=dedupeKey?await tx.platformOperationalEvent.upsert({where:{dedupe_key:dedupeKey},create:row,update:{}}):await tx.platformOperationalEvent.create({data:row});await auditOperation(tx,saved);return saved;});}
+  try{return await this.db.$transaction(async tx=>{let row:any={type,data:safe,ip:context?.ip||null,peer_ip:context?.peerIp||null,request_id:context?.requestId||null,dedupe_key:dedupeKey||null,...digestOnly(type)};if(!dedupeKey&&DEDUPE_TYPES.has(type))row={...row,...await throttleError(tx,type,safe)};const saved=dedupeKey?await tx.platformOperationalEvent.upsert({where:{dedupe_key:dedupeKey},create:row,update:{}}):await tx.platformOperationalEvent.create({data:row});await auditOperation(tx,saved);return saved;});}
   catch{console.error(JSON.stringify({event:'operations_persist_failed',type,requestId:context?.requestId}));}
  }
  async error(type:string,error:any,data:Record<string,unknown>={}){
@@ -106,7 +113,7 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
    if(!target.ok||target.payload.ok!==true){code='TELEGRAM_CHAT_UNAVAILABLE';}
    else if(target.payload.result.type!=='channel'||target.payload.result.title!=='[crefans] operations'){code='TELEGRAM_CHANNEL_MISMATCH';}
    else{
-    const text=operationsAlertText(row,this.config.get('APP_ENV')||this.config.get('NODE_ENV')||'local',this.config.get<string>('LOCAL_AUTH_SECRET'));
+    const text=row.type===DIGEST_TYPE?digestText(row,this.config.get('APP_ENV')||this.config.get('NODE_ENV')||'local',labels):operationsAlertText(row,this.config.get('APP_ENV')||this.config.get('NODE_ENV')||'local',this.config.get<string>('LOCAL_AUTH_SECRET'));
     const sent=await post('sendMessage',{chat_id:chat,text});
     if(sent.ok&&sent.payload.ok===true){await this.db.platformOperationalEvent.update({where:{id:row.id},data:{delivered_at:new Date(),locked_until:null,last_error_code:null}});return true;}
     if(sent.status===429){code='TELEGRAM_RATE_LIMITED';const delay=Number(sent.payload.parameters?.retry_after);if(Number.isFinite(delay)&&delay>=0)retryMs=Math.max(1200,Math.min(delay*1000,3600000));}
@@ -135,12 +142,14 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
    const runs=await tx.platformJob.findMany({where:{id:{startsWith:'worker-run-'},completed_at:{gt:since,lte:now}},select:{note:true}});
    const notes=runs.map(r=>JSON.parse(r.note||'{}'));
    const data={runs:runs.length,failedRuns:notes.filter(n=>Object.keys(n.failures||{}).length).length,processed:notes.reduce((sum,n)=>sum+(Number(n.processed)||0),0)};
-   const event=await tx.platformOperationalEvent.create({data:{type:'worker.hourly',data,dedupe_key:`worker-hour-${since.getTime()}`}});await auditOperation(tx,event);
+   const event=await tx.platformOperationalEvent.create({data:{type:'worker.hourly',data,dedupe_key:`worker-hour-${since.getTime()}`,...digestOnly('worker.hourly',now)}});await auditOperation(tx,event);
    await tx.platformJob.update({where:{id:clockId},data:{completed_at:now}});
   });
+  await runDailyDigest(this.db,now);
   // Minimize retention of operational IPs/IDs, retaining undelivered alerts.
   const cutoff=new Date(now.getTime()-30*86400000);
   await this.db.platformJob.deleteMany({where:{id:{startsWith:'worker-run-'},completed_at:{lt:cutoff}}});
+  await this.db.platformJob.deleteMany({where:{id:{startsWith:'alert-dedupe:'},completed_at:{lt:cutoff}}});
   await this.db.platformOperationalEvent.deleteMany({where:{delivered_at:{not:null},created_at:{lt:cutoff}}});
   await this.db.platformSecurityIp.deleteMany({where:{window_start:{lt:cutoff},OR:[{blocked_until:null},{blocked_until:{lt:cutoff}}]}});
  }

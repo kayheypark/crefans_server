@@ -1,3 +1,14 @@
+## 2026-11-18 운영 텔레그램 알림 소음 줄이기 — 중복 제거 + 하루 요약 (feat/alert-dedupe-digest, 미배포)
+- 사용자 결정(2026-11-18): 중복 제거 + 하루 요약. 근거 조사: 프론트 .local/night-work/2026-11-18-1016/notes-operator.md 2절.
+- 중복 제거: http.error·worker.error·ai-photo.failed는 같은 유형+job/route/method/status+errorType/errorCode/fingerprint(+stage/provider/actor)가 1시간에 1번만 발송. 나머지는 outbox·감사 원장에 그대로 저장하되 delivered_at+last_error_code=SUPPRESSED_DUPLICATE(콘솔 로그 '텔레그램' 줄에 표시). 다음 발송 알림에 "반복: 직전 알림(시각 KST) 이후 N회 더 발생" 줄. 잠금은 platform_jobs `alert-dedupe:<type>:<sha256 32자>`(FOR UPDATE, 회원 식별자·IP 미포함, 30일 뒤 정리). process.error·worker.stale/stalled·watchdog 백로그는 대상 아님.
+- 하루 요약: 매일 09:00 KST(=00:00 UTC) 직후 worker reportRun에서 operations.daily_digest 1건(전날 09:00~당일 09:00 유형별 건수, 중복 생략 건수, 배치 실행·실패·처리·작업별 처리). platform_jobs `worker-operations-digest` 시계+dedupe_key `operations-digest:<slot>`로 1회만. 첫 배포 시점에는 다음 09:00부터. 워커가 09:00에 멈춰 있었으면 재개 직후 1건.
+- 개별 발송 중단(요약에만 포함, last_error_code=DIGESTED): worker.hourly, worker.completed, member.signup, content.created/updated/deleted, member/creator.profile.updated, admin.inquiry_replied/report_resolved/document_saved. 돈·보안·무통장·주문·입금·환불·출금·콩·구독·레퍼럴·guest.ai_*·AI 비용 유형은 즉시 발송 유지(목록에 없는 새 유형도 기본 즉시).
+- 버그 수정: guest.ai_usage/closed의 used·limit가 허용 목록에 없어 숫자가 빠지던 문제. 원시 영문 유형명 18종에 한국어 라벨 추가(payment.*, *.stuck, media.*, referral.*, alerts.backlog 등).
+- 구현: src/platform/operations-alert-policy.ts(신규), operations.service.ts(라벨·allowed·record·flush 문구 선택·reportRun), operations-events.ts(digestOnly 1줄). 스키마 변경 없음. feat/purge-library-ip(NO_IP 줄)·feat/ai-cost-caps와 겹치지 않게 operationsAlertText는 건드리지 않음.
+- 검증(2026-11-18 11:3x KST, 로컬 3307 격리 crefans_platform_e2e, 텔레그램은 스텁): tests/platform-operations-alerts.test.cjs 6/6 — 같은 오류 10회→발송 1·생략 9·1시간 뒤 "9회" 표시, 다른 job/route/code 5건 모두 발송, 돈 계열 13종×10회 전부 즉시(생략·요약 0), 요약 09:00 전 미발송·동시 2워커 1건·같은 슬롯 재실행 0·다음날 1건·건수 정확, guest 숫자 표시, src 전 알림 유형 라벨 검사. 대조: src를 origin/prod로 되돌리면 5/6 실패(2번 '다른 오류 모두 발송'은 원래도 통과), beans.tip을 요약 목록에 넣으면 3번만 실패, used/limit 제거 시 5번만 실패. npm run test:operations 60 pass/1 skip/0 fail, platform-guest-caption 7/7, bank-transfer 8/8, ai-photo 44/44, disk-alert 5/5, tsc 0. test:openapi 14/14(origin/prod의 오래된 수치 281/107/124 → 284/108/126 수정: +2 콘솔 비회원 초기화, +1 입금했어요).
+- 기존 실패(이번 변경과 무관, origin/prod에서도 동일): tests/platform-audit.test.cjs 8·9번 watchdog 테스트 가짜 DB에 mediaWatermarkJob 없음.
+- 미확인: 실제 텔레그램 수신 화면, 운영 DB 기준 하루 건수 감소 실측. 남은 결정: 요약에 '오늘 할 일'(입금 대기·환불 기한 등) 줄 추가, subscription.*·beans.tip 등 사업 이벤트를 요약으로 내릴지(현재 즉시 유지).
+
 ## 2026-11-17 텔레그램 주문·입금 알림 보강 (feat/order-telegram, 운영 crefans-api:ordertg-20261117)
 - 사용자 결정: 무통장 주문 접수 알림(bank_transfer.opened)에 상품명(productName, 상품 카탈로그 문구 60자, 개인정보 아님) 추가 — AI 이용권 상품명·광고상품명·'콩 N개'. 알림 본문 '상품: …'.
 - 사용자 결정: 구매자 '입금했어요' → POST payments/bank-transfer/:kind/:orderId/deposited, 본인 입금 대기 주문만, 주문당 1회(dedupe) 텔레그램 'bank_transfer.deposit_reported'(이름·계좌 없음). 은행 자동 입금 확인은 없음(운영자 콘솔 확인 그대로).

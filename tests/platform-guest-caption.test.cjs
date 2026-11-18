@@ -68,7 +68,7 @@ test('every AI photo failure is queued for Telegram with codes only: no IP, prom
 });
 
 test('the stored alert row and the Telegram text carry no IP for AI photo failures, while other alerts keep it',async()=>{
- const rows=[];const tx={platformOperationalEvent:{create:async({data})=>{rows.push(data);return{id:'e1',...data,created_at:new Date()};}},platformAuditLog:{create:async()=>({})}};
+ const rows=[];const job={},tx={platformOperationalEvent:{create:async({data})=>{rows.push(data);return{id:'e1',...data,created_at:new Date()};}},platformAuditLog:{create:async()=>({})},$queryRaw:async()=>[],platformJob:{createMany:async({data})=>{job[data[0].id]??=data[0];},findUniqueOrThrow:async({where})=>job[where.id],update:async({where,data})=>Object.assign(job[where.id],data)}};// error alerts take the hourly dedupe lock
  const ops=new PlatformOperationsService({$transaction:async fn=>fn(tx)},config({}));
  await requestContext.run({requestId:'q1',ip:'203.0.113.9',peerIp:'10.0.0.1'},()=>ops.record('ai-photo.failed',{errorCode:'X',stage:'generation',provider:'seedream',actor:'guest',status:502},undefined,{omitIp:true}));
  await requestContext.run({requestId:'q2',ip:'203.0.113.9',peerIp:'10.0.0.1'},()=>ops.record('http.error',{errorCode:'Y',status:500}));
