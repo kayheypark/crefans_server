@@ -1,3 +1,12 @@
+## 2026-11-18 탈퇴 회원 보관함 사진 파기·무통장 알림 IP 제외 (feat/purge-library-ip, 미배포)
+- 사용자 결정(2026-11-18): ① 탈퇴 회원의 AI 사진 내 보관함 사진도 처리방침 7조대로 파기. ② 무통장(bank_transfer.*) 텔레그램 알림에 구매자 접속·연결 IP를 보내지 않음(금액·상품명 유지).
+- 원인 ①: 미디어 정리(jobs.service.ts)가 metadata.aiLibrary.active=true를 제외하는데, 탈퇴 파기(member-purge.ts)는 게시물 첨부만 해제해 보관함 사진이 영구 보존됨.
+- 변경 ①: purgeMember가 해당 회원 미디어의 보관함 표시를 active:false로 바꿈 → 기존 일일 정리(MEDIA_DELETE_ENABLED, 유예 7일)가 삭제. 이용 중 회원 동작은 그대로. 게시하지 않은 AI 결과는 원래 제외 대상이 아니라 같은 정리로 삭제됨. 실패 상세(ai_photo_failure_details)는 30일 만료 삭제 경로 그대로.
+- 변경 ②: operations.service.ts 알림 문구에서 bank_transfer.* 를 '접속 IP: 보내지 않음'으로(ai-photo.failed와 같음). 콘솔 기록 행의 IP는 유지.
+- 검증(2026-11-18 KST, 로컬 3307 격리 DB, CREFANS_E2E=true): tsc --noEmit 0, platform-jobs·operations·bank-transfer·watermark-followups·guest-caption 36/36, moderation·referrals·pilot-followups 26/26, test:openapi 14/14. 대조: 수정 2건을 되돌리면 새 테스트 3건 실패(탈퇴 보관함 삭제·dry-run 후보 수·무통장 IP). 이용 중 회원 보관함 사진은 계속 보존(대조 테스트 통과).
+- test:openapi 기대값이 낡아 갱신: 전체 281→284, user 107→108, console 124→126(11-17 비회원 횟수 초기화 2개·입금했어요 1개 반영).
+- 미배포. 운영 반영·실제 텔레그램 수신 화면은 미확인.
+
 ## 2026-11-17 텔레그램 주문·입금 알림 보강 (feat/order-telegram, 운영 crefans-api:ordertg-20261117)
 - 사용자 결정: 무통장 주문 접수 알림(bank_transfer.opened)에 상품명(productName, 상품 카탈로그 문구 60자, 개인정보 아님) 추가 — AI 이용권 상품명·광고상품명·'콩 N개'. 알림 본문 '상품: …'.
 - 사용자 결정: 구매자 '입금했어요' → POST payments/bank-transfer/:kind/:orderId/deposited, 본인 입금 대기 주문만, 주문당 1회(dedupe) 텔레그램 'bank_transfer.deposit_reported'(이름·계좌 없음). 은행 자동 입금 확인은 없음(운영자 콘솔 확인 그대로).

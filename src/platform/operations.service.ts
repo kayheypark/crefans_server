@@ -30,11 +30,12 @@ function metadata(data:Record<string,unknown>){
 }
 /** Telegram is outside the service (overseas transfer): member identifiers leave only as a keyed hash (2026-11-02 user decision).
  * Operators find the raw value through 기록 ID in the console log. */
-const NO_IP_TYPES=new Set(['ai-photo.failed']);
+// 2026-11-18 user decision: bank transfer alerts (bank_transfer.*) do not carry the buyer's IP either; the console log keeps it.
+const NO_IP_TYPES=new Set(['ai-photo.failed']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
 const KIND_LABELS:Record<string,string>={bean:'콩 충전','ai-shop':'AI 이용권',ad:'광고상품'};
 export function operationsAlertText(row:{type:string;ip:string|null;peer_ip:string|null;created_at:Date;id:string;request_id:string|null;data:unknown},env:string,secret?:string){
  const hidden=(value:unknown)=>secret?'h:'+createHmac('sha256',secret).update(`operations-alert:${String(value)}`).digest('hex').slice(0,12):'(숨김)';
- const lines=[`[crefans] ${labels[row.type]||row.type}`,`환경: ${env}`,...(NO_IP_TYPES.has(row.type)?['접속 IP: 보내지 않음']:[`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`]),`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
+ const lines=[`[crefans] ${labels[row.type]||row.type}`,`환경: ${env}`,...(noIp(row.type)?['접속 IP: 보내지 않음']:[`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`]),`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
  for(const [key,value] of Object.entries(row.data as Record<string,unknown>))lines.push(`${key==='productName'?'상품':key}: ${key==='kind'&&typeof value==='string'&&KIND_LABELS[value]?KIND_LABELS[value]:key==='amount'&&typeof value==='number'?`${value.toLocaleString('ko-KR')}원`:['memberId','creatorId'].includes(key)?hidden(value):typeof value==='object'?JSON.stringify(value):String(value)}`);
  return lines.join('\n').slice(0,3800);
 }
