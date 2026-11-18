@@ -376,6 +376,22 @@ export function costumeReferenceIds(value:unknown,kinds:string[],style:string):s
  if(new Set(canonical).size!==canonical.length)reject(400,'INVALID_COSTUME_REFERENCES','의상을 다시 선택해 주세요.');
  return canonical;
 }
+// 2026-11-18 user decision: costumes from games and anime (every catalog category except 'general' / 기본) may carry copyright,
+// so photos made with them cannot be used commercially — posts with them take no bean tips and stay fully public.
+// Categories follow the front catalog (lib/crefans/ai-photo-costumes.ts); the asset file prefix identifies the work.
+const GENERAL_COSTUME_ASSETS=new Set(['maid','sailor','gothic','mage','cyber','idol','cheer','beach']);
+const COSTUME_CATEGORY_BY_PREFIX:Record<string,string>={nikke:'nikke',overwatch:'overwatch',diablo:'diablo',aot:'aot',demon:'demon-slayer',jjk:'jujutsu',genshin:'genshin',blue:'bluearchive'};
+/** Catalog category of a costume ID; an asset with an unknown prefix counts as a franchise costume (never as 'general'). */
+export function costumeCategory(id:string):string|undefined{
+ const canonical=canonicalId(id);if(!canonical)return undefined;const asset=COSTUME_ASSETS[canonical];
+ if(GENERAL_COSTUME_ASSETS.has(asset))return 'general';
+ const prefix=asset.split('-')[0];return COSTUME_CATEGORY_BY_PREFIX[prefix]||prefix;
+}
+/** Metadata for a generated photo: set only when a franchise costume was used (first franchise category in selection order). */
+export function franchiseCostumeMeta(ids:string[]):{aiFranchiseCostume:true;aiCostumeCategory:string}|null{
+ for(const id of ids){const category=costumeCategory(id);if(category&&category!=='general')return{aiFranchiseCostume:true,aiCostumeCategory:category};}
+ return null;
+}
 export async function readCostumeReference(id:string):Promise<Buffer>{
  const canonical=canonicalId(id);if(!canonical)reject(400,'INVALID_COSTUME_REFERENCES','의상을 다시 선택해 주세요.');
  try{return await readFile(join(__dirname,'ai-photo-costumes',COSTUME_ASSETS[canonical]+'-v2.webp'));}

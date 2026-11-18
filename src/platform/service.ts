@@ -10,6 +10,7 @@ import {recordMarketingChoice} from './marketing.service';
 import {marketingRewardOn,marketingRewardEligible,MARKETING_REWARD} from './marketing-reward';
 import {adultContentBlocked,isBeta,livePayments,manualPayouts} from './beta-policy';
 import {LegalDocumentsService} from './legal-documents';
+import {isFranchiseMedia} from './franchise-costume';
 import {ConfigService} from '@nestjs/config';
 import {signupPolicy} from './signup-policy';
 import {billingMethodView} from './billing-failures';
@@ -73,8 +74,10 @@ export class PlatformService {
  async post(p:any,viewer?:string,expose=true){const allowed=expose?await this.consumeContent(p,viewer):(!p.is_membership&&await this.access(p,viewer)),c=await this.db.creator.findUnique({where:{user_id:p.user_sub}});// A converting iPhone video stays in place as `processing` so viewers see an "optimizing" notice instead of a gap (2026-11-01).
    // 2026-11-13: a photo still being watermarked is listed with processing:true like a video, so the post shows a processing
    // placeholder instead of silently dropping the photo; the file URL is only fetched once processing ends.
-   const media=allowed?p.medias.filter((x:any)=>!x.is_deleted&&!x.media.is_deleted&&['COMPLETED','PROCESSING'].includes(x.media.processing_status)).map((x:any)=>({type:x.media.type==='VIDEO'?'video':'image',url:`/api/v1/media/${x.media.id}/file`,...(x.media.processing_status==='PROCESSING'?{processing:true}:{}),...((x.media.metadata as any)?.aiGenerated===true?{aiGenerated:true}:{}) })):[];
-   return{id:p.id,creatorId:p.user_sub,title:p.title,body:allowed?p.content:'',image:media.find((x:any)=>x.type==='image')?.url||'',position:'center',media,likes:p.like_count,comments:p.comment_count,views:p.total_view_count,supporterCount:await postSupporterCount(this.db,p.id),tipsEnabled:!!c&&p.allow_tips!==false,requiredRank:p.is_membership?p.membership_level||1:0,requiredPlanId:p.access_plan_id||undefined,time:p.created_at.toISOString(),commentsEnabled:(c?!!c.comments_enabled:true)&&p.allow_comments,canAccess:allowed};}
+   const media=allowed?p.medias.filter((x:any)=>!x.is_deleted&&!x.media.is_deleted&&['COMPLETED','PROCESSING'].includes(x.media.processing_status)).map((x:any)=>({type:x.media.type==='VIDEO'?'video':'image',url:`/api/v1/media/${x.media.id}/file`,...(x.media.processing_status==='PROCESSING'?{processing:true}:{}),...((x.media.metadata as any)?.aiGenerated===true?{aiGenerated:true}:{}),...(isFranchiseMedia(x.media.metadata)?{franchiseCostume:true}:{}) })):[];
+   // 2026-11-18: a post with a game/anime costume photo takes no post tips (tipsEnabled false) and says why (commercialRestricted).
+   const commercialRestricted=p.medias.some((x:any)=>!x.is_deleted&&!x.media.is_deleted&&isFranchiseMedia(x.media.metadata));
+   return{id:p.id,creatorId:p.user_sub,title:p.title,body:allowed?p.content:'',image:media.find((x:any)=>x.type==='image')?.url||'',position:'center',media,likes:p.like_count,comments:p.comment_count,views:p.total_view_count,supporterCount:await postSupporterCount(this.db,p.id),tipsEnabled:!!c&&p.allow_tips!==false&&!commercialRestricted,commercialRestricted,requiredRank:p.is_membership?p.membership_level||1:0,requiredPlanId:p.access_plan_id||undefined,time:p.created_at.toISOString(),commentsEnabled:(c?!!c.comments_enabled:true)&&p.allow_comments,canAccess:allowed};}
  async bootstrap(viewer?:string,collection?:string){
    const [creators,plans,posts,documents]=await Promise.all([
     this.db.creator.findMany({where:{is_active:true},include:{category:true},take:100}),this.db.membershipItem.findMany({where:{is_deleted:false},take:500}),

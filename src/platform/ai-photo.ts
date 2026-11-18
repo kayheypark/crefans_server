@@ -27,7 +27,8 @@ const GUEST_LIFETIME=3650*86400;
 import {aiFailureTrace,diagnosticId,recordAiFailure,recordAiRequest,traceAiEvent,AiFailureTrace} from './ai-photo-failures';
 import {aiPhotoAllowed} from './ai-photo-grants';
 import {backgroundReferenceId,readBackgroundReference} from './ai-photo-background-references';
-import {costumeReferenceIds,readCostumeReference,STOCKING_COSTUME_IDS} from './ai-photo-costume-references';
+import {costumeReferenceIds,franchiseCostumeMeta,readCostumeReference,STOCKING_COSTUME_IDS} from './ai-photo-costume-references';
+import {franchiseFields} from './franchise-costume';
 import {ticketSummary,useAiPhotoTicket} from './ai-photo-tickets';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
@@ -193,7 +194,7 @@ export class AiPhotoService{
   try{
    const row=await this.service.db.media.create({data:{id,user_sub:sub,type:'IMAGE',metadata:{...watermark,...meta},original_name:'ai-photo.webp',file_name:id,file_size:webp.length,mime_type:'image/webp',original_url:`/api/v1/media/${id}/file`,s3_upload_key:remote?`platform/${id}`:`local/${id}`,processing_status:remote?'UPLOADING':'COMPLETED',processed_at:remote?null:new Date()}});
    if(remote){await this.storage.put(id,destination,'image/webp',webp.length);await this.service.db.media.update({where:{id},data:{processing_status:'COMPLETED',processed_at:new Date()}});}
-   return{id:row.id,type:'image' as const,url:row.original_url,aiGenerated:true};
+   return{id:row.id,type:'image' as const,url:row.original_url,aiGenerated:true,...(meta.aiFranchiseCostume===true?{franchiseCostume:true}:{})};
   }finally{if(remote){try{await unlink(destination);}catch{}}}
  }
  async library(sub:string,query:any){await this.service.member(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return listPhotoLibrary(this.service.db,sub,query);}
@@ -241,6 +242,8 @@ export class AiPhotoService{
   const referenceIds=costumeReferenceIds(input?.costumeIds,kinds,style);
   const backgroundId=backgroundReferenceId(input?.backgroundId,kinds);
   const library=await photoLibraryReferences(this.service.db,sub,input?.libraryIds,kinds);
+  const inherited=(await this.service.db.media.findMany({where:{id:{in:[String(input?.sourceId),...library.map(item=>item.id)]},user_sub:sub},select:{metadata:true}})).map(row=>franchiseFields(row.metadata)).find(fields=>fields.aiFranchiseCostume);
+  const franchise=franchiseCostumeMeta(referenceIds)||inherited||null;
   if(backgroundId&&library.some(item=>item.category==='background'))reject(400,'INVALID_BACKGROUND_REFERENCE','배경 사진은 하나만 선택해 주세요.');
   await this.stage('source');
   const original=await this.source(sub,input?.sourceId);
@@ -325,7 +328,8 @@ export class AiPhotoService{
    charged=false;// The provider was paid from here on; a blocked or unchecked result still counts.
    if(!safe.length&&unchecked)reject(503,'MODERATION_UNAVAILABLE','만든 사진의 안전 검사를 완료하지 못했어요. 사진은 표시하지 않았어요.');
    if(!safe.length)reject(400,'UNSAFE_OUTPUT','만든 사진이 안전 기준을 통과하지 못했어요. 다른 표현으로 다시 시도해 주세요.');
-   const meta={aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiEditKinds:kinds,...(targetGender?{aiTargetGender:targetGender}:{}),aiModel:model,aiMode:mode,aiCreatedAt:new Date().toISOString(),aiDurationMs:Date.now()-started};
+   // 2026-11-18: game/anime costume → aiFranchiseCostume (+category); a re-edit of a flagged photo or flagged library reference keeps it.
+   const meta={...(franchise||{}),aiGenerated:true,aiSourceId:String(input.sourceId),aiKind:kind,aiEditKinds:kinds,...(targetGender?{aiTargetGender:targetGender}:{}),aiModel:model,aiMode:mode,aiCreatedAt:new Date().toISOString(),aiDurationMs:Date.now()-started};
    await this.stage('storage','local');
    const storageStart=Date.now(),storageId=randomUUID(),storageAttempt=++aiFailureTrace.getStore().sequence;
    await traceAiEvent(this.service.db,'step.started',{operation:'storage',provider:'local',attemptId:storageId,attempt:storageAttempt,outcome:'started'});
