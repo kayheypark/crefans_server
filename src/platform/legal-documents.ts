@@ -381,12 +381,29 @@ const adultPolicy:LegalDocument={...basePolicy,version:'2026-11-17.adult.1',upda
  sections:basePolicy.sections.map(sec=>sec.body.includes(POLICY_ADULT_FROM)?{...sec,body:sec.body.replace(POLICY_ADULT_FROM,ADULT_RULE+' 제재가 잘못됐다고 생각하면 위의 검토 요청을 할 수 있습니다.')}:sec)};
 if(!adultPolicy.sections.some(sec=>sec.body.includes(ADULT_RULE)))throw Error('Legal revision anchor missing in operating policy');
 const adultCatalog:LegalCatalog={...phoneStoreCatalog,documents:{...phoneStoreCatalog.documents,terms:adultTerms,policy:adultPolicy}};
+// 2026-11-18 user approval (notice-based overseas transfer, draft wording as written): PostHog Cloud US usage analytics and session
+// replay for the /service app (front feat/posthog). In force from its deploy day; the front must not collect before this is served. Sources (확인일 2026-11-18): https://posthog.com/docs/data/events-retention
+// (free plan events 1 year), https://posthog.com/docs/session-replay/data-retention (free up to 30 days, pay-as-you-go up to 90),
+// https://posthog.com/docs/privacy/data-collection (Discard IP data; GeoIP still runs first), posthog-js cookie_expiration 365 days.
+const POSTHOG_PROCESSING='④ PostHog, Inc.(미국, privacy@posthog.com): 서비스 화면을 이용할 때마다 다음 정보가 HTTPS로 PostHog Cloud(미국)에 전송됩니다. 접속 기록(방문한 화면 주소와 이전 화면 주소 — 주소 뒤의 검색어·인증값 등은 지우고 보냄, 이용 시각), 기기·브라우저 정보(기기 종류, 운영체제, 브라우저, 화면 크기, 언어), PostHog 쿠키에 저장한 무작위 방문자 식별자, 버튼·링크 클릭과 AI 사진 체험·게시·회원가입 단계 도달 기록, 일부 화면의 화면 이용 기록(화면 구성과 스크롤·클릭 움직임. 입력한 값은 가리고 사진·영상은 기록하지 않음), 접속 IP. 목적은 서비스 이용 흐름 분석과 이탈 원인 파악을 통한 서비스 개선입니다. 결제·지갑·출금·정산·설정·로그인·회원가입·메시지 화면에서는 화면 이용 기록을 남기지 않으며, 회원 이메일·닉네임·회원 식별번호는 보내지 않습니다. 접속 IP는 PostHog가 저장하기 전에 버리도록 설정하며, 버리기 전에 국가·도시 수준의 위치 추정값이 만들어져 저장될 수 있습니다. 이용 분석 기록은 최대 1년, 화면 이용 기록은 최대 30일 보관한 뒤 PostHog에서 삭제됩니다.';
+const POSTHOG_REFUSAL='④의 이용 분석은 서비스 이용에 꼭 필요한 처리가 아니므로 거부해도 서비스 이용에 제한이 없습니다. 거부 방법은 10조를 확인하세요.';
+const POSTHOG_COOKIE='서비스 이용 분석(9조 ④)을 위해 PostHog 쿠키(ph_로 시작하는 이름)에 무작위 방문자 식별자와 방문 세션 정보를 최대 1년 저장합니다. 광고에 쓰지 않으며 회원 계정과 연결하지 않습니다. 브라우저에서 이 쿠키를 삭제하면 식별자가 새로 만들어집니다. 브라우저의 \'추적 안 함(Do Not Track)\' 설정을 켜거나 브라우저 추적 방지·콘텐츠 차단 기능으로 posthog.com 연결을 막으면 분석 정보를 보내지 않습니다. 거부해도 서비스 이용에 제한이 없습니다.';
+export const POSTHOG_PRIVACY_DATE='2026-11-18';
+export const POSTHOG_PRIVACY:LegalDocument={...phoneStorePrivacy,version:'2026-11-18.posthog.1',updatedAt:POSTHOG_PRIVACY_DATE,publishedAt:POSTHOG_PRIVACY_DATE,effectiveAt:POSTHOG_PRIVACY_DATE,status:'published',
+ notice:phoneStorePrivacy.notice+' 2026-11-18 개정: 7항·8항·9항·10항 — 서비스 이용 분석과 화면 이용 기록(PostHog, 미국) 위탁·국외 이전, 분석 쿠키와 거부 방법을 적었습니다.',
+ sections:phoneStorePrivacy.sections.map(sec=>{
+  if(sec.title.startsWith('7. '))return{...sec,body:sec.body+'\n서비스 이용 분석 기록과 화면 이용 기록(PostHog)의 보관은 9조 ④를 따릅니다.'};
+  if(sec.title.startsWith('8. '))return{...sec,body:sec.body+'\n서비스 이용 분석과 화면 이용 기록을 PostHog, Inc.에 위탁합니다. 처리 항목·국외 이전·거부 방법은 9조 ④와 10조를 확인하세요.'};
+  if(sec.title.startsWith('9. '))return{...sec,body:swapIn(sec.title,swapIn(sec.title,sec.body,'위 처리는 미디어 열람','①~③ 처리는 미디어 열람'),'\n국외 이전을 원하지 않으면 회원가입을 하지 않거나 탈퇴할 수 있습니다.','\n'+POSTHOG_PROCESSING+'\n국외 이전을 원하지 않으면 회원가입을 하지 않거나 탈퇴할 수 있습니다.')+'\n'+POSTHOG_REFUSAL,links:[...(sec.links||[]),{label:'PostHog 개인정보처리방침',href:'https://posthog.com/privacy'},{label:'PostHog 데이터 처리 계약(DPA)',href:'https://posthog.com/dpa'}]};
+  if(sec.title.startsWith('10. '))return{...sec,body:sec.body+'\n'+POSTHOG_COOKIE};
+  return sec;})};
+const posthogCatalog:LegalCatalog={...adultCatalog,documents:{...adultCatalog.documents,privacy:POSTHOG_PRIVACY}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)
