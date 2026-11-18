@@ -63,6 +63,11 @@
 
 - 콩 후원은 server `docs/platform-implementation.md`의 콩 확장 설계를 따른다. 구형 Wallet/Transfer와 신규 Bean 원장을 자동 혼합하지 않고, 충전·후원·출금은 중복 집계하지 않는다. 공유 지갑/후원/출금과 독립 콘솔은 연결되어 있다. 기능/live 판매 기본 off 및 실공급자 미확인 경계·배포 상태는 PROGRESS.md에서 확인한다.
 
+## 운영 이미지 빌드 (2026-11-18 사용자 지시)
+
+- 운영 이미지(front, api+worker, admin)는 집 개발 PC(devbox)에서만 빌드한다. 맥에서 운영 이미지를 빌드하지 않고, 운영 서버에서도 빌드하지 않는다(admin 포함). 운영 접속키는 맥과 devbox 둘 다 있다.
+- 실행은 맥 `.local/release-tools/devbox-release.sh <front|api|admin> <tag> [--build-only|--check-transfer] [--checks FILE]`(devbox `~/crefans-release/bin/<c>.sh`를 띄움). 이미지 전송은 devbox → 운영 직접, 복구본은 맥 `/Users/ethan/crefans-recovery`로 수거·검증 후에만 운영 이전 이미지를 정리한다. 상세·검사 항목은 `infra/platform/README.md`의 devbox 릴리스 절과 devbox `~/crefans-release/README.md`.
+
 ## 브랜치 규칙
 
 - 새 작업은 최신 `origin/prod`에서 `feat/<작업명>` 생성 → `dev` 통합·검증 → `prod` 승격한다. `dev`에서 새 작업을 분기하지 않는다.

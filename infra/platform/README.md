@@ -146,3 +146,14 @@ sudo docker compose -p crefans-beta -f compose.yml -f compose.beta.yml -f compos
 일부 이전 로컬 이미지가 목록·ID 조회에는 있지만 태그 조회는 `No such image`로 실패했다. 원인은 미확정이다. 보존 도구는 이 오류에 한해 계획과 정확히 같은 ID, 해당 태그 하나만 보유, 다른 저장소 digest 없음, 현재 컨테이너 미사용을 확인한 뒤 ID로 일반 `docker rmi`를 실행한다. 다른 오류·추가 태그·사용 중이면 거부하며 `--force`는 사용하지 않는다. 계획 출력·사용자 보고·최신3개 보존 규칙은 같다. 자체검사5조건과 사용중 보호를 없앤 대조 실패를 확인했다.
 
 근거: [Docker image rm](https://docs.docker.com/reference/cli/docker/image/rm/), 확인2026-10-29. 공식 CLI는 태그·ID·digest 삭제를 지원하며 여러 태그의 ID 강제삭제는 하지 않는다. 실행 증거는 front `.local/studio-input-console-deploy-20261029/`와 `docs/audit/studio-input-console-deployment-20261029.json`.
+
+## devbox 운영 이미지 릴리스 (2026-11-18)
+
+사용자 지시 "빌드는 무조건 개발 PC에서만"에 따라 front·api(worker)·admin 운영 이미지를 집 개발 PC(devbox, Rocky 9 x86_64)에서 빌드한다. 맥 빌드(front `infra/platform/ship-image.sh`의 `--platform linux/amd64` 빌드)와 운영 서버 admin 빌드는 더 쓰지 않는다. 운영 접속키는 맥(`.local/cancel-now-20261106/ssh.sh`)과 devbox(`~/.ssh/crefans-prod/ssh.sh`) 둘 다 있다.
+
+- 소스: devbox가 GitLab(`gitlab-local`) `prod`를 미러로 가져와 SHA를 정하고, GitHub `prod`가 앞서거나 갈라지면 중단한다. `git archive`로 깨끗한 트리를 만들어 네이티브 amd64로 빌드하며 revision 라벨에 SHA를 넣는다.
+- front: `infra/platform/Dockerfile` + devbox `~/.crefans/frontend-build.env`(600)의 NEXT_PUBLIC_* build-arg(값 미출력), 카카오·PostHog 키 번들 포함·sharp-linux-x64 검사.
+- api: 운영 api 컨테이너의 현재 이미지를 FROM으로 devbox에서 `npm ci → prisma generate → npm run build`한 src·dist/src·prisma를 덮어쓴다. 기준 이미지 ID가 운영과 같고 package-lock.json이 같을 때만 진행(다르면 중단). APP_RELEASE·배경 132장·main/worker·prisma client와 이미지 안 파일 해시=빌드 결과를 검사한다. 교체는 DB 전체 덤프 → API_IMAGE·APP_RELEASE만 변경 → `migrate deploy`/status → api·worker 교체, 실패 시 설정 복원·이전 이미지 복귀.
+- admin: crefans_admin `Dockerfile`을 devbox에서 빌드하고 운영에는 이미지만 전송한다.
+- 공통: 운영 읽기 전용 사전 검사 → `/tmp` 전송·SHA-256·`docker load`·레이어 대조 → 해당 서비스만 교체·다른 컨테이너 불변 확인 → 릴리스별 `--checks` → 이전 이미지·설정(·DB 덤프)을 devbox 대기 저장소로 받아 검증 → 맥이 `/Users/ethan/crefans-recovery`로 수거·검증한 뒤에만 운영 이전 이미지·`/opt/crefans-backup-<c>-<tag>` 정리.
+- 운영 변경 없는 확인: `--build-only`(빌드·검사·압축만), `--check-transfer`(+운영 읽기 전용 사전 검사와 압축본을 운영 `sha256sum`으로만 흘려 대조, 운영 디스크 쓰기 없음).
