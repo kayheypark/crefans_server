@@ -55,6 +55,15 @@
 - 검증(2026-11-18 11:2x KST, 기반 origin/prod d0637d3, 격리 crefans_platform_e2e DB): tsc --noEmit 0, 신규 tests/platform-member-phone-reveal.test.cjs 5/5(비최고관리자·부운영자 members.update도 403, 사유 없음/공백/4자/201자/숫자/쿼리 사유 400, 감사 행에 번호·사유 원문 없음+해시 일치, 구 GET 404, 미보관 404, 21번째 429·다른 운영자 통과), 대조: origin/prod 컨트롤러로 되돌리면 5/5 실패 후 복원. platform-admin-operators 7/7, test:openapi 14/14.
 - 미실행: dev/prod 통합, 배포, 운영 확인. 콘솔은 crefans_admin 같은 브랜치.
 
+## 2026-11-18 가입 자동 로그인 + 정보성 가입 축하 메일 (feat/signup-autologin-welcome, 미배포)
+- 사용자 결정(11-18): 가입 완료 시 바로 로그인, 가입 축하 메일은 정보성만(혜택·이벤트·광고 없음, 광고판은 범위 밖), 기존 회원 소급 없음.
+- 자동 로그인: `auth.controller` signup 성공 후 `auth.login`(local.signIn → 세션 행·HttpOnly 쿠키·감사)을 그대로 호출, 응답 `autoLogin`. 세션 발급 실패 시 가입 유지·autoLogin=false. Origin 가드·쿠키 설정은 로그인과 동일 경로.
+- 축하 메일: `WELCOME_MAIL_ENABLED=true`일 때만 가입 트랜잭션에서 member_notices `welcome:v1:{memberId}` 1건(createMany skipDuplicates, 이메일·닉네임은 행에 저장 안 함). member-notices 작업이 발송, 실패 시 기존 백오프로 최대 5회·가입 후 72시간, 이후 expired. 스위치 끄면 대기 행 disabled. 템플릿 `welcomeMail`(제목 "[크레팬스] 가입을 축하해요, 사진 한 장으로 시작해 보세요", 닉네임·이메일 escape, 버튼 https://{crefans.com|beta}/service/landing-ai-image-generation만, 이미지는 같은 origin의 /brand/mail/welcome-*.jpg·popper png).
+- **배포 순서**: 프론트(이미지 /brand/mail/) 배포 → 이미지 200 확인 → 서버 배포 → `WELCOME_MAIL_ENABLED=true`. 운영 env 기본 false(runtime.env.example).
+- 검증(2026-11-18 11:3x KST, 커밋 d8c73fe, 3307 격리 dev DB): tsc/build 0, platform-signup-welcome 4/4(세션 유효·실패/중복 가입 쿠키 없음·로그인 실패 시 autoLogin=false·1회 큐잉·메일 실패해도 가입 성공·재시도 상한·기존 회원 무발송·disabled), mail-templates 32/32(escape·URL 허용목록 대조), platform-openapi 14/14(개수 단언 281/107/124→실제 284/108/126 정정), platform-auth·signup-mode·signup-invites·referrals·guest·phone-verification·auth-hardening·jobs·membership-confirmation 통과. local-members는 *_test DB 필요로 미실행(기존 환경).
+- 대조(되돌림) 검사: controller 원복→2건 실패, 큐잉 제거→2건 실패, 재시도 상한 제거→1건 실패, origin/prod src 전체→4건 실패, 템플릿 escape 제거→escape 테스트 실패. 복구 후 4/4.
+- 메일 미리보기 `.local/welcome-mail-final.png`(헤드리스 Chrome, 이미지 로컬 파일로 치환). 실제 SMTP 발송·수신함 확인은 미실행(NOT_RUN). 분류(정보성 여부) 최종 판단은 프론트 night-work 노트 1-4 미결 사항 참조.
+
 ## 2026-11-17 텔레그램 주문·입금 알림 보강 (feat/order-telegram, 운영 crefans-api:ordertg-20261117)
 - 사용자 결정: 무통장 주문 접수 알림(bank_transfer.opened)에 상품명(productName, 상품 카탈로그 문구 60자, 개인정보 아님) 추가 — AI 이용권 상품명·광고상품명·'콩 N개'. 알림 본문 '상품: …'.
 - 사용자 결정: 구매자 '입금했어요' → POST payments/bank-transfer/:kind/:orderId/deposited, 본인 입금 대기 주문만, 주문당 1회(dedupe) 텔레그램 'bank_transfer.deposit_reported'(이름·계좌 없음). 은행 자동 입금 확인은 없음(운영자 콘솔 확인 그대로).

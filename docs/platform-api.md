@@ -51,7 +51,7 @@ HTTP 상태는 보존한다. 400 입력, 401 세션, 403 권한, 404 없음, 409
 | POST | /identity/status | attemptId, state; 완료 시 서버 proof; URL에 증명값을 넣지 않음 |
 | POST | /identity/callback | 공급자 원문 HMAC, reference·목적·만료 검증 |
 | POST | /auth/identity | 과거 호출 호환용, PASS_NOT_CONFIGURED |
-| POST | /auth/signup | email/password/nickname/terms/privacy/marketing/policyVersions + emailProof; PASS 모드는 identityProof, email-only 모드는 ageAcknowledged=true. 초대 링크(referralCode) 가입은 referralDisclosure=true 필수(추천인에게 가린 이메일·진행 상태 표시 동의, member_consents kind referral-disclosure, 2026-11-02) |
+| POST | /auth/signup | email/password/nickname/terms/privacy/marketing/policyVersions + emailProof; PASS 모드는 identityProof, email-only 모드는 ageAcknowledged=true. 초대 링크(referralCode) 가입은 referralDisclosure=true 필수(추천인에게 가린 이메일·진행 상태 표시 동의, member_consents kind referral-disclosure, 2026-11-02). 2026-11-18: 성공 시 로그인과 같은 경로로 세션 쿠키 발급(`autoLogin`=true, 실패 시 false·가입 유지), `WELCOME_MAIL_ENABLED=true`면 정보성 가입 축하 메일 1건을 member_notices(`welcome:v1:{memberId}`)에 큐잉 — 최대 5회·72시간 재시도, 기존 회원 소급 없음 |
 | POST | /auth/login | email/password; 쿠키 발급 |
 | POST | /auth/refresh | refresh 쿠키; 기존 토큰 폐기 후 회전 |
 | POST | /auth/logout | access 또는 refresh로 회원 세션 철회, 쿠키 삭제 |
