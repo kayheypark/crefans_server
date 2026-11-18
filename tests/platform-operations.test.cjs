@@ -89,3 +89,17 @@ test('Telegram alerts carry member identifiers only as a keyed hash; 기록 ID s
  assert.match(first,/^memberId: h:[0-9a-f]{12}$/m);assert.match(first,/^creatorId: h:[0-9a-f]{12}$/m);assert.equal(first,again,'same member, same hash');assert.notEqual(first,other,'the hash depends on the server secret');
  assert.match(none,/^memberId: \(숨김\)$/m);
 });
+
+// 2026-11-18 user decision: bank transfer alerts leave out the buyer's IP (like ai-photo.failed) but keep amount and product.
+test('bank transfer alerts omit IP while other types keep it',()=>{
+ const {operationsAlertText}=require('../dist/src/platform/operations.service');
+ const base={id:randomUUID(),ip:'203.0.113.7',peer_ip:'198.51.100.8',request_id:randomUUID(),created_at:new Date()};
+ for(const type of['bank_transfer.opened','bank_transfer.deposit_reported','bank_transfer.expiring','bank_transfer.expired']){
+  const text=operationsAlertText({...base,type,data:{kind:'ai-shop',amount:5000,productName:'AI 이용권 10회'}},'synthetic','secret');
+  assert.match(text,/접속 IP: 보내지 않음/,type);assert.doesNotMatch(text,/203\.0\.113\.7|198\.51\.100\.8|연결 IP/,type);
+  assert.match(text,/amount: 5,000원/,type);assert.match(text,/상품: AI 이용권 10회/,type);
+ }
+ assert.match(operationsAlertText({...base,type:'ai-photo.failed',data:{errorCode:'X'}},'synthetic','secret'),/접속 IP: 보내지 않음/);
+ const other=operationsAlertText({...base,type:'beans.charge_created',data:{amount:5000}},'synthetic','secret');
+ assert.match(other,/접속 IP: 203\.0\.113\.7/);assert.match(other,/연결 IP: 198\.51\.100\.8/);
+});
