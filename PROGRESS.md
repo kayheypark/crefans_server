@@ -1,3 +1,8 @@
+## 2026-11-18 랜딩 방문 알림 같은 IP 제한 제거 (feat/landing-alert-no-throttle)
+- 사용자 지시(16:09 KST) "같은 아이피알림도 계속 알려줘" + "둘다 진행 배포"(운영 배포 승인).
+- 변경: funnel-stats.ts — 접속 IP당 30분 1회 제한(landingAlertAllowed·salt·메모리 Map) 제거, landingVisitAlert의 ip 인자 제거. 유지: KST 하루 100건 후 `funnel.landing_cap` 1회, 봇·빈 UA 제외, IP 없는 내용(omitIp). 프론트는 그대로 탭(세션)당 1회 전송. openapi-contract·docs/platform-api.md 문구 갱신.
+- 검증(로컬 3307 격리 crefans_platform_e2e, CREFANS_E2E=true, 순차): tsc 0, build 0, platform-funnel 9/9(같은 IP 두 번째 랜딩도 알림 행 2개), test:openapi 14/14, test:operations 62/1skip/0fail. 대조: funnel-stats.ts만 origin/prod 판으로 되돌리면 'same client IP right after: counted and alerted again' 실패(그 외 2건은 시그니처 차이로 실패) 확인 후 원복.
+
 ## 2026-11-18 15:5x KST 운영 배포 — 랜딩 방문 텔레그램 알림 (API landingalert-20261118, 프론트 front-landingalert-20261118)
 - 통합: feat/landing-visit-alert → dev ac8d1cf(Jenkins crefans-dev-deploy #49 SUCCESS, deploy-logs/20261118-154602.log 실패 0) → prod ccfdbc5(origin·github, HEAD==origin/prod). dev 확인: Origin http://172.30.1.16 로 landing_view POST 201 → dev outbox funnel.landing_view 행(ip·peer_ip null, 유입·기기·오늘 누적 기록; dev는 텔레그램 미전송 상태 attempts 0).
 - API: crefans-api:landingalert-20261118(FROM posthog-20261118, revision ccfdbc5, APP_RELEASE landingalert-20261118). 스크립트 crefans_server-nightfix/.local/release-landingalert-20261118/(ship.log, 15:53:39 KST exit 0): DB 덤프 → 새 마이그레이션 없음 → api·worker healthy → WELCOME_MAIL_ENABLED=true 유지, .env·runtime.env는 API_IMAGE·APP_RELEASE 외 동일, 다른 컨테이너 불변, 약관 adult.1·처리방침 posthog.1, 보호 경로 401/404, telemetry 잘못된 단계 400, 컨테이너 안 랜딩 알림 코드 확인.
