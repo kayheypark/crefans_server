@@ -281,7 +281,7 @@ test('2026-11-18 posthog.1: privacy 7-10 disclose PostHog analytics and replay; 
  assert.equal(legal.catalog(new Date('2026-11-17T23:59:00+09:00')).documents.privacy.version,'2026-11-17.phone.3','the previous day keeps phone.3');
  for(const day of ['2026-11-18T12:00:00+09:00','2027-01-01T12:00:00+09:00'])assert.equal(legal.catalog(new Date(day)).documents.privacy.version,'2026-11-18.posthog.1');
  const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-18\.posthog\.1:[0-9a-f]{64}$/);assert.match(JSON.stringify(signup.documents.privacy),/PostHog/);
- for(const kind of ['terms','policy'])assert.equal(c.documents[kind].version,'2026-11-17.adult.1','terms and policy unchanged');
+ assert.equal(c.documents.terms.version,'2026-11-17.adult.1','terms unchanged');assert.equal(c.documents.policy.version,'2026-11-18.franchise.1','policy: only the franchise clause (separate test)');
  const body=title=>d.sections.find(s=>s.title.startsWith(title)).body;
  // PIPA 28-8(2) items: what, country, when/how, recipient + contact, purpose + retention, how to refuse.
  assert.match(body('9. '),/④ PostHog, Inc\.\(미국, privacy@posthog\.com\): 서비스 화면을 이용할 때마다 다음 정보가 HTTPS로/);
@@ -303,5 +303,22 @@ test('2026-11-18 reward.1: advertising consent names the sender and the first-co
  for(const phrase of ['좋아하는일해야지(크레팬스)','광고성 정보를 이메일로','프로모션 콩 10개','30일','처음 한 번','이 혜택을 받을 수 없을 뿐 그 밖의 불이익은 없습니다','회수하지 않으며','추가로 드리지 않습니다','출금·환불되지 않으며'])assert.ok(body.includes(phrase),phrase);
  assert.deepEqual(d.sections[2],before.sections[1],'withdrawal/retention section unchanged');
  const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:[0-9a-f]{64}$/);
- const now=legal.catalog(new Date('2026-11-18T00:00:00+09:00')),prior=legal.catalog(new Date('2026-11-17T23:59:00+09:00'));assert.deepEqual(now.documents.terms,prior.documents.terms);assert.deepEqual(now.documents.policy,prior.documents.policy);assert.equal(now.documents.privacy.version,'2026-11-18.posthog.1');assert.deepEqual(now.collection,prior.collection);
+ const now=legal.catalog(new Date('2026-11-18T00:00:00+09:00')),prior=legal.catalog(new Date('2026-11-17T23:59:00+09:00'));assert.deepEqual(now.documents.terms,prior.documents.terms);assert.deepEqual(now.documents.policy.sections.slice(0,prior.documents.policy.sections.length),prior.documents.policy.sections);assert.equal(now.documents.privacy.version,'2026-11-18.posthog.1');assert.deepEqual(now.collection,prior.collection);
+});
+// 2026-11-18 user approval: operating-policy clause for AI photos with costumes modelled on third-party works (code already enforces it).
+test('2026-11-18 franchise.1: operating policy adds the third-party-work costume clause from 2026-11-18 only; other documents unchanged',()=>{
+ const {FRANCHISE_POLICY:d,FRANCHISE_POLICY_SECTION:sec,POSTHOG_PRIVACY,MARKETING_REWARD_CONSENT}=require('../dist/src/platform/legal-documents'),legal=new LegalDocumentsService();
+ const before=legal.catalog(new Date('2026-11-17T23:59:00+09:00')),now=legal.catalog(new Date('2026-11-18T00:00:00+09:00'));
+ assert.equal(d.version,'2026-11-18.franchise.1');assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-18');assert.equal(d.effectiveAt,'2026-11-18');assert.equal(d.updatedAt,'2026-11-18');
+ assert.match(d.notice,/^2026년 11월 18일부터 적용합니다\..*제3자 작품 모티프 의상을 사용한 AI 사진의 이용 제한/);
+ assert.equal(before.documents.policy.version,'2026-11-17.adult.1','the previous day keeps adult.1');assert.doesNotMatch(JSON.stringify(before.documents.policy),/제한 사진/);
+ for(const day of ['2026-11-18T00:00:00+09:00','2026-11-18T12:00:00+09:00','2027-01-01T12:00:00+09:00'])assert.deepEqual(legal.catalog(new Date(day)).documents.policy,d,day);
+ assert.deepEqual(d.sections.slice(0,-1),before.documents.policy.sections,'existing clauses unchanged');assert.deepEqual(d.sections.at(-1),sec);
+ assert.equal(sec.title,'제3자 작품 모티프 의상을 사용한 AI 사진의 이용 제한');
+ for(const phrase of ['① 적용 대상: AI 사진 편집(비회원 체험 포함)','상업적 이용 권한이 확보되지 않은 의상','게임·애니메이션 분류','1. 게시물 후원(콩 후원)을 받을 수 없습니다(크리에이터 프로필 후원은 영향 없음).','전체 공개로만 게시할 수 있습니다','3. 이미 유료 공개 범위로 게시된 게시물에 제한 사진을 추가할 수 없습니다.','회수·환불하지 않습니다','④ 판정 기준','의상 정보가 기록되지 않은 이전 사진은 제한하지 않습니다','내려받아 다시 올린 경우 포함',"'신고와 이의제기' 절차를 따릅니다","⑥ 기본 의상: '기본' 분류 의상으로 만든 사진은 이 조항의 제한을 받지 않습니다."])assert.ok(sec.body.includes(phrase),phrase);
+ for(const n of ['①','②','③','④','⑤','⑥'])assert.equal(sec.body.split(n).length,2,n);
+ // Terms, privacy, collection and the advertising consent stay the versions already served on 2026-11-18.
+ assert.equal(now.documents.terms.version,'2026-11-17.adult.1');assert.deepEqual(now.documents.terms,before.documents.terms);
+ assert.deepEqual(now.documents.privacy,POSTHOG_PRIVACY);assert.deepEqual(now.marketing,MARKETING_REWARD_CONSENT);assert.deepEqual(now.collection,before.collection);
+ const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-18\.posthog\.1:/);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:/);assert.match(signup.versions.terms,/^2026-11-17\.adult\.1:/);
 });
