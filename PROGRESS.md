@@ -12,6 +12,14 @@
 - 변경: 비활성 크리에이터만 미리 제외하고 나머지는 access()의 규칙(체험 글 24시간 공개, 회원 계정 사용 가능)을 따름. 크리에이터가 아닌 글은 열람 불가면 피드 노출도 기록하지 않음. 본인 제외에 같은 브라우저 체험 작성자(cf_guest 쿠키)를 추가. 중복 제거(30분 창, 회원/방문자 해시)는 기존과 동일. OpenAPI 설명 갱신.
 - 테스트: `tests/post-view-metrics.test.cjs` 8·9번(체험 글: 회원·다른 방문자 각 1회, 같은 브라우저·24시간 지난 글 제외 / 비크리에이터 회원 글: 타인 집계, 본인·비활성 계정 제외).
 - 과거 조회수는 실제 열람을 알 수 없어 소급하지 않음.
+- 검증(로컬 3307 격리 crefans_platform_e2e, CREFANS_E2E=true, 순차, 2026-11-18 19:43~20:00 KST): tsc 0, build 0, test:openapi 14/14, post-view-metrics 9/9(수정 전 8·9번 실패 재현), platform-post-visibility 5/5, platform-guest 10/10(prod 병합본에서는 4·8번 실패 — 수정 전 origin/prod ea147b8에서도 같은 2건, 공유 e2e DB의 비회원 AI 하루 한도 소진, 이 변경과 무관). platform-access.integration은 실행 중 서버 필요라 미실행.
+- 대조: 같은 브라우저 제외 제거→8번 실패, 비크리에이터 열람 불가 피드 기록 허용→8·9번 실패, post-views.ts 원복→8·9번 실패, 복구 후 9/9.
+- 운영 현재값(읽기 전용, 19:50 KST 배포 전): 체험 글 7개(24시간 공개 중 1개) 조회수 합 0·비크리에이터 회원 글 3개 합 0. 소급 없음.
+- 통합: fix 40ed5c5 → dev f3cd9f8(GitLab·GitHub; PROGRESS 충돌만 양쪽 유지), devbox Jenkins .last-success=f3cd9f8(deploy-logs/20261118-194602.log 실패 0). dev API 임시 체험 글 행으로 방문자 2명 1→2, 같은 방문자 재요청 recorded=false 확인 후 행 삭제. 프론트 docs:record·check:docs PASS(front dev ab9acce, evidence만).
+- prod: termsfee/copysync-20261118 운영 반영 확인(19:59 KST) 후 dev→prod ae01901(origin/prod 대비 4개 파일만, dev==prod 트리), GitLab·GitHub 푸시.
+- 배포(20:01~20:10 KST): devbox `devbox-release.sh api guestviews-20261118` --check-transfer OK → 실배포(FROM termsfee-20261118, 이미지 1,949개 파일=prod ae01901 빌드, DB 덤프, migrate up to date, APP_ENV=prod·WELCOME_MAIL_ENABLED=true·OWNER_HOME_IPS 있음, 약관 beans.1·개인정보 posthog.1·운영정책 franchise.1, 가입 동의 해시 불변). 프론트 변경 없음(배포 안 함).
+- 운영 확인(20:11 KST): 공개 중 체험 글 f807eb99에 맥·devbox 두 클라이언트(다른 방문자) 피드 노출 → 조회수 0→1→2, 같은 방문자 재요청은 recorded=false(검증용 2회가 실제 값에 포함됨).
+- 복구: /Users/ethan/crefans-recovery/20261118/guestviews-20261118-api(이전 이미지 termsfee-20261118·DB 덤프·설정, SHA256·태그/ID OK), finalize로 운영 이전 이미지·백업 정리.
 
 ## 2026-11-18 이용약관 2026-11-18.beans.1 — 콩 출금 수수료·보상 콩 기한, 만료 알림 문구 (feat/terms-bean-fee-expiry)
 - 사용자 결정(/pilot-work 2026-11-18, 근거 front .local/pilot-work/2026-11-18-consistency.md 1·6·7항): 약관 개정을 **오늘(2026-11-18) 즉시 시행**. 사전 공지 기간을 두라는 권고와 다르게 사용자가 즉시 시행을 골랐다(사용자 결정으로 기록). 실제 시행 시각 = 운영 API 배포 시각. 운영 배포 승인 포함.
