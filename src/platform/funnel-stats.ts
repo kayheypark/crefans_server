@@ -1,7 +1,7 @@
 // 2026-11-18 user decision ("방법 1 서버 집계"): count how many visits reach each step of the AI photo trial funnel.
 // Aggregate only — KST day, step key, count. No member, guest id, IP, cookie or user agent is stored, so it is not personal data.
 // Server steps are counted where they happen; the browser may only report the three view steps below (once per tab session, approximate).
-import {createHash} from 'node:crypto';
+import {createHash,randomBytes} from 'node:crypto';
 import {kstDay} from './ai-preset-usage';
 import {reject} from './http';
 import {requestContext} from './request-context';
@@ -41,11 +41,50 @@ export function funnelRateLimit(ip:string|undefined,now=Date.now()){
  return count<=PER_WINDOW;
 }
 
-export async function reportFunnelStep(db:any,input:any){
+// 2026-11-18 user decision (랜딩 방문 텔레그램 알림): landing_view may also carry the external referrer host and utm_source.
+// Anything that fails the pattern is silently dropped (the count still happens); other fields stay a 400.
+const OPTIONAL_FIELDS=new Set(['referrerHost','utmSource']),HOST=/^[a-z0-9.-]{1,253}$/,UTM=/^[A-Za-z0-9_.-]{1,40}$/;
+export function landingSource(input:any){
+ return{referrerHost:typeof input?.referrerHost==='string'&&HOST.test(input.referrerHost)?input.referrerHost:undefined,utmSource:typeof input?.utmSource==='string'&&UTM.test(input.utmSource)?input.utmSource:undefined};
+}
+
+// Alert limits: one alert per client IP per 30 minutes (hashed with a per-process salt, memory only, never stored),
+// at most 100 landing alerts per KST day; the 100th is followed by one cap alert and then counting only. Obvious bots are skipped.
+const ALERT_WINDOW_MS=30*60000,ALERT_DAILY_CAP=100,SALT=randomBytes(16).toString('hex');
+let alerted=new Map<string,number>();
+export function landingAlertAllowed(ip:string|undefined,now=Date.now()){
+ if(alerted.size>MAX_KEYS)alerted=new Map([...alerted].filter(([,at])=>now-at<ALERT_WINDOW_MS));
+ const key=createHash('sha256').update(SALT+(ip||'unknown')).digest('hex').slice(0,32),last=alerted.get(key);
+ if(last!==undefined&&now-last<ALERT_WINDOW_MS)return false;
+ alerted.set(key,now);return true;
+}
+const BOT=/^node$|undici|bot|crawl|spider|slurp|headless|lighthouse|preview|facebookexternalhit|embedly|curl|wget|python|httpclient|okhttp|go-http|axios|node-fetch|java\/|monitor|scan/i;
+export const isBotAgent=(ua:unknown)=>typeof ua!=='string'||!ua.trim()||BOT.test(ua);
+const device=(ua:string)=>/Mobi|Android|iPhone|iPad|iPod/i.test(ua)?'모바일':'데스크톱';
+const kstTime=(d:Date)=>new Date(+d+9*3600000).toISOString().slice(0,16).replace('T',' ');
+
+/** Queues the immediate 랜딩 방문 alert. Never throws; the caller does not await it. */
+export async function landingVisitAlert(db:any,operations:{record:Function},source:{referrerHost?:string;utmSource?:string},userAgent:unknown,ip:string|undefined,now=new Date()){
+ try{
+  if(isBotAgent(userAgent)||!landingAlertAllowed(ip,+now))return'skipped';
+  const day=kstDay(now),start=new Date(+day-9*3600000);
+  const sent=await db.platformOperationalEvent.count({where:{type:'funnel.landing_view',created_at:{gte:start}}});
+  if(sent>=ALERT_DAILY_CAP){await operations.record('funnel.landing_cap',{limit:ALERT_DAILY_CAP},`funnel.landing_cap:${day.toISOString().slice(0,10)}`,{omitIp:true});return'capped';}
+  const today=(await db.funnelStepDaily.findUnique({where:{day_step:{day,step:'landing_view'}}}))?.count||0;
+  const from=[source.referrerHost,source.utmSource?`utm_source=${source.utmSource}`:undefined].filter(Boolean).join(' · ')||'직접 방문 또는 알 수 없음';
+  await operations.record('funnel.landing_view',{'방문 시각(KST)':kstTime(now),'랜딩':'AI 사진 랜딩','유입':from,'기기':device(String(userAgent)),'오늘 랜딩 방문':today},undefined,{omitIp:true});
+  return'queued';
+ }catch{console.error(JSON.stringify({event:'funnel.landing_alert_failed'}));return'failed';}
+}
+
+export async function reportFunnelStep(db:any,input:any,alert?:{operations:{record:Function};userAgent:unknown}){
  const step=input?.step;
- if(typeof step!=='string'||!CLIENT_FUNNEL_STEPS.has(step)||Object.keys(input).length!==1)reject(400,'INVALID_FUNNEL_STEP','알 수 없는 단계예요.');
- if(!funnelRateLimit(requestContext.getStore()?.ip))reject(429,'RATE_LIMITED','잠시 후 다시 시도해주세요.');
- return{recorded:await recordFunnelStep(db,step as FunnelStep)};
+ if(typeof step!=='string'||!CLIENT_FUNNEL_STEPS.has(step)||Object.keys(input).some(k=>k!=='step'&&!(step==='landing_view'&&OPTIONAL_FIELDS.has(k))))reject(400,'INVALID_FUNNEL_STEP','알 수 없는 단계예요.');
+ const ip=requestContext.getStore()?.ip;
+ if(!funnelRateLimit(ip))reject(429,'RATE_LIMITED','잠시 후 다시 시도해주세요.');
+ const recorded=await recordFunnelStep(db,step as FunnelStep);
+ if(recorded&&step==='landing_view'&&alert)void landingVisitAlert(db,alert.operations,landingSource(input),alert.userAgent,ip);
+ return{recorded};
 }
 
 const dateOnly=(d:Date)=>d.toISOString().slice(0,10);
