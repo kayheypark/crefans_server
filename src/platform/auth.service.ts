@@ -1,6 +1,7 @@
 import {lockHandlePolicy,availableSignupHandle} from './handles';
 import {ensureBeanWallet} from './bean-ledger';
 import {recordMarketingChoice} from './marketing.service';
+import {marketingRewardOn} from './marketing-reward';
 import {enqueueWelcome,welcomeMailEnabled} from './member-notices';
 import {PhoneVerificationService} from './phone-verification';
 import {LegalDocumentsService} from './legal-documents';
@@ -94,7 +95,7 @@ export class PlatformAuthService {
      if(this.phones?.enabled())await this.phones.attachSignup(tx,email,input,member.id);
      if(this.config.get('BEAN_LEDGER_ENABLED')==='true')await ensureBeanWallet(tx,member.id);
      await tx.accountPreference.create({data:{member_id:member.id,marketing_alert:false}});
-     await tx.memberConsent.createMany({data:consents.filter(c=>c.kind!=='marketing').map(c=>({...c,member_id:member.id}))});if(input.marketing===true)await recordMarketingChoice(tx,member.id,true,'signup',this.legal.signup().documents.marketing);await tx.signupChallenge.delete({where:{email}});await enqueueOperation(tx,'member.signup',{memberId:member.id},`member.signup:${member.id}`);
+     await tx.memberConsent.createMany({data:consents.filter(c=>c.kind!=='marketing').map(c=>({...c,member_id:member.id}))});if(input.marketing===true)await recordMarketingChoice(tx,member.id,true,'signup',this.legal.signup().documents.marketing,new Date(),marketingRewardOn(this.config));await tx.signupChallenge.delete({where:{email}});await enqueueOperation(tx,'member.signup',{memberId:member.id},`member.signup:${member.id}`);
      // 2026-11-18: informational welcome mail, queued once per member and sent later by the member-notices job.
      if(welcomeMailEnabled(this.config))await enqueueWelcome(tx,member.id);
    });await recordFunnelStep(this.db,'signup_completed');return{message:'회원가입이 완료되었습니다.'};
