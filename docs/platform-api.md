@@ -318,6 +318,7 @@ UI는 별도 `crefans_admin` 저장소의 `/console`이며 서비스 프론트�
 | GET | /admin/logs/:id | 동일 권한. 상세·동일 요청/대상/배치의 최근100건 타임라인·outbox 발송 상태, 미존재404 |
 | POST | /admin/client-errors | 활성 관리자. 비신뢰 브라우저 오류 종류·정적 JS 위치 보고, IP별10회/분 |
 | POST | /telemetry/browser-errors | 선택 인증. 서비스 브라우저 오류 보고, 동일 제한·허용 목록 재검증 |
+| POST | /telemetry/funnel | 선택 인증. 유입 단계 화면 방문(landing_view·guest_consent_view·signup_view)만 허용, 그 외 400. IP당 분당 30회(메모리, IP 미저장). KST 일자·단계·횟수만 저장(2026-11-18) |
 | POST | /guide/advisor | 비로그인·쿠키 없음. CORS는 `GUIDE_ORIGINS`(기본 guide.crefans.com)만 허용하고, Origin 검사는 `GUIDE_ORIGINS`와 서비스 출처(`FRONTEND_ORIGINS`에서 `ADMIN_ORIGINS` 제외; 2026-11-08 고객센터 AI 가이드가 같은 출처로 호출)를 허용한다. 콘솔 출처는 거부. `{question}` 1~500자, 이메일·10자리 이상 숫자 400 PERSONAL_DATA, 역할 변경·지침/모델 요구 400 OUT_OF_SCOPE(공급사 호출 전), 근거가 있을 때만 Moderation(omni-moderation-latest) 유해 400 UNSAFE_INPUT·판정 불가 502. 가이드 색인+현행 약관 3종에서 글자 일치 검색과 의미 검색(Embeddings `text-embedding-3-small`, 코사인 ≥ `GUIDE_ADVISOR_MIN_SIMILARITY`)을 순위 융합(RRF)해 근거를 찾고 OpenAI Responses API(store=false)로 평문 답변 `{answer,sources,found}`; 근거 없으면 답변·Moderation 호출 없이 고정 안내(질문은 의미 검색에만 전송). 의미 검색 실패 시 글자 검색만 사용. 키 없음 503 PROVIDER_NOT_CONFIGURED, 선택 `client`(브라우저 익명 ID 16~64자, 없거나 형식 오류면 IP) 15회/일 429 DAILY_LIMIT(UTC 일 단위, 09:00 KST 초기화), IP별 5회/분·50회/일·전체 1000회/일 429; Responses 요청에 safety_identifier=익명 ID 해시. 답변에 공급사·모델명·지침/태그·링크·HTML·개인정보가 있거나 Moderation 플래그·판정 불가면 고정 안내로 교체, 시간 초과 504, 공급사 오류 502. 모델명 비노출, 질문 원문 미저장. 구현 `src/platform/guide-advisor.ts` |
 
 응답 envelope 4개 필드는 유지하며 `X-Request-ID` 응답 헤더를 추가했다. 클라이언트 입력 ID는 신뢰하지 않는다. 로그 API는 수정/삭제를 제공하지 않는다. 수집·보관·감사/외부 공급사 실패 경계·공식 근거는 [운영 사고 추적 로그](./operational-logging.md)를 따른다. 운영 배포 상태는 PROGRESS 최신 기록과 실행 증거를 확인한다.
@@ -699,6 +700,7 @@ AI 이용권 구독형/횟수형 (2026-11-16 사용자 결정)
 | POST | /admin/ai-photo-grants/:creatorId/tickets/:ticketId/revoke | members.update: 기존 무료 리셋권 회수 |
 | POST | /admin/ai-photo-grants/:creatorId/quota-reset | members.update: 대상 무료 일일 횟수 초기화 |
 | POST | /admin/ai-photo-grants/quota-reset | members.update: 허용 대상 무료 일일 횟수 초기화 |
+| GET | /admin/funnel-stats | overview.view: 최근 14일(KST) AI 사진 체험 유입 단계별 횟수·합계. 개인 식별 정보 없는 집계(2026-11-18) |
 | GET | /admin/ai-photo-guest-quota | members.view: 비회원 AI 체험 횟수 초기화 회차·마지막 초기화 시각(2026-11-17) |
 | POST | /admin/ai-photo-guest-quota/reset | members.update: 모든 비회원 AI 체험 횟수(방문자별·IP별) 초기화. 확인 문구 '전체 초기화'·사유 필요, 비회원 전체 하루 한도는 유지(2026-11-17) |
 | POST | /studio/ai-photo/reset-ticket | 본인 무료 리셋권 사용, 유료 횟수권과 별도 |
@@ -775,3 +777,10 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 
 - 2026-11-17 AI 사진 Seedream 출력 거절(OutputImageSensitiveContentDetected): 요청에 스타킹·시스루·망사·타이츠가 있으면 승인된 스타킹 문구(STOCKING_CLAUSE)로 한 번만 다시 요청. 최종 거절은 400 OUTPUT_MATERIAL_BLOCKED(소재 문구) 또는 PROVIDER_OUTPUT_BLOCKED이며 이용 횟수·하트·이용권을 되돌린다(공급사 미과금). 앱은 '다시 시도/닫기'를 보여 준다. OpenAI 출력 안전검사 차단(UNSAFE_OUTPUT)은 기존대로 차감.
 - 2026-11-17 후속: 의상장 선택은 프리셋 문구 대신 costumeIds만 오므로 STOCKING_COSTUME_IDS(프론트 카탈로그의 스타킹·시스루·망사·타이츠 의상 65종)로도 스타킹 재요청을 판단. retryImproved=true(앱의 '네')면 첫 요청부터 개선 문구(스타킹 문구+실제 코스튬 촬영 문구 IMPROVED_PHOTO_CLAUSE)로 한 번 요청하고 자동 재요청은 하지 않음.
+
+## AI 사진 체험 유입 단계 집계 (2026-11-18)
+
+- 사용자 결정 "방법 1 서버 집계": 표 `funnel_step_daily`(day KST DATE, step, count)에 단계별 일 합계만 더한다. 회원 ID·비회원 ID·IP·쿠키·브라우저 정보는 저장하지 않는다. 구현 `src/platform/funnel-stats.ts`, 마이그레이션 `20261118010000_funnel_step_daily`(추가만).
+- 서버가 직접 세는 단계: 체험 동의 완료(`POST /guest/session` 성공), AI 생성 시작·성공(비회원/회원, `ai-photo.ts` edit), 글 자동 작성(`POST /guest/content/caption` 응답), 게시(비회원 `POST /guest/content`, 회원 `POST /studio/content`의 새 글 바로 게시만), 회원가입 완료(`POST /auth/signup` 트랜잭션 후).
+- 브라우저가 보내는 단계: 랜딩 방문(`/service/landing-ai-image-generation`), 체험 동의 화면, 회원가입 화면. 탭(sessionStorage)당 한 번만 보내므로 대략값이다. 개인을 구분하지 않아 같은 사람이 여러 번 셀 수 있고, 전환율은 단계 합계 비율일 뿐 같은 사람의 이동을 뜻하지 않는다.
+- 집계 실패는 원래 요청을 바꾸지 않는다(로그 `funnel.record_failed`만). 콘솔은 대시보드(overview.view)에서 최근 14일 표를 읽기 전용으로 본다.

@@ -9,6 +9,7 @@ import {AiPhotoService} from './ai-photo';
 import {GuestCaptionService} from './guest-caption';
 import {PlatformAuthGuard} from './platform-auth.guard';
 import {appendAudit} from './audit';
+import {recordFunnelStep} from './funnel-stats';
 import {reject} from './http';
 import {requestContext} from './request-context';
 import {LocalMemberService} from '../auth/local/local-member.service';
@@ -32,6 +33,7 @@ export class GuestService{
   let id=guestFromRequest(req);
   if(!id){const token=randomBytes(32).toString('base64url');id=guestIdFromToken(token);res.cookie(GUEST_COOKIE,token,this.cookieOptions());}
   await appendAudit(this.service.db,{category:'business',action:'guest.consented',entityId:id,data:{version:GUEST_CONSENT_VERSION}});
+  await recordFunnelStep(this.service.db,'guest_consent_agreed');
   return{active:true,consentVersion:GUEST_CONSENT_VERSION};
  }
  // 2026-11-16 user decision: signing in no longer links trial posts by itself; the browser first asks. This counts what would move.
@@ -56,9 +58,9 @@ export class GuestController{
  constructor(private guests:GuestService,private studio:PlatformStudioService,private photos:AiPhotoService,private captions:GuestCaptionService){}
  @Get('session') session(@Req() req:any){return this.guests.status(req,id=>this.photos.guestRemaining(id));}
  @Post('session') start(@Req() req:any,@Res({passthrough:true}) res:any,@Body() body:any){return this.guests.start(req,res,body);}
- @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);return this.studio.saveContent(id,body,{guest:true});}
+ @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);const saved=await this.studio.saveContent(id,body,{guest:true});await recordFunnelStep(this.studio.db,'post_published_guest');return saved;}
  // Writes the empty title/body at publish time; the visitor confirms before posting (2026-11-16).
- @Post('content/caption') caption(@Req() req:any,@Body() body:any){return this.captions.caption(this.guests.require(req),body,this.guests.ipHash());}
+ @Post('content/caption') async caption(@Req() req:any,@Body() body:any){const result=await this.captions.caption(this.guests.require(req),body,this.guests.ipHash());await recordFunnelStep(this.studio.db,'caption_written');return result;}
  // 2026-11-16 user decision: the signed-out author may edit only the title and body of their own post; deleting stays unavailable.
  // Declared after content/caption so that literal route wins.
  @Post('content/:id') async editContent(@Req() req:any,@Param('id') postId:string,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('edit',id);return this.studio.updateGuestText(id,postId,body);}

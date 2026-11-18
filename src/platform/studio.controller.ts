@@ -5,6 +5,7 @@ import {reject} from './http';
 import {PlatformOperationsService} from './operations.service';
 import {LocalMemberService} from '../auth/local/local-member.service';
 import {requestPartnerContract} from './partner-policy';
+import {recordFunnelStep} from './funnel-stats';
 @Controller('studio') @UseGuards(PlatformAuthGuard)
 export class PlatformStudioController {
  constructor(private studio:PlatformStudioService,private operations:PlatformOperationsService,private limiter:LocalMemberService){}
@@ -15,7 +16,8 @@ export class PlatformStudioController {
  @Put('profile') profile(@Body() b:any,@Req() r:any){return this.studio.updateProfile(r.user.sub,b);}
  @Put('activity') async activity(@Body('active') active:boolean,@Req() r:any){if(typeof active!=='boolean')reject(400,'INVALID_INPUT','활동 상태를 확인해주세요.');const c=await this.studio.db.creator.updateMany({where:{user_id:r.user.sub},data:{is_active:active}});if(!c.count)reject(403,'CREATOR_REQUIRED','크리에이터 등록이 필요합니다.');return{message:'활동 상태를 변경했습니다.'};}
  @Put('comments-setting') async comments(@Body('enabled') enabled:boolean,@Req() r:any){if(typeof enabled!=='boolean')reject(400,'INVALID_INPUT','댓글 상태를 확인해주세요.');const c=await this.studio.db.creator.updateMany({where:{user_id:r.user.sub},data:{comments_enabled:enabled}});if(!c.count)reject(403,'CREATOR_REQUIRED','크리에이터 등록이 필요합니다.');return{message:'댓글 설정을 저장했습니다.'};}
- @Post('content') saveContent(@Body() b:any,@Req() r:any){return this.studio.saveContent(r.user.sub,b);}
+ // 2026-11-18 funnel: a new post published right away is counted; edits, drafts and schedules are not.
+ @Post('content') async saveContent(@Body() b:any,@Req() r:any){const saved=await this.studio.saveContent(r.user.sub,b);if(b?.status==='published'&&!b?.id)await recordFunnelStep(this.studio.db,'post_published_member');return saved;}
  @Put('content/:id/visibility') contentVisibility(@Param('id') id:string,@Body() body:any,@Req() r:any){return this.studio.setContentVisibility(r.user.sub,id,body);}
  @Post('content/:id/delete') deleteContent(@Param('id') id:string,@Body() body:any,@Req() r:any){return this.studio.deleteContent(r.user.sub,id,body);}
  @Post('memberships') membership(@Body() b:any,@Req() r:any){return this.studio.saveMembership(r.user.sub,b);}
