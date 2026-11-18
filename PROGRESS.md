@@ -1,3 +1,11 @@
+## 2026-11-18 개인정보처리방침 PostHog 개정 초안 (feat/posthog-policy, 미공개)
+- 사용자 결정(11-18): PostHog Cloud US 이용 분석·세션 리플레이(front feat/posthog). 수집은 처리방침 문안 승인·공개 후 시작.
+- `src/platform/legal-documents.ts`에 `POSTHOG_PRIVACY_DRAFT`(2026-11-18.posthog.1, status draft, effectiveAt null) 추가. catalog() 미연결이라 공개 문서·가입 동의본(2026-11-17.phone.3)은 그대로. 7·8·10항 문장 추가, 9항 ④ PostHog(이전 항목·국가·일시/방법·받는 자/연락처·목적·보유기간)와 ④ 거부 시 불이익 없음, 기존 거부 문장의 범위를 ①~③으로 좁힘.
+- 근거(확인일 2026-11-18): 이벤트 보존 https://posthog.com/docs/data/events-retention (무료 1년, 2026-11-05 이후 신규 유료 기본 2년), 리플레이 보존 https://posthog.com/docs/session-replay/data-retention (무료 최대 30일, 종량제 최대 90일), IP https://posthog.com/docs/privacy/data-collection (Discard IP data, GeoIP는 폐기 전 실행), 쿠키 365일(posthog-js 1.445.1 cookie_expiration 기본). 법령: law.go.kr 제28조의8(시행 2026-09-11) 제1항·제3호 일부만 확인, 제2항 각 호 원문 미확인. PostHog 우편 주소·US 호스팅 리전 미확인.
+- 미결정: ① 국외 이전 근거(제3호 계약이행+고지 vs 제1호 별도 동의 배너) — 분석은 필수 처리가 아니고 비회원에게도 적용되어 법률 검토 필요 ② 요금제·IP 설정에 따라 보유기간·IP 문구 조정 ③ 리플레이에 다른 회원 닉네임·글 텍스트 노출 허용 여부. 승인용 요약: `.local/posthog-policy-draft.md`(커밋 제외).
+- 순서 주의: 공개 키가 ~/.crefans/frontend-build.env에 있으므로 front feat/posthog 배포 전에 이 처리방침을 공개·시행해야 한다.
+- 검증 2026-11-18: `npx tsc --noEmit` 0, `npm run build` 0, `node --test tests/platform-legal.test.cjs` 32/32(초안 비시행·항목·나머지 조항 불변 검사 추가). 대조: dist에서 초안을 published로 바꾸거나 ①~③ 문구를 되돌리면 각각 실패 확인 후 원복.
+
 ## 2026-11-18 13:3x KST 운영 API 배포 시도 → 자동 롤백 (today-20261118, 운영은 ordertg-20261117 유지)
 - 이미지 crefans-api:today-20261118(prod dade06d 오버레이, FROM ordertg-20261117). 스크립트 crefans_server-nightfix/.local/release-today-20261118/(ship.log 포함).
 - 진행: 배포 전 DB 덤프 → migrate deploy로 20261118010000_funnel_step_daily 적용(추가만, 'Database schema is up to date') → api·worker 교체 → 약관·guest/claim·studio 401·휴대폰 GET 404 통과 → 휴대폰 POST 검사가 401 대신 403(ORIGIN_REQUIRED: 검사 curl에 Origin 헤더 없음, 앱의 출처 검사 동작)이라 스크립트 실패 → 자동 롤백. 롤백 후 api·worker ordertg-20261117 healthy, .env·runtime.env 원복 확인. funnel_step_daily 표는 남음(구 이미지는 사용 안 함).

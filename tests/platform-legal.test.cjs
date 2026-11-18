@@ -272,3 +272,19 @@ test('2026-11-17 adult.1: terms/policy carry no beta wording, forbid adult conte
  assert.match(by('4. '),/첫 갱신 실패 후 24시간 간격으로 최대 3회/);assert.match(by('4. '),/멤버십 카드 결제로는 실제 청구를 하지 않습니다/,'test-card wording kept without beta');
  assert.equal(legal.catalog(new Date('2026-11-16T12:00:00+09:00')).documents.terms.version,'2026-11-16.ai.1','the previous day keeps ai.1');
 });
+test('2026-11-18 PostHog privacy draft stays out of force until the user approves it',()=>{
+ const {POSTHOG_PRIVACY_DRAFT:d}=require('../dist/src/platform/legal-documents'),legal=new LegalDocumentsService();
+ assert.equal(d.status,'draft');assert.equal(d.effectiveAt,null);assert.equal(d.publishedAt,undefined);
+ for(const day of ['2026-11-18T12:00:00+09:00','2027-01-01T12:00:00+09:00'])assert.equal(legal.catalog(new Date(day)).documents.privacy.version,'2026-11-17.phone.3');
+ assert.doesNotMatch(JSON.stringify(legal.signup()),/PostHog/);
+ const body=title=>d.sections.find(s=>s.title.startsWith(title)).body;
+ // PIPA 28-8(2) items: what, country, when/how, recipient + contact, purpose + retention, how to refuse.
+ assert.match(body('9. '),/④ PostHog, Inc\.\(미국, privacy@posthog\.com\): 서비스 화면을 이용할 때마다 다음 정보가 HTTPS로/);
+ for(const item of ['접속 기록','기기·브라우저 정보','무작위 방문자 식별자','화면 이용 기록','입력한 값은 가리고 사진·영상은 기록하지 않음','접속 IP','이탈 원인 파악','최대 1년','최대 30일','①~③ 처리는','거부해도 서비스 이용에 제한이 없습니다'])assert.ok(body('9. ').includes(item),item);
+ assert.ok(body('9. ').indexOf('④ PostHog')<body('9. ').indexOf('국외 이전을 원하지 않으면'));
+ assert.match(body('8. '),/PostHog, Inc\.에 위탁합니다/);assert.match(body('7. '),/9조 ④를 따릅니다/);
+ assert.match(body('10. '),/ph_로 시작하는 이름.*최대 1년.*추적 안 함\(Do Not Track\)/s);
+ // Everything else is the phone.3 text unchanged.
+ const current=legal.catalog().documents.privacy;
+ for(const s of current.sections.filter(s=>!/^(7|8|9|10)\. /.test(s.title)))assert.deepEqual(d.sections.find(x=>x.title===s.title),s);
+});
