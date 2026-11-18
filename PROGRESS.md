@@ -1,3 +1,9 @@
+## 2026-11-18 dev 통합 — 오늘 서버 작업 6개 병합 + AI 성공 알림 예상 원가 (dev, 미배포·prod 미반영)
+- 병합 순서(--no-ff): feat/purge-library-ip → feat/ai-cost-caps → feat/funnel-stats → feat/phone-reveal-audit → feat/alert-dedupe-digest → feat/signup-autologin-welcome.
+- 충돌 해결: PROGRESS 상단 기록 모두 유지. operations.service.ts 라벨·allowed·NO_IP_TYPES는 합집합(원가 알림 3종·무통장 noIp·AI 성공 알림). ai-photo.ts는 원가 통제·유입 집계·성공 알림 모두 유지. auth.service.ts 가입 완료는 축하 메일 큐잉+signup_completed 집계 함께. test:openapi 수치는 병합 후 실제 값 286/109/127(+2 유입 집계, 휴대폰 보기 GET→POST는 개수 변화 없음).
+- 통합 커밋(사용자 지시 '원가 모듈 병합 후 쉬우면 성공 알림에 예상 원가'): providerCall마다 estimateMilliUsd(입력 장수)를 trace에 합산(재요청 포함), ai-photo.succeeded에 estimatedUsd(달러, 소수 3자리) 추가. 테스트: 원본+가이드+의상 1장=3장 → 0.044. 대조: 합산 줄 제거 시 해당 테스트 실패.
+- 검증(2026-11-18 11:4x KST, 로컬 3307 crefans_platform_e2e, 순차): tsc 0, build 0, test:openapi 14/14, jobs 4, operations 11, operations-events 15, operations-http 1, operations-alerts 7, ai-photo 48, ai-photo-grants 5, funnel 6, member-phone-reveal 5, auth 3, auth-hardening 4, signup-mode 6, signup-invites 9, signup-welcome 4, guest 10, guest-caption 7, bank-transfer 8 — 모두 실패 0. 실제 텔레그램·운영 검증 없음.
+
 ## 2026-11-18 탈퇴 회원 보관함 사진 파기·무통장 알림 IP 제외 (feat/purge-library-ip, 미배포)
 - 사용자 결정(2026-11-18): ① 탈퇴 회원의 AI 사진 내 보관함 사진도 처리방침 7조대로 파기. ② 무통장(bank_transfer.*) 텔레그램 알림에 구매자 접속·연결 IP를 보내지 않음(금액·상품명 유지).
 - 원인 ①: 미디어 정리(jobs.service.ts)가 metadata.aiLibrary.active=true를 제외하는데, 탈퇴 파기(member-purge.ts)는 게시물 첨부만 해제해 보관함 사진이 영구 보존됨.

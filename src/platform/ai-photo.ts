@@ -32,7 +32,7 @@ import {ticketSummary,useAiPhotoTicket} from './ai-photo-tickets';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 import {presetUsageKeys,recordPresetUsage} from './ai-preset-usage';
-import {AI_COST_ALERTS,AI_PROVIDER_DAILY_CALLS,kstDay,reserveProviderCall} from './ai-photo-cost';
+import {AI_COST_ALERTS,AI_PROVIDER_DAILY_CALLS,estimateMilliUsd,kstDay,reserveProviderCall} from './ai-photo-cost';
 import {recordFunnelStep} from './funnel-stats';
 
 export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=2000;
@@ -106,7 +106,7 @@ export class AiPhotoService{
  // Categories, preset keys and counts only: no prompt, photo, member id, email or IP leaves the service.
  private async successAlert(sub:string,input:any,trace:AiFailureTrace,started:number,guest:boolean){try{
   const kind=String(input?.kind||''),kinds=kind==='combined'?editKinds(kind,input?.editKinds):[kind],presets=presetUsageKeys(input).map(p=>`${p.kind}:${p.key}`).join(', ');
-  await this.operations.record('ai-photo.succeeded',{actor:guest||sub.startsWith('guest:')?'guest':'member',mode:diagnosticId(input?.mode)||'general',style:diagnosticId(input?.style)||'photo',kinds:kinds.join(','),presets:presets||'없음',references:trace.referenceImages??0,durationMs:Date.now()-started},undefined,{omitIp:true});
+  await this.operations.record('ai-photo.succeeded',{actor:guest||sub.startsWith('guest:')?'guest':'member',mode:diagnosticId(input?.mode)||'general',style:diagnosticId(input?.style)||'photo',kinds:kinds.join(','),presets:presets||'없음',references:trace.referenceImages??0,durationMs:Date.now()-started,...(trace.estimatedMilliUsd?{estimatedUsd:(trace.estimatedMilliUsd/1000).toFixed(3)}:{})},undefined,{omitIp:true});
  }catch{this.logger.warn({event:'ai-photo.success_alert_failed',requestId:trace.requestId});}}
  // Telegram: every 50 guest generations a day and when the daily cap closes (operations alert queue, one message per milestone).
  private async guestUsageAlert(closed=false){try{const used=await this.usedIn('ai-photo:guest-total',DAY);if(closed)await this.operations.record('guest.ai_closed',{used:Math.min(used,GUEST_DAILY_TOTAL),limit:GUEST_DAILY_TOTAL},`guest-ai-closed:${this.window()}`);else if(used>0&&(used%50===0||used===GUEST_DAILY_TOTAL))await this.operations.record('guest.ai_usage',{used,limit:GUEST_DAILY_TOTAL},`guest-ai:${this.window()}:${used}`);}catch{}}
@@ -115,6 +115,7 @@ export class AiPhotoService{
  private async providerCall(inputImages:number){
   const day=this.costDay(),reserved=await reserveProviderCall(this.service.db,day,inputImages);
   if(!reserved){await this.operations.record('ai-photo.provider_cap',{limit:AI_PROVIDER_DAILY_CALLS},`ai-provider-cap:${day}`,{omitIp:true});reject(503,'AI_PROVIDER_DAILY_CAP','오늘 AI 사진 생성량이 모두 찼어요. 이번 시도는 차감되지 않았어요. 내일 다시 이용해 주세요.');}
+  {const trace=aiFailureTrace.getStore();if(trace)trace.estimatedMilliUsd=(trace.estimatedMilliUsd||0)+estimateMilliUsd(inputImages);}// for the success alert (retries included)
   for(const alert of AI_COST_ALERTS)if(reserved.before<alert.milli&&reserved.after>=alert.milli)await this.operations.record(alert.type,{estimatedUsd:(reserved.after/1000).toFixed(2),thresholdUsd:alert.milli/1000,calls:reserved.calls},`${alert.type}:${day}`,{omitIp:true});
  }
  private configured(){return !!this.settings.apiKey&&!!this.settings.seedreamKey;}
