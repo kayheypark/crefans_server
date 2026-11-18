@@ -1,3 +1,9 @@
+## 2026-11-18 13:2x KST prod 승격 — 오늘 서버 작업 6개 (미배포 시점 기록)
+- 사용자 승인(2026-11-18, dev 서버 검증·Jenkins #13 통과 후). origin/prod d0637d3에서 분리 HEAD 작업 트리(crefans_server-prod-20261118)로 --no-ff 병합: purge-library-ip → ai-cost-caps → funnel-stats → phone-reveal-audit → alert-dedupe-digest → signup-autologin-welcome.
+- dev에 직접 들어간 fc401f3(AI 성공 알림 예상 원가)는 원가 모듈 의존이라 feat/alert-dedupe-digest에 feat/ai-cost-caps를 먼저 병합(2e9638c)한 뒤 체리픽(ceda72f)해 브랜치 경유로 반영.
+- 충돌은 dev 해결과 동일(라벨·allowed·NO_IP_TYPES 합집합, auth 가입 완료는 축하 메일 큐잉+signup_completed, openapi 286/109/127). git diff origin/dev HEAD: 코드 차이 0(PROGRESS만).
+- 검증(로컬 3307 격리 crefans_platform_e2e, CREFANS_E2E=true, 순차): tsc 0, build 0, test:openapi 14/14, jobs 4, operations 11, operations-events 15, operations-http 1, operations-alerts 7, ai-photo 48, ai-photo-grants 5, funnel 6, member-phone-reveal 5, auth 3, auth-hardening 4, signup-mode 6, signup-invites 9, signup-welcome 4, guest 10, guest-caption 7, bank-transfer 8 — 실패 0. docs/current-contracts.md는 프론트 docs:contracts로 재생성.
+
 ## 2026-11-18 탈퇴 회원 보관함 사진 파기·무통장 알림 IP 제외 (feat/purge-library-ip, 미배포)
 - 사용자 결정(2026-11-18): ① 탈퇴 회원의 AI 사진 내 보관함 사진도 처리방침 7조대로 파기. ② 무통장(bank_transfer.*) 텔레그램 알림에 구매자 접속·연결 IP를 보내지 않음(금액·상품명 유지).
 - 원인 ①: 미디어 정리(jobs.service.ts)가 metadata.aiLibrary.active=true를 제외하는데, 탈퇴 파기(member-purge.ts)는 게시물 첨부만 해제해 보관함 사진이 영구 보존됨.
