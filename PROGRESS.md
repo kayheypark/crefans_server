@@ -1,3 +1,9 @@
+## 2026-11-19 01:15~01:52 KST 처리방침 posthog.2·PostHog 화면 오류 수집 — 운영 API privacy2-20261119, 프론트 errors-20261119
+- 사용자 결정("응 허용", 운영 게시 "오늘 시행으로 배포"): 처리방침 2026-11-19.posthog.2(2026-11-19 시행) — 9조 ④ PostHog 항목에 "화면 오류 정보(화면에서 난 오류의 종류·메시지와 오류가 난 서비스 코드 위치. 주소 뒤 검색어·인증값, 이메일 주소, 긴 숫자는 지우고 보냄)" 추가, 다른 조항 불변(테스트로 확인). 시행 방식은 posthog.1과 같은 게시일 즉시 시행.
+- 프론트: capture_exceptions 켬. beforeSend가 $exception 이벤트의 모든 문자열에서 주소 검색어·해시 제거, 이메일→<email>, 6자리 이상 숫자→<number>, 500자 제한. 다른 이벤트는 기존 그대로. 콘솔 기록은 계속 끔.
+- 순서: 서버(처리방침) 운영 게시 확인(/api/v1/common privacy 2026-11-19.posthog.2, 화면 오류 정보 포함) 후 프론트 배포. 운영 번들 capture_exceptions:!0 확인.
+- 검증: server platform-legal 36/36(posthog.2 신규 1건), front posthog 10/10(오류 정리 신규 1건), 대조: 이전 posthog.ts로 2건 실패. 개발 서버 처리방침 페이지 문구·"2026.11.19 시행" 확인.
+- 이탈 분석 fetch.py: $exception_list 첫 항목의 종류·메시지도 timeline에 넣도록 보강.
 ## 2026-11-19 00:00~00:51 KST 공유 버튼 알림·이탈 분석 자동화·랜딩 말풍선 — 운영 API share-20261119, 프론트 hint-20261119
 - 공유 버튼 알림(사용자 지시 "공유하기 버튼 누른 것도 텔레그램으로 추적"): 서버 src/platform/share-alert.ts + POST /telemetry/share(허용 라벨만, 봇 제외, IP당 분당 30, 하루 200건 상한), 운영 알림 share.clicked(위치·방식·결과·게시물·기기·오늘 공유·접속 IP, 랜딩처럼 (집) 표시). 프론트 lib/api/share-report.ts를 AiPhotoDialog 공유(native|download)·usePostShare(kakao|copy|more)에 연결. 테스트 server platform-share 3/3·openapi 14/14·operations 11/11, front share-report 2/2·post-share 10/10. 대조: 컨트롤러 라우트 제거 시 2건 실패. 개발·운영 각각 복사 1회로 알림 행 확인, 운영 텔레그램 전달(00:45).
 - 프론트(사용자 지시): 랜딩 결과 순서 모더니아·고딕·메이드·아이돌·마법사(아이돌 4번째). 의상 카테고리 선택 위 말풍선 "니케, 원신, 블루아카이브, 진격거"(AI_PHOTO_COSTUME_HINT, 랜딩·편집기, 떠오르는 애니메이션, reduced-motion이면 정지). PostHog capture_dead_clicks 켬(클릭 범위, 텍스트·속성 가림 유지). 예외(capture_exceptions)는 처리방침 PostHog 항목에 오류 정보가 없어 끔 — 켜려면 처리방침 개정 필요(사용자 결정 대기). 운영 랜딩에서 순서·말풍선 애니메이션 확인.
