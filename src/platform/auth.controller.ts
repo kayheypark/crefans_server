@@ -12,7 +12,10 @@ export class PlatformAuthController {
  @Post('signup/phone/start') @HttpCode(200) phoneStart(@Body() body:any){return this.auth.signupPhoneStart(body);}
  @Post('signup/phone/confirm') @HttpCode(200) phoneConfirm(@Body() body:any){return this.auth.signupPhoneConfirm(body);}
  @Post('identity') identity(){return this.auth.identity();}
- @Post('signup') signup(@Body() body:any){return this.auth.signup(body);}
+ // 2026-11-18 user decision: a finished signup signs the new member in through the same login path (session row, HttpOnly
+ // cookies, audit, Origin guard). If that sign-in fails the account still exists and autoLogin=false sends them to the login form.
+ @Post('signup') async signup(@Body() body:any,@Res({passthrough:true}) res:Response){const result=await this.auth.signup(body);
+  try{const tokens=await this.auth.login({email:body.email,password:body.password});setAuthCookies(res,tokens,this.config);return{...result,autoLogin:true};}catch{return{...result,autoLogin:false};}}
  @Post('login') async login(@Body() body:any,@Res({passthrough:true}) res:Response){const tokens=await this.auth.login(body);setAuthCookies(res,tokens,this.config);return{message:'로그인했습니다.'};}
  @Post('logout') async logout(@Req() req:any,@Res({passthrough:true}) res:Response){await this.auth.logout(req.cookies?.access_token,req.cookies?.refresh_token);clearAuthCookies(res,this.config);return{message:'로그아웃했습니다.'};}
  @Post('refresh') async refresh(@Req() req:any,@Res({passthrough:true}) res:Response){try{const tokens=await this.auth.refresh(req.cookies?.refresh_token);setAuthCookies(res,tokens,this.config);return{message:'세션을 갱신했습니다.'};}catch(error){clearAuthCookies(res,this.config);throw error;}}

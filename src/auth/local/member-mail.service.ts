@@ -4,7 +4,7 @@ import {randomUUID} from "node:crypto";
 import { Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createTransport, Transporter } from "nodemailer";
-import { codeMail, CodePurpose, noticeMail, noticeCopy, marketingMail } from "./mail/templates";
+import { codeMail, CodePurpose, noticeMail, noticeCopy, marketingMail, welcomeMail } from "./mail/templates";
 
 @Injectable()
 export class MemberMailService {
@@ -18,6 +18,9 @@ export class MemberMailService {
   }
   async sendMarketing(email:string,subject:string,body:string,url:string,advertisement:boolean,id:string){
     return this.send(email,marketingMail(subject,body,url,advertisement),advertisement?'marketing-campaign':'marketing-notice',id);
+  }
+  async sendWelcome(email:string,data:{nickname:string;joinedAt:string},url:string,id:string){
+    return this.send(email,welcomeMail({...data,email},url),'welcome',id);
   }
   private async send(email:string,message:ReturnType<typeof codeMail>,purpose:string,messageId:string=randomUUID()){
     const attemptId=randomUUID(),start=Date.now();
