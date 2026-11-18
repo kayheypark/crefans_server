@@ -516,8 +516,9 @@ test('every successful generation queues one immediate success alert without pro
   reset();await requestContext.run({requestId:ok,ip:'203.0.113.7',peerIp:'10.0.0.7'},async()=>photos.edit(user,request,await mask()));
   const rows=await db.platformOperationalEvent.findMany({where:{request_id:ok,type:'ai-photo.succeeded'}});assert.equal(rows.length,1);const [row]=rows;
   assert.equal(row.delivered_at,null,'queued for Telegram now (not deduped or digested)');assert.equal(row.last_error_code,null);assert.equal(row.ip,null);assert.equal(row.peer_ip,null);
-  assert.deepEqual(Object.keys(row.data).sort(),['actor','durationMs','kinds','mode','presets','references','style']);
-  assert.deepEqual({...row.data,durationMs:0},{actor:'member',mode:'cosplay',style:'cosplay',kinds:'outfit',presets:'outfit:80bdd0, pose:의자에 앉기',references:1,durationMs:0});
+  assert.deepEqual(Object.keys(row.data).sort(),['actor','durationMs','estimatedUsd','kinds','mode','presets','references','style']);
+  // estimatedUsd (dev integration with feat/ai-cost-caps): original + clothing guide + 1 costume reference = 3 input images, 3×$0.008+$0.020.
+  assert.deepEqual({...row.data,durationMs:0},{actor:'member',mode:'cosplay',style:'cosplay',kinds:'outfit',presets:'outfit:80bdd0, pose:의자에 앉기',references:1,estimatedUsd:'0.044',durationMs:0});
   const text=require('../dist/src/platform/operations.service').operationsAlertText(row,'synthetic','secret');assert.match(text,/^\[crefans\] AI 사진 생성 성공/);assert.match(text,/접속 IP: 보내지 않음/);
   assert.doesNotMatch(JSON.stringify(row)+text,new RegExp(['성공알림프롬프트표식','@','203\\.0\\.113','10\\.0\\.0\\.7',user,'aisuccess_','base64'].join('|')));
  }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;await db.platformOperationalEvent.deleteMany({where:{request_id:{in:[ok,bad]}}});}

@@ -1,3 +1,7 @@
+## 2026-11-18 AI 성공 알림 예상 원가 (fc401f3 체리픽, feat/alert-dedupe-digest)
+- dev에 직접 들어간 통합 커밋 fc401f3을 prod 승격용으로 이 브랜치에 옮김. 원가 모듈(feat/ai-cost-caps)에 의존하므로 먼저 그 브랜치를 이 브랜치에 병합(충돌은 dev 통합과 같은 합집합).
+- 내용: providerCall마다 estimateMilliUsd(입력 장수)를 trace에 합산, ai-photo.succeeded에 estimatedUsd(소수 3자리). 테스트 기대값 0.044(원본+가이드+참고 1장).
+
 ## 2026-11-18 알림 정책 조정 — 가입 즉시·AI 실패 전건·AI 성공 알림 (feat/alert-dedupe-digest, 미배포)
 - 사용자 결정(2026-11-18): member.signup은 즉시 발송 유지(요약 전용 목록에서 제외). ai-photo.failed는 중복 제거하지 않고 실패마다 발송(DEDUPE_TYPES에서 제외, http.error·worker.error는 시간당 1회 유지).
 - 신규: AI 사진 생성 성공마다 ai-photo.succeeded 즉시 알림('AI 사진 생성 성공', 초기 단계라 성공/실패 모두 알림). 내용: actor(member/guest), mode, style, kinds(편집 항목), presets(종류:키 — 의상·배경은 서버 검증 ID, 그 외는 프론트 카드 제목 presetKeys), references(참고 이미지 수: 의상·보관함·배경, 원본·가이드 제외), durationMs. 프롬프트·이미지·회원 ID·이메일·IP 없음(omitIp + NO_IP_TYPES, allow-list로 다른 키 제거). 알림 기록 실패는 생성 결과에 영향 없음. 예상 원가는 이 브랜치에 없음(feat/ai-cost-caps 병합 후 dev 통합 커밋에서 추가 여부 판단).
