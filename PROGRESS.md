@@ -9,6 +9,13 @@
 - 운영 확인: 18:53:21 deploy_test_ip 방문 1회 → funnel.landing_test, ip 121.140.82.62, 사유 '배포 후 테스트', 텔레그램 전송 Y, landing_view 집계 35 그대로. 운영 컨테이너에서 렌더한 본문 첫 줄 '사유: 배포 후 테스트', '접속 IP: 121.140.82.62 (집)'(텔레그램 화면 자체는 사용자 확인 필요).
 - 복구: /Users/ethan/crefans-recovery/20261118/landingip-20261118-api(이전 이미지 franchise-20261118·DB 덤프·설정, settings-prev의 runtime.env에는 OWNER_HOME_IPS 없음=변경 전 사본), finalize로 운영 이전 이미지·백업 삭제. 오늘 랜딩 요청 목록(읽기 전용 SELECT, IP 포함)은 .local/landingip-deploy-20261118/(커밋 안 함).
 
+## 2026-11-18 18:36~19:07 KST 운영 API 배포 policyfranchise-20261118 — 운영정책 2026-11-18.franchise.1
+- 통합: feat/policy-franchise-costume bd18179 → dev fa1b3b4(PROGRESS 충돌만 양쪽 유지 해소; devbox Jenkins .last-success==fa1b3b4, deploy-logs/20261118-184101.log 실패 0; dev API http://172.30.1.16/api/v1/common policy=2026-11-18.franchise.1 확인) → franchise·landingip 운영 배포 완료 확인(18:54, 복구 폴더 2개·운영 api 이미지 landingip-20261118) 후 prod 7cc087f(origin/dev 병합, origin/prod 조상 확인, src·prisma 차이 legal-documents.ts만; tsc 0·build 0·platform-legal 34/34·test:openapi 14/14; origin·github).
+- 배포: devbox `devbox-release.sh api policyfranchise-20261118` --check-transfer OK → 실배포 18:58~19:04(FROM landingip-20261118, 이미지 1,949개 파일=prod 트리 빌드, 기준 대비 4개 변경, DB 전체 덤프, migrate status up to date, APP_ENV=prod·WELCOME_MAIL_ENABLED=true·OWNER_HOME_IPS 있음, 다른 컨테이너 불변).
+- 운영 확인: /api/v1/common policy 2026-11-18.franchise.1(3절, ①~⑥)·privacy 2026-11-18.posthog.1·terms 2026-11-17.adult.1, bootstrap signupReady True·가입 동의 버전·해시(terms/privacy/marketing reward.1) 배포 전과 동일. https://crefans.com/service/legal/policy 화면에 시행일 2026년 11월 18일·새 절 전문 표시(브라우저 확인).
+- 복구본: /Users/ethan/crefans-recovery/20261118/policyfranchise-20261118-api(SHA256SUMS·이미지 태그/ID OK), finalize로 운영 이전 이미지 landingip-20261118·백업 폴더 정리.
+- 문서: 프론트 docs:contracts가 이 저장소 docs/current-contracts.md 환경 키(OWNER_HOME_IPS·TRUSTED_PROXY_IPS, landingip 작업분) 재생성 → 함께 커밋. 프론트 docs:record·check:docs PASS(evidence 프론트 dev 커밋).
+
 ## 2026-11-18 운영정책 2026-11-18.franchise.1 — 제3자 작품 모티프 의상 AI 사진 이용 제한 조항 (feat/policy-franchise-costume)
 - 사용자 승인(2026-11-18 "추천안으로 해", 운영 반영 포함): 시행일 2026-11-18(코드가 이미 같은 날 제한 시행), 문구 '제3자의 작품을 모티프로 한 의상으로, 상업적 이용 권한이 확보되지 않은 의상', ④ 신고 기반 판정 포함.
 - 변경: `legal-documents.ts` FRANCHISE_POLICY(adultPolicy + 3번째 절 '제3자 작품 모티프 의상을 사용한 AI 사진의 이용 제한' ①~⑥, publishedAt·effectiveAt·updatedAt 2026-11-18, notice 갱신), catalog()가 2026-11-18(KST)부터 franchiseCatalog(rewardCatalog 기반: 약관 adult.1·개인정보 posthog.1·광고성 동의 reward.1·수집안내 그대로). 이전 날은 adult.1.
