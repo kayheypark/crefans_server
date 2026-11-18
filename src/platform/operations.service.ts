@@ -22,9 +22,9 @@ const labels:Record<string,string>={'creator.partner_requested':'파트너 계�
  'media.watermark_failed':'워터마크 변환 실패 건 남아 있음','media.watermark_stuck':'워터마크 변환 멈춤','media.watermark_skipped':'워터마크 건너뜀(핸들 형식 확인 필요)','media.transcode_stuck':'아이폰 영상 변환 30분 넘게 대기','media.transcode_failed':'아이폰 영상 변환 실패(최근 1시간)',
  'audit.retention_lagging':'요청 감사 로그 보관기한 파기 지연','alerts.backlog':'운영 알림 15분 넘게 미전송','worker.stalled':'배치 15분 넘게 멈춤 — 프로세스 재시작',
  'admin.inquiry_replied':'운영자 문의 답변','admin.report_resolved':'운영자 신고 처리','admin.document_saved':'운영자 공지·FAQ 저장','operations.daily_digest':'운영 일일 요약',
- 'funnel.landing_view':'랜딩 방문','funnel.landing_cap':'오늘 랜딩 알림 상한 도달(100건) — 오늘 남은 방문은 집계만 하고 알림 안 보냄',
+ 'funnel.landing_view':'랜딩 방문','funnel.landing_test':'랜딩 방문','funnel.landing_cap':'오늘 랜딩 알림 상한 도달(100건) — 오늘 남은 방문은 집계만 하고 알림 안 보냄',
 };
-const allowed=new Set(['limit','calls','estimatedUsd','thresholdUsd','ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','mode','style','kinds','presets','references','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각','방문 시각(KST)','랜딩','유입','기기','오늘 랜딩 방문']);
+const allowed=new Set(['limit','calls','estimatedUsd','thresholdUsd','ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','mode','style','kinds','presets','references','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각','방문 시각(KST)','랜딩','유입','기기','오늘 랜딩 방문','사유']);
 function metadata(data:Record<string,unknown>){
  const result:Record<string,any>={};
  for(const [key,value] of Object.entries(data)){
@@ -40,13 +40,17 @@ function metadata(data:Record<string,unknown>){
 /** Telegram is outside the service (overseas transfer): member identifiers leave only as a keyed hash (2026-11-02 user decision).
  * Operators find the raw value through 기록 ID in the console log. */
 // 2026-11-18 user decision: bank transfer alerts (bank_transfer.*) do not carry the buyer's IP either; the console log keeps it.
-// 2026-11-18 랜딩 방문 알림: visitor alerts never carry an IP (it is not even stored on the row).
-const NO_IP_TYPES=new Set(['ai-photo.failed','ai-photo.succeeded','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical','funnel.landing_view','funnel.landing_cap']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
+// 2026-11-18 랜딩 방문 알림 상한 알림은 IP 없음. 방문 알림 자체는 같은 날 사용자 지시로 접속 IP 포함(아래 LANDING_TYPES).
+const NO_IP_TYPES=new Set(['ai-photo.failed','ai-photo.succeeded','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical','funnel.landing_cap']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
+// 2026-11-18 user decision: landing alerts show only the trusted client IP, marked (집) when it is in OWNER_HOME_IPS (comma-separated).
+const LANDING_TYPES=new Set(['funnel.landing_view','funnel.landing_test']);
 const KIND_LABELS:Record<string,string>={bean:'콩 충전','ai-shop':'AI 이용권',ad:'광고상품'};
-export function operationsAlertText(row:{type:string;ip:string|null;peer_ip:string|null;created_at:Date;id:string;request_id:string|null;data:unknown},env:string,secret?:string){
+export function operationsAlertText(row:{type:string;ip:string|null;peer_ip:string|null;created_at:Date;id:string;request_id:string|null;data:unknown},env:string,secret?:string,homeIps=''){
  const hidden=(value:unknown)=>secret?'h:'+createHmac('sha256',secret).update(`operations-alert:${String(value)}`).digest('hex').slice(0,12):'(숨김)';
- const lines=[`[crefans] ${labels[row.type]||row.type}`,`환경: ${env}`,...(noIp(row.type)?['접속 IP: 보내지 않음']:[`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`]),`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
- for(const [key,value] of Object.entries(row.data as Record<string,unknown>))lines.push(`${key==='productName'?'상품':key}: ${key==='kind'&&typeof value==='string'&&KIND_LABELS[value]?KIND_LABELS[value]:key==='amount'&&typeof value==='number'?`${value.toLocaleString('ko-KR')}원`:['memberId','creatorId'].includes(key)?hidden(value):typeof value==='object'?JSON.stringify(value):String(value)}`);
+ const home=!!row.ip&&homeIps.split(',').map(s=>s.trim()).includes(row.ip),data=row.data as Record<string,unknown>,reason=typeof data?.['사유']==='string'?data['사유']:'';
+ const ipLines=LANDING_TYPES.has(row.type)?[`접속 IP: ${row.ip||'알 수 없음'}${home?' (집)':''}`]:noIp(row.type)?['접속 IP: 보내지 않음']:[`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`];
+ const lines=[...(reason?[`사유: ${reason}`]:[]),`[crefans] ${labels[row.type]||row.type}`,`환경: ${env}`,...ipLines,`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
+ for(const [key,value] of Object.entries(data))if(key!=='사유')lines.push(`${key==='productName'?'상품':key}: ${key==='kind'&&typeof value==='string'&&KIND_LABELS[value]?KIND_LABELS[value]:key==='amount'&&typeof value==='number'?`${value.toLocaleString('ko-KR')}원`:['memberId','creatorId'].includes(key)?hidden(value):typeof value==='object'?JSON.stringify(value):String(value)}`);
  return lines.join('\n').slice(0,3800);
 }
 @Injectable()
@@ -117,7 +121,7 @@ export class PlatformOperationsService implements OnModuleInit,OnModuleDestroy {
    if(!target.ok||target.payload.ok!==true){code='TELEGRAM_CHAT_UNAVAILABLE';}
    else if(target.payload.result.type!=='channel'||target.payload.result.title!=='[crefans] operations'){code='TELEGRAM_CHANNEL_MISMATCH';}
    else{
-    const text=row.type===DIGEST_TYPE?digestText(row,this.config.get('APP_ENV')||this.config.get('NODE_ENV')||'local',labels):operationsAlertText(row,this.config.get('APP_ENV')||this.config.get('NODE_ENV')||'local',this.config.get<string>('LOCAL_AUTH_SECRET'));
+    const text=row.type===DIGEST_TYPE?digestText(row,this.config.get('APP_ENV')||this.config.get('NODE_ENV')||'local',labels):operationsAlertText(row,this.config.get('APP_ENV')||this.config.get('NODE_ENV')||'local',this.config.get<string>('LOCAL_AUTH_SECRET'),this.config.get<string>('OWNER_HOME_IPS')||'');
     const sent=await post('sendMessage',{chat_id:chat,text});
     if(sent.ok&&sent.payload.ok===true){await this.db.platformOperationalEvent.update({where:{id:row.id},data:{delivered_at:new Date(),locked_until:null,last_error_code:null}});return true;}
     if(sent.status===429){code='TELEGRAM_RATE_LIMITED';const delay=Number(sent.payload.parameters?.retry_after);if(Number.isFinite(delay)&&delay>=0)retryMs=Math.max(1200,Math.min(delay*1000,3600000));}

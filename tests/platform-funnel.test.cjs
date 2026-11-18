@@ -4,7 +4,7 @@ require('reflect-metadata');require('dotenv').config({path:'.local/platform.env'
 // a server-side hook (guest consent) counts; the console report is zero-filled for 14 days. Uses the isolated e2e DB.
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 assert.equal(process.env.CREFANS_E2E,'true');const source=process.env.DATABASE_URL;assert.match(source||'',/@127\.0\.0\.1:3307\/crefans_platform_dev$/);const url=new URL(source);url.pathname='/crefans_platform_e2e';process.env.DATABASE_URL=url.toString();
-Object.assign(process.env,{LOCAL_AUTH_SECRET:'r'.repeat(64),DATA_ENCRYPTION_KEY:'a'.repeat(64),TELEGRAM_OPERATIONS_BOT_TOKEN:'',TELEGRAM_OPERATIONS_CHAT_ID:'',SMTP_HOST:'',BEAN_LEDGER_ENABLED:'false',AUTH_PROVIDER:'local',MEDIA_STORAGE:'local'});
+Object.assign(process.env,{LOCAL_AUTH_SECRET:'r'.repeat(64),DATA_ENCRYPTION_KEY:'a'.repeat(64),TELEGRAM_OPERATIONS_BOT_TOKEN:'',TRUSTED_PROXY_IPS:'127.0.0.1',TELEGRAM_OPERATIONS_CHAT_ID:'',SMTP_HOST:'',BEAN_LEDGER_ENABLED:'false',AUTH_PROVIDER:'local',MEDIA_STORAGE:'local'});
 const {PrismaClient}=require('@prisma/client'),db=new PrismaClient(),{NestFactory}=require('@nestjs/core'),{PlatformModule}=require('../dist/src/platform/module');
 const funnel=require('../dist/src/platform/funnel-stats'),{kstDay}=require('../dist/src/platform/ai-preset-usage');
 const {GuestService,GUEST_CONSENT_VERSION,guestFromRequest}=require('../dist/src/platform/guest');
@@ -14,7 +14,9 @@ const send=body=>fetch(base+'/api/v1/telemetry/funnel',{method:'POST',headers:{'
 before(async()=>{
  globalThis.__release=await require('./e2e-db-lock.cjs').lockE2EDatabase(source);
  const result=require('node:child_process').spawnSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy'],{env:process.env,encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);
- app=await NestFactory.create(PlatformModule,{logger:false});app.setGlobalPrefix('api/v1');await app.listen(0,'127.0.0.1');base=await app.getUrl();
+ app=await NestFactory.create(PlatformModule,{logger:false});
+ // Same request context as main.ts: trusted proxy (loopback here) → X-Crefans-Client-IP becomes the client IP.
+ const security=app.get(require('../dist/src/platform/security.service').PlatformSecurityService);app.use((req,res,next)=>{void security.middleware(req,res,next).catch(next);});app.setGlobalPrefix('api/v1');await app.listen(0,'127.0.0.1');base=await app.getUrl();
 });
 after(async()=>{await app?.close();try{for(const id of guests)await db.platformAuditLog.deleteMany({where:{entity_id:id}}).catch(()=>{});
  if(alertIds.length){await db.platformAuditLog.deleteMany({where:{source_id:{in:alertIds}}}).catch(()=>{});await db.platformOperationalEvent.deleteMany({where:{id:{in:alertIds}}});}}finally{await db.$disconnect();await globalThis.__release?.();}});
@@ -62,17 +64,17 @@ const settle=async(since,n)=>{for(let i=0;i<40;i++){const rows=await landingRows
 const fakeOps=()=>{const calls=[];return{calls,record:async(...args)=>{calls.push(args);return{id:'x'};}};};
 const fakeDb=(sent,today=7)=>({platformOperationalEvent:{count:async()=>sent},funnelStepDaily:{findUnique:async()=>({count:today})}});
 
-test('landing alert: an accepted landing_view queues one immediate alert without IP, user agent or full URL; a second landing from the same IP is alerted too',async()=>{
+test('landing alert: an accepted landing_view queues one immediate alert with the client IP but no user agent or full URL; a second landing from the same IP is alerted too',async()=>{
  assert.ok(!policy.DIGEST_TYPES.has('funnel.landing_view')&&!policy.DEDUPE_TYPES.has('funnel.landing_view'),'immediate, not digested or deduped');
- const since=new Date(Date.now()-1000),post=body=>fetch(base+'/api/v1/telemetry/funnel',{method:'POST',headers:{'content-type':'application/json','user-agent':IPHONE},body:JSON.stringify(body)});
+ const since=new Date(Date.now()-1000),post=body=>fetch(base+'/api/v1/telemetry/funnel',{method:'POST',headers:{'content-type':'application/json','user-agent':IPHONE,'x-crefans-client-ip':'198.51.100.23'},body:JSON.stringify(body)});
  const res=await post({step:'landing_view',referrerHost:'m.search.naver.com',utmSource:'insta_bio'});assert.equal(res.status,201);assert.deepEqual(await res.json(),{recorded:true});
  const [row]=await settle(since,1);assert.ok(row,'alert queued');assert.equal(row.type,'funnel.landing_view');assert.equal(row.delivered_at,null);assert.equal(row.last_error_code,null);
- assert.equal(row.ip,null);assert.equal(row.peer_ip,null);
+ assert.equal(row.ip,'198.51.100.23','2026-11-18 user decision: the trusted client IP (X-Crefans-Client-IP from the trusted proxy) is kept for the alert');
  assert.equal(row.data['랜딩'],'AI 사진 랜딩');assert.equal(row.data['유입'],'m.search.naver.com · utm_source=insta_bio');assert.equal(row.data['기기'],'모바일');assert.equal(row.data['오늘 랜딩 방문'],await count('landing_view'));assert.match(row.data['방문 시각(KST)'],/^\d{4}-\d\d-\d\d \d\d:\d\d$/);
  const text=operationsAlertText(row,'test','k'.repeat(32));
- assert.match(text,/^\[crefans\] 랜딩 방문/);assert.match(text,/접속 IP: 보내지 않음/);assert.doesNotMatch(text,/127\.0\.0\.1|::1|iPhone|Mozilla|Safari|연결 IP|search\.naver\?|cookie|session/i);
+ assert.match(text,/^\[crefans\] 랜딩 방문/);assert.ok(text.split('\n').includes(`접속 IP: ${row.ip}`),text);assert.doesNotMatch(text,/보내지 않음|\(집\)|사유:|iPhone|Mozilla|Safari|연결 IP|search\.naver\?|cookie|session/i);
  const again=await post({step:'landing_view'});assert.equal(again.status,201);
- const rows=await settle(since,2);assert.equal(rows.length,2,'same client IP right after: counted and alerted again');assert.equal(rows[1].type,'funnel.landing_view');assert.equal(rows[1].ip,null);assert.equal(rows[1].data['유입'],'직접 방문 또는 알 수 없음');
+ const rows=await settle(since,2);assert.equal(rows.length,2,'same client IP right after: counted and alerted again');assert.equal(rows[1].type,'funnel.landing_view');assert.equal(rows[1].ip,row.ip);assert.equal(rows[1].data['유입'],'직접 방문 또는 알 수 없음');
  assert.equal(funnel.landingAlertAllowed,undefined,'no per-IP throttle');
 });
 test('landing alert: invalid referrer host / utm are dropped, unknown fields still 400, bots skipped, daily cap sends one cap alert then counts only',async()=>{
@@ -85,7 +87,7 @@ test('landing alert: invalid referrer host / utm are dropped, unknown fields sti
  assert.equal(await funnel.landingVisitAlert(fakeDb(0),ops,funnel.landingSource({referrerHost:'nope nope'}),IPHONE),'queued');assert.equal(ops.calls[0][1]['유입'],'직접 방문 또는 알 수 없음');
  for(const ua of ['node','Mozilla/5.0 (compatible; Googlebot/2.1)','curl/8.4.0','HeadlessChrome/120','',undefined])assert.equal(await funnel.landingVisitAlert(fakeDb(0),ops,{},ua),'skipped',String(ua));
  assert.equal(ops.calls.length,1,'bots and missing user agents are not alerted');
- ops=fakeOps();assert.equal(await funnel.landingVisitAlert(fakeDb(99),ops,{},'Mozilla/5.0 (Windows NT 10.0)'),'queued');assert.equal(ops.calls[0][0],'funnel.landing_view');assert.equal(ops.calls[0][1]['기기'],'데스크톱');assert.deepEqual(ops.calls[0][3],{omitIp:true});
+ ops=fakeOps();assert.equal(await funnel.landingVisitAlert(fakeDb(99),ops,{},'Mozilla/5.0 (Windows NT 10.0)'),'queued');assert.equal(ops.calls[0][0],'funnel.landing_view');assert.equal(ops.calls[0][1]['기기'],'데스크톱');assert.equal(ops.calls[0][3],undefined,'visit alerts keep the client IP');
  ops=fakeOps();assert.equal(await funnel.landingVisitAlert(fakeDb(100),ops,{},IPHONE),'capped');assert.equal(ops.calls[0][0],'funnel.landing_cap');assert.match(ops.calls[0][2],/^funnel\.landing_cap:\d{4}-\d\d-\d\d$/,'one cap alert per KST day (dedupe key)');assert.deepEqual(ops.calls[0][3],{omitIp:true});
  // The cap alert really is stored once per day on the real outbox.
  const real=app.get(PlatformOperationsService),since=new Date(Date.now()-1000),key='funnel.landing_cap:test-'+crypto.randomUUID();
@@ -100,4 +102,35 @@ test('landing alert: a failing outbox or database never fails the telemetry requ
  assert.equal(await funnel.landingVisitAlert(db,throwing,{},IPHONE),'failed');
  assert.equal(await funnel.landingVisitAlert({platformOperationalEvent:{count:async()=>{throw Error('db down');}}},fakeOps(),{},IPHONE),'failed');
  assert.equal(await count('landing_view'),prior+1);
+});
+
+// 2026-11-18 user decision: 접속 IP in the landing alert, ' (집)' for OWNER_HOME_IPS; utm_source deploy_test* = 배포 후 테스트 (alerted with a
+// first 사유 line, not counted in funnel_step_daily, not counted toward the daily alert cap).
+test('landing alert text: client IP shown, owner home IP marked (집) only when listed, other alerts unchanged',()=>{
+ const row={type:'funnel.landing_view',ip:'121.140.82.62',peer_ip:'172.30.90.2',created_at:new Date(),id:'e1',request_id:'r1',data:{'유입':'직접 방문 또는 알 수 없음'}};
+ const lines=homes=>operationsAlertText(row,'test','k'.repeat(32),homes).split('\n');
+ assert.ok(lines('').includes('접속 IP: 121.140.82.62'));assert.ok(!lines('').some(l=>l.includes('(집)')||l.startsWith('연결 IP')||l.startsWith('사유')));
+ assert.ok(lines('121.140.82.62').includes('접속 IP: 121.140.82.62 (집)'));assert.ok(lines(' 10.0.0.1 , 121.140.82.62 ').includes('접속 IP: 121.140.82.62 (집)'));
+ assert.ok(lines('121.140.82.6').includes('접속 IP: 121.140.82.62'),'no prefix match');
+ assert.ok(operationsAlertText({...row,ip:null},'test','k',' ').split('\n').includes('접속 IP: 알 수 없음'));
+ const other=operationsAlertText({...row,type:'security.ip_blocked',data:{}},'test','k','121.140.82.62').split('\n');
+ assert.ok(other.includes('접속 IP: 121.140.82.62')&&other.includes('연결 IP: 172.30.90.2'),'non-landing alerts keep the old format, no (집)');
+ assert.ok(operationsAlertText({...row,type:'funnel.landing_cap',data:{limit:100}},'test','k','121.140.82.62').includes('접속 IP: 보내지 않음'));
+});
+test('deploy_test visit: alerted with 사유 first line and the client IP, not counted in the funnel table or toward the cap; real visits unchanged',async()=>{
+ assert.equal(funnel.isDeployTest({utmSource:'deploy_test_ip'}),true);assert.equal(funnel.isDeployTest({utmSource:'DEPLOY_TEST'}),true);
+ for(const u of ['deploytest','x_deploy_test','insta_bio',undefined])assert.equal(funnel.isDeployTest({utmSource:u}),false,String(u));
+ const since=new Date(),post=body=>fetch(base+'/api/v1/telemetry/funnel',{method:'POST',headers:{'content-type':'application/json','user-agent':IPHONE,'x-crefans-client-ip':'121.140.82.62'},body:JSON.stringify(body)});
+ await new Promise(r=>setTimeout(r,1100));const prior=await count('landing_view');
+ const res=await post({step:'landing_view',utmSource:'Deploy_Test_ip'});assert.equal(res.status,201);assert.deepEqual(await res.json(),{recorded:false});
+ const [row]=await settle(since,1);assert.ok(row);assert.equal(row.type,'funnel.landing_test');assert.equal(row.ip,'121.140.82.62');assert.equal(row.data['사유'],'배포 후 테스트');assert.equal(row.data['오늘 랜딩 방문'],prior);
+ assert.equal(await count('landing_view'),prior,'not counted in funnel_step_daily');
+ const text=operationsAlertText(row,'test','k'.repeat(32),'121.140.82.62').split('\n');
+ assert.equal(text[0],'사유: 배포 후 테스트');assert.equal(text[1],'[crefans] 랜딩 방문');assert.ok(text.includes('접속 IP: 121.140.82.62 (집)'));assert.equal(text.filter(l=>l.startsWith('사유')).length,1);
+ const real=await post({step:'landing_view',utmSource:'insta_bio'});assert.deepEqual(await real.json(),{recorded:true});assert.equal(await count('landing_view'),prior+1,'a real visit still counts');
+ const rows=await settle(since,2);assert.equal(rows[1].type,'funnel.landing_view');assert.equal(rows[1].data['사유'],undefined);
+ // Cap: 100 real alerts today → a real visit is capped, a deploy_test visit is still alerted; the cap query counts only funnel.landing_view.
+ let ops=fakeOps(),where;const capDb={platformOperationalEvent:{count:async q=>{where=q.where;return 100;}},funnelStepDaily:{findUnique:async()=>({count:7})}};
+ assert.equal(await funnel.landingVisitAlert(capDb,ops,{utmSource:'insta_bio'},IPHONE),'capped');assert.equal(where.type,'funnel.landing_view');
+ ops=fakeOps();assert.equal(await funnel.landingVisitAlert(capDb,ops,{utmSource:'deploy_test_ip'},IPHONE),'queued');assert.equal(ops.calls[0][0],'funnel.landing_test');assert.equal(ops.calls[0][1]['사유'],'배포 후 테스트');
 });
