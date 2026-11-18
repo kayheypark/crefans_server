@@ -1,3 +1,14 @@
+## 2026-11-18 21:3x~22:03 KST 랜딩 알림 utm_medium·utm_campaign 표시 (feat/landing-utm) — 운영 API·프론트 utm-20261118
+- 사용자 지시(2026-11-18): "당근에 새롭게 캠페인 시작…텔레그램 알림에서도 해당 파라미터 읽을 수 있게 개선", 운영 배포 승인(클릭 "지금 배포").
+- 링크 규칙(구글 GA 캠페인 URL 안내·PostHog UTM 문서 확인): 당근 `?utm_source=daangn&utm_medium=cpc&utm_campaign=daangn_202611`(무료 소식은 medium=social), X `utm_source=x&utm_medium=social&utm_campaign=launch_202611`, 인스타 `utm_source=instagram&utm_medium=social&utm_campaign=bio|launch_202611`. 소문자 고정.
+- 서버: `src/platform/funnel-stats.ts` landingSource가 utmMedium·utmCampaign도 같은 패턴(`^[A-Za-z0-9_.-]{1,40}$`)으로 받고 형식이 틀리면 버림. landingFrom: 알려진 출처 이름(daangn→당근, x→X, instagram→인스타그램) + 호스트 + utm_source·utm_medium·utm_campaign. 다른 필드(utm_term 등)는 400 유지. openapi 설명 갱신.
+- 프론트: `lib/api/funnel.ts` landing_view에 utm_medium·utm_campaign 전송(같은 패턴). utm_content는 PostHog에만.
+- 검증: 서버 tsc 0·build 0, platform-funnel 12/12, test:openapi 14/14, test:operations 62/1skip(격리 3307 e2e). 대조: funnel-stats.ts를 origin/prod 판으로 되돌리면 새 테스트 포함 2건 실패. 프론트 tests/funnel 5/5·posthog 통과, lib/api/funnel.ts 되돌리면 새 테스트 실패. 프론트 tsc는 빌린 node_modules에 posthog-js 없어 미확인(Jenkins 빌드 통과).
+- 통합: server 7280ed6 → dev bac57a6 → prod fc5b963, front c78e9b9 → dev a8e2637 → prod 45c66b0(문서 증거 재기록, check:docs 0). dev는 prod로 fast-forward.
+- dev(devbox Jenkins): deploy-logs 20261118-214001·214101 실패 0. 개발 서버 실제 브라우저 방문 → 알림 행 유입 "당근 · utm_source=daangn · utm_medium=cpc · utm_campaign=daangn_202611".
+- 운영(devbox 빌드): api 21:53~22:00, front ~22:02 deploy OK, 복구본 /Users/ethan/crefans-recovery/20261118/utm-20261118-{api,front} 검증. 운영 컨테이너 api·worker·frontend utm-20261118 확인. 운영 확인: deploy_test 방문 1회 → funnel.landing_test 행 유입 "utm_source=deploy_test_utm · utm_medium=cpc · utm_campaign=daangn_202611", 텔레그램 전달 완료, 오늘 랜딩 집계 불변(80).
+- 참고: 같은 브라우저 탭은 sessionStorage로 랜딩을 1회만 보냄(확인 때 플래그 지우고 재방문).
+- X: 같은 날 21:34 @crefans_app 최신글을 UTM 링크로 재게시(사용자 선택 "맥 Chrome으로 올려", 기존 글 유지). 인스타는 미변경.
 ## 2026-11-18 19:22~20:0x KST 운영 배포 — API termsfee-20261118(약관 beans.1), 프론트 copysync-20261118(FAQ·배지+PostHog Safari 녹화 수정), 가이드 prod 3d6cde4
 - 통합: server feat ca11315 → dev a49aacd(GitLab·GitHub) → prod 2a296d9(origin/dev 병합, origin/prod 조상 확인, src 차이 legal-documents·beans.service·templates 3개, 병합 트리 tsc 0·build 0·platform-legal 35/35). front fix/copy-sync f3e620e → dev 03b654c(PROGRESS·evidence 충돌만 해소; 작업 중 다른 세션이 GitLab dev에 푸시해 GitHub dev와 갈라졌던 것을 병합으로 맞춰 양쪽 03b654c, 강제 푸시 없음) → prod 2065ca5(사용자 승인으로 fix/replay-blank-trial도 병합, PROGRESS 충돌만 해소, 차이 범위=FAQ·배지 파일+app/service/layout.tsx+tests/posthog.test.cjs+evidence·PROGRESS; tsc 0, npm test 739/757 실패 18=기존 기준, check:docs PASS). guide → dev a1437f4 → prod 3d6cde4.
 - dev(devbox Jenkins): .last-success server a49aacd·front 03b654c, deploy-logs/20261118-194102.log 실패 0. dev API common terms 2026-11-18.beans.1, dev 프론트 번들에 새 FAQ·배지 문구.
