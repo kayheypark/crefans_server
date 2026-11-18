@@ -15,6 +15,7 @@ import {MarketingService} from './marketing.service';
 import {confirmSettlementReceipt} from './settlement-receipts';
 import {LocalMemberService} from '../auth/local/local-member.service';
 import {reportClientError} from './client-errors';
+import {funnelStats} from './funnel-stats';
 import {adminLogs,adminLogDetail} from './admin-logs';
 import {actorContext,auditChange,contentDigest,appendAudit} from './audit';
 import {Body,CanActivate,Controller,Delete,ExecutionContext,Get,Header,HttpCode,Injectable,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
@@ -82,6 +83,7 @@ export class PlatformAdminController{
  @Delete('operators/:id') @Permit('super') deactivateOperator(@Param('id') id:string,@Req() req:any){return updateOperator(this.service.db,req.admin,id,{isActive:false});}
  @Get('dashboard') @Permit(['overview','view']) dashboard(@Query() query:any,@Req() req:any){return adminDashboard(this.service.db,req.admin,query);}
  @Get('overview') @Permit(['overview','view']) overview(){return adminOverview(this.service.db);}
+ @Get('funnel-stats') @Permit(['overview','view']) funnel(){return funnelStats(this.service.db);}
  @Get('revenue') @Permit(['revenue','view']) revenue(@Query() query:any,@Req() req:any){return adminRevenue(this.service.db,req.admin,query);}
  @Get('reserved-handles') @Permit(['reserved-handles','view']) reservedHandles(@Query() query:any,@Req() req:any){return listReservedHandles(this.service.db,req.admin,query);}
  @Get('reserved-handles/:id/history') @Permit(['reserved-handles','view']) reservedHistory(@Param('id') id:string,@Query() query:any,@Req() req:any){return reservedHandleHistory(this.service.db,req.admin,id,query);}

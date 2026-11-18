@@ -65,6 +65,7 @@
 | GET | `/api/v1/admin/financial-policy` | `src/platform/admin.controller.ts::financialPolicy` |
 | PUT | `/api/v1/admin/financial-policy` | `src/platform/admin.controller.ts::setFinancialPolicy` |
 | GET | `/api/v1/admin/financial-policy/history` | `src/platform/admin.controller.ts::financialPolicyHistory` |
+| GET | `/api/v1/admin/funnel-stats` | `src/platform/admin.controller.ts::funnel` |
 | GET | `/api/v1/admin/inquiries` | `src/platform/admin.controller.ts::inquiries` |
 | POST | `/api/v1/admin/inquiries/:id/reply` | `src/platform/admin.controller.ts::reply` |
 | GET | `/api/v1/admin/invites` | `src/platform/signup-invites.controller.ts::list` |
@@ -290,6 +291,7 @@
 | POST | `/api/v1/subscriptions/:creator/cancel` | `src/platform/finance.controller.ts::cancel` |
 | POST | `/api/v1/subscriptions/:id/resume` | `src/platform/finance.controller.ts::resume` |
 | POST | `/api/v1/telemetry/browser-errors` | `src/platform/telemetry.controller.ts::report` |
+| POST | `/api/v1/telemetry/funnel` | `src/platform/telemetry.controller.ts::funnel` |
 
 GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator 목록에 추가하지 않는다. 바이너리 미디어 예외와 권한 의미는 [API 계약](./platform-api.md)을 따른다.
 
@@ -486,8 +488,9 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261117010000_creator_terms_contract`
 - `20261117020000_member_phone_encrypted`
 - `20261117030000_ai_preset_usage`
+- `20261118010000_funnel_step_daily`
 
-## Prisma 전체 정의 (111 models · 15 enums)
+## Prisma 전체 정의 (112 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -2784,5 +2787,15 @@ model AiPresetUsageDaily {
   updated_at DateTime @default(now()) @updatedAt
   @@id([day, kind, preset_key])
   @@map("ai_preset_usage_daily")
+}
+
+/// 2026-11-18: daily AI photo trial funnel step counts (aggregate only, no person, IP or cookie is stored).
+model FunnelStepDaily {
+  day        DateTime @db.Date
+  step       String   @db.VarChar(32)
+  count      Int      @default(0)
+  updated_at DateTime @default(now()) @updatedAt
+  @@id([day, step])
+  @@map("funnel_step_daily")
 }
 ```

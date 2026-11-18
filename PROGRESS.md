@@ -1,3 +1,13 @@
+## 2026-11-18 11:3x KST AI 사진 체험 유입 단계 집계 (feat/funnel-stats, 미배포)
+- 사용자 결정 "방법 1 서버 집계 + 배포": 표 funnel_step_daily(day KST DATE, step, count, updated_at) — 회원·비회원 ID·IP·쿠키·브라우저 정보 없음. 마이그레이션 20261118010000_funnel_step_daily(추가만). 구현 src/platform/funnel-stats.ts, 설명 docs/platform-api.md 끝 절.
+- 서버 직접 집계: guest_consent_agreed(guest.start), ai_started/ai_succeeded_guest|member(ai-photo edit), caption_written(guest caption 응답), post_published_guest(guest content), post_published_member(studio content 새 글 바로 게시만, 크리에이터 포함), signup_completed(auth.signup 트랜잭션 후). 집계 실패는 요청에 영향 없음.
+- 공개 POST /telemetry/funnel: landing_view·guest_consent_view·signup_view만 허용(그 외·서버 단계·추가 필드 400), IP당 분당 30회 메모리 제한(IP는 해시 키로 1분만 메모리, 저장 안 함). 콘솔 GET /admin/funnel-stats(overview.view, 최근 14일).
+- OpenAPI 286/user 109/console 127(이전 281/107/124는 stale였음, 실제 284/108/126).
+- 검증: tsc 0, build 0, platform-funnel 6/6(격리 e2e DB: 컬럼 4개만·미허용 400·증가·IP 제한·동의 집계·14일 0채움), 대조: 허용 목록 제거 시 1실패, 동의 집계 제거 시 1실패. guest 10/10, guest-caption 7/7, ai-photo 44/44, auth 3/3, openapi 14/14. 회원 게시·가입 완료 집계는 코드 연결만(전용 테스트 없음).
+- docs:contracts 재생성(라우트 2·마이그레이션·모델만 차이). check:docs는 변경 파일 증거 만료 20건(통합 시 docs:record/prove 필요).
+- 주의: node_modules 공유라 prisma generate가 메인 체크아웃 생성 클라이언트에 FunnelStepDaily를 추가함(추가만).
+- 미실행: dev/prod 통합, 운영 DB migrate deploy, 배포.
+
 ## 2026-11-17 텔레그램 주문·입금 알림 보강 (feat/order-telegram, 운영 crefans-api:ordertg-20261117)
 - 사용자 결정: 무통장 주문 접수 알림(bank_transfer.opened)에 상품명(productName, 상품 카탈로그 문구 60자, 개인정보 아님) 추가 — AI 이용권 상품명·광고상품명·'콩 N개'. 알림 본문 '상품: …'.
 - 사용자 결정: 구매자 '입금했어요' → POST payments/bank-transfer/:kind/:orderId/deposited, 본인 입금 대기 주문만, 주문당 1회(dedupe) 텔레그램 'bank_transfer.deposit_reported'(이름·계좌 없음). 은행 자동 입금 확인은 없음(운영자 콘솔 확인 그대로).

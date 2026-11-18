@@ -32,6 +32,7 @@ import {ticketSummary,useAiPhotoTicket} from './ai-photo-tickets';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 import {recordPresetUsage} from './ai-preset-usage';
+import {recordFunnelStep} from './funnel-stats';
 
 export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=2000;
 const MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
@@ -199,7 +200,8 @@ export class AiPhotoService{
   const trace:AiFailureTrace={requestId:requestContext.getStore()?.requestId||randomUUID(),actorId:sub,selectedProvider,selectedModel:this.settings.model,sequence:0,stage:'validation',provider:'local'},started=Date.now();
   return aiFailureTrace.run(trace,async()=>{
    await traceAiEvent(this.service.db,'started',{mode:diagnosticId(mode),selectedModel:trace.selectedModel,selectedProvider});
-   try{const result=await this.performEdit(sub,input,mask,guest);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);await recordAiRequest(this.service.db,this.configService,input,trace,{count:result.images.length,targetId:result.images[0]?.id});await recordPresetUsage(this.service.db,input);return result;}
+   await recordFunnelStep(this.service.db,guest?'ai_started_guest':'ai_started_member');
+   try{const result=await this.performEdit(sub,input,mask,guest);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);await recordAiRequest(this.service.db,this.configService,input,trace,{count:result.images.length,targetId:result.images[0]?.id});await recordPresetUsage(this.service.db,input);await recordFunnelStep(this.service.db,guest?'ai_succeeded_guest':'ai_succeeded_member');return result;}
    catch(error){await recordAiFailure(this.service.db,this.configService,sub,input,error,trace,started);await this.failureAlert(sub,error,trace,started,!!guest);throw error;}
   });
  }
