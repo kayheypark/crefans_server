@@ -48,6 +48,7 @@ test('every run is logged, failures emit immediately, work is summarized hourly'
  const jobs=new Map(),events=[],start=new Date('2026-10-21T16:00:00Z');
  const fake={platformAuditLog:{create:async({data})=>data,upsert:async({create})=>create},platformSecurityIp:{deleteMany:async()=>({count:0})},platformJob:{
   create:async({data})=>{jobs.set(data.id,data);return data;},
+  createMany:async({data})=>{for(const r of data)if(!jobs.has(r.id))jobs.set(r.id,r);},
   upsert:async({where,create})=>{if(!jobs.has(where.id))jobs.set(where.id,create);return jobs.get(where.id);},
   findUniqueOrThrow:async({where})=>jobs.get(where.id),
   findMany:async({where})=>[...jobs.values()].filter(r=>r.id.startsWith('worker-run-')&&r.completed_at>where.completed_at.gt&&r.completed_at<=where.completed_at.lte),
@@ -56,13 +57,13 @@ test('every run is logged, failures emit immediately, work is summarized hourly'
  const isolated=new PlatformOperationsService(fake,new ConfigService({}));
  await isolated.reportRun(start,{},{},start);
  await isolated.reportRun(new Date(+start+60000),{},{},new Date(+start+60000));
- assert.equal(jobs.size,3);assert.equal(events.length,0);
+ assert.equal(jobs.size,4);assert.equal(events.length,0);// two runs, the hourly clock and the 09:00 KST digest clock
  await isolated.reportRun(new Date(+start+120000),{},{renewal:1},new Date(+start+120000));
  assert.equal(events.length,0);
  await isolated.reportRun(new Date(+start+180000),{renewal:1},{},new Date(+start+180000));
  assert.equal(events[0].type,'worker.error');
  await isolated.reportRun(new Date(+start+3600000),{},{},new Date(+start+3600000));
- assert.equal(events[1].type,'worker.hourly');assert.equal(events[1].data.runs,4);assert.equal(events[1].data.failedRuns,1);assert.equal(events[1].data.processed,1);
+ assert.equal(events[1].type,'worker.hourly');assert.ok(events[1].delivered_at,'hourly summary goes to the daily digest, not Telegram');assert.equal(events[1].last_error_code,'DIGESTED');assert.equal(events[1].data.runs,4);assert.equal(events[1].data.failedRuns,1);assert.equal(events[1].data.processed,1);
  await isolated.reportRun(new Date(+start+3660000),{},{},new Date(+start+3660000));
  assert.equal(events.length,2);assert.ok(!events.some(e=>e.type==='worker.completed'));assert.equal([...jobs.keys()].filter(k=>k.startsWith('worker-run-')).length,6);
 });

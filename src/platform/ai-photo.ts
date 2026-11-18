@@ -31,7 +31,7 @@ import {costumeReferenceIds,readCostumeReference,STOCKING_COSTUME_IDS} from './a
 import {ticketSummary,useAiPhotoTicket} from './ai-photo-tickets';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
-import {recordPresetUsage} from './ai-preset-usage';
+import {presetUsageKeys,recordPresetUsage} from './ai-preset-usage';
 import {AI_COST_ALERTS,AI_PROVIDER_DAILY_CALLS,kstDay,reserveProviderCall} from './ai-photo-cost';
 import {recordFunnelStep} from './funnel-stats';
 
@@ -102,6 +102,12 @@ export class AiPhotoService{
   if(code==='AI_PROVIDER_DAILY_CAP')return;// Alerted once per day by providerCall instead of on every refused request.
   await this.operations.record('ai-photo.failed',{errorCode:code,status:error?.getStatus?.()||500,stage:diagnosticId(trace.stage)||'unknown',provider:diagnosticId(trace.provider)||'unknown',errorType:diagnosticId(trace.providerCode)||'none',actor:guest||sub.startsWith('guest:')?'guest':'member',durationMs:Date.now()-started},undefined,{omitIp:true});
  }catch{this.logger.warn({event:'ai-photo.failure_alert_failed',requestId:trace.requestId});}}
+ // 2026-11-18 user decision: early stage, so every successful generation is also sent at once (never deduped or digested).
+ // Categories, preset keys and counts only: no prompt, photo, member id, email or IP leaves the service.
+ private async successAlert(sub:string,input:any,trace:AiFailureTrace,started:number,guest:boolean){try{
+  const kind=String(input?.kind||''),kinds=kind==='combined'?editKinds(kind,input?.editKinds):[kind],presets=presetUsageKeys(input).map(p=>`${p.kind}:${p.key}`).join(', ');
+  await this.operations.record('ai-photo.succeeded',{actor:guest||sub.startsWith('guest:')?'guest':'member',mode:diagnosticId(input?.mode)||'general',style:diagnosticId(input?.style)||'photo',kinds:kinds.join(','),presets:presets||'없음',references:trace.referenceImages??0,durationMs:Date.now()-started},undefined,{omitIp:true});
+ }catch{this.logger.warn({event:'ai-photo.success_alert_failed',requestId:trace.requestId});}}
  // Telegram: every 50 guest generations a day and when the daily cap closes (operations alert queue, one message per milestone).
  private async guestUsageAlert(closed=false){try{const used=await this.usedIn('ai-photo:guest-total',DAY);if(closed)await this.operations.record('guest.ai_closed',{used:Math.min(used,GUEST_DAILY_TOTAL),limit:GUEST_DAILY_TOTAL},`guest-ai-closed:${this.window()}`);else if(used>0&&(used%50===0||used===GUEST_DAILY_TOTAL))await this.operations.record('guest.ai_usage',{used,limit:GUEST_DAILY_TOTAL},`guest-ai:${this.window()}:${used}`);}catch{}}
  costDay(){return kstDay();}
@@ -210,7 +216,7 @@ export class AiPhotoService{
   return aiFailureTrace.run(trace,async()=>{
    await traceAiEvent(this.service.db,'started',{mode:diagnosticId(mode),selectedModel:trace.selectedModel,selectedProvider});
    await recordFunnelStep(this.service.db,guest?'ai_started_guest':'ai_started_member');
-   try{const result=await this.performEdit(sub,input,mask,guest);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);await recordAiRequest(this.service.db,this.configService,input,trace,{count:result.images.length,targetId:result.images[0]?.id});await recordPresetUsage(this.service.db,input);await recordFunnelStep(this.service.db,guest?'ai_succeeded_guest':'ai_succeeded_member');return result;}
+   try{const result=await this.performEdit(sub,input,mask,guest);await traceAiEvent(this.service.db,'succeeded',{selectedModel:trace.selectedModel,selectedProvider,count:result.images.length,targetId:result.images[0]?.id},Date.now()-started,200);await recordAiRequest(this.service.db,this.configService,input,trace,{count:result.images.length,targetId:result.images[0]?.id});await recordPresetUsage(this.service.db,input);await this.successAlert(sub,input,trace,started,!!guest);await recordFunnelStep(this.service.db,guest?'ai_succeeded_guest':'ai_succeeded_member');return result;}
    catch(error){await recordAiFailure(this.service.db,this.configService,sub,input,error,trace,started);await this.failureAlert(sub,error,trace,started,!!guest);throw error;}
   });
  }
@@ -256,6 +262,7 @@ export class AiPhotoService{
    for(let i=0;i<alpha.length;i++){overlay[i*4]=244;overlay[i*4+1]=114;overlay[i*4+2]=182;overlay[i*4+3]=Math.round((255-alpha[i])*.55);}
    guide=await sharp(image!).composite([{input:overlay,raw:{width:width!,height:height!,channels:4}}]).png().toBuffer();
   }
+  {const trace=aiFailureTrace.getStore();if(trace)trace.referenceImages=references.length;}
   if(1+(guide?1:0)+references.length>10)reject(400,'INVALID_COSTUME_REFERENCES','의상과 보관함 참고 사진의 수를 줄여 주세요. 원본을 포함해 최대 10장이에요.');
   await this.stage('quota');
   const key=this.creatorKey(sub);
