@@ -3426,3 +3426,8 @@
 - 사용자 승인("이번 작업 + 처리방침·약관 개정", 녹화 가리기 함께). prod `857e8bc` = 43df483 + 짧은 코드(7d526dc) + 개정(03eab9f, 9adfe12 체리픽) + 공유 문구(857e8bc). GUEST_LIMITS_DATE는 배포일 그대로 2026-11-19(KST 23시대 배포).
 - devbox 빌드·운영 교체 OK(api/worker만 교체, 마이그레이션 guest_share_links 적용), 운영 검사: privacy 2026-11-19.guest-limits.1·terms 2026-11-19.ai-units.1, guest/session replayConsented=false, share-visit 없는 코드 {accepted:false}. 복구본 /Users/ethan/crefans-recovery/20261119/share-legal-20261119-api 검증 후 운영 이전 이미지 정리. runtime.env 변경 없음(WELCOME_MAIL_ENABLED 유지).
 - 미확인: 운영에서 실제 결과로 짧은 링크 발급·다른 네트워크 방문 보상.
+
+### 2026-11-20 05:0x 비회원 공유 보상을 첫 공유 때 바로 지급 (dev·개발 서버, 운영 대기)
+- 사용자 결정: 공유 창 완료 또는 링크 복사 = 공유. `POST /guest/ai-photo/share-done {mediaId}` 본인 완료 AI 결과 확인 후 grantGuestShareReward(브라우저당 1회, 동시 요청도 1회), 감사 guest.ai_result_share_reward {via:'share'}. share-link·share-visit 삭제, 마이그레이션 `20261120050000_drop_guest_share_links`(개발 서버 적용).
+- 처리방침 17항 `2026-11-20.guest-share.1`·약관 13조 `2026-11-20.share-reward.1`, SHARE_REWARD_DATE='2026-11-20'(운영 배포일이 다르면 옮길 것). 공유 링크 보관·방문자 IP 비교 설명 삭제, "공유 창으로 공유하거나 링크를 복사하면 체험 식별값으로 한 번 기록, 누구에게 공유했는지는 수집하지 않음".
+- 검증: tsc, platform-legal 39/39, platform-openapi 15/15(288개), 공유 테스트(이전 코드로 되돌리면 실패). 개발 서버 API: 원본 사진 404, 첫 공유 granted true, 두 번째 false, 잔여 3→6.
