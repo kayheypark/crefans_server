@@ -744,8 +744,7 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 | POST | /guest/session | 체험 동의(consent, version) 후 cf_guest 발급 |
 | POST | /media/guest | 체험 사진 업로드(이미지만, IP당 하루 60회) |
 | POST | /guest/ai-photo/edit | 체험 AI 사진 편집(보관함·하트 불가) |
-| POST | /guest/ai-photo/share-link | 본인의 AI 결과 사진을 확인하고 7일 유효한 공유 보상 토큰을 발급 |
-| POST | /guest/ai-photo/share-visit | 기존 체험 쿠키가 없고 공유자와 다른 네트워크에서 들어온 유효한 공유 링크 방문을 확인하여 공유자에 체험 이용권 3장 1회 지급 |
+| POST | /guest/ai-photo/share-done | 본인의 완료된 AI 결과 사진을 공유 창으로 공유했거나 링크를 복사하면 체험 이용권 3장을 브라우저당 한 번 지급(2026-11-20 사용자 결정, 공유 내용은 저장하지 않음) |
 | POST | /guest/content | 체험 게시물 바로 게시(본인 AI 결과물만) |
 | POST | /guest/content/caption | 비워 둔 제목·본문 AI 작성(고른 항목 이름·요청 문장만 OpenAI 전송, 입력·결과 유해성 검사, 실패·한도 초과 시 정해진 문장, 방문자당·IP당 하루 30회, 전체 하루 1,000회). 방문자가 확인한 뒤 /guest/content로 게시 |
 | POST | /guest/content/:id | 같은 브라우저(작성자 guest id) 체험 게시물의 제목·본문만 수정(사진·공개 범위·삭제 불가, 하루 30회·IP 60회, 남의 글 404) — 2026-11-16 |

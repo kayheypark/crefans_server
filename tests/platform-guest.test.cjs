@@ -52,32 +52,23 @@ test('replay consent is always offered with the required trial consent (privacy 
  assert.equal((await guestsService.status(agreed.req,async()=>({limit:3,remaining:3,postRewardClaimed:false,shareRewardClaimed:false}))).replayConsented,true,'recorded replay consent unmasks the trial screens');
 });
 
-test('AI result share grants three credits once on a new visitor network',async()=>{
- const owner=await startGuest(),other=await startGuest(),visitor=browser();
- const result=await upload(owner.id,{aiGenerated:true}),original=await upload(owner.id);
- const send=(id)=>requestContext.run({ip:'192.0.2.44'},()=>guestsService.shareLink(owner.req,id));
- const visit=(token,ip='198.51.100.31',req=visitor.req)=>requestContext.run({ip},()=>guestsService.shareVisit({...req,headers:{'user-agent':'Mozilla/5.0 Safari/605.1'}},token));
- await assert.rejects(send(original),code('GUEST_SHARE_NOT_FOUND'));
+// 2026-11-20 user decision: the reward is paid at the first share (share sheet finished or link copied), once per browser.
+test('AI result share grants three credits at the first share of the guest\'s own result, once',async()=>{
+ const owner=await startGuest(),other=await startGuest();
+ const result=await upload(owner.id,{aiGenerated:true}),original=await upload(owner.id),second=await upload(owner.id,{aiGenerated:true});
+ const done=id=>guestsService.shareDone(owner.req,id);
+ await assert.rejects(done('bad id!'),code('GUEST_SHARE_INVALID'));
+ await assert.rejects(done(original),code('GUEST_SHARE_NOT_FOUND'));
  const foreign=await upload(other.id,{aiGenerated:true});
- await assert.rejects(send(foreign),code('GUEST_SHARE_NOT_FOUND'));
- const {token}=await send(result);
- assert.ok(!token.includes(owner.id));
+ await assert.rejects(done(foreign),code('GUEST_SHARE_NOT_FOUND'));
  assert.equal((await photos.guestQuota(owner.id)).remaining,3);
- assert.equal((await visit(token,'192.0.2.44')).accepted,false);
- assert.equal((await visit(token,'198.51.100.31',owner.req)).accepted,false);
- // 2026-11-19: an 8-character code stored on the server; an unknown or expired code is refused.
- assert.match(token,/^[A-Za-z0-9]{8}$/);
- const tampered=(token[0]==='A'?'B':'A')+token.slice(1);
- assert.equal((await visit(tampered)).accepted,false);
- const expired=await send(result);await db.guestShareLink.update({where:{code:expired.token},data:{expires_at:new Date(Date.now()-1000)}});
- assert.equal((await visit(expired.token,'198.51.100.39')).accepted,false);
- await send(result);assert.equal(await db.guestShareLink.count({where:{code:expired.token}}),0,'expired codes are deleted when new links are made');
- const visits=await Promise.all([visit(token),visit(token,'198.51.100.32')]);
- assert.equal(visits.filter(row=>row.accepted).length,1);
- const {token:second}=await send(result);
- assert.equal((await visit(second,'198.51.100.33')).accepted,false);
+ const twice=await Promise.all([done(result),done(result)]);
+ assert.equal(twice.filter(row=>row.granted).length,1,'concurrent shares pay once');
+ assert.deepEqual(await done(second),{granted:false},'a later share of another result pays nothing');
  const quota=await photos.guestQuota(owner.id);
  assert.equal(quota.remaining,6);assert.equal(quota.shareRewardClaimed,true);assert.equal(quota.postRewardClaimed,false);
+ assert.equal(await db.platformAuditLog.count({where:{entity_id:owner.id,action:'guest.ai_result_share_reward'}}),1);
+ assert.equal(typeof guestsService.shareVisit,'undefined','visits no longer pay');
 });
 
 test('a guest publishes only, without comments or tips; the post is in the feed for 24 hours and then closed',async()=>{
