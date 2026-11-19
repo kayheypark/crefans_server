@@ -16,6 +16,14 @@ test('reservation/failure restoration are exactly once; no negative counts; refu
 test('proportional refund freezes remaining and same identity recovers an uncertain cancellation',async()=>{const o=await paid(),use=await reservePaidPhoto(db,member);await finishPaidPhoto(db,use.id,true);uncertain=true;await assert.rejects(shop.refund(member,o.id),/response lost/);assert.equal((await shop.order(member,o.id)).status,'refunding');assert.equal(await paidPhotoCount(db,member),0);const before=cancels;const refunded=await shop.refund(member,o.id);assert.equal(cancels,before);assert.equal(refunded.refundAmount,900);assert.equal(refunded.remaining,0);assert.equal(refunded.status,'refunded');await shop.refund(member,o.id);assert.equal(cancels,before);});
 test('approval then local failure recovers without second provider charge',async()=>{const o=await create(),original=shop.apply.bind(shop),before=approvals;shop.apply=async()=>{throw Error('synthetic database failure');};try{await assert.rejects(shop.confirm(member,o.id,{orderId:o.id,amount:o.amount,paymentKey:'key-'+o.id}),/synthetic database/);}finally{shop.apply=original;}await shop.reconcile();assert.equal(approvals,before+1);assert.equal((await shop.order(member,o.id)).remaining,10);});
 test('external cancellation freezes paid credits; forged callback cannot grant',async()=>{const o=await paid();await assert.rejects(shop.apply(o.id,{...providerRows.get(o.id),currency:'USD'}),code('PAYMENT_MISMATCH'));await shop.apply(o.id,{...providerRows.get(o.id),status:'CANCELED',balanceAmount:0});assert.equal((await shop.order(member,o.id)).status,'review');});
+test('half-use balance is frozen and refunded at the purchased unit price in whole KRW',async()=>{
+ const order=await paid();
+ await db.aiShopOrder.update({where:{id:order.id},data:{remaining:9.5}});
+ const result=await shop.refund(member,order.id);
+ assert.equal(result.refundAmount,950);
+ assert.equal(result.status,'refunded');
+ assert.equal((await shop.order(member,order.id)).refund_quantity,9.5);
+});
 test('archival keeps paid snapshots, blocks new sale, and permissions are independent',async()=>{const before=await db.aiShopOrder.findFirst({where:{creator_id:member,status:'paid'}});await admin.remove(product.id,{version:product.version});await assert.rejects(create(),code('PRODUCT_UNAVAILABLE'));assert.equal((await shop.order(member,before.id)).name,'검증용 10회');const {can}=require('../dist/src/platform/admin-permissions');assert.equal(can({role:'ADMIN',permissions:{advertising:{view:true,update:true}}},'shop','update'),false);assert.equal(can({role:'SUPER_ADMIN'},'shop','update'),true);});
 // 2026-11-17 user decision: signed-out visitors browse the shop. The public list is the visible catalog only, without any member check.
 test('public catalog lists only visible products and needs no member; the route has no session guard',async()=>{

@@ -17,7 +17,7 @@ export function safeAuditData(data:Record<string,unknown>={}){
   else if(k==='providerCode'){const value=identifier(v);if(value)safe[k]=value;}
   else if(k==='errorCode'){if(typeof v==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(v))safe[k]=v;}
   else if(scalarKeys.has(k)){const value=identifier(v,k==='messageId'?160:191);if(value)safe[k]=value;}
-  else if(numericKeys.has(k)&&typeof v==='number'&&Number.isSafeInteger(v)&&v>=0)safe[k]=v;
+  else if(numericKeys.has(k)&&typeof v==='number'&&v>=0&&(Number.isSafeInteger(v)||(k==='count'&&Number.isSafeInteger(v*2))))safe[k]=v;
   else if(k==='route')safe.route=safeRoute(v);
   else if(k==='changedFields'&&Array.isArray(v))safe[k]=v.filter(x=>typeof x==='string'&&/^[a-zA-Z_]{1,48}$/.test(x)).slice(0,40);
   else if(k==='frames'&&Array.isArray(v))safe[k]=v.filter(x=>typeof x==='string'&&/^(?:(?:src|dist|node_modules|_next\/static)\/[A-Za-z0-9_./@-]+|node:[A-Za-z0-9_/-]+):\d+:\d+$/.test(x)).slice(0,12);
