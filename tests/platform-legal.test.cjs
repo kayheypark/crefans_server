@@ -380,7 +380,7 @@ test('2026-11-19 guest-limits.1 / ai-units.1: privacy 17항 and terms 13조 matc
  const seventeen=p.sections.find(s=>s.title.startsWith('17. ')).body,thirteen=t.sections.find(s=>s.title.startsWith('13. ')).body;
  assert.ok(seventeen.includes(`브라우저당 체험 이용권 ${GUEST_AI_LIMIT}장, 첫 게시글을 올리면 ${GUEST_POST_REWARD}장, 공유한 결과 링크로 다른 방문자가 처음 들어오면 ${GUEST_SHARE_REWARD}장`));
  assert.ok(seventeen.includes(`빠르게 ${m('fast',dm).units}장·표준 ${m('standard',dm).units}장·정밀하게 ${m('precise',dm).units}장`));assert.ok(thirteen.includes(`빠르게 ${m('fast',dm).units}개, 표준 ${m('standard',dm).units}개, 정밀하게 ${m('precise',dm).units}개`));
- assert.doesNotMatch(seventeen,/브라우저당 10회/);assert.match(seventeen,/결과 공유: 체험 결과 사진의 공유 링크에는/);assert.match(seventeen,/만료 시각\(7일\)/);
+ assert.doesNotMatch(seventeen,/브라우저당 10회/);assert.match(seventeen,/결과 공유: 체험 결과 사진의 공유 링크를 만들면/);assert.match(seventeen,/링크에는 임의의 짧은 코드만 넣으며, 만료된 기록은 삭제합니다/);assert.match(seventeen,/만료 시각\(7일\)/);
  assert.match(thirteen,/빠르게 0\.5개, 표준 1개, 정밀하게 2개/);assert.match(thirteen,/브라우저당 체험 이용권 3장/);assert.match(thirteen,/이벤트·프로모션이나 안내 페이지에 따라 달라질 수 있으며/);
  assert.doesNotMatch(thirteen,/무료 생성은 하루 10회/);
  p.sections.forEach((s,i)=>{if(!s.title.startsWith('17. '))assert.deepEqual(s,prevP.sections[i],s.title);});
