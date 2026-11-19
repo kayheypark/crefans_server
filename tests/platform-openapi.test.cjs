@@ -95,6 +95,28 @@ test('guard backend failure is closed and never exposes internal exception',asyn
  denyAdmin=true;
  try{for(const path of Object.values(API_DOCS_PAGES)){const response=await request(path+'/openapi.json','admin_access_token='+ADMIN_TOKEN);assert.equal(response.status,500);assert.doesNotMatch(await response.text(),/private-db-failure|openapi/);}}finally{denyAdmin=false;}
 });
+test('photo balances accept half units and reject quarters in every editor response',()=>{
+ const Ajv=require('ajv'),validator=new Ajv();
+ const endpoints=[
+  ['get','guest/session',['remaining']],
+  ['post','guest/ai-photo/edit',['remaining']],
+  ['get','studio/ai-photo/quota',['remaining','paidRemaining','rewardRemaining']],
+  ['post','studio/ai-photo/edit',['remaining']],
+  ['post','studio/ai-photo/hearts',['remaining','credits']],
+  ['post','studio/ai-photo/reset-ticket',['remaining']]
+ ];
+ for(const [method,path,fields] of endpoints){
+  const success=document.paths['/api/v1/'+path][method].responses[method==='post'?'201':'200'];
+  const properties=success.content['application/json'].schema.properties.data.properties;
+  for(const field of fields){
+   assert.ok(properties[field],path+' '+field);
+   const validates=validator.compile(properties[field]);
+   for(const value of [0,0.5,1,9.5])assert.equal(validates(value),true,path+' '+field);
+   for(const value of [0.25,-0.5,'9.5'])assert.equal(validates(value),false,path+' '+field);
+  }
+ }
+});
+
 test('documented serializers use the current response field names',async()=>{
  const schema=document.components.schemas;
  const check=(name,value)=>assert.deepEqual(Object.keys(schema[name].properties).sort(),Object.keys(value).sort(),name);

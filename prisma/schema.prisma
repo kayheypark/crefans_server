@@ -1129,7 +1129,8 @@ model MemberChallenge {
 /// Shared across processes; keys are hashes, not emails or IP addresses.
 model AuthRateBucket {
   id         String @id @db.Char(64)
-  count      Int @default(1)
+  count      Float @default(1)
+  quota_generation String? @db.Char(36)
   expires_at DateTime
   @@index([expires_at])
   @@map("auth_rate_buckets")
@@ -2045,7 +2046,7 @@ model AiPhotoResetTicketUse {
  ticket_id String @db.VarChar(191)
  creator_user_id String @db.VarChar(191)
  /// today's used count that the ticket cleared
- used_before Int
+ used_before Float
  created_at DateTime @default(now())
  @@index([ticket_id])
  @@index([creator_user_id, created_at])
@@ -2090,13 +2091,13 @@ model AiShopOrder {
  terms String @db.Text
  environment String @db.VarChar(10)
  status String @default("pending") @db.VarChar(20)
- remaining Int @default(0)
+ remaining Float @default(0)
  payment_key String? @db.VarChar(200)
  locked_until DateTime?
  paid_at DateTime?
  expires_at DateTime?
  refund_amount Int?
- refund_quantity Int?
+ refund_quantity Float?
  refunded_at DateTime?
  failure_code String? @db.VarChar(100)
  created_at DateTime @default(now())
@@ -2107,6 +2108,9 @@ model AiShopOrder {
 }
 model AiShopUse {
  id String @id @default(uuid())
+ request_id String? @db.VarChar(191)
+ units Float @default(1)
+ @@index([request_id])
  order_id String @db.VarChar(191)
  creator_id String @db.VarChar(191)
  status String @default("reserved") @db.VarChar(20)
@@ -2120,7 +2124,7 @@ model AiShopUse {
 model AiHeartWallet {
  user_id String @id @db.VarChar(191)
  hearts Int @default(0)
- credits Int @default(0)
+ credits Float @default(0)
  @@map("ai_heart_wallets")
 }
 model AiHeartGame {
@@ -2139,6 +2143,7 @@ model AiHeartGame {
 }
 model AiHeartUse {
  id String @id
+ units Float @default(1)
  user_id String @db.VarChar(191)
  status String @default("reserved") @db.VarChar(20)
  @@map("ai_heart_uses")

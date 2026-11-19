@@ -98,9 +98,9 @@
 
 - 블루 아카이브 카테고리는 기존 기본교복4종+신규 학생 기본복112종=116종(2026-11-14 확장). 프론트카드와 서버허용ID/참조파일을 함께 관리한다.
 
-- AI 사진 생성은 모든 모드에서 Seedream 5.5로 고정하고 AI_PHOTO_BYTEPLUS_API_KEY를 사용한다. OpenAI 입력/출력 안전검사 키는 별도 유지하며 키 미설정 상태로 운영 전환하지 않는다.
+- AI 사진 생성은 모든 모드에서 선택한 generationMethod로 생성하며 AI_PHOTO_BYTEPLUS_API_KEY를 사용한다. OpenAI 입력/출력 안전검사 키는 별도 유지하며 키 미설정 상태로 운영 전환하지 않는다.
 
-- mode는 코스어/일반 UI 기록으로만 보존한다. 누락은 일반이며 생성 모델은 모두 Seedream 5.5다. 기존 AI_PHOTO_COSPLAY_PROVIDER/AI_PHOTO_MODEL/AI_PHOTO_QUALITY 설정은 사용하지 않고 키 누락 시 대체 생성 모델 없이 비활성화한다.
+- mode는 코스어/일반 UI 기록으로만 보존한다. 누락은 일반이다. generationMethod가 fast/standard/precise이면 서버가 Flash/5.5/Pro로 매핑하고 각각 0.5/1/2개를 차감한다. generationMethod 생략은 기존 설정과 1개 차감을 유지한다. 기존 AI_PHOTO_COSPLAY_PROVIDER/AI_PHOTO_MODEL/AI_PHOTO_QUALITY 설정은 사용하지 않고 키 누락 시 대체 생성 모델 없이 비활성화한다.
 
 - Seedream 생성 요청은 watermark=false로 제공사 가시 워터마크를 끈다. aiGenerated 메타데이터와 게시글 AI 표시·크리에이터 워터마크 정책은 유지한다.
 

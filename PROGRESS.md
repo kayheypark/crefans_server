@@ -1,3 +1,10 @@
+## 2026-11-19 AI 사진 생성 방식 바로 선택
+
+- 회원·비회원이 편집 요청에 빠르게(`fast`, 0.5개), 표준(`standard`, 1개), 정밀하게(`precise`, 2개)를 지정한다. 서버는 선택한 방식으로 Seedream 생성 요청·미디어 기록·원가 집계를 일치시킨다. 생성 방식을 생략한 기존 앱은 이전 서버 설정으로 1개를 사용한다. [API 계약 및 단가](docs/platform-api.md)
+- 12:48 KST, macOS 개발 PC에서 `6047074` 기준 변경본을 격리 MySQL과 공급사 대역으로 검사했다. `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-ai-photo.test.cjs tests/platform-openapi.test.cjs`가 종료 코드 0으로 69/69건 통과했다. 회원·비회원 각각 3개 방식의 모델·잔액·저장 모델·원가, 잘못된 값 5종의 차감 전 거절을 포함한다. 공급사 실호출은 수행하지 않았다.
+- 12:51 KST, 회원·비회원 잔액 응답 6개 경로의 OpenAPI를 0.5 배수로 명시했다. `npm run build`와 `node --test tests/platform-openapi.test.cjs`는 종료 코드 0(15/15)이며, 9.5를 허용하고 0.25·음수·문자열을 거절하는 JSON Schema 검사를 포함한다.
+- 12:53 KST, macOS `6047074` 기준 변경본에서 `npm run build` 및 `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-ai-photo.test.cjs tests/platform-ai-shop.test.cjs tests/platform-ai-subscription.test.cjs tests/platform-ai-photo-grants.test.cjs` 종료 코드 0, 77/77 통과. 격리 MySQL과 공급사 대역에서 기존 정수 잔액, 0.5개 단위 혼합 차감·복구, 동시 요청, 초기화 후 복구, 감사기록, 카드·구독 부분 환불을 확인했다. 잔액 부족·음수·허용 단위 밖의 입력은 해당 회귀 검사의 대조군이다. 실제 유료 생성과 결제사 환불은 실행하지 않았다.
+
 ## 2026-11-19 개발 AI 사진 편집 Flash 선택
 
 - 운영 기준 `e93d149`에서 회원·비회원 공통 사진 편집 모델을 `AI_PHOTO_BYTEPLUS_MODEL`로 선택하도록 변경했다. 기본값은 기존 5.5이며 선택 가능한 Flash ID는 `dola-seedream-5-0-flash-260915`다. 오타는 서비스 시작 시 검출한다. 환경 예시는 `infra/platform/runtime.env.example`, API 계약은 `docs/platform-api.md`에 있다.

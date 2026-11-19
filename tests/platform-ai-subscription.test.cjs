@@ -61,8 +61,9 @@ test('refund returns unused uses × unit price by partial cancel and ends the su
  const s=await subs.start(creator,{productId:plan.id,version:plan.version,termsVersion:AI_SHOP_TERMS});await subs.activate(s.id,'enc-3','하나 **** 0001');
  const use=await reservePaidPhoto(db,creator);await db.aiShopUse.update({where:{id:use.id},data:{status:'consumed'}});
  const order=await db.aiShopOrder.findFirstOrThrow({where:{creator_id:creator,status:'paid',expires_at:{gt:new Date()}}});assert.equal((await shop.orders(creator)).find(o=>o.id===order.id).subscription,true);await assert.rejects(shop.refund(creator,order.id),code('SUBSCRIPTION_ORDER'),'subscription uses are not refunded through the one-time PG path');
+ await db.aiShopOrder.update({where:{id:order.id},data:{remaining:{decrement:.5}}});
  const refunded=await subs.refund(creator,s.id);assert.equal(refunded.status,'refunded');
- const c=cancels.at(-1);assert.equal(c.amount,150*65);assert.equal(c.remainingAmount,9900-150*65);assert.equal(await paidPhotoCount(db,creator),0);
+ const c=cancels.at(-1);assert.equal(c.amount,150*64.5);assert.equal(c.remainingAmount,9900-150*64.5);assert.equal(await paidPhotoCount(db,creator),0);
  failNext=1;const f=await subs.start(creator,{productId:plan.id,version:plan.version,termsVersion:AI_SHOP_TERMS});await assert.rejects(subs.activate(f.id,'enc-4','x'),code('INICIS_CARD_DECLINED'));
  assert.equal((await db.aiSubscription.findUnique({where:{id:f.id}})).status,'ended');
 });
