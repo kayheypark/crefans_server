@@ -7,7 +7,7 @@ import {createHash,createHmac} from 'node:crypto';
 // - Guest posts show in the whole feed for 24 hours, then nobody but the same browser can open them.
 // - Signing in (or signing up) on the same browser moves the guest posts and photos to that account.
 // - AI credits: three per visitor plus a one-time publishing reward. Network and service caps count requests.
-export const GUEST_COOKIE='cf_guest',GUEST_PREFIX='guest:',GUEST_POST_HOURS=24,GUEST_AI_LIMIT=3,GUEST_POST_REWARD=3,GUEST_IP_DAILY=10,GUEST_DAILY_TOTAL=200;
+export const GUEST_COOKIE='cf_guest',GUEST_PREFIX='guest:',GUEST_POST_HOURS=24,GUEST_AI_LIMIT=3,GUEST_POST_REWARD=3,GUEST_SHARE_REWARD=3,GUEST_IP_DAILY=10,GUEST_DAILY_TOTAL=200;
 export const GUEST_CONSENT_VERSION='2026-11-16.guest.5';
 export const GUEST_REPLAY_CONSENT_VERSION='2026-11-19.replay.1';
 export const GUEST_RETENTION_DAYS=30;
@@ -42,4 +42,17 @@ export async function grantGuestPostReward(tx:any,id:string):Promise<number>{
  const inserted=await tx.$executeRaw`INSERT IGNORE INTO auth_rate_buckets (id,count,expires_at)
    VALUES (${postRewardId(id)},${GUEST_POST_REWARD},${expires})`;
  return inserted===1?GUEST_POST_REWARD:0;
+}
+
+const shareRewardId=(id:string)=>digest('ai-photo:guest-share-reward:'+id);
+
+export async function guestShareRewardClaimed(db:any,id:string):Promise<boolean>{
+ return !!await db.authRateBucket.findUnique({where:{id:shareRewardId(id)},select:{id:true}});
+}
+
+export async function grantGuestShareReward(tx:any,id:string):Promise<boolean>{
+ const expires=new Date(Date.now()+GUEST_RETENTION_DAYS*86400000);
+ const inserted=await tx.$executeRaw`INSERT IGNORE INTO auth_rate_buckets (id,count,expires_at)
+   VALUES (${shareRewardId(id)},${GUEST_SHARE_REWARD},${expires})`;
+ return inserted===1;
 }

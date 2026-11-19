@@ -23,7 +23,7 @@ import {reject} from './http';
 import {contentDigest} from './audit';
 import {requestContext} from './request-context';
 import {PlatformOperationsService} from './operations.service';
-import {GUEST_AI_LIMIT,GUEST_POST_REWARD,GUEST_DAILY_TOTAL,GUEST_IP_DAILY,guestPostRewardClaimed,guestQuotaEpoch,guestQuotaKey} from './guest-policy';
+import {GUEST_AI_LIMIT,GUEST_POST_REWARD,GUEST_SHARE_REWARD,GUEST_DAILY_TOTAL,GUEST_IP_DAILY,guestPostRewardClaimed,guestShareRewardClaimed,guestQuotaEpoch,guestQuotaKey} from './guest-policy';
 const GUEST_LIFETIME=3650*86400;
 import {aiFailureTrace,diagnosticId,recordAiFailure,recordAiRequest,traceAiEvent,AiFailureTrace} from './ai-photo-failures';
 import {aiPhotoAllowed} from './ai-photo-grants';
@@ -103,10 +103,10 @@ export class AiPhotoService{
  private async usedIn(key:string,seconds:number){const row=await this.service.db.authRateBucket.findUnique({where:{id:this.bucket(key,seconds)}});return row?.count??0;}
  async guestQuota(id:string){
   const db=this.service.db;
-  const [epoch,postRewardClaimed]=await Promise.all([guestQuotaEpoch(db),guestPostRewardClaimed(db,id)]);
-  const limit=GUEST_AI_LIMIT+(postRewardClaimed?GUEST_POST_REWARD:0);
+  const [epoch,postRewardClaimed,shareRewardClaimed]=await Promise.all([guestQuotaEpoch(db),guestPostRewardClaimed(db,id),guestShareRewardClaimed(db,id)]);
+  const limit=GUEST_AI_LIMIT+(postRewardClaimed?GUEST_POST_REWARD:0)+(shareRewardClaimed?GUEST_SHARE_REWARD:0);
   const used=await this.usedIn(guestQuotaKey('ai-photo:guest:',id,epoch),GUEST_LIFETIME);
-  return{limit,remaining:Math.max(0,limit-used),postRewardClaimed,epoch};
+  return{limit,remaining:Math.max(0,limit-used),postRewardClaimed,shareRewardClaimed,epoch};
  }
  async guestRemaining(id:string){return (await this.guestQuota(id)).remaining;}
  // 2026-11-16 user decision: every AI photo failure goes to Telegram (operations alert queue), user-caused ones included.
