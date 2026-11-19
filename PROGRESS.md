@@ -3421,3 +3421,8 @@
 - 처리방침 17항 공유 문구(미시행 guest-limits.1)를 "서버에 보관, 링크에는 짧은 코드, 만료 기록 삭제"로 수정 `b024772`.
 - 검증: tsc, platform-openapi 15/15, platform-legal 전부, platform-guest 공유 테스트 통과(옛 코드로 되돌리면 실패). guest 6·10번은 로컬 e2e DB의 오늘 200회 한도 소진으로 기존과 같은 실패.
 - 운영 배포 시: guest-limits.1 처리방침·약관(9adfe12)을 같이 낼지 사용자 결정, 같이 내면 GUEST_LIMITS_DATE를 배포일로.
+
+### 2026-11-19 23:1x 운영 배포: 결과 공유 짧은 코드 + 처리방침·약관 개정 (api share-legal-20261119)
+- 사용자 승인("이번 작업 + 처리방침·약관 개정", 녹화 가리기 함께). prod `857e8bc` = 43df483 + 짧은 코드(7d526dc) + 개정(03eab9f, 9adfe12 체리픽) + 공유 문구(857e8bc). GUEST_LIMITS_DATE는 배포일 그대로 2026-11-19(KST 23시대 배포).
+- devbox 빌드·운영 교체 OK(api/worker만 교체, 마이그레이션 guest_share_links 적용), 운영 검사: privacy 2026-11-19.guest-limits.1·terms 2026-11-19.ai-units.1, guest/session replayConsented=false, share-visit 없는 코드 {accepted:false}. 복구본 /Users/ethan/crefans-recovery/20261119/share-legal-20261119-api 검증 후 운영 이전 이미지 정리. runtime.env 변경 없음(WELCOME_MAIL_ENABLED 유지).
+- 미확인: 운영에서 실제 결과로 짧은 링크 발급·다른 네트워크 방문 보상.
