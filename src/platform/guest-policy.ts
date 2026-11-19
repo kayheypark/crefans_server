@@ -9,6 +9,7 @@ import {createHash,createHmac} from 'node:crypto';
 // - AI credits: three per visitor plus a one-time publishing reward. Network and service caps count requests.
 export const GUEST_COOKIE='cf_guest',GUEST_PREFIX='guest:',GUEST_POST_HOURS=24,GUEST_AI_LIMIT=3,GUEST_POST_REWARD=3,GUEST_IP_DAILY=10,GUEST_DAILY_TOTAL=200;
 export const GUEST_CONSENT_VERSION='2026-11-16.guest.5';
+export const GUEST_REPLAY_CONSENT_VERSION='2026-11-19.replay.1';
 export const GUEST_RETENTION_DAYS=30;
 export const isGuestId=(id?:string|null)=>typeof id==='string'&&id.startsWith(GUEST_PREFIX);
 export const guestIdFromToken=(token:string)=>GUEST_PREFIX+createHash('sha256').update('crefans-guest:'+token).digest('hex').slice(0,40);

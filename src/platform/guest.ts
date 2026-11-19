@@ -14,7 +14,7 @@ import {reject} from './http';
 import {requestContext} from './request-context';
 import {LocalMemberService} from '../auth/local/local-member.service';
 
-import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash} from './guest-policy';
+import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,GUEST_REPLAY_CONSENT_VERSION,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash} from './guest-policy';
 export * from './guest-policy';
 const COOKIE_DAYS=30;
 
@@ -27,16 +27,28 @@ export class GuestService{
  private cookieOptions(){const cookie=this.config.get('app.cookie')||{};return{httpOnly:true,secure:!!cookie.secure,sameSite:'lax' as const,path:'/',maxAge:COOKIE_DAYS*86400000,...(cookie.domain?{domain:cookie.domain}:{})};}
  require(req:any){const id=guestFromRequest(req);if(!id)reject(401,'GUEST_SESSION_REQUIRED','체험을 시작하려면 안내에 동의해 주세요.');return id;}
  ipHash(){return guestIpHash(this.config,requestContext.getStore()?.ip);}
+ private replayConsentVersion(){
+  return this.config.get('GUEST_REPLAY_CONTENT_CONSENT_VERSION')===GUEST_REPLAY_CONSENT_VERSION?GUEST_REPLAY_CONSENT_VERSION:undefined;
+ }
  async status(req:any,quota:(id:string)=>Promise<{limit:number;remaining:number;postRewardClaimed:boolean}>){
   const id=guestFromRequest(req);
+  const replayConsentVersion=this.replayConsentVersion();
   const {limit,remaining,postRewardClaimed}=id?await quota(id):{limit:GUEST_AI_LIMIT,remaining:GUEST_AI_LIMIT,postRewardClaimed:false};
-  return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,postHours:GUEST_POST_HOURS,limit,remaining,postRewardClaimed,postReward:GUEST_POST_REWARD};
+  return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,postHours:GUEST_POST_HOURS,limit,remaining,postRewardClaimed,postReward:GUEST_POST_REWARD,...(replayConsentVersion?{replayConsentVersion}:{})};
  }
  async start(req:any,res:any,input:any){
   if(input?.consent!==true||input?.version!==GUEST_CONSENT_VERSION)reject(400,'GUEST_CONSENT_REQUIRED','체험 안내를 확인하고 동의해 주세요.');
-  let id=guestFromRequest(req);
-  if(!id){const token=randomBytes(32).toString('base64url');id=guestIdFromToken(token);res.cookie(GUEST_COOKIE,token,this.cookieOptions());}
-  await appendAudit(this.service.db,{category:'business',action:'guest.consented',entityId:id,data:{version:GUEST_CONSENT_VERSION}});
+  const replayVersion=this.replayConsentVersion(),replay=input?.replayConsent;
+  if(replay!==undefined&&(!replayVersion||replay?.agreed!==true||replay?.version!==replayVersion)){
+   reject(400,'GUEST_REPLAY_CONSENT_INVALID','선택 동의 안내가 바뀌었어요. 화면을 새로고침해 주세요.');
+  }
+  const existing=guestFromRequest(req),token=existing?undefined:randomBytes(32).toString('base64url');
+  const id=existing??guestIdFromToken(token!);
+  await this.service.db.$transaction(async tx=>{
+   await appendAudit(tx,{category:'business',action:'guest.consented',entityId:id,data:{version:GUEST_CONSENT_VERSION}});
+   if(replay)await appendAudit(tx,{category:'business',action:'guest.replay_consented',entityId:id,data:{policyVersion:replayVersion}});
+  });
+  if(token)res.cookie(GUEST_COOKIE,token,this.cookieOptions());
   await recordFunnelStep(this.service.db,'guest_consent_agreed');
   return{active:true,consentVersion:GUEST_CONSENT_VERSION};
  }

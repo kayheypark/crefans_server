@@ -33,6 +33,32 @@ test('a guest needs the consent of the current notice; the cookie holds a random
  await guestsService.start(b.req,b.res,{consent:true,version:GUEST_CONSENT_VERSION});assert.equal(b.req.cookies[GUEST_COOKIE],token,'an existing visitor keeps the same token');
 });
 
+test('replay consent is independently versioned and optional',async()=>{
+ const key='GUEST_REPLAY_CONTENT_CONSENT_VERSION',previous=process.env[key],version=guestModule.GUEST_REPLAY_CONSENT_VERSION;
+ const request={consent:true,version:GUEST_CONSENT_VERSION};
+ const selected={replayConsent:{agreed:true,version}};
+ try{
+  delete process.env[key];
+  const disabled=browser();
+  await assert.rejects(guestsService.start(disabled.req,disabled.res,{...request,...selected}),code('GUEST_REPLAY_CONSENT_INVALID'));
+  assert.equal(disabled.req.cookies[GUEST_COOKIE],undefined);
+  process.env[key]=version;
+  const status=()=>guestsService.status({cookies:{}},()=>{throw Error('anonymous status has no saved quota');});
+  assert.equal((await status()).replayConsentVersion,version);
+  const declined=await startGuest();
+  assert.equal(await db.platformAuditLog.count({where:{entity_id:declined.id,action:'guest.replay_consented'}}),0);
+  const optedIn=browser();
+  await assert.rejects(guestsService.start(optedIn.req,optedIn.res,{...request,replayConsent:{agreed:true,version:'old'}}),code('GUEST_REPLAY_CONSENT_INVALID'));
+  await guestsService.start(optedIn.req,optedIn.res,{...request,...selected});
+  const id=guestFromRequest(optedIn.req);guests.push(id);
+  const rows=await db.platformAuditLog.findMany({where:{entity_id:id,action:{in:['guest.consented','guest.replay_consented']}}});
+  assert.equal(rows.length,2);
+  assert.equal(rows.find(row=>row.action==='guest.replay_consented').metadata.policyVersion,version);
+ }finally{
+  if(previous===undefined)delete process.env[key];else process.env[key]=previous;
+ }
+});
+
 test('a guest publishes only, without comments or tips; the post is in the feed for 24 hours and then closed',async()=>{
  const g=await startGuest();
  await assert.rejects(studio.saveContent(g.id,post({status:'draft'}),{guest:true}),code('GUEST_PUBLISH_ONLY'));
