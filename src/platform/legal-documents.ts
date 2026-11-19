@@ -469,12 +469,30 @@ export const GUEST_REPLAY_PRIVACY:LegalDocument={...POSTHOG_ERRORS_PRIVACY,versi
  notice:POSTHOG_ERRORS_PRIVACY.notice+' 2026-11-19 개정: 17항 — 비회원 AI 사진 체험 동의에 체험 화면의 이용 기록(PostHog, 미국: 사진·입력 내용 포함, 최대 30일)을 넣었고, 9항 ④에 그 차이를 적었습니다.',
  sections:POSTHOG_ERRORS_PRIVACY.sections.map(sec=>sec.title.startsWith('17. ')?{...sec,body:sec.body+'\n\n'+GUEST_REPLAY_17}:sec.title.startsWith('9. ')?{...sec,body:swapIn(sec.title,sec.body,POSTHOG_REFUSAL,POSTHOG_REFUSAL+' '+GUEST_REPLAY_REFUSAL)+'\n'+GUEST_REPLAY_9}:sec)};
 const guestReplayCatalog:LegalCatalog={...posthogErrorsCatalog,documents:{...posthogErrorsCatalog.documents,privacy:GUEST_REPLAY_PRIVACY}};
+// 2026-11-19 user decisions (/pilot-work): privacy 17항 states the guest credits the code grants (guest-policy GUEST_AI_LIMIT 3,
+// GUEST_POST_REWARD 3, GUEST_SHARE_REWARD 3; ai-photo-cost units fast 0.5·standard 1·precise 2) instead of the stale '브라우저당 10회',
+// and the share-link processing; terms 13조 states the per-method usage. Quantities may vary by landing/promotion and are shown on
+// the screen (user wording). Effective on the deploy day (user chose immediate effect over the 7-day notice of the KFTC standard terms).
+// Move GUEST_LIMITS_DATE to the actual production deploy day (KST) when it ships.
+export const GUEST_LIMITS_DATE='2026-11-19';
+const LIMITS_P17_FROM='체험 횟수 제한(브라우저당 10회, 같은 접속 IP 하루 10회, 비회원 전체 하루 200회)';
+const LIMITS_P17_TO='체험 횟수 제한(브라우저당 체험 이용권 3장, 첫 게시글을 올리면 3장, 공유한 결과 링크로 다른 방문자가 처음 들어오면 3장을 각각 한 번 더 지급, 사진 1장에 빠르게 0.5장·표준 1장·정밀하게 2장 차감, 같은 접속 IP 하루 10회, 비회원 전체 하루 200회. 이용권과 보상 수량은 이벤트·안내 페이지에 따라 달라질 수 있으며 적용되는 수량은 체험 화면에 표시)';
+const LIMITS_P17_SHARE='결과 공유: 체험 결과 사진의 공유 링크에는 공유한 브라우저의 체험 식별값, 접속 IP를 서버 보안키로 변환한 값, 만료 시각(7일)을 암호화해 넣습니다. 다른 방문자가 그 링크로 들어오면 그 방문자의 접속 IP 변환값과 비교해 공유한 사람 본인이 아닌지 확인한 뒤 보상을 기록하며, 같은 접속 IP의 반복 방문은 보안 기록 기준으로 횟수를 제한합니다.';
+const LIMITS_T13_FROM='한 번에 1장을 만들며, 무료 생성은 하루 10회이고 매일 오전 9시(한국 시간)에 다시 채워집니다.';
+const LIMITS_T13_TO='한 번에 1장을 만들며, 생성 방식에 따라 사진 1장에 쓰는 이용권이 다릅니다(빠르게 0.5개, 표준 1개, 정밀하게 2개). 회원의 무료 이용권은 하루 10개이고 매일 오전 9시(한국 시간)에 다시 채워집니다. 로그인하지 않은 방문자는 브라우저당 체험 이용권 3장을 받고, 첫 게시글을 올리거나 공유한 결과 링크로 다른 방문자가 처음 들어오면 각각 3장을 한 번 더 받습니다. 무료·체험 이용권과 보상의 수량은 이벤트·프로모션이나 안내 페이지에 따라 달라질 수 있으며, 적용되는 수량은 해당 화면에 표시합니다.';
+export const GUEST_LIMITS_PRIVACY:LegalDocument={...GUEST_REPLAY_PRIVACY,version:'2026-11-19.guest-limits.1',updatedAt:GUEST_LIMITS_DATE,publishedAt:GUEST_LIMITS_DATE,effectiveAt:GUEST_LIMITS_DATE,status:'published',
+ notice:GUEST_REPLAY_PRIVACY.notice+' 2026-11-19 개정: 17항 — 비회원 체험 이용권 수량(3장, 첫 게시·결과 공유 보상 각 3장)과 생성 방식별 차감, 결과 공유 링크 처리를 실제 운영에 맞게 적었습니다.',
+ sections:GUEST_REPLAY_PRIVACY.sections.map(sec=>sec.title.startsWith('17. ')?{...sec,body:swapIn(sec.title,sec.body,LIMITS_P17_FROM,LIMITS_P17_TO).replace('\n\n화면 이용 기록(PostHog, 미국)','\n\n'+LIMITS_P17_SHARE+'\n\n화면 이용 기록(PostHog, 미국)')}:sec)};
+export const GUEST_LIMITS_TERMS:LegalDocument={...BEAN_TERMS,version:'2026-11-19.ai-units.1',updatedAt:GUEST_LIMITS_DATE,publishedAt:GUEST_LIMITS_DATE,effectiveAt:GUEST_LIMITS_DATE,status:'published',
+ notice:'2026년 11월 19일부터 적용합니다. 제13조에 생성 방식별 이용권 사용량(빠르게 0.5개·표준 1개·정밀하게 2개), 비회원 체험 이용권과 보상 수량, 수량이 이벤트·안내 페이지에 따라 달라질 수 있다는 내용을 적었습니다. 그 밖의 조항은 바뀌지 않았습니다. 이전 개정 내역은 이전 버전에서 볼 수 있습니다.',
+ sections:BEAN_TERMS.sections.map(sec=>sec.title.startsWith('13. ')?{...sec,body:swapIn(sec.title,sec.body,LIMITS_T13_FROM,LIMITS_T13_TO)}:sec)};
+const guestLimitsCatalog:LegalCatalog={...guestReplayCatalog,documents:{...guestReplayCatalog.documents,privacy:GUEST_LIMITS_PRIVACY,terms:GUEST_LIMITS_TERMS}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=GUEST_REPLAY_PRIVACY_DATE?guestReplayCatalog:day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=GUEST_LIMITS_DATE?guestLimitsCatalog:day>=GUEST_REPLAY_PRIVACY_DATE?guestReplayCatalog:day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

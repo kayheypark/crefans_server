@@ -39,6 +39,7 @@ test('replay consent is always offered with the required trial consent (privacy 
  assert.equal((await status()).replayConsentVersion,version);
  const plain=await startGuest();
  assert.equal(await db.platformAuditLog.count({where:{entity_id:plain.id,action:'guest.replay_consented'}}),0);
+ assert.equal((await guestsService.status(plain.req,async()=>({limit:3,remaining:3,postRewardClaimed:false,shareRewardClaimed:false}))).replayConsented,false,'no replay consent recorded');
  const stale=browser();
  await assert.rejects(guestsService.start(stale.req,stale.res,{...request,replayConsent:{agreed:true,version:'old'}}),code('GUEST_REPLAY_CONSENT_INVALID'));
  assert.equal(stale.req.cookies[GUEST_COOKIE],undefined);
@@ -48,6 +49,7 @@ test('replay consent is always offered with the required trial consent (privacy 
  const rows=await db.platformAuditLog.findMany({where:{entity_id:id,action:{in:['guest.consented','guest.replay_consented']}}});
  assert.equal(rows.length,2);
  assert.equal(rows.find(row=>row.action==='guest.replay_consented').metadata.policyVersion,version);
+ assert.equal((await guestsService.status(agreed.req,async()=>({limit:3,remaining:3,postRewardClaimed:false,shareRewardClaimed:false}))).replayConsented,true,'recorded replay consent unmasks the trial screens');
 });
 
 test('AI result share grants three credits once on a new visitor network',async()=>{
