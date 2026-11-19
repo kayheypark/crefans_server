@@ -487,12 +487,28 @@ export const GUEST_LIMITS_TERMS:LegalDocument={...BEAN_TERMS,version:'2026-11-19
  notice:'2026년 11월 19일부터 적용합니다. 제13조에 생성 방식별 이용권 사용량(빠르게 0.5개·표준 1개·정밀하게 2개), 비회원 체험 이용권과 보상 수량, 수량이 이벤트·안내 페이지에 따라 달라질 수 있다는 내용을 적었습니다. 그 밖의 조항은 바뀌지 않았습니다. 이전 개정 내역은 이전 버전에서 볼 수 있습니다.',
  sections:BEAN_TERMS.sections.map(sec=>sec.title.startsWith('13. ')?{...sec,body:swapIn(sec.title,sec.body,LIMITS_T13_FROM,LIMITS_T13_TO)}:sec)};
 const guestLimitsCatalog:LegalCatalog={...guestReplayCatalog,documents:{...guestReplayCatalog.documents,privacy:GUEST_LIMITS_PRIVACY,terms:GUEST_LIMITS_TERMS}};
+// 2026-11-20 user decisions: the trial share reward is paid at the first share (share sheet finished or link copied) instead of a
+// visit from another network, so 17항 drops the share-link storage and visitor IP comparison and 13조 says "처음 공유하면".
+// Effective on the deploy day (KST); move SHARE_REWARD_DATE if it ships on another day.
+export const SHARE_REWARD_DATE='2026-11-20';
+const SHARE_P17_FROM='공유한 결과 링크로 다른 방문자가 처음 들어오면 3장을 각각 한 번 더 지급';
+const SHARE_P17_TO='체험 결과 사진을 처음 공유하면 3장을 각각 한 번 더 지급';
+const SHARE_P17_TEXT='결과 공유: 체험 결과 사진을 공유 창으로 공유하거나 링크를 복사하면 그 브라우저의 체험 식별값으로 공유 보상을 한 번 기록합니다. 공유 링크에는 개인을 식별하는 값을 넣지 않고, 누구에게 공유했는지는 수집하지 않습니다.';
+const SHARE_T13_FROM='첫 게시글을 올리거나 공유한 결과 링크로 다른 방문자가 처음 들어오면 각각 3장을 한 번 더 받습니다.';
+const SHARE_T13_TO='첫 게시글을 올리거나 체험 결과 사진을 처음 공유(공유 창으로 공유하거나 링크 복사)하면 각각 3장을 한 번 더 받습니다.';
+export const SHARE_REWARD_PRIVACY:LegalDocument={...GUEST_LIMITS_PRIVACY,version:'2026-11-20.guest-share.1',updatedAt:SHARE_REWARD_DATE,publishedAt:SHARE_REWARD_DATE,effectiveAt:SHARE_REWARD_DATE,status:'published',
+ notice:GUEST_LIMITS_PRIVACY.notice+' 2026-11-20 개정: 17항 — 결과 공유 보상을 공유할 때 바로 지급하도록 바꾸고, 공유 링크 보관과 방문자 접속 IP 비교를 없앴습니다.',
+ sections:GUEST_LIMITS_PRIVACY.sections.map(sec=>sec.title.startsWith('17. ')?{...sec,body:swapIn(sec.title,swapIn(sec.title,sec.body,SHARE_P17_FROM,SHARE_P17_TO),LIMITS_P17_SHARE,SHARE_P17_TEXT)}:sec)};
+export const SHARE_REWARD_TERMS:LegalDocument={...GUEST_LIMITS_TERMS,version:'2026-11-20.share-reward.1',updatedAt:SHARE_REWARD_DATE,publishedAt:SHARE_REWARD_DATE,effectiveAt:SHARE_REWARD_DATE,status:'published',
+ notice:'2026년 11월 20일부터 적용합니다. 제13조의 비회원 결과 공유 보상을 다른 방문자가 링크로 들어올 때가 아니라 결과 사진을 처음 공유할 때 받도록 바꾸었습니다. 그 밖의 조항은 바뀌지 않았습니다. 이전 개정 내역은 이전 버전에서 볼 수 있습니다.',
+ sections:GUEST_LIMITS_TERMS.sections.map(sec=>sec.title.startsWith('13. ')?{...sec,body:swapIn(sec.title,sec.body,SHARE_T13_FROM,SHARE_T13_TO)}:sec)};
+const shareRewardCatalog:LegalCatalog={...guestLimitsCatalog,documents:{...guestLimitsCatalog.documents,privacy:SHARE_REWARD_PRIVACY,terms:SHARE_REWARD_TERMS}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=GUEST_LIMITS_DATE?guestLimitsCatalog:day>=GUEST_REPLAY_PRIVACY_DATE?guestReplayCatalog:day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=SHARE_REWARD_DATE?shareRewardCatalog:day>=GUEST_LIMITS_DATE?guestLimitsCatalog:day>=GUEST_REPLAY_PRIVACY_DATE?guestReplayCatalog:day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

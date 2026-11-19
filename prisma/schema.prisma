@@ -1136,17 +1136,6 @@ model AuthRateBucket {
   @@map("auth_rate_buckets")
 }
 
-// 2026-11-19 user request: short AI result share links (/s/<code>). The row holds what the long encrypted token carried
-// (sharer's guest id, keyed IP hash, expiry) and is deleted after it expires.
-model GuestShareLink {
-  code       String   @id @db.Char(8)
-  guest_id   String   @db.VarChar(64)
-  ip_hash    String   @db.Char(32)
-  expires_at DateTime
-  created_at DateTime @default(now())
-  @@index([expires_at])
-  @@map("guest_share_links")
-}
 
 
 model AccountPreference {
