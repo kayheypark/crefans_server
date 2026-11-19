@@ -4,8 +4,9 @@ import {auditRow,appendAudit,observeAudit} from './audit';
 import {requestContext} from './request-context';
 import {PaymentProvider} from './payment-provider';
 import {can} from './admin-permissions';
+import {CostumeReviewTarget,queueCostumeFailure} from './ai-costume-review';
 
-export type AiFailureTrace={requestId:string;actorId?:string;selectedModel?:string;selectedProvider?:string;sequence?:number;stage:string;provider:string;providerCode?:string;providerRequestId?:string;providerStatus?:number;referenceImages?:number;estimatedMilliUsd?:number};
+export type AiFailureTrace={requestId:string;actorId?:string;selectedModel?:string;selectedProvider?:string;sequence?:number;stage:string;provider:string;providerCode?:string;providerRequestId?:string;providerStatus?:number;referenceImages?:number;estimatedMilliUsd?:number;costumeReview?:CostumeReviewTarget;approvedCostumeSha256?:string};
 export const aiFailureTrace=new AsyncLocalStorage<AiFailureTrace>();
 export const diagnosticId=(v:unknown)=>typeof v==='string'&&/^[a-zA-Z0-9_.:-]{1,191}$/.test(v)?v:undefined;
 // Do not retain obvious credentials/contact details even in the encrypted diagnostic store.
@@ -28,6 +29,7 @@ export async function recordAiFailure(db:any,config:ConfigService,sub:string,inp
  const row=auditRow({category:'error',action:'ai-photo.failed',level:'error',status,durationMs:Date.now()-started,data:{errorCode:code,errorType:diagnosticId(error?.name),provider:trace.provider,selectedModel:trace.selectedModel,selectedProvider:trace.selectedProvider,operation:trace.stage,providerCode:trace.providerCode,providerRequestId:trace.providerRequestId,httpStatus:trace.providerStatus}},context);
  // The general log contains only identifiers/codes; never prompt text or raw provider errors.
  console.warn(JSON.stringify({event:'audit',...row}));
+ await queueCostumeFailure(db,trace.costumeReview,code,trace.providerStatus);
  try{
   const payload={...trace,outcome:'failed',errorCode:code,prompt:diagnosticPrompt(input?.prompt),options:requestOptions(input)};
   const encrypted=new PaymentProvider(config).encrypt(JSON.stringify(payload));

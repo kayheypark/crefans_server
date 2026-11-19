@@ -12,6 +12,14 @@
       {
         "include": "platform/ai-photo-backgrounds/*.webp",
         "outDir": "dist/src"
+      },
+      {
+        "include": "platform/ai-photo-composite-bases/approved.json",
+        "outDir": "dist/src"
+      },
+      {
+        "include": "platform/ai-photo-composite-bases/*.webp",
+        "outDir": "dist/src"
       }
     ]
   }

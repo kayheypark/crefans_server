@@ -407,6 +407,153 @@ test('library photos are real image references, individually moderated and numbe
  reset();flags=[false,true];const before=(await photos.quota(who)).remaining;await assert.rejects(photos.edit(who,base({sourceId:original,kind:'background',libraryIds:[background]})),code('UNSAFE_INPUT'));assert.equal(calls.filter(x=>x.kind==='edit').length,0);assert.equal((await photos.quota(who)).remaining,before-1,'existing unsafe-input charging policy is preserved');
 });
 
+const floorPose='바닥에 편하게 앉아 쉬는 포즈로 바꿔줘.';
+const compositeRequest=sourceId=>base({
+ sourceId,mode:'cosplay',kind:'combined',style:'cosplay',editKinds:['outfit','pose'],costumeIds:['d63f76'],
+ prompt:['의상 참조 사진 1의 코디를 적용해줘.',floorPose].join('\r\n'),
+});
+const compositeInstruction='Image 2 is a service-created costume and pose reference.';
+
+async function useTestComposite(t,approvedPose=floorPose,approvedCostumeId='d63f76'){
+ const registry=require('../dist/src/platform/ai-photo-composite-bases');
+ const image=await sharp(await png(72,90)).webp().toBuffer();
+ t.mock.method(registry,'readCostumeCompositeBase',async(id,request,hasPose)=>{
+  const matchesPose=hasPose?approvedPose&&request.split(/\r?\n/).includes(approvedPose):approvedPose==='';
+  return id===approvedCostumeId&&matchesPose?image:null;
+ });
+ return image;
+}
+
+test('approved composite uses the member or guest original, then shared base, then optional public background',async t=>{
+ const shared=await useTestComposite(t);
+ const owner=await makeCreator('composite_'+tag);
+ const visitor='guest:'+crypto.randomBytes(20).toString('hex');
+ const background=await require('../dist/src/platform/ai-photo-background-references').readBackgroundReference('b7a101');
+ t.after(()=>db.media.deleteMany({where:{user_sub:visitor}}));
+ const ownId=await media(owner);
+ for(const [actor,id,guest] of [[owner,ownId,undefined],[visitor,await media(visitor,720,900),{ipHash:'composite-'+tag}]]){
+  const input=compositeRequest(id);
+  if(guest){input.editKinds.push('background');input.backgroundId='b7a101';}
+  reset();
+  const result=await photos.edit(actor,input,undefined,guest);
+  const edit=calls.find(entry=>entry.kind==='edit');
+  assert.ok(edit.fields.prompt.includes(compositeInstruction));
+  assert.match(edit.fields.prompt,/Image 1 is the only source for facial identity/);
+  const original=await sharp(fs.readFileSync(path.join(mediaRoot,id))).rotate().png().toBuffer();
+  const expected=guest?[original,shared,background]:[original,shared];
+  assert.deepEqual(edit.images.map(item=>item.bytes),expected);
+  assert.deepEqual(calls.map(c=>c.kind),[...expected.map(()=>'moderation'),'edit','moderation']);
+  for(const [i,bytes] of expected.entries()){
+   const checked=calls[i].body.input.find(item=>item.type==='image_url').image_url.url;
+   assert.equal(checked.split(',')[1],bytes.toString('base64'));
+  }
+  if(guest)assert.match(edit.fields.prompt,/Image 3 is a public background reference/);
+  const saved=await db.media.findUniqueOrThrow({where:{id:result.images[0].id}});
+  assert.equal(saved.user_sub,actor);
+  assert.equal(saved.metadata.aiSourceId,id);
+ }
+ const trace=await db.platformAuditLog.findMany({where:{actor_id:owner,action:'ai-photo.step.started',
+  metadata:{path:'$.operation',equals:'input'}},orderBy:{occurred_at:'asc'}});
+ assert.deepEqual(trace.map(row=>row.metadata.source),['original','costume-composite-base']);
+ reset();
+ await assert.rejects(photos.edit(visitor,compositeRequest(ownId),undefined,{ipHash:'composite-'+tag}),code('MEDIA_NOT_FOUND'));
+ assert.equal(calls.length,0);
+});
+
+test('outfit-only composite explicitly keeps the original pose and framing',async t=>{
+ const shared=await useTestComposite(t,'');
+ const owner=await makeCreator('comp_outfit'+tag),id=await media(owner);
+ const request={...compositeRequest(id),kind:'outfit',editKinds:undefined,prompt:'의상 참조 사진 1의 코디를 적용해줘.'};
+ reset();
+ await photos.edit(owner,request);
+ const edit=calls.find(entry=>entry.kind==='edit');
+ assert.deepEqual(edit.images[1].bytes,shared);
+ assert.match(edit.fields.prompt,/Image 2 is a service-created costume reference/);
+ assert.match(edit.fields.prompt,/Keep the pose and framing from image 1/);
+ assert.doesNotMatch(edit.fields.prompt,/and requested pose/);
+ reset();
+ await photos.edit(owner,compositeRequest(id));
+ assert.match(calls.find(entry=>entry.kind==='edit').fields.prompt,/Do not copy the reference mannequin/);
+});
+
+test('approved composite is subject to input and output moderation',async t=>{
+ await useTestComposite(t);
+ const owner=await makeCreator('comp_gate'+tag),id=await media(owner);
+ for(const [verdicts,error,expected] of [
+  [[true],'UNSAFE_INPUT',['moderation']],
+  [[false,true],'UNSAFE_INPUT',['moderation','moderation']],
+  [[false,false,true],'UNSAFE_OUTPUT',['moderation','moderation','edit','moderation']],
+ ]){
+  reset();flags=[...verdicts];
+  await assert.rejects(photos.edit(owner,compositeRequest(id)),code(error));
+  assert.deepEqual(calls.map(c=>c.kind),expected);
+ }
+ assert.equal(await db.media.count({where:{user_sub:owner}}),1);
+});
+
+test('unapproved costume with a pose, and combinations outside composite scope, use the regular mannequin prompt and bytes',async t=>{
+ const {readCostumeReference}=require('../dist/src/platform/ai-photo-costume-references');
+ const owner=await makeCreator('comp_miss'+tag),id=await media(owner),privatePose=await media(owner);
+ await photos.saveLibrary(owner,{id:privatePose,title:'포즈',category:'pose'});
+ const verify=async(overrides,guide)=>{
+  reset();
+  const request={...compositeRequest(id),...overrides};
+  await photos.edit(owner,request,guide);
+  const edit=calls.find(c=>c.kind==='edit');
+  assert.ok(!edit.fields.prompt.includes(compositeInstruction));
+  assert.match(edit.fields.prompt,/Do not copy the reference mannequin/);
+  assert.deepEqual(edit.images[guide?2:1].bytes,await readCostumeReference(request.costumeIds[0]));
+ };
+ await verify({costumeIds:['6ee320']}); // Real catalog: Mitsuri has no validated composite.
+ await useTestComposite(t);
+ await verify({prompt:'자연스럽게 서 있는 포즈로 바꿔줘.'});
+ await verify({prompt:floorPose+'\n한 손을 들어 가볍게 인사해줘.'});
+ await verify({libraryIds:[privatePose]});
+ await verify({mode:'general'});
+ await verify({costumeIds:['d63f76','313a28']});
+ await verify({},await mask());
+ await verify({kind:'outfit',editKinds:undefined});
+});
+
+test('repeated failures queue one preset and a later member success records only the approved studio base',async t=>{
+ const {AI_PHOTO_COSTUME_IDS}=require('../dist/src/platform/ai-photo-costume-references');
+ const existing=await db.$queryRaw`SELECT costume_id FROM ai_costume_fit_reviews WHERE pose=${floorPose}`;
+ const seen=new Set(existing.map(row=>row.costume_id));
+ const costumeId=AI_PHOTO_COSTUME_IDS.find(id=>!seen.has(id));
+ assert.ok(costumeId,'a new costume and pose combination in the isolated database');
+ t.after(()=>db.$executeRaw`DELETE FROM ai_costume_fit_reviews WHERE costume_id=${costumeId} AND pose=${floorPose}`);
+ const owner=await makeCreator('comp_queue'+tag),id=await media(owner);
+ const request={...compositeRequest(id),costumeIds:[costumeId]};
+ for(let i=0;i<2;i++){
+  reset();editStatus=400;providerError={code:'moderation_blocked',moderation_details:{moderation_stage:'output'}};
+  await assert.rejects(photos.edit(owner,request),code('UNSAFE_OUTPUT'));
+ }
+ const rows=()=>db.$queryRaw`SELECT policy_failures,fitting_failures,verified_base_sha256,last_verified_at FROM ai_costume_fit_reviews WHERE costume_id=${costumeId} AND pose=${floorPose}`;
+ const pending=await rows();
+ assert.deepEqual(pending.map(row=>[Number(row.policy_failures),Number(row.fitting_failures),row.verified_base_sha256,row.last_verified_at]),[[2,0,null,null]]);
+
+ const nextOwner=await makeCreator('comp_next'+tag),nextSource=await media(nextOwner,720,900);
+ const nextRequest={...request,sourceId:nextSource};
+ reset();
+ await photos.edit(nextOwner,nextRequest);
+ assert.equal((await rows())[0].verified_base_sha256,null,'ordinary mannequin generation leaves review pending');
+ const shared=await useTestComposite(t,floorPose,costumeId);
+ reset();flags=[false,false,true];
+ await assert.rejects(photos.edit(nextOwner,nextRequest),code('UNSAFE_OUTPUT'));
+ assert.equal((await rows())[0].verified_base_sha256,null,'blocked composite output was never saved');
+ reset();
+ const generated=await photos.edit(nextOwner,nextRequest);
+ const edit=calls.find(entry=>entry.kind==='edit');
+ assert.deepEqual(edit.images[1].bytes,shared);
+ const saved=await db.media.findUniqueOrThrow({where:{id:generated.images[0].id}});
+ assert.equal(saved.user_sub,nextOwner);
+ assert.equal(saved.metadata.aiSourceId,nextSource);
+ const [verified]=await rows();
+ assert.equal(Number(verified.policy_failures),3);
+ assert.equal(verified.verified_base_sha256,crypto.createHash('sha256').update(shared).digest('hex'));
+ assert.ok(verified.last_verified_at instanceof Date);
+});
+
 test('public backgrounds attach exact catalog bytes, moderate independently and reject invalid or conflicting choices',async()=>{
  reset();const who=await makeCreator('publicbg_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'공용배경 QA'}});const id=await media(who);
  await photos.edit(who,base({sourceId:id,kind:'background',backgroundId:'b7a101'}));

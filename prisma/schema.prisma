@@ -2281,6 +2281,19 @@ model PhoneVerification {
   @@map("phone_verifications")
 }
 
+/// Catalog-only failure counts for studio review. An empty pose means preserve the original pose.
+model AiCostumeFitReview {
+  costume_id       String   @db.VarChar(6)
+  pose             String   @db.VarChar(191)
+  policy_failures  Int      @default(0) @db.UnsignedInt
+  fitting_failures Int      @default(0) @db.UnsignedInt
+  last_failed_at   DateTime @default(now()) @db.DateTime(3)
+  verified_base_sha256 String? @db.Char(64)
+  last_verified_at     DateTime? @db.DateTime(3)
+  @@id([costume_id, pose])
+  @@map("ai_costume_fit_reviews")
+}
+
 /// 2026-11-17: daily AI photo preset usage (aggregate only, no person or request is stored).
 model AiPresetUsageDaily {
   day        DateTime @db.Date
