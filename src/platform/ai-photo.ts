@@ -35,7 +35,7 @@ import {ticketSummary,useAiPhotoTicket} from './ai-photo-tickets';
 import {containsPersonalData,looksLikeInjection} from './guide-advisor';
 import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 import {presetUsageKeys,recordPresetUsage} from './ai-preset-usage';
-import {AI_COST_ALERTS,AI_PROVIDER_DAILY_CALLS,estimateMilliUsd,kstDay,reserveProviderCall} from './ai-photo-cost';
+import {AI_COST_ALERTS,AI_PROVIDER_DAILY_CALLS,configuredSeedreamModel,kstDay,reserveProviderCall} from './ai-photo-cost';
 import {recordFunnelStep} from './funnel-stats';
 
 export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=2000;
@@ -55,7 +55,7 @@ function editKinds(kind:string,value:unknown):string[]{
 
 export function aiPhotoConfig(config:ConfigService){
  const int=(v:unknown,d:number)=>{const n=Number(v);return Number.isSafeInteger(n)&&n>0?n:d;};
- return{seedreamKey:(config.get('AI_PHOTO_BYTEPLUS_API_KEY')||'').trim(),apiKey:(config.get('AI_PHOTO_OPENAI_API_KEY')||config.get('GUIDE_ADVISOR_OPENAI_API_KEY')||'').trim(),model:'dola-seedream-5-5-261028',
+ return{seedreamKey:(config.get('AI_PHOTO_BYTEPLUS_API_KEY')||'').trim(),apiKey:(config.get('AI_PHOTO_OPENAI_API_KEY')||config.get('GUIDE_ADVISOR_OPENAI_API_KEY')||'').trim(),model:configuredSeedreamModel(config.get<string>('AI_PHOTO_BYTEPLUS_MODEL')),
   perDay:int(config.get('AI_PHOTO_PER_DAY'),AI_PHOTO_DAILY_LIMIT),dailyTotal:int(config.get('AI_PHOTO_DAILY_TOTAL'),300),timeoutMs:int(config.get('AI_PHOTO_TIMEOUT_MS'),120000)};
 }
 /** The prompt sent to the provider: the creator's words are framed by fixed rules (identity kept, no sexual content, no text). */
@@ -120,9 +120,9 @@ export class AiPhotoService{
  costDay(){return kstDay();}
  /** 2026-11-18 user decision: counts every Seedream request against the KST-day cap (900) and estimated spend; alerts once per day. */
  private async providerCall(inputImages:number){
-  const day=this.costDay(),reserved=await reserveProviderCall(this.service.db,day,inputImages);
+  const day=this.costDay(),reserved=await reserveProviderCall(this.service.db,day,inputImages,this.settings.model);
   if(!reserved){await this.operations.record('ai-photo.provider_cap',{limit:AI_PROVIDER_DAILY_CALLS},`ai-provider-cap:${day}`,{omitIp:true});reject(503,'AI_PROVIDER_DAILY_CAP','오늘 AI 사진 생성량이 모두 찼어요. 이번 시도는 차감되지 않았어요. 내일 다시 이용해 주세요.');}
-  {const trace=aiFailureTrace.getStore();if(trace)trace.estimatedMilliUsd=(trace.estimatedMilliUsd||0)+estimateMilliUsd(inputImages);}// for the success alert (retries included)
+  {const trace=aiFailureTrace.getStore();if(trace)trace.estimatedMilliUsd=(trace.estimatedMilliUsd||0)+(reserved.after-reserved.before);}// for the success alert (retries included)
   for(const alert of AI_COST_ALERTS)if(reserved.before<alert.milli&&reserved.after>=alert.milli)await this.operations.record(alert.type,{estimatedUsd:(reserved.after/1000).toFixed(2),thresholdUsd:alert.milli/1000,calls:reserved.calls},`${alert.type}:${day}`,{omitIp:true});
  }
  private configured(){return !!this.settings.apiKey&&!!this.settings.seedreamKey;}

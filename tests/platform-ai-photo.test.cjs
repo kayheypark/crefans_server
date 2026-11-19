@@ -13,7 +13,7 @@ async function media(owner,w=600,h=900){const id=crypto.randomUUID();fs.writeFil
 let calls=[],flags=[],editStatus=200,outputs=2,moderationDown=false,providerError=null,warnings=[];
 async function stub(url,init){
  if(url.endsWith('/moderations')){const body=JSON.parse(init.body);calls.push({kind:'moderation',body});if(body.input.filter(i=>i.type==='image_url').length>1)return new Response(JSON.stringify({error:{code:'too_many_images'}}),{status:400});if(moderationDown)return new Response('{}',{status:503});const f=flags.length?flags.shift():false;return new Response(JSON.stringify({results:[{flagged:f}]}),{status:200});}
- if(url.endsWith('/images/generations')){const fields=JSON.parse(init.body),entry={kind:'edit',fields,images:fields.image.map(value=>({type:value.slice(5,value.indexOf(';')),bytes:Buffer.from(value.split(',')[1],'base64')}))};assert.equal(fields.model,'dola-seedream-5-5-261028');calls.push(entry);
+ if(url.endsWith('/images/generations')){const fields=JSON.parse(init.body),entry={kind:'edit',fields,images:fields.image.map(value=>({type:value.slice(5,value.indexOf(';')),bytes:Buffer.from(value.split(',')[1],'base64')}))};assert.equal(fields.model,photos.settings.model);calls.push(entry);
   if(editStatus!==200)return new Response(JSON.stringify({error:providerError||{code:editStatus===400?'moderation_blocked':'server_error'}}),{status:editStatus,headers:{'x-request-id':'req_ai_photo_test'}});
   const data=[];for(let i=0;i<outputs;i++)data.push({b64_json:(await png(1024,1536,{r:10*i,g:80,b:200})).toString('base64')});return new Response(JSON.stringify({data}),{status:200});}
  throw new Error('unexpected '+url);
@@ -771,4 +771,25 @@ test('2026-11-18: estimated cost alerts fire once when crossing $30 and once whe
   const warn=await db.platformOperationalEvent.findMany({where:{dedupe_key:`ai-photo.cost_warning:${day}`}}),crit=await db.platformOperationalEvent.findMany({where:{dedupe_key:`ai-photo.cost_critical:${day}`}});
   assert.equal(warn.length,1);assert.equal(crit.length,1);assert.deepEqual([warn[0].data.thresholdUsd,crit[0].data.thresholdUsd,crit[0].data.estimatedUsd],[30,60,'60.03']);assert.equal(warn[0].ip,null);
  }finally{photos.costDay=prev;photos.operations.record=record;}
+});
+
+test('Flash configuration reaches generation, saved media and the estimated budget',async t=>{
+ const {ConfigService}=require('@nestjs/config'),{aiPhotoConfig}=require('../dist/src/platform/ai-photo');
+ const {digest}=require('../dist/src/auth/local/credentials'),{estimateMilliUsd}=require('../dist/src/platform/ai-photo-cost');
+ const flash='dola-seedream-5-0-flash-260915',settings=photos.settings,day=photos.costDay;
+ const dayKey='flash-'+tag;
+ t.after(()=>{photos.settings=settings;photos.costDay=day;});
+ assert.equal(aiPhotoConfig(new ConfigService({AI_PHOTO_BYTEPLUS_MODEL:''})).model,'dola-seedream-5-5-261028');
+ assert.throws(()=>aiPhotoConfig(new ConfigService({AI_PHOTO_BYTEPLUS_MODEL:'typo'})),/Unsupported AI_PHOTO_BYTEPLUS_MODEL/);
+ photos.settings=aiPhotoConfig(new ConfigService({AI_PHOTO_BYTEPLUS_MODEL:flash}));
+ photos.costDay=()=>dayKey;
+ const user=await makeCreator('aiflash_'+tag);
+ reset();outputs=1;
+ const result=await photos.edit(user,base({sourceId:await media(user),kind:'outfit',style:'cosplay',mode:'cosplay',costumeIds:['80bdd0']}));
+ const sent=calls.find(c=>c.kind==='edit').fields;
+ assert.equal(sent.model,flash);assert.equal(sent.image.length,2);
+ assert.equal((await db.media.findUniqueOrThrow({where:{id:result.images[0].id}})).metadata.aiModel,flash);
+ assert.equal((await db.authRateBucket.findUniqueOrThrow({where:{id:digest('ai-photo:provider-cost-milli:'+dayKey)}})).count,18);
+ assert.equal(estimateMilliUsd(1,flash),18);
+ assert.equal(estimateMilliUsd(10,flash),18);
 });
