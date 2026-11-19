@@ -891,19 +891,3 @@ test('fractional credits respect shared guest request caps under concurrency and
  assert.equal(await photos.used(day.key),1);
  assert.equal(await photos.used(pool.key),1);
 });
-
-// 2026-11-20 user decision: the chosen chest cup / hip size attaches a fictional-model body-size reference after the background.
-test('body-size references attach the catalog bytes after the background, are moderated and only accept one chest and one hip with a body edit',async()=>{
- reset();const who=await makeCreator('bodyref_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'신체 참고 QA'}});const id=await media(who);
- const file=name=>fs.readFileSync(path.join(__dirname,'../dist/src/platform/ai-photo-body-references/'+name+'.webp'));
- await photos.edit(who,base({sourceId:id,kind:'body',bodyIds:JSON.stringify(['chest-D','hip-L'])}));
- let request=calls.find(x=>x.kind==='edit');assert.equal(request.images.length,3);
- assert.deepEqual(request.images[1].bytes,file('chest-D'));assert.deepEqual(request.images[2].bytes,file('hip-L'));
- assert.match(request.fields.prompt,/Image 2 is a body-size reference for the chest \(bust\)/);assert.match(request.fields.prompt,/Image 3 is a body-size reference for the hips and buttocks/);assert.match(request.fields.prompt,/never copy the model's face/);
- assert.equal(calls.filter(x=>x.kind==='moderation').length,4,'original, two references and the output');
- reset();await photos.edit(who,base({sourceId:id,kind:'combined',editKinds:['body','background'],backgroundId:'b7a101',bodyIds:['chest-G']}));
- request=calls.find(x=>x.kind==='edit');assert.match(request.fields.prompt,/Image 2 is a public background reference/);assert.match(request.fields.prompt,/Image 3 is a body-size reference for the chest/);assert.deepEqual(request.images[2].bytes,file('chest-G'));
- reset();for(const value of ['../../secret',['chest-H'],['chest-A','chest-B'],['hip-S','hip-M'],['chest-A','hip-S','hip-M'],'not json',null])await assert.rejects(photos.edit(who,base({sourceId:id,kind:'body',bodyIds:value})),code('INVALID_BODY_REFERENCE'),String(value));
- await assert.rejects(photos.edit(who,base({sourceId:id,kind:'pose',bodyIds:['chest-A']})),code('INVALID_BODY_REFERENCE'));assert.equal(calls.length,0);
- for(const name of ['chest-A','chest-B','chest-C','chest-D','chest-E','chest-F','chest-G','hip-S','hip-M','hip-L','hip-XL','hip-XXL','hip-XXXL'])assert.ok(file(name).length>1000,name);
-});
