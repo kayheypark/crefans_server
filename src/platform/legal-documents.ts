@@ -503,12 +503,28 @@ export const SHARE_REWARD_TERMS:LegalDocument={...GUEST_LIMITS_TERMS,version:'20
  notice:'2026년 11월 20일부터 적용합니다. 제13조의 비회원 결과 공유 보상을 다른 방문자가 링크로 들어올 때가 아니라 결과 사진을 처음 공유할 때 받도록 바꾸었습니다. 그 밖의 조항은 바뀌지 않았습니다. 이전 개정 내역은 이전 버전에서 볼 수 있습니다.',
  sections:GUEST_LIMITS_TERMS.sections.map(sec=>sec.title.startsWith('13. ')?{...sec,body:swapIn(sec.title,sec.body,SHARE_T13_FROM,SHARE_T13_TO)}:sec)};
 const shareRewardCatalog:LegalCatalog={...guestLimitsCatalog,documents:{...guestLimitsCatalog.documents,privacy:SHARE_REWARD_PRIVACY,terms:SHARE_REWARD_TERMS}};
+// 2026-11-20 user decisions (later the same day): guest credits refill to 3 every day at 09:00 KST like members, and the post
+// and share rewards (3 each) can be earned once a day and are usable until the next refill. Same-day revision, effective on deploy.
+export const GUEST_DAILY_DATE='2026-11-20';
+const DAILY_P17_FROM='브라우저당 체험 이용권 3장, 첫 게시글을 올리면 3장, 체험 결과 사진을 처음 공유하면 3장을 각각 한 번 더 지급';
+const DAILY_P17_TO='브라우저당 하루 체험 이용권 3장을 매일 오전 9시(한국 시간)에 다시 채우고, 그날 첫 게시글을 올리거나 체험 결과 사진을 처음 공유하면 그날 쓸 수 있는 3장을 각각 한 번 더 지급';
+const DAILY_P17_SHARE_FROM='그 브라우저의 체험 식별값으로 공유 보상을 한 번 기록합니다.';
+const DAILY_P17_SHARE_TO='그 브라우저의 체험 식별값으로 그날의 공유 보상을 기록합니다.';
+const DAILY_T13_FROM='로그인하지 않은 방문자는 브라우저당 체험 이용권 3장을 받고, 첫 게시글을 올리거나 체험 결과 사진을 처음 공유(공유 창으로 공유하거나 링크 복사)하면 각각 3장을 한 번 더 받습니다.';
+const DAILY_T13_TO='로그인하지 않은 방문자는 브라우저당 하루 체험 이용권 3장을 받고 매일 오전 9시(한국 시간)에 다시 채워지며, 그날 첫 게시글을 올리거나 체험 결과 사진을 처음 공유(공유 창으로 공유하거나 링크 복사)하면 그날 쓸 수 있는 3장을 각각 한 번 더 받습니다. 남은 체험 이용권과 보상은 다음 날로 넘어가지 않습니다.';
+export const GUEST_DAILY_PRIVACY:LegalDocument={...SHARE_REWARD_PRIVACY,version:'2026-11-20.guest-daily.1',updatedAt:GUEST_DAILY_DATE,publishedAt:GUEST_DAILY_DATE,effectiveAt:GUEST_DAILY_DATE,status:'published',
+ notice:SHARE_REWARD_PRIVACY.notice+' 2026-11-20 추가 개정: 17항 — 비회원 체험 이용권을 매일 오전 9시에 3장으로 다시 채우고, 게시·공유 보상을 하루 한 번씩 받을 수 있게 바꾸었습니다.',
+ sections:SHARE_REWARD_PRIVACY.sections.map(sec=>sec.title.startsWith('17. ')?{...sec,body:swapIn(sec.title,swapIn(sec.title,sec.body,DAILY_P17_FROM,DAILY_P17_TO),DAILY_P17_SHARE_FROM,DAILY_P17_SHARE_TO)}:sec)};
+export const GUEST_DAILY_TERMS:LegalDocument={...SHARE_REWARD_TERMS,version:'2026-11-20.guest-daily.1',updatedAt:GUEST_DAILY_DATE,publishedAt:GUEST_DAILY_DATE,effectiveAt:GUEST_DAILY_DATE,status:'published',
+ notice:'2026년 11월 20일부터 적용합니다. 제13조의 비회원 체험 이용권을 매일 오전 9시(한국 시간)에 3장으로 다시 채우고, 첫 게시·첫 공유 보상을 하루 한 번씩 받을 수 있도록 바꾸었습니다. 그 밖의 조항은 바뀌지 않았습니다. 이전 개정 내역은 이전 버전에서 볼 수 있습니다.',
+ sections:SHARE_REWARD_TERMS.sections.map(sec=>sec.title.startsWith('13. ')?{...sec,body:swapIn(sec.title,sec.body,DAILY_T13_FROM,DAILY_T13_TO)}:sec)};
+const guestDailyCatalog:LegalCatalog={...shareRewardCatalog,documents:{...shareRewardCatalog.documents,privacy:GUEST_DAILY_PRIVACY,terms:GUEST_DAILY_TERMS}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=SHARE_REWARD_DATE?shareRewardCatalog:day>=GUEST_LIMITS_DATE?guestLimitsCatalog:day>=GUEST_REPLAY_PRIVACY_DATE?guestReplayCatalog:day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=GUEST_DAILY_DATE?guestDailyCatalog:day>=SHARE_REWARD_DATE?shareRewardCatalog:day>=GUEST_LIMITS_DATE?guestLimitsCatalog:day>=GUEST_REPLAY_PRIVACY_DATE?guestReplayCatalog:day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)

@@ -707,7 +707,7 @@ test('console reset gives every visitor a fresh 10 tries and keeps the guests da
  const admin={id:crypto.randomUUID(),role:'SUPER_ADMIN',is_active:true},viewer={id:crypto.randomUUID(),role:'VIEWER',is_active:true,permissions:{members:['view']}};
  const visitor='guest:'+crypto.randomBytes(20).toString('hex'),{guestQuotaEpoch,guestQuotaKey}=require('../dist/src/platform/guest-policy');
  try{
-  const epoch=await guestQuotaEpoch(db);for(let n=0;n<3;n++)await photos.limiter.limit(guestQuotaKey('ai-photo:guest:',visitor,epoch),10,3650*86400);
+  const epoch=await guestQuotaEpoch(db);for(let n=0;n<3;n++)await photos.limiter.limit(guestQuotaKey('ai-photo:guest:',visitor,epoch),10,86400);// 2026-11-20: the guest window is daily
   assert.equal(await photos.guestRemaining(visitor),0);
   await assert.rejects(resetGuestAiQuota(db,admin,{reason:'테스트 초기화',confirm:'틀림'}),code('CONFIRMATION_REQUIRED'));
   await assert.rejects(resetGuestAiQuota(db,viewer,{reason:'테스트 초기화',confirm:'전체 초기화'}));

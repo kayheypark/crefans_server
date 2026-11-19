@@ -29,30 +29,34 @@ export async function guestQuotaEpoch(db:any):Promise<number>{const row=await db
 export const guestQuotaKey=(prefix:'ai-photo:guest:'|'ai-photo:guest-ip:',id:string,epoch:number)=>prefix+(prefix==='ai-photo:guest:'?'publish-reward:':'')+(epoch?epoch+':':'')+id;
 
 
-const postRewardId=(id:string)=>digest('ai-photo:guest-post-reward:'+id);
+// 2026-11-20 user decision: guest credits refill every day at 09:00 KST (00:00 UTC, the same window as members), and the
+// post and share rewards (3 each) can be earned once per day and expire at the next refill.
+export const guestRewardDay=(now=Date.now())=>Math.floor(now/86400000);
+const nextRefill=(now=Date.now())=>new Date((guestRewardDay(now)+1)*86400000);
+const postRewardId=(id:string,now=Date.now())=>digest('ai-photo:guest-post-reward:'+guestRewardDay(now)+':'+id);
 
-export async function guestPostRewardClaimed(db:any,id:string):Promise<boolean>{
- return !!await db.authRateBucket.findUnique({where:{id:postRewardId(id)},select:{id:true}});
+export async function guestPostRewardClaimed(db:any,id:string,now=Date.now()):Promise<boolean>{
+ return !!await db.authRateBucket.findUnique({where:{id:postRewardId(id,now)},select:{id:true}});
 }
 
 // Called in the same transaction as a successful publication. The primary key enforces
-// one grant per browser session, including concurrent publishes and request retries.
-export async function grantGuestPostReward(tx:any,id:string):Promise<number>{
- const expires=new Date(Date.now()+GUEST_RETENTION_DAYS*86400000);
+// one grant per browser a day, including concurrent publishes and request retries.
+export async function grantGuestPostReward(tx:any,id:string,now=Date.now()):Promise<number>{
+ const expires=nextRefill(now);
  const inserted=await tx.$executeRaw`INSERT IGNORE INTO auth_rate_buckets (id,count,expires_at)
-   VALUES (${postRewardId(id)},${GUEST_POST_REWARD},${expires})`;
+   VALUES (${postRewardId(id,now)},${GUEST_POST_REWARD},${expires})`;
  return inserted===1?GUEST_POST_REWARD:0;
 }
 
-const shareRewardId=(id:string)=>digest('ai-photo:guest-share-reward:'+id);
+const shareRewardId=(id:string,now=Date.now())=>digest('ai-photo:guest-share-reward:'+guestRewardDay(now)+':'+id);
 
-export async function guestShareRewardClaimed(db:any,id:string):Promise<boolean>{
- return !!await db.authRateBucket.findUnique({where:{id:shareRewardId(id)},select:{id:true}});
+export async function guestShareRewardClaimed(db:any,id:string,now=Date.now()):Promise<boolean>{
+ return !!await db.authRateBucket.findUnique({where:{id:shareRewardId(id,now)},select:{id:true}});
 }
 
-export async function grantGuestShareReward(tx:any,id:string):Promise<boolean>{
- const expires=new Date(Date.now()+GUEST_RETENTION_DAYS*86400000);
+export async function grantGuestShareReward(tx:any,id:string,now=Date.now()):Promise<boolean>{
+ const expires=nextRefill(now);
  const inserted=await tx.$executeRaw`INSERT IGNORE INTO auth_rate_buckets (id,count,expires_at)
-   VALUES (${shareRewardId(id)},${GUEST_SHARE_REWARD},${expires})`;
+   VALUES (${shareRewardId(id,now)},${GUEST_SHARE_REWARD},${expires})`;
  return inserted===1;
 }

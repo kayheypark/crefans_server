@@ -71,6 +71,23 @@ test('AI result share grants three credits at the first share of the guest\'s ow
  assert.equal(typeof guestsService.shareVisit,'undefined','visits no longer pay');
 });
 
+// 2026-11-20 user decisions: guest credits refill to 3 every day at 09:00 KST (00:00 UTC) and the share reward can be earned
+// again the next day; yesterday's leftovers do not carry over.
+test('guest credits and the share reward reset at the next 09:00 KST',async()=>{
+ const owner=await startGuest(),result=await upload(owner.id,{aiGenerated:true});
+ const realNow=Date.now,day=Math.floor(realNow()/86400000);
+ try{
+  Date.now=()=>day*86400000+3600000;// 10:00 KST today
+  assert.equal((await photos.guestQuota(owner.id)).remaining,3);
+  assert.deepEqual(await guestsService.shareDone(owner.req,result),{granted:true});assert.deepEqual(await guestsService.shareDone(owner.req,result),{granted:false});
+  assert.equal((await photos.guestQuota(owner.id)).remaining,6);
+  Date.now=()=>(day+1)*86400000+60000;// 09:01 KST tomorrow
+  const next=await photos.guestQuota(owner.id);assert.equal(next.remaining,3,'refilled to 3, no carry-over');assert.equal(next.shareRewardClaimed,false);
+  assert.deepEqual(await guestsService.shareDone(owner.req,result),{granted:true},'the share reward can be earned again');
+  assert.equal((await photos.guestQuota(owner.id)).remaining,6);
+ }finally{Date.now=realNow;}
+});
+
 test('a guest publishes only, without comments or tips; the post is in the feed for 24 hours and then closed',async()=>{
  const g=await startGuest();
  await assert.rejects(studio.saveContent(g.id,post({status:'draft'}),{guest:true}),code('GUEST_PUBLISH_ONLY'));
