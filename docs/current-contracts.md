@@ -391,7 +391,7 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 
 ### server
 
-환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `OWNER_HOME_IPS`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `DISK_ALERT_WARNING_PERCENT`, `DISK_ALERT_CRITICAL_PERCENT`, `DISK_ALERT_INTERVAL_MINUTES`, `DISK_ALERT_PATH`, `BETA_MODE`, `ADULT_CONTENT_BLOCKED`, `SIGNUP_OPEN`, `SIGNUP_MAIL_DAILY_TOTAL`, `MARKETING_MAIL_ENABLED`, `WELCOME_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`, `GUIDE_ADVISOR_OPENAI_API_KEY`, `GUIDE_ADVISOR_MODEL`, `GUIDE_ADVISOR_REASONING_EFFORT`, `GUIDE_ORIGINS`, `GUIDE_ADVISOR_INDEX_URL`, `GUIDE_ADVISOR_MIN_SIMILARITY`, `GUIDE_ADVISOR_PER_MINUTE`, `GUIDE_ADVISOR_PER_DAY`, `GUIDE_ADVISOR_PER_CLIENT_DAY`, `GUIDE_ADVISOR_DAILY_TOTAL`, `GUIDE_ADVISOR_MAX_OUTPUT_TOKENS`, `GUIDE_ADVISOR_TIMEOUT_MS`, `AI_PHOTO_BYTEPLUS_API_KEY`, `AI_PHOTO_OPENAI_API_KEY`, `AI_PHOTO_PER_DAY`, `AI_PHOTO_DAILY_TOTAL`
+환경 키: `DATABASE_URL`, `AUTH_PROVIDER`, `LOCAL_AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `HOST`, `PORT`, `NODE_ENV`, `FRONTEND_ORIGINS`, `ADMIN_ORIGINS`, `PUBLIC_API_ORIGIN`, `MEDIA_ROOT`, `MEMBER_MAIL_PROVIDER`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `PLATFORM_FEE_BPS`, `SETTLEMENT_HOLD_DAYS`, `REFUND_WINDOW_DAYS`, `RENEWAL_MAX_RETRIES`, `RENEWAL_RETRY_HOURS`, `SIGNUP_IDENTITY_MODE`, `SIGNUP_EMAIL_ALLOWLIST`, `PASS_ADAPTER_URL`, `PASS_ADAPTER_SECRET`, `PASS_CALLBACK_SECRET`, `BANK_ADAPTER_URL`, `BANK_ADAPTER_SECRET`, `BANK_PAYOUTS_ENABLED`, `MEDIA_ORPHAN_GRACE_DAYS`, `MEDIA_DELETE_ENABLED`, `MEDIA_STORAGE`, `S3_MEDIA_BUCKET`, `MEDIA_EDGE_SECRET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_UPLOAD_BUCKET`, `S3_PROCESSED_BUCKET`, `TELEGRAM_OPERATIONS_BOT_TOKEN`, `TELEGRAM_OPERATIONS_CHAT_ID`, `OWNER_HOME_IPS`, `TRUSTED_PROXY_IPS`, `APP_ENV`, `ACCESS_LOG_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS`, `APP_RELEASE`, `OPERATIONS_WATCHDOG_ENABLED`, `DISK_ALERT_WARNING_PERCENT`, `DISK_ALERT_CRITICAL_PERCENT`, `DISK_ALERT_INTERVAL_MINUTES`, `DISK_ALERT_PATH`, `BETA_MODE`, `ADULT_CONTENT_BLOCKED`, `SIGNUP_OPEN`, `SIGNUP_MAIL_DAILY_TOTAL`, `MARKETING_MAIL_ENABLED`, `WELCOME_MAIL_ENABLED`, `MARKETING_PUBLIC_ORIGIN`, `MARKETING_UNSUBSCRIBE_SECRET`, `BEAN_LEDGER_ENABLED`, `BEAN_LIVE_PAYMENTS_APPROVED`, `CREFANS_PREVIEW_LOGIN_HASH`, `GUIDE_ADVISOR_OPENAI_API_KEY`, `GUIDE_ADVISOR_MODEL`, `GUIDE_ADVISOR_REASONING_EFFORT`, `GUIDE_ORIGINS`, `GUIDE_ADVISOR_INDEX_URL`, `GUIDE_ADVISOR_MIN_SIMILARITY`, `GUIDE_ADVISOR_PER_MINUTE`, `GUIDE_ADVISOR_PER_DAY`, `GUIDE_ADVISOR_PER_CLIENT_DAY`, `GUIDE_ADVISOR_DAILY_TOTAL`, `GUIDE_ADVISOR_MAX_OUTPUT_TOKENS`, `GUIDE_ADVISOR_TIMEOUT_MS`, `AI_PHOTO_BYTEPLUS_MODEL`, `AI_PHOTO_BYTEPLUS_API_KEY`, `AI_PHOTO_OPENAI_API_KEY`, `AI_PHOTO_PER_DAY`, `AI_PHOTO_DAILY_TOTAL`
 
 | 명령 | package.json 실행문 |
 | --- | --- |
@@ -490,8 +490,11 @@ GET 라우트의 Express HEAD 처리 및 OPTIONS/CORS는 별도 명시 decorator
 - `20261117020000_member_phone_encrypted`
 - `20261117030000_ai_preset_usage`
 - `20261118010000_funnel_step_daily`
+- `20261119110000_ai_costume_fit_reviews`
+- `20261119110100_ai_costume_verified_route`
+- `20261119150000_ai_photo_fractional_units`
 
-## Prisma 전체 정의 (112 models · 15 enums)
+## Prisma 전체 정의 (113 models · 15 enums)
 
 아래는 `prisma/schema.prisma` 원문이다. 필드·관계·제약·인덱스를 생략하지 않는다. 기존 모델의 Cognito 주석은 과거 호환 필드 이름이며 플랫폼 인증 방식은 Member 자체 세션이다. 배포된 DB 스키마와 일치하는지는 대상 DB에서 별도 검증한다.
 
@@ -1627,7 +1630,8 @@ model MemberChallenge {
 /// Shared across processes; keys are hashes, not emails or IP addresses.
 model AuthRateBucket {
   id         String @id @db.Char(64)
-  count      Int @default(1)
+  count      Float @default(1)
+  quota_generation String? @db.Char(36)
   expires_at DateTime
   @@index([expires_at])
   @@map("auth_rate_buckets")
@@ -2543,7 +2547,7 @@ model AiPhotoResetTicketUse {
  ticket_id String @db.VarChar(191)
  creator_user_id String @db.VarChar(191)
  /// today's used count that the ticket cleared
- used_before Int
+ used_before Float
  created_at DateTime @default(now())
  @@index([ticket_id])
  @@index([creator_user_id, created_at])
@@ -2588,13 +2592,13 @@ model AiShopOrder {
  terms String @db.Text
  environment String @db.VarChar(10)
  status String @default("pending") @db.VarChar(20)
- remaining Int @default(0)
+ remaining Float @default(0)
  payment_key String? @db.VarChar(200)
  locked_until DateTime?
  paid_at DateTime?
  expires_at DateTime?
  refund_amount Int?
- refund_quantity Int?
+ refund_quantity Float?
  refunded_at DateTime?
  failure_code String? @db.VarChar(100)
  created_at DateTime @default(now())
@@ -2605,6 +2609,9 @@ model AiShopOrder {
 }
 model AiShopUse {
  id String @id @default(uuid())
+ request_id String? @db.VarChar(191)
+ units Float @default(1)
+ @@index([request_id])
  order_id String @db.VarChar(191)
  creator_id String @db.VarChar(191)
  status String @default("reserved") @db.VarChar(20)
@@ -2618,7 +2625,7 @@ model AiShopUse {
 model AiHeartWallet {
  user_id String @id @db.VarChar(191)
  hearts Int @default(0)
- credits Int @default(0)
+ credits Float @default(0)
  @@map("ai_heart_wallets")
 }
 model AiHeartGame {
@@ -2637,6 +2644,7 @@ model AiHeartGame {
 }
 model AiHeartUse {
  id String @id
+ units Float @default(1)
  user_id String @db.VarChar(191)
  status String @default("reserved") @db.VarChar(20)
  @@map("ai_heart_uses")
@@ -2777,6 +2785,19 @@ model PhoneVerification {
   proof_hash  String?  @db.VarChar(64)
   @@index([member_id, created_at])
   @@map("phone_verifications")
+}
+
+/// Catalog-only failure counts for studio review. An empty pose means preserve the original pose.
+model AiCostumeFitReview {
+  costume_id       String   @db.VarChar(6)
+  pose             String   @db.VarChar(191)
+  policy_failures  Int      @default(0) @db.UnsignedInt
+  fitting_failures Int      @default(0) @db.UnsignedInt
+  last_failed_at   DateTime @default(now()) @db.DateTime(3)
+  verified_base_sha256 String? @db.Char(64)
+  last_verified_at     DateTime? @db.DateTime(3)
+  @@id([costume_id, pose])
+  @@map("ai_costume_fit_reviews")
 }
 
 /// 2026-11-17: daily AI photo preset usage (aggregate only, no person or request is stored).
