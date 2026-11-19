@@ -54,9 +54,26 @@ test('money, bank transfer, order, payout, security and AI cost alerts are never
  for(const type of['security.ip_blocked','guest.ai_closed','guest.ai_usage'])for(let i=0;i<3;i++){const row=track(await ops.record(type,{ip:'198.51.100.1',used:50+i,limit:300}));assert.equal(row.delivered_at,null,type);}
  for(const t of policy.DIGEST_TYPES)assert.doesNotMatch(t,/^(bank_transfer|manual_refund|beans|payment|refund|subscription|security|ai_subscription|referral|guest)\./,t);
  // Control: an informational type is digested (stored, handled, not sent).
- const info=track(await db.$transaction(tx=>enqueueOperation(tx,'content.created',{targetId:scope})));assert.ok(info.delivered_at);assert.equal(info.last_error_code,'DIGESTED');
+ const info=track(await db.$transaction(tx=>enqueueOperation(tx,'content.updated',{targetId:scope})));assert.ok(info.delivered_at);assert.equal(info.last_error_code,'DIGESTED');
  const pending=await db.platformOperationalEvent.count({where:{id:{in:[...ids]},delivered_at:null}});assert.equal(pending,money.length*10+9);
- const sent=await drain();assert.equal(sent.length,pending);assert.ok(!sent.some(t=>t.includes('콘텐츠 등록')));
+ const sent=await drain();assert.equal(sent.length,pending);assert.ok(!sent.some(t=>t.includes('콘텐츠 수정')));
+});
+
+test('content registrations are queued and delivered individually, including after the landing cap',async()=>{
+ for(const id of [...ids])ids.delete(id);
+ const cap=track(await ops.record('funnel.landing_cap',{limit:100},`funnel.landing_cap:test-${scope}`,{omitIp:true}));
+ assert.equal(cap.delivered_at,null);
+ const registrations=await db.$transaction(async tx=>{
+  const rows=[];
+  for(const status of ['draft','published']){
+   rows.push(await enqueueOperation(tx,'content.created',{postId:randomUUID(),status}));
+  }
+  return rows;
+ });
+ for(const row of registrations){track(row);assert.equal(row.delivered_at,null);assert.equal(row.last_error_code,null);}
+ const sent=await drain();
+ assert.equal(sent.filter(message=>message.startsWith('[crefans] 콘텐츠 등록')).length,2);
+ assert.equal(sent.length,3);
 });
 
 // 2026-11-18 user decision (revised): signups stay immediate and every AI photo failure is sent, even when identical.
