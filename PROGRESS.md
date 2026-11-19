@@ -3393,3 +3393,9 @@
 - 촬영컨셉 검증 완료: 프론트60/60, 서버28/28(격리DB·공급자대역), 타입검사·서버build 성공. WebKit390px 네 이미지 로딩·선택/해제·가로넘침/JS오류 없음, 모바일 캡처 시각 확인. Seedream 예시4종 실생성 성공. 실제 사용자 사진 편집/운영 배포 미실행. 증거: 프론트 docs/audit/shoot-concepts-20261114.json.
 
 - 최종: 서버build·실제격리DB/공급자대역30/30, 프론트65/65·typecheck, 문서계약240라우트/103모델/61migration 통과. 기능 feat/ai-heart-rewards, 서버신규migration은격리DB만적용. 실공급자/운영/브라우저통합검증 미실행. 증거 프론트 docs/audit/ai-heart-rewards-20261114.json. 다음: 요청 시 기존 미배포 묶음과 함께dev→prod통합·migration→API/프론트배포. 하트잔액은반복100개도달마다전환하며1회해금후매10개자동전환은아님.
+
+## 2026-11-19 비회원 체험 녹화 동의를 필수 1개로 합침 (개발 서버 시험만)
+- 사용자 결정: '(선택) 사용성 분석' 체크박스를 없애고 처리방침 17항 필수 동의 1개로 화면 녹화(PostHog) 동의까지 보낸다. 녹화 안내는 본문 '자세히' 목록으로 이동. 원래 작업은 다른 세션의 미커밋 사본(front guest-publish-prod, server guest-publish-credit)에서 가져와 dev에 커밋(front e19a309, server 82b3238).
+- 개발 서버 runtime.env에 GUEST_REPLAY_CONTENT_CONSENT_VERSION=2026-11-19.replay.1 추가(백업 runtime.env.bak-replay-consent-20261119). 운영 runtime.env에는 없음 → 운영은 녹화 동의를 주고받지 않음.
+- 검증: server tsc·build OK, platform-guest 11/11. front tsc(posthog-js 미설치 기존 오류 외 0), guest-claim-dialog·crefans-contract·posthog 14/14. 개발 서버 배포 스모크 실패 0. API: 올바른 판 동의 200, 옛 판 400 GUEST_REPLAY_CONSENT_INVALID. 비로그인 브라우저(Playwright, 375px): 체크박스 1개, 자세히 목록에 PostHog 안내 있음.
+- 미결: 처리방침 17항 본문에 녹화 미포함. 운영 반영 전 구분 동의(개인정보보호법 22조 1항)·선택 동의 거부 시 서비스 거부 금지(22조 5항) 재검토 필요. 녹화 동의 여부에 따라 실제 녹화를 켜고 끄는 로직은 이 변경 범위에 없음.
