@@ -3399,3 +3399,10 @@
 - 개발 서버 runtime.env에 GUEST_REPLAY_CONTENT_CONSENT_VERSION=2026-11-19.replay.1 추가(백업 runtime.env.bak-replay-consent-20261119). 운영 runtime.env에는 없음 → 운영은 녹화 동의를 주고받지 않음.
 - 검증: server tsc·build OK, platform-guest 11/11. front tsc(posthog-js 미설치 기존 오류 외 0), guest-claim-dialog·crefans-contract·posthog 14/14. 개발 서버 배포 스모크 실패 0. API: 올바른 판 동의 200, 옛 판 400 GUEST_REPLAY_CONSENT_INVALID. 비로그인 브라우저(Playwright, 375px): 체크박스 1개, 자세히 목록에 PostHog 안내 있음.
 - 미결: 처리방침 17항 본문에 녹화 미포함. 운영 반영 전 구분 동의(개인정보보호법 22조 1항)·선택 동의 거부 시 서비스 거부 금지(22조 5항) 재검토 필요. 녹화 동의 여부에 따라 실제 녹화를 켜고 끄는 로직은 이 변경 범위에 없음.
+
+### 2026-11-19 18:1x 운영 반영(사용자 지시 "처리방침에도 넣고 다되면 운영배포해")
+- 운영 브랜치: server prod=dev a38f202(82b3238 녹화 동의 기록 + a38f202 처리방침 2026-11-19.guest-replay.1: 17항에 체험 화면 이용 기록, 9조 ④ 차이, replayConsentVersion 항상 제공. 운영 배포 도구가 새 설정 키를 받지 않아 설정값 게이트를 없앰), front prod cfd3319(75d69e7 위 e19a309 체리픽). GitLab origin·GitHub github prod 동일.
+- 배포(devbox-release.sh, 개발 PC 빌드): api guest-replay-20261119 OK(검사: 처리방침 판 guest-replay.1, replayConsentVersion 2026-11-19.replay.1, 옛 판 동의 400). front guest-replay-20261119 1차는 내 검사 오류(처리방침 페이지 SSR HTML에 문구 없음)로 실패→자동 롤백, 검사 수정 후 guest-replay2-20261119 OK. 1차 잔여 이미지·백업(.env 해시가 맥 복구본과 같음 확인)은 운영에서 삭제. 복구본 맥 /Users/ethan/crefans-recovery/20261119/{guest-replay-20261119-api,guest-replay2-20261119-front} 검증 후 운영 이전 이미지 정리.
+- 운영 확인: runtime.env WELCOME_MAIL_ENABLED=true 유지, 컨테이너 api=guest-replay-20261119·frontend=guest-replay2-20261119, 비로그인 Playwright(375px)로 https://crefans.com/service/try 체크박스 1개·자세히 목록 PostHog 안내 확인. 개발: Jenkins crefans-dev-deploy #95~97 SUCCESS, .last-success server a38f202·front bce0ae4, 개발 서버 runtime.env의 GUEST_REPLAY_CONTENT_CONSENT_VERSION 제거.
+- 맥 디스크 114MB→34GiB: 사용자 승인으로 복구 이미지 묶음 31개(36.8GB) 삭제, 목록 /Users/ethan/crefans-recovery/candidates-deleted-20261119.tsv.
+- 미결: 동의만 기록하고 동의자 녹화 가리기 해제 로직 없음(처리방침이 실제보다 넓게 고지). 처리방침 17항 "브라우저당 10회" vs 코드 GUEST_AI_LIMIT=3(기존, platform-legal 1건 실패). 다른 세션의 미커밋 사본(front guest-publish-prod, server guest-publish-credit)에 같은 변경이 남음→전달문 전달 필요. 운영 다른 잔여물(/opt/crefans-backup-admin-admin-today-20261118, -cancel-now-20261106, 이미지 crefans-api:search-preview-20261111)은 이번 작업 것이 아니라 그대로 둠.
