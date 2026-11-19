@@ -3414,3 +3414,10 @@
 - 프론트 61cc109: posthog.ts REPLAY_UNMASK_ATTR(data-ph-unmask) — html에 이 속성이 있으면 blockSelector의 미디어 부분이 빠지고 maskInputFn이 입력을 그대로 기록(비밀번호·파일·숨김 입력·ph-no-capture는 계속 가림). useGuestTrialModel이 session.active && replayConsented일 때만 켜고 떠날 때 끔.
 - 검증: server tsc·build, platform-legal 38/38(새 대조 테스트 포함), platform-guest·openapi 중 1건 실패(200-a-day: 로컬 테스트 DB 오늘 누적+quota_generation 칼럼 미적용으로 보이는 환경 문제, 이번 변경 무관 추정·미확정). front posthog 13/13, 대조(해제 로직 제거 시 2건 실패) 확인, crefans-contract 2번은 기준선부터 실패(dev AiResultShare.tsx가 lib/api 직접 import, 다른 세션). 개발 서버 deploy-dev 실패 0, .last-success server 9adfe12·front 61cc109, API terms ai-units.1·privacy guest-limits.1. Playwright(비로그인, http://172.30.1.16): 동의 전 속성 없음 → 동의 후 replayConsented true·속성 켜짐·회원 미디어 img 비차단·file input 차단 → 피드 이동 시 속성 꺼짐. 127.0.0.1 출처로는 동의가 "허용되지 않은 요청"으로 거절(출처 검사, 정상).
 - 미확인: 실제 PostHog 녹화 화면(개발 빌드의 PostHog 키 여부 미확인), 운영 배포.
+
+### 2026-11-19 23:0x AI 결과 공유 8자리 짧은 코드 (dev·개발 서버, 운영 대기)
+- 사용자 요청: 공유 링크가 너무 김. `9b3d67c`(feat/share-short-link, origin/prod 기준) → dev `955ec99`. 마이그레이션 `20261119230000_guest_share_links`(개발 서버 적용 확인).
+- `guest_share_links(code CHAR(8), guest_id, ip_hash, expires_at)`: 발급 때 만료 행 삭제, 방문 때 코드 조회 전 IP당 시간 30회 제한, 본인 IP·만료·없는 코드는 거절. 기존 긴 토큰은 만료(7일)까지 받음 — 2026-11-27 이후 그 분기 제거 가능.
+- 처리방침 17항 공유 문구(미시행 guest-limits.1)를 "서버에 보관, 링크에는 짧은 코드, 만료 기록 삭제"로 수정 `b024772`.
+- 검증: tsc, platform-openapi 15/15, platform-legal 전부, platform-guest 공유 테스트 통과(옛 코드로 되돌리면 실패). guest 6·10번은 로컬 e2e DB의 오늘 200회 한도 소진으로 기존과 같은 실패.
+- 운영 배포 시: guest-limits.1 처리방침·약관(9adfe12)을 같이 낼지 사용자 결정, 같이 내면 GUEST_LIMITS_DATE를 배포일로.
