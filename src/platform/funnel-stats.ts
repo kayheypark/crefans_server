@@ -8,6 +8,7 @@ import {requestContext} from './request-context';
 
 export const FUNNEL_STEPS=[
  ['landing_view','AI 사진 랜딩 방문'],
+ ['landing_view_result_share','AI 사진 결과 공유 링크 방문'],
  ['guest_consent_view','체험 동의 화면'],
  ['guest_consent_agreed','체험 동의 완료'],
  ['ai_started_guest','AI 생성 시작(비회원)'],
@@ -92,7 +93,11 @@ export async function reportFunnelStep(db:any,input:any,alert?:{operations:{reco
  if(!funnelRateLimit(ip))reject(429,'RATE_LIMITED','잠시 후 다시 시도해주세요.');
  if(step==='landing_view'&&isDeployTest(landingSource(input))){if(alert)void landingVisitAlert(db,alert.operations,landingSource(input),alert.userAgent);return{recorded:false};}
  const recorded=await recordFunnelStep(db,step as FunnelStep);
- if(recorded&&step==='landing_view'&&alert)void landingVisitAlert(db,alert.operations,landingSource(input),alert.userAgent);
+ if(recorded&&step==='landing_view'){
+  const source=landingSource(input);
+  if(source.utmSource==='crefans_share'&&source.utmCampaign==='ai_photo'&&source.utmContent==='result')await recordFunnelStep(db,'landing_view_result_share');
+  if(alert)void landingVisitAlert(db,alert.operations,source,alert.userAgent);
+ }
  return{recorded};
 }
 

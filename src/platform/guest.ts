@@ -9,14 +9,17 @@ import {AiPhotoService} from './ai-photo';
 import {GuestCaptionService} from './guest-caption';
 import {PlatformAuthGuard} from './platform-auth.guard';
 import {appendAudit} from './audit';
-import {recordFunnelStep} from './funnel-stats';
+import {PaymentProvider} from './payment-provider';
+import {isBotAgent,recordFunnelStep} from './funnel-stats';
 import {reject} from './http';
 import {requestContext} from './request-context';
 import {LocalMemberService} from '../auth/local/local-member.service';
 
-import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,GUEST_REPLAY_CONSENT_VERSION,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash} from './guest-policy';
+import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,GUEST_REPLAY_CONSENT_VERSION,GUEST_SHARE_REWARD,grantGuestShareReward,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash} from './guest-policy';
 export * from './guest-policy';
 const COOKIE_DAYS=30;
+const SHARE_LIFETIME=7*86400000;
+const SHARE_PURPOSE='guest-ai-result-share:';
 
 @Injectable()
 export class GuestService{
@@ -31,11 +34,11 @@ export class GuestService{
   // 2026-11-19 user decision: part of the single required trial consent (privacy 17항, 2026-11-19.guest-replay.1), always offered.
   return GUEST_REPLAY_CONSENT_VERSION;
  }
- async status(req:any,quota:(id:string)=>Promise<{limit:number;remaining:number;postRewardClaimed:boolean}>){
+ async status(req:any,quota:(id:string)=>Promise<{limit:number;remaining:number;postRewardClaimed:boolean;shareRewardClaimed:boolean}>){
   const id=guestFromRequest(req);
   const replayConsentVersion=this.replayConsentVersion();
-  const {limit,remaining,postRewardClaimed}=id?await quota(id):{limit:GUEST_AI_LIMIT,remaining:GUEST_AI_LIMIT,postRewardClaimed:false};
-  return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,postHours:GUEST_POST_HOURS,limit,remaining,postRewardClaimed,postReward:GUEST_POST_REWARD,...(replayConsentVersion?{replayConsentVersion}:{})};
+  const {limit,remaining,postRewardClaimed,shareRewardClaimed}=id?await quota(id):{limit:GUEST_AI_LIMIT,remaining:GUEST_AI_LIMIT,postRewardClaimed:false,shareRewardClaimed:false};
+  return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,postHours:GUEST_POST_HOURS,limit,remaining,postRewardClaimed,postReward:GUEST_POST_REWARD,shareRewardClaimed,...(replayConsentVersion?{replayConsentVersion}:{})};
  }
  async start(req:any,res:any,input:any){
   if(input?.consent!==true||input?.version!==GUEST_CONSENT_VERSION)reject(400,'GUEST_CONSENT_REQUIRED','체험 안내를 확인하고 동의해 주세요.');
@@ -52,6 +55,33 @@ export class GuestService{
   if(token)res.cookie(GUEST_COOKIE,token,this.cookieOptions());
   await recordFunnelStep(this.service.db,'guest_consent_agreed');
   return{active:true,consentVersion:GUEST_CONSENT_VERSION};
+ }
+ async shareLink(req:any,mediaId:unknown){
+  const id=this.require(req);
+  if(typeof mediaId!=='string'||!/^[A-Za-z0-9_-]{1,100}$/.test(mediaId))reject(400,'GUEST_SHARE_INVALID','공유할 사진을 확인해 주세요.');
+  const media=await this.service.db.media.findFirst({where:{id:mediaId as string,user_sub:id,type:'IMAGE',processing_status:'COMPLETED',is_deleted:false,metadata:{path:'$.aiGenerated',equals:true}},select:{id:true}});
+  if(!media)reject(404,'GUEST_SHARE_NOT_FOUND','공유할 결과 사진을 찾을 수 없어요.');
+  const ip=this.ipHash();
+  const expiresAt=Date.now()+SHARE_LIFETIME;
+  return{token:new PaymentProvider(this.config).encrypt(SHARE_PURPOSE+JSON.stringify([id,ip,expiresAt]))};
+ }
+ async shareVisit(req:any,token:unknown){
+  const ip=this.ipHash();
+  if(isBotAgent(req.headers?.['user-agent'])||guestFromRequest(req)||!requestContext.getStore()?.ip||typeof token!=='string'||!/^[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{1,200}$/.test(token))return{accepted:false};
+  let share:[string,string,number];
+  try{
+   const value=new PaymentProvider(this.config).decrypt(token);
+   if(!value.startsWith(SHARE_PURPOSE))return{accepted:false};
+   share=JSON.parse(value.slice(SHARE_PURPOSE.length));
+   if(!Array.isArray(share)||!/^guest:[a-f0-9]{40}$/.test(share[0])||typeof share[1]!=='string'||!Number.isSafeInteger(share[2])||share[2]<=Date.now()||share[1]===ip)return{accepted:false};
+  }catch{return{accepted:false};}
+  await this.limiter.limit('guest-result-share-visit:'+ip,30,3600);
+  const accepted=await this.service.db.$transaction(async tx=>{
+   const granted=await grantGuestShareReward(tx,share[0]);
+   if(granted)await appendAudit(tx,{category:'business',action:'guest.ai_result_share_reward',entityId:share[0],data:{amount:GUEST_SHARE_REWARD}});
+   return granted;
+  });
+  return{accepted};
  }
  // 2026-11-16 user decision: signing in no longer links trial posts by itself; the browser first asks. This counts what would move.
  async claimable(member:string,req:any){await this.service.member(member);const id=guestFromRequest(req);if(!id)return{posts:0};return{posts:await this.service.db.posting.count({where:{user_sub:id,is_deleted:false}})};}
@@ -75,6 +105,8 @@ export class GuestController{
  constructor(private guests:GuestService,private studio:PlatformStudioService,private photos:AiPhotoService,private captions:GuestCaptionService){}
  @Get('session') session(@Req() req:any){return this.guests.status(req,id=>this.photos.guestQuota(id));}
  @Post('session') start(@Req() req:any,@Res({passthrough:true}) res:any,@Body() body:any){return this.guests.start(req,res,body);}
+ @Post('ai-photo/share-link') shareLink(@Req() req:any,@Body() body:any){return this.guests.shareLink(req,body?.mediaId);}
+ @Post('ai-photo/share-visit') shareVisit(@Req() req:any,@Body() body:any){return this.guests.shareVisit(req,body?.token);}
  @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);const saved=await this.studio.saveContent(id,body,{guest:true});await recordFunnelStep(this.studio.db,'post_published_guest');return saved;}
  // Writes the empty title/body at publish time; the visitor confirms before posting (2026-11-16).
  @Post('content/caption') async caption(@Req() req:any,@Body() body:any){const result=await this.captions.caption(this.guests.require(req),body,this.guests.ipHash());await recordFunnelStep(this.studio.db,'caption_written');return result;}

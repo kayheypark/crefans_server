@@ -50,6 +50,29 @@ test('replay consent is always offered with the required trial consent (privacy 
  assert.equal(rows.find(row=>row.action==='guest.replay_consented').metadata.policyVersion,version);
 });
 
+test('AI result share grants three credits once on a new visitor network',async()=>{
+ const owner=await startGuest(),other=await startGuest(),visitor=browser();
+ const result=await upload(owner.id,{aiGenerated:true}),original=await upload(owner.id);
+ const send=(id)=>requestContext.run({ip:'192.0.2.44'},()=>guestsService.shareLink(owner.req,id));
+ const visit=(token,ip='198.51.100.31',req=visitor.req)=>requestContext.run({ip},()=>guestsService.shareVisit({...req,headers:{'user-agent':'Mozilla/5.0 Safari/605.1'}},token));
+ await assert.rejects(send(original),code('GUEST_SHARE_NOT_FOUND'));
+ const foreign=await upload(other.id,{aiGenerated:true});
+ await assert.rejects(send(foreign),code('GUEST_SHARE_NOT_FOUND'));
+ const {token}=await send(result);
+ assert.ok(!token.includes(owner.id));
+ assert.equal((await photos.guestQuota(owner.id)).remaining,3);
+ assert.equal((await visit(token,'192.0.2.44')).accepted,false);
+ assert.equal((await visit(token,'198.51.100.31',owner.req)).accepted,false);
+ const tampered=token.slice(0,40)+(token[40]==='A'?'B':'A')+token.slice(41);
+ assert.equal((await visit(tampered)).accepted,false);
+ const visits=await Promise.all([visit(token),visit(token,'198.51.100.32')]);
+ assert.equal(visits.filter(row=>row.accepted).length,1);
+ const {token:second}=await send(result);
+ assert.equal((await visit(second,'198.51.100.33')).accepted,false);
+ const quota=await photos.guestQuota(owner.id);
+ assert.equal(quota.remaining,6);assert.equal(quota.shareRewardClaimed,true);assert.equal(quota.postRewardClaimed,false);
+});
+
 test('a guest publishes only, without comments or tips; the post is in the feed for 24 hours and then closed',async()=>{
  const g=await startGuest();
  await assert.rejects(studio.saveContent(g.id,post({status:'draft'}),{guest:true}),code('GUEST_PUBLISH_ONLY'));

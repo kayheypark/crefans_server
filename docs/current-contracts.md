@@ -172,6 +172,8 @@
 | GET | `/api/v1/events/promotion-beans` | `src/platform/beans.controller.ts::promotionEvent` |
 | POST | `/api/v1/events/promotion-beans/claim` | `src/platform/beans.controller.ts::claimPromotionEvent` |
 | POST | `/api/v1/guest/ai-photo/edit` | `src/platform/guest.ts::edit` |
+| POST | `/api/v1/guest/ai-photo/share-link` | `src/platform/guest.ts::shareLink` |
+| POST | `/api/v1/guest/ai-photo/share-visit` | `src/platform/guest.ts::shareVisit` |
 | GET | `/api/v1/guest/claim` | `src/platform/guest.ts::claimable` |
 | POST | `/api/v1/guest/claim` | `src/platform/guest.ts::claim` |
 | POST | `/api/v1/guest/content` | `src/platform/guest.ts::content` |

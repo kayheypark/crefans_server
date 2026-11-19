@@ -10,7 +10,7 @@ export const SHARE_WHERE={ai_result:'AI 사진 결과(게시 전)',post:'게시�
 export const SHARE_METHOD={native:'기기 공유(카톡 등 앱 고르기)',download:'사진 저장(파일 공유 안 되는 기기)',kakao:'카카오톡',copy:'링크 복사',more:'기기 공유(더보기)'} as const;
 // kakao 'done' means the Kakao share picker opened; the app cannot know whether a message was actually sent.
 export const SHARE_OUTCOME={done:'완료',cancelled:'취소',failed:'실패'} as const;
-const METHODS:Record<string,string[]>={ai_result:['native','download'],post:['kakao','copy','more']};
+const METHODS:Record<string,string[]>={ai_result:['native','download','copy'],post:['kakao','copy','more']};
 const POST_ID=/^[A-Za-z0-9-]{1,64}$/,FIELDS=new Set(['where','method','outcome','postId']),DAILY_CAP=200;
 const device=(ua:string)=>/Mobi|Android|iPhone|iPad|iPod/i.test(ua)?'모바일':'데스크톱';
 const kstTime=(d:Date)=>new Date(+d+9*3600000).toISOString().slice(0,16).replace('T',' ');

@@ -48,8 +48,13 @@ test('recordFunnelStep ignores unknown keys and never throws; the report is 14 K
  assert.equal(await funnel.recordFunnelStep(db,'nope'),false);
  assert.equal(await funnel.recordFunnelStep({$executeRaw:async()=>{throw Error('db down');}},'landing_view'),false);
  const prior=await count('signup_completed');assert.equal(await funnel.recordFunnelStep(db,'signup_completed'),true);assert.equal(await count('signup_completed'),prior+1);
+ const priorShare=await count('landing_view_result_share');
+ await funnel.reportFunnelStep(db,{step:'landing_view',utmSource:'crefans_share',utmMedium:'share',utmCampaign:'ai_photo',utmContent:'result'});
+ assert.equal(await count('landing_view_result_share'),priorShare+1);
+ await funnel.reportFunnelStep(db,{step:'landing_view',utmSource:'crefans_share',utmContent:'landing'});
+ assert.equal(await count('landing_view_result_share'),priorShare+1);
  const report=await funnel.funnelStats(db);assert.equal(report.dates.length,14);assert.equal(report.dates[13],kstDay().toISOString().slice(0,10));
- assert.equal(report.steps.length,12);const landing=report.steps.find(s=>s.key==='landing_view');assert.equal(landing.source,'browser');assert.equal(landing.daily.length,14);assert.equal(landing.daily[13],await count('landing_view'));assert.equal(landing.total,landing.daily.reduce((a,b)=>a+b,0));
+ assert.equal(report.steps.length,13);const landing=report.steps.find(s=>s.key==='landing_view');assert.equal(landing.source,'browser');assert.equal(landing.daily.length,14);assert.equal(landing.daily[13],await count('landing_view'));assert.equal(landing.total,landing.daily.reduce((a,b)=>a+b,0));
  assert.equal(report.steps.find(s=>s.key==='signup_completed').source,'server');
  assert.equal(kstDay(new Date('2026-11-18T15:30:00Z')).toISOString().slice(0,10),'2026-11-19','after 00:00 KST it is the next day');
 });

@@ -732,7 +732,7 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 
 ## 비회원 AI 사진 체험·파트너 계약 요청 — 2026-11-15
 - 비회원 체험은 `cf_guest`(httpOnly, 30일) 쿠키로 방문자를 구분한다. 동의 버전은 `GUEST_CONSENT_VERSION`(현재 2026-11-15.guest.2)과 같아야 한다. 접속 IP는 서버 보안키 HMAC 값으로만 횟수를 센다.
-- AI 한도: 브라우저 기본 이용권 3장(GUEST_AI_LIMIT) 및 첫 게시 성공 시 3장 1회 지급, 같은 IP 하루 10회(GUEST_IP_LIMIT), 비회원 전체 하루 200회(GUEST_DAILY_CLOSED). 비회원 생성은 회원의 서비스 전체 상한(`ai-photo:total`)을 쓰지 않는다.
+- AI 한도: 브라우저 기본 이용권 3장(GUEST_AI_LIMIT) 및 첫 게시 성공 시 3장 1회 지급, AI 결과 공유 링크를 통해 인정된 첫 유입이 있으면 별도로 3장 1회 지급, 같은 IP 하루 10회(GUEST_IP_LIMIT), 비회원 전체 하루 200회(GUEST_DAILY_CLOSED). 비회원 생성은 회원의 서비스 전체 상한(`ai-photo:total`)을 쓰지 않는다.
 - 체험 게시물은 바로 게시만 되고(댓글·후원 없음) 24시간 공개 후 비공개, 검색 제외. 첨부는 본인의 AI 결과물만(GUEST_AI_RESULT_ONLY). 같은 브라우저로 로그인하면 `/guest/claim`이 게시물·사진을 회원으로 옮긴다.
 - AI 사진 편집 실패는 회원·비회원·원인과 관계없이 모두 운영 텔레그램 알림 `ai-photo.failed`로 보낸다(오류 코드·단계·공급자·회원/비회원 구분·소요 시간과 접속 IP. 요청 문장·사진·회원 식별자 없음. 2026-11-16 결정, 2026-11-18 사용자 지시로 접속 IP 추가 — 랜딩 알림처럼 신뢰 프록시가 넘긴 접속 IP만, OWNER_HOME_IPS면 '(집)', 연결 IP 없음. 근거: 처리방침 9조 Telegram 운영 오류 알림에 접속 IP 포함). 성공·비용 알림은 계속 IP 없음.
 - AI 사진 생성 성공·실패 알림은 요청에서 검증한 공용 의상의 영문 캐릭터명을 선택 순서대로 표시한다(예: `의상: Modernia, D.Va`). 특정 캐릭터가 없는 기본 의상은 영문 의상명을 쓴다. 의상 선택이 없거나 검증 전에 실패하면 의상 줄을 생략한다. 사용량 통계의 프리셋 키는 기존 카탈로그 ID를 사용한다.
@@ -744,6 +744,8 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 | POST | /guest/session | 체험 동의(consent, version) 후 cf_guest 발급 |
 | POST | /media/guest | 체험 사진 업로드(이미지만, IP당 하루 60회) |
 | POST | /guest/ai-photo/edit | 체험 AI 사진 편집(보관함·하트 불가) |
+| POST | /guest/ai-photo/share-link | 본인의 AI 결과 사진을 확인하고 7일 유효한 공유 보상 토큰을 발급 |
+| POST | /guest/ai-photo/share-visit | 기존 체험 쿠키가 없고 공유자와 다른 네트워크에서 들어온 유효한 공유 링크 방문을 확인하여 공유자에 체험 이용권 3장 1회 지급 |
 | POST | /guest/content | 체험 게시물 바로 게시(본인 AI 결과물만) |
 | POST | /guest/content/caption | 비워 둔 제목·본문 AI 작성(고른 항목 이름·요청 문장만 OpenAI 전송, 입력·결과 유해성 검사, 실패·한도 초과 시 정해진 문장, 방문자당·IP당 하루 30회, 전체 하루 1,000회). 방문자가 확인한 뒤 /guest/content로 게시 |
 | POST | /guest/content/:id | 같은 브라우저(작성자 guest id) 체험 게시물의 제목·본문만 수정(사진·공개 범위·삭제 불가, 하루 30회·IP 60회, 남의 글 404) — 2026-11-16 |
