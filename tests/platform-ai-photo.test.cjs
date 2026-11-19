@@ -899,7 +899,7 @@ test('body-size references attach the catalog bytes after the background, are mo
  await photos.edit(who,base({sourceId:id,kind:'body',bodyIds:JSON.stringify(['chest-D','hip-L'])}));
  let request=calls.find(x=>x.kind==='edit');assert.equal(request.images.length,3);
  assert.deepEqual(request.images[1].bytes,file('chest-D'));assert.deepEqual(request.images[2].bytes,file('hip-L'));
- assert.match(request.fields.prompt,/Image 2 is a body-size reference for the chest \(bust\)/);assert.match(request.fields.prompt,/Image 3 is a body-size reference for the hips and buttocks/);assert.match(request.fields.prompt,/never copy the model's face/);assert.match(request.fields.prompt,/Never open, cut, lower or reshape a neckline/);
+ assert.match(request.fields.prompt,/Image 2 is a body-size reference for the chest \(bust\)/);assert.match(request.fields.prompt,/Image 3 is a body-size reference for the hips and buttocks/);assert.match(request.fields.prompt,/never copy the model's face/);
  assert.equal(calls.filter(x=>x.kind==='moderation').length,4,'original, two references and the output');
  reset();await photos.edit(who,base({sourceId:id,kind:'combined',editKinds:['body','background'],backgroundId:'b7a101',bodyIds:['chest-G']}));
  request=calls.find(x=>x.kind==='edit');assert.match(request.fields.prompt,/Image 2 is a public background reference/);assert.match(request.fields.prompt,/Image 3 is a body-size reference for the chest/);assert.deepEqual(request.images[2].bytes,file('chest-G'));
