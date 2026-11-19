@@ -28,7 +28,8 @@ export class GuestService{
  require(req:any){const id=guestFromRequest(req);if(!id)reject(401,'GUEST_SESSION_REQUIRED','체험을 시작하려면 안내에 동의해 주세요.');return id;}
  ipHash(){return guestIpHash(this.config,requestContext.getStore()?.ip);}
  private replayConsentVersion(){
-  return this.config.get('GUEST_REPLAY_CONTENT_CONSENT_VERSION')===GUEST_REPLAY_CONSENT_VERSION?GUEST_REPLAY_CONSENT_VERSION:undefined;
+  // 2026-11-19 user decision: part of the single required trial consent (privacy 17항, 2026-11-19.guest-replay.1), always offered.
+  return GUEST_REPLAY_CONSENT_VERSION;
  }
  async status(req:any,quota:(id:string)=>Promise<{limit:number;remaining:number;postRewardClaimed:boolean}>){
   const id=guestFromRequest(req);

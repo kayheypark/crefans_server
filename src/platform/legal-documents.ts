@@ -458,12 +458,23 @@ export const POSTHOG_ERRORS_PRIVACY:LegalDocument={...POSTHOG_PRIVACY,version:'2
  notice:POSTHOG_PRIVACY.notice+' 2026-11-19 개정: 9항 ④ — PostHog로 보내는 항목에 화면 오류 정보(오류 종류·메시지·코드 위치)를 추가했습니다.',
  sections:POSTHOG_PRIVACY.sections.map(sec=>sec.title.startsWith('9. ')?{...sec,body:swapIn(sec.title,sec.body,'AI 사진 체험·게시·회원가입 단계 도달 기록, ','AI 사진 체험·게시·회원가입 단계 도달 기록, '+POSTHOG_ERRORS_ITEM+', ')}:sec)};
 const posthogErrorsCatalog:LegalCatalog={...beanTermsCatalog,documents:{...beanTermsCatalog.documents,privacy:POSTHOG_ERRORS_PRIVACY}};
+// 2026-11-19 user decision ("17항 필수에 합침", 이탈 분석): a guest's single required trial consent (17항) also covers session replay of the
+// trial screens sent to PostHog (US), listed item by item. Advised against (개인정보 보호법 제22조제1항 separate consent per item, 제22조제5항
+// no refusal of service for declining an optional item; law.go.kr 시행 2026-09-11, 확인일 2026-11-19); the user chose it. In force from the deploy day.
+export const GUEST_REPLAY_PRIVACY_DATE='2026-11-19';
+const GUEST_REPLAY_17='화면 이용 기록(PostHog, 미국): 체험을 시작할 때 받는 이 항의 동의에는 체험 화면의 이용 기록이 포함됩니다. 사용 흐름과 불편을 분석해 서비스를 개선하려고 체험 화면의 녹화(업로드한 사진의 썸네일, AI로 만든 사진, 게시물 제목·본문, 프리셋·의상 검색어와 화면 구성·스크롤·클릭 움직임)를 HTTPS로 PostHog, Inc.(미국, privacy@posthog.com)에 보내고 최대 30일 보관합니다. 국외 이전 시기는 체험 화면을 이용할 때마다이며, 그 밖의 처리 항목·쿠키·거부 방법은 9조 ④와 10조를 따릅니다. 이 동의를 원하지 않으면 체험을 이용하지 않거나 회원가입 후 스튜디오를 이용할 수 있습니다.';
+const GUEST_REPLAY_9='④의 화면 이용 기록은 입력한 값과 사진·영상을 기록하지 않지만, 비회원 AI 사진 체험 화면은 17항의 체험 동의에 따라 사진과 입력 내용도 기록합니다.';
+const GUEST_REPLAY_REFUSAL='다만 비회원 AI 사진 체험은 17항에 따라 체험 동의에 화면 이용 기록이 포함됩니다.';
+export const GUEST_REPLAY_PRIVACY:LegalDocument={...POSTHOG_ERRORS_PRIVACY,version:'2026-11-19.guest-replay.1',updatedAt:GUEST_REPLAY_PRIVACY_DATE,publishedAt:GUEST_REPLAY_PRIVACY_DATE,effectiveAt:GUEST_REPLAY_PRIVACY_DATE,status:'published',
+ notice:POSTHOG_ERRORS_PRIVACY.notice+' 2026-11-19 개정: 17항 — 비회원 AI 사진 체험 동의에 체험 화면의 이용 기록(PostHog, 미국: 사진·입력 내용 포함, 최대 30일)을 넣었고, 9항 ④에 그 차이를 적었습니다.',
+ sections:POSTHOG_ERRORS_PRIVACY.sections.map(sec=>sec.title.startsWith('17. ')?{...sec,body:sec.body+'\n\n'+GUEST_REPLAY_17}:sec.title.startsWith('9. ')?{...sec,body:swapIn(sec.title,sec.body,POSTHOG_REFUSAL,POSTHOG_REFUSAL+' '+GUEST_REPLAY_REFUSAL)+'\n'+GUEST_REPLAY_9}:sec)};
+const guestReplayCatalog:LegalCatalog={...posthogErrorsCatalog,documents:{...posthogErrorsCatalog.documents,privacy:GUEST_REPLAY_PRIVACY}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=GUEST_REPLAY_PRIVACY_DATE?guestReplayCatalog:day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)
