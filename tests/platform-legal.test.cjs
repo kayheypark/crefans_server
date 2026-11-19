@@ -16,7 +16,7 @@ test('the released documents are in force with no open items: terms/policy from 
  for(const d of [source.catalog().collection,source.catalog(new Date('2026-11-17T23:59:00+09:00')).marketing]){assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-10-22');assert.equal(d.effectiveAt,'2026-10-30');assert.doesNotMatch(d.version,/draft/);}
  assert.equal(source.catalog().upcoming,undefined,'nothing pending');
  // The privacy policy was revised on the notice day of the merged revision (2026-11-02 user decision) and applies from that day.
- const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-19');assert.equal(p.effectiveAt,'2026-11-19');assert.equal(p.version,'2026-11-19.guest-replay.1');assert.match(JSON.stringify(p),/16\. 대표 기능: AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
+ const p=source.catalog().documents.privacy;assert.equal(p.status,'published');assert.equal(p.publishedAt,'2026-11-19');assert.equal(p.effectiveAt,'2026-11-19');assert.equal(p.version,'2026-11-19.guest-limits.1');assert.match(JSON.stringify(p),/16\. 대표 기능: AI 사진 편집/);assert.match(JSON.stringify(p),/최대 30일/);assert.match(JSON.stringify(p),/의미 검색 기능\(임베딩\)/);assert.match(JSON.stringify(p),/무작위 익명 ID/);assert.match(JSON.stringify(p),/최근 50개/);assert.doesNotMatch(JSON.stringify(p),/새로고침·새 대화 시 삭제/);assert.match(JSON.stringify(p),/cf_post_visitor/);
  const privacy=JSON.stringify(source.catalog().documents.privacy);for(const pending of ['시행 전','개방 전','확정하지 않았','아직 자동 삭제'])assert.ok(!privacy.includes(pending),pending);
  for(const recipient of ['Amazon Web Services Korea LLC','Google Asia Pacific Pte. Ltd.','Telegram Messenger Inc.'])assert.ok(privacy.includes(recipient),recipient);
 });
@@ -92,7 +92,7 @@ test('2026-11-11 payout revision: article 6 states the company transfer from the
 test('2026-11-13 partner revision: article 6 limits withdrawals to partner creators and keeps the account/PIN and hold rules',()=>{
  const legal=new LegalDocumentsService(),{PARTNER_TERMS_DATE}=require('../dist/src/platform/legal-documents');assert.equal(PARTNER_TERMS_DATE,'2026-11-13');
  const before=legal.catalog(new Date('2026-11-12T23:59:00+09:00')).documents.terms,after=legal.catalog(new Date('2026-11-13T00:00:00+09:00')).documents.terms;
- assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-18.beans.1');
+ assert.equal(before.version,'2026-11-11.payout.1');assert.equal(after.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-11-14T12:00:00+09:00')).documents.terms.version,'2026-11-13.partner.1');assert.equal(legal.catalog(new Date('2026-12-06T12:00:00+09:00')).documents.terms.version,'2026-11-19.ai-units.1');
  const six=after.sections.find(s=>s.title==='6. 크리에이터 수수료·정산·출금').body;
  assert.match(six,/파트너십 계약을 맺은 크리에이터\(프로필에 인증 배지 표시\)만 신청할 수 있습니다/);assert.match(six,/정산 계좌와 출금 비밀번호는 계약 전에도 미리 등록할 수 있습니다/);
  assert.match(six,/인증 배지가 해제되면 아직 지급되지 않은 출금 신청은 보류되며, 잔액은 그대로 유지됩니다/);assert.match(six,/출금에는 본인 명의 정산 계좌의 확인과 별도 출금 인증이 필요합니다/);
@@ -138,7 +138,7 @@ test('guide AI privacy notice distinguishes optional requests, provider retentio
 });
 test('privacy article 8 discloses Modusign as the e-contract processor (2026-11-12 ask-me)',()=>{
  const p=new LegalDocumentsService().catalog().documents.privacy;
- assert.equal(p.version,'2026-11-19.guest-replay.1');assert.equal(p.effectiveAt,'2026-11-19');assert.equal(p.status,'published');
+ assert.equal(p.version,'2026-11-19.guest-limits.1');assert.equal(p.effectiveAt,'2026-11-19');assert.equal(p.status,'published');
  const s8=p.sections.find(s=>s.title==='8. 처리 위탁과 제3자 제공');
  assert.match(s8.body,/전자계약 체결·보관을 주식회사 모두싸인에 위탁/);
  assert.ok(s8.links.some(l=>l.href==='https://support.modusign.co.kr/ko/articles/9ae892d6'),'links to Modusign privacy policy');
@@ -180,12 +180,12 @@ test('2026-11-15 sync revision: article 11 states bean charge limits and article
 
 // 2026-11-15 user decision: signed-out AI photo trial is disclosed before it ships (section 17 + cookie note in section 10).
 test('privacy 2026-11-15.guest.1 discloses the signed-out AI photo trial: cookie, IP hash, limits, 24h public, claim, retention, transfer',async()=>{
- const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-19.guest-replay.1');
+ const p=new LegalDocumentsService().catalog().documents.privacy;assert.equal(p.version,'2026-11-19.guest-limits.1');
  const guest=p.sections.find(s=>s.title==='17. 대표 기능: 비회원 AI 사진 체험');assert.ok(guest);
- for(const phrase of ['cf_guest','최대 30일','서버 보안키로 변환','감사 기록 기준(2년)','AI로 만든 사진만','브라우저당 10회','하루 10회','하루 200회','24시간','비공개','같은 브라우저','게시 후 30일','16항과 같습니다','동의'])assert.ok(guest.body.includes(phrase),phrase);
+ for(const phrase of ['cf_guest','최대 30일','서버 보안키로 변환','감사 기록 기준(2년)','AI로 만든 사진만','브라우저당 체험 이용권 3장','첫 게시글을 올리면 3장','결과 링크로 다른 방문자가 처음 들어오면 3장','빠르게 0.5장·표준 1장·정밀하게 2장','적용되는 수량은 체험 화면에 표시','하루 10회','하루 200회','24시간','비공개','같은 브라우저','게시 후 30일','16항과 같습니다','동의'])assert.ok(guest.body.includes(phrase),phrase);
  assert.match(p.sections.find(s=>s.title==='10. 쿠키와 자동 수집').body,/cf_guest를 최대 30일/);
- const {GUEST_AI_LIMIT,GUEST_IP_DAILY,GUEST_DAILY_TOTAL,GUEST_POST_HOURS,GUEST_RETENTION_DAYS}=require('../dist/src/platform/guest');
- assert.deepEqual([GUEST_AI_LIMIT,GUEST_IP_DAILY,GUEST_DAILY_TOTAL,GUEST_POST_HOURS,GUEST_RETENTION_DAYS],[10,10,200,24,30],'policy numbers match the code');
+ const {GUEST_AI_LIMIT,GUEST_POST_REWARD,GUEST_SHARE_REWARD,GUEST_IP_DAILY,GUEST_DAILY_TOTAL,GUEST_POST_HOURS,GUEST_RETENTION_DAYS}=require('../dist/src/platform/guest');
+ assert.deepEqual([GUEST_AI_LIMIT,GUEST_POST_REWARD,GUEST_SHARE_REWARD,GUEST_IP_DAILY,GUEST_DAILY_TOTAL,GUEST_POST_HOURS,GUEST_RETENTION_DAYS],[3,3,3,10,200,24,30],'policy numbers match the code');
 });
 
 // 2026-11-15 user decisions (/ask-me after night-work): article 2 states open signup, article 6 states selling before the
@@ -279,8 +279,8 @@ test('2026-11-18 posthog.1: privacy 7-10 disclose PostHog analytics and replay; 
  assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-18');assert.equal(d.effectiveAt,'2026-11-18');assert.equal(d.version,'2026-11-18.posthog.1');
  assert.deepEqual(c.documents.privacy,d,'KST midnight of 2026-11-18 serves posthog.1');assert.match(d.notice,/2026-11-18 개정: 7항·8항·9항·10항/);
  assert.equal(legal.catalog(new Date('2026-11-17T23:59:00+09:00')).documents.privacy.version,'2026-11-17.phone.3','the previous day keeps phone.3');
- assert.equal(legal.catalog(new Date('2026-11-18T23:59:00+09:00')).documents.privacy.version,'2026-11-18.posthog.1');assert.equal(legal.catalog(new Date('2027-01-01T12:00:00+09:00')).documents.privacy.version,'2026-11-19.guest-replay.1','posthog.2 follows (separate test)');
- const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-19\.guest-replay\.1:[0-9a-f]{64}$/);assert.match(JSON.stringify(signup.documents.privacy),/PostHog/);
+ assert.equal(legal.catalog(new Date('2026-11-18T23:59:00+09:00')).documents.privacy.version,'2026-11-18.posthog.1');assert.equal(legal.catalog(new Date('2027-01-01T12:00:00+09:00')).documents.privacy.version,'2026-11-19.guest-limits.1','posthog.2 follows (separate test)');
+ const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-19\.guest-limits\.1:[0-9a-f]{64}$/);assert.match(JSON.stringify(signup.documents.privacy),/PostHog/);
  assert.equal(c.documents.terms.version,'2026-11-18.beans.1','terms: only the bean revision (separate test)');assert.equal(c.documents.policy.version,'2026-11-18.franchise.1','policy: only the franchise clause (separate test)');
  const body=title=>d.sections.find(s=>s.title.startsWith(title)).body;
  // PIPA 28-8(2) items: what, country, when/how, recipient + contact, purpose + retention, how to refuse.
@@ -320,7 +320,7 @@ test('2026-11-18 franchise.1: operating policy adds the third-party-work costume
  // Terms, privacy, collection and the advertising consent stay the versions already served on 2026-11-18.
  assert.equal(now.documents.terms.version,'2026-11-18.beans.1','terms: only the bean revision (separate test)');
  assert.deepEqual(now.documents.privacy,POSTHOG_PRIVACY);assert.deepEqual(now.marketing,MARKETING_REWARD_CONSENT);assert.deepEqual(now.collection,before.collection);
- const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-19\.guest-replay\.1:/);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:/);assert.match(signup.versions.terms,/^2026-11-18\.beans\.1:/);
+ const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.privacy,/^2026-11-19\.guest-limits\.1:/);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:/);assert.match(signup.versions.terms,/^2026-11-19\.ai-units\.1:/);
 });
 // 2026-11-18 user decision (/pilot-work): terms 6 states the bean withdrawal fee/minimum, terms 11 the consent-reward lot; immediate effect.
 test('2026-11-18 beans.1: terms 6 bean withdrawal fee 20% and 1,000 beans, terms 11 reward beans 30 days with a 7-day notice; nothing else changes',()=>{
@@ -329,7 +329,7 @@ test('2026-11-18 beans.1: terms 6 bean withdrawal fee 20% and 1,000 beans, terms
  assert.equal(old.version,'2026-11-17.adult.1','the previous day keeps adult.1');
  assert.equal(d.version,'2026-11-18.beans.1');assert.equal(d.status,'published');assert.equal(d.publishedAt,'2026-11-18');assert.equal(d.effectiveAt,'2026-11-18');assert.equal(d.updatedAt,'2026-11-18');
  assert.match(d.notice,/^2026년 11월 18일부터 적용합니다\..*제6조.*제11조/);
- for(const day of ['2026-11-18T00:00:00+09:00','2026-11-18T19:30:00+09:00','2027-01-01T12:00:00+09:00'])assert.deepEqual(legal.catalog(new Date(day)).documents.terms,d,day);
+ for(const day of ['2026-11-18T00:00:00+09:00','2026-11-18T19:30:00+09:00'])assert.deepEqual(legal.catalog(new Date(day)).documents.terms,d,day);
  const by=(doc,x)=>doc.sections.find(s=>s.title.startsWith(x)).body,s6=by(d,'6. '),s11=by(d,'11. ');
  // Values come from the code that computes payouts and expiry.
  assert.equal(beanPolicy.withdrawalFeeBps,2000);assert.equal(beanPolicy.minimumWithdrawalBeans,1000);assert.equal(beanPolicy.krwPerBean,100);assert.equal(MARKETING_REWARD.validDays,30);assert.equal(MARKETING_REWARD.beans,10);assert.equal(beanPolicy.expiryNoticeDays,30);
@@ -340,7 +340,7 @@ test('2026-11-18 beans.1: terms 6 bean withdrawal fee 20% and 1,000 beans, terms
  d.sections.forEach((s,i)=>{if(!/^(6|11)\. /.test(s.title))assert.deepEqual(s,old.sections[i],s.title);});
  const now=legal.catalog(new Date('2026-11-18T12:00:00+09:00'));
  assert.deepEqual(now.documents.privacy,POSTHOG_PRIVACY);assert.deepEqual(now.documents.policy,FRANCHISE_POLICY);assert.deepEqual(now.marketing,MARKETING_REWARD_CONSENT);assert.deepEqual(now.collection,before.collection);
- const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.terms,/^2026-11-18\.beans\.1:[0-9a-f]{64}$/);assert.match(signup.versions.privacy,/^2026-11-19\.guest-replay\.1:/);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:/);
+ const signup=legal.signup();assert.equal(signup.signupReady,true);assert.match(signup.versions.terms,/^2026-11-19\.ai-units\.1:[0-9a-f]{64}$/);assert.match(signup.versions.privacy,/^2026-11-19\.guest-limits\.1:/);assert.match(signup.versions.marketing,/^2026-11-18\.reward\.1:/);
  assert.match(JSON.stringify(signup.documents.terms),/출금 수수료 20%/);
 });
 
@@ -348,18 +348,18 @@ test('2026-11-18 beans.1: terms 6 bean withdrawal fee 20% and 1,000 beans, terms
 test('2026-11-19 posthog.2: 9조 ④ names screen error information; only that article changes; previous day keeps posthog.1',()=>{
  const {POSTHOG_ERRORS_PRIVACY:d,POSTHOG_PRIVACY:prev}=require('../dist/src/platform/legal-documents'),legal=new LegalDocumentsService();
  assert.equal(d.version,'2026-11-19.posthog.2');assert.equal(d.effectiveAt,'2026-11-19');assert.equal(d.status,'published');
- assert.equal(legal.catalog(new Date('2026-11-19T00:00:00+09:00')).documents.privacy.version,'2026-11-19.guest-replay.1','same-day guest-replay.1 supersedes posthog.2');assert.equal(legal.catalog(new Date('2026-11-18T23:59:00+09:00')).documents.privacy.version,'2026-11-18.posthog.1');
+ assert.equal(legal.catalog(new Date('2026-11-19T00:00:00+09:00')).documents.privacy.version,'2026-11-19.guest-limits.1','same-day guest-replay.1/guest-limits.1 supersede posthog.2');assert.equal(legal.catalog(new Date('2026-11-18T23:59:00+09:00')).documents.privacy.version,'2026-11-18.posthog.1');
  const nine=d.sections.find(s=>s.title.startsWith('9. ')).body;assert.match(nine,/단계 도달 기록, 화면 오류 정보\(화면에서 난 오류의 종류·메시지와 오류가 난 서비스 코드 위치\. 주소 뒤 검색어·인증값, 이메일 주소, 긴 숫자는 지우고 보냄\), 일부 화면의 화면 이용 기록/);
  assert.match(d.notice,/2026-11-19 개정: 9항 ④ — PostHog로 보내는 항목에 화면 오류 정보/);
  d.sections.forEach((s,i)=>{if(!s.title.startsWith('9. '))assert.deepEqual(s,prev.sections[i],s.title);});
- const c=legal.catalog(new Date('2026-11-19T12:00:00+09:00'));assert.equal(c.documents.terms.version,'2026-11-18.beans.1');assert.equal(c.documents.policy.version,'2026-11-18.franchise.1');
+ const c=legal.catalog(new Date('2026-11-19T12:00:00+09:00'));assert.equal(c.documents.terms.version,'2026-11-19.ai-units.1');assert.equal(c.documents.policy.version,'2026-11-18.franchise.1');
 });
 
 // 2026-11-19 user decision ("17항 필수에 합침"): guest trial consent (17항) includes session replay of trial screens (PostHog, US).
 test('2026-11-19 guest-replay.1: 17항 includes trial session replay; 9조 ④ notes the difference; other articles unchanged',()=>{
  const {GUEST_REPLAY_PRIVACY:d,POSTHOG_ERRORS_PRIVACY:prev}=require('../dist/src/platform/legal-documents'),legal=new LegalDocumentsService();
  assert.equal(d.version,'2026-11-19.guest-replay.1');assert.equal(d.effectiveAt,'2026-11-19');assert.equal(d.status,'published');
- assert.deepEqual(legal.catalog(new Date('2026-11-19T00:00:00+09:00')).documents.privacy,d);
+ assert.equal(legal.catalog(new Date('2026-11-19T00:00:00+09:00')).documents.privacy.version,'2026-11-19.guest-limits.1','same-day guest-limits.1 follows');
  const seventeen=d.sections.find(s=>s.title.startsWith('17. ')).body;
  assert.match(seventeen,/화면 이용 기록\(PostHog, 미국\): 체험을 시작할 때 받는 이 항의 동의에는 체험 화면의 이용 기록이 포함됩니다/);
  assert.match(seventeen,/PostHog, Inc\.\(미국, privacy@posthog\.com\)에 보내고 최대 30일 보관합니다/);
@@ -368,4 +368,21 @@ test('2026-11-19 guest-replay.1: 17항 includes trial session replay; 9조 ④ n
  assert.match(nine,/다만 비회원 AI 사진 체험은 17항에 따라 체험 동의에 화면 이용 기록이 포함됩니다/);
  assert.match(d.notice,/2026-11-19 개정: 17항/);
  d.sections.forEach((s,i)=>{if(!s.title.startsWith('9. ')&&!s.title.startsWith('17. '))assert.deepEqual(s,prev.sections[i],s.title);});
+});
+
+// 2026-11-19 user decisions (/pilot-work): 17항 states the real guest credits and share-link processing; terms 13조 the per-method usage.
+test('2026-11-19 guest-limits.1 / ai-units.1: privacy 17항 and terms 13조 match the guest credits and generation units in code',()=>{
+ const {GUEST_LIMITS_PRIVACY:p,GUEST_REPLAY_PRIVACY:prevP,GUEST_LIMITS_TERMS:t,BEAN_TERMS:prevT}=require('../dist/src/platform/legal-documents'),legal=new LegalDocumentsService();
+ const c=legal.catalog(new Date('2026-11-19T12:00:00+09:00'));assert.deepEqual(c.documents.privacy,p);assert.deepEqual(c.documents.terms,t);
+ assert.equal(p.version,'2026-11-19.guest-limits.1');assert.equal(t.version,'2026-11-19.ai-units.1');assert.equal(t.effectiveAt,'2026-11-19');
+ const {GUEST_AI_LIMIT,GUEST_POST_REWARD,GUEST_SHARE_REWARD}=require('../dist/src/platform/guest');
+ const {resolveAiPhotoMethod:m,DEFAULT_SEEDREAM_MODEL:dm}=require('../dist/src/platform/ai-photo-cost');
+ const seventeen=p.sections.find(s=>s.title.startsWith('17. ')).body,thirteen=t.sections.find(s=>s.title.startsWith('13. ')).body;
+ assert.ok(seventeen.includes(`브라우저당 체험 이용권 ${GUEST_AI_LIMIT}장, 첫 게시글을 올리면 ${GUEST_POST_REWARD}장, 공유한 결과 링크로 다른 방문자가 처음 들어오면 ${GUEST_SHARE_REWARD}장`));
+ assert.ok(seventeen.includes(`빠르게 ${m('fast',dm).units}장·표준 ${m('standard',dm).units}장·정밀하게 ${m('precise',dm).units}장`));assert.ok(thirteen.includes(`빠르게 ${m('fast',dm).units}개, 표준 ${m('standard',dm).units}개, 정밀하게 ${m('precise',dm).units}개`));
+ assert.doesNotMatch(seventeen,/브라우저당 10회/);assert.match(seventeen,/결과 공유: 체험 결과 사진의 공유 링크에는/);assert.match(seventeen,/만료 시각\(7일\)/);
+ assert.match(thirteen,/빠르게 0\.5개, 표준 1개, 정밀하게 2개/);assert.match(thirteen,/브라우저당 체험 이용권 3장/);assert.match(thirteen,/이벤트·프로모션이나 안내 페이지에 따라 달라질 수 있으며/);
+ assert.doesNotMatch(thirteen,/무료 생성은 하루 10회/);
+ p.sections.forEach((s,i)=>{if(!s.title.startsWith('17. '))assert.deepEqual(s,prevP.sections[i],s.title);});
+ t.sections.forEach((s,i)=>{if(!s.title.startsWith('13. '))assert.deepEqual(s,prevT.sections[i],s.title);});
 });
