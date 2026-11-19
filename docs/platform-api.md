@@ -626,9 +626,11 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 | GET | /studio/ai-photo/library | 본인 AI 허용 크리에이터 사진 보관함. q(60자)/category/page(0부터), 24개와 hasMore 응답. |
 | POST | /studio/ai-photo/library | 본인 완료 이미지의 id/title(1~60자)/category 저장·수정. remove=true는 보관해제만 수행. |
 | POST | /studio/ai-photo/crop | 본인 완료 AI 이미지. JSON `sourceId,left,top,width,height` 정수 픽셀 영역, 범위검사 후 새 AI 미디어 응답. 횟수 미차감·원본 보존. |
-| POST | /studio/ai-photo/edit | multipart `sourceId,kind(outfit|makeup|expression|pose|background|camera|lens|body|combined),editKinds(combined 필수 JSON 배열 2~8항목),style(photo|cosplay|daily),prompt(1~2000),targetGender(female|male, 선택),consent=true,mask(PNG, outfit 포함 시 선택; 옷 세부 지정 ON일 때 전송)`. 응답 `{images:[{id,type,url,aiGenerated}],remaining}`. |
+| POST | /studio/ai-photo/edit | multipart `sourceId,kind(outfit|makeup|expression|pose|background|camera|lens|body|combined),editKinds(combined 필수 JSON 배열 2~8항목),style(photo|cosplay|daily),prompt(1~2000),generationMethod(fast|standard|precise, 선택),targetGender(female|male, 선택),consent=true,mask(PNG, outfit 포함 시 선택; 옷 세부 지정 ON일 때 전송)`. 응답 `{images:[{id,type,url,aiGenerated}],remaining}`. |
 
-- 순서: 활성 회원 확인(403 AI_PHOTO_NOT_ALLOWED) → 본인 완료 이미지(404) → 문구 개인정보·지시 무력화 차단 → 마스크(칠한 곳 없음 400) → 하루 `AI_PHOTO_PER_DAY`(기본 10, UTC 하루=한국 오전 9시, 429 DAILY_LIMIT)·전체 `AI_PHOTO_DAILY_TOTAL`(기본 300; 무료·하트 보상 사용만 셈, AI 이용권·구독형 유료 사용(paidUse)은 제외(2026-11-18). 전체가 차면 무료·보상 시도는 되돌리고 남은 유료 횟수가 있으면 그것으로 진행, 없으면 429 SERVICE_BUSY) → 문구+사진 Moderation(판정 불가 503, 실패 시 진행 안 함) → 모든 모드(general/cosplay/누락)에서 BytePlus `/api/v3/images/generations`(dola-seedream-5-5-261028, 1장, 1536px 이하 PNG, watermark=false; 원본·의상 가이드·참조 총10장 이하). 생성 키는 `AI_PHOTO_BYTEPLUS_API_KEY`, OpenAI 키는 안전검사에만 사용하며 생성 대체 모델은 없음 → 결과별 Moderation(통과만 저장) → 크리에이터 비공개 미디어(webp, metadata.aiGenerated·aiSourceId·aiKind·aiModel, 워터마크 대상 기록).
+- 회원 및 비회원의 `generationMethod`는 `fast`(빠르게, 0.5개), `standard`(표준, 1개), `precise`(정밀하게, 2개)다. 생략한 기존 앱 요청은 설정된 기본 모델로 1개를 사용한다. 다른 값은 공급사 호출 및 차감 전에 400 `INVALID_GENERATION_METHOD`로 거절한다. 편집 결과와 잔액 조회의 `remaining`에는 0.5 단위 소수가 올 수 있다.
+- 서버는 위 세 값을 순서대로 `dola-seedream-5-0-flash-260915`, `dola-seedream-5-5-261028`, `dola-seedream-5-0-pro-260628`에 연결한다. 실제 호출 모델로 예산을 추산한다. 현재 출력 크기에서는 Flash는 $0.018, 5.5는 출력 $0.020 및 입력 사진당 $0.008, Pro는 출력 $0.045 및 두 번째 입력 사진부터 장당 $0.003이다. 2026-11-19 확인. [BytePlus 요금표](https://docs.byteplus.com/en/docs/modelark/model-pricing?redirect=1)
+- 순서: 활성 회원 확인(403 AI_PHOTO_NOT_ALLOWED) → 본인 완료 이미지(404) → 문구 개인정보·지시 무력화 차단 → 마스크(칠한 곳 없음 400) → 하루 `AI_PHOTO_PER_DAY`(기본 10, UTC 하루=한국 오전 9시, 429 DAILY_LIMIT)·전체 `AI_PHOTO_DAILY_TOTAL`(기본 300; 무료·하트 보상 사용만 셈, AI 이용권·구독형 유료 사용(paidUse)은 제외(2026-11-18). 전체가 차면 무료·보상 시도는 되돌리고 남은 유료 횟수가 있으면 그것으로 진행, 없으면 429 SERVICE_BUSY) → 문구+사진 Moderation(판정 불가 503, 실패 시 진행 안 함) → 모든 모드(general/cosplay/누락)에서 BytePlus `/api/v3/images/generations`(요청이 생성 방식을 생략하면 `AI_PHOTO_BYTEPLUS_MODEL`을 사용하며 이 설정의 기본값은 5.5, PNG 1장, watermark=false; 원본·의상 가이드·참조 총10장 이하). 생성 키는 `AI_PHOTO_BYTEPLUS_API_KEY`, OpenAI 키는 안전검사에만 사용하며 생성 대체 모델은 없음 → 결과별 Moderation(통과만 저장) → 크리에이터 비공개 미디어(webp, metadata.aiGenerated·aiSourceId·aiKind·aiModel, 워터마크 대상 기록).
 - 2026-11-13: 단일 최종 프롬프트에 누적한 요청은 combined+editKinds로 전달한다. 의상 단일은 공급사 mask, 복합 의상 또는 성별 변경+의상은 원본 첫 이미지와 분홍 의상영역 표시 참고 이미지 두 장(image[])으로 전달한다. 요청한 다른 영역 변경을 마스크가 막지 않도록 하는 처리이며 실제 AI 품질을 보장하지 않는다. targetGender 미지정은 정체성·체형 유지, 지정 시 성인 남성/여성 얼굴 표현 변경 허용. body는 요청한 가슴/힙/키 비율만 변경하도록 체형 고정 지시를 해제한다. 나이·피부색·착의·안전검사는 보존한다. 렌즈는 촬영 느낌의 AI 재현이며 실제 렌즈 촬영/정확한 광학 성능으로 표시하지 않는다. 생성 결과는 본인 완료 미디어와 같은 소스 검사를 거쳐 다시 편집할 수 있다. metadata.aiEditKinds/aiTargetGender를 기록한다.
 - 횟수: 공급사 일반 오류·시간 초과·입력 안전검사 판정 불가는 되돌리고, 입력·결과 차단 및 생성 완료 뒤 결과 검사 판정 불가는 차감한다. 문구 원문은 DB에 저장하지 않는다. 키는 `AI_PHOTO_OPENAI_API_KEY`(없으면 GUIDE_ADVISOR 키).
 - 표시: 게시 시 워터마크 파생 미디어도 aiGenerated 를 이어받고, 팬 게시물·스튜디오 목록 미디어 응답에 `aiGenerated:true`를 넣는다. 처리방침 2026-11-08.aiphoto.1 의 16번 항목.
@@ -644,7 +646,7 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 
 ### 2026-11-13 코스프레 전체 코디
 - AI 사진 편집의 outfit+cosplay는 원본과 분홍 의상 영역 가이드를 전달한다. 단일 의상 요청도 hard mask 대신 가이드를 사용하여 명시된 가발·헤어색/스타일·머리장식·소품·신발을 의상 영역 밖에서도 적용한다. 일반 outfit+photo도 분홍 가이드로 의상 편집 영역을 전달한다. 얼굴·정체성·요청하지 않은 부분을 보존하며 원본 구도 안에 보이는 부분만 적용한다(별도 구도/포즈 요청은 허용).
-- 모델 분기는 `mode=general|cosplay`(누락 general)로만 결정하며 사진 `style`과 분리한다. Seedream 키는 `AI_PHOTO_BYTEPLUS_API_KEY`, OpenAI 키는 일반 생성과 양쪽 모드의 입력/출력 Moderation에 유지한다. Seedream은 원본·가이드·의상 순서의 base64 JSON, 최대10입력(의상8개), b64_json PNG1장, 현재 출력크기 유지, watermark=false(제공사 표시 워터마크 끔, 크레팬스 aiGenerated 표시 유지). 생성 미설정 시 코스어 요청만 거절하며 일반모드는 유지한다.
+- 생성 방식은 `generationMethod`로 고른다. 일반과 코스어 모드 모두 Seedream 생성과 OpenAI 입력/출력 Moderation을 사용한다. Seedream은 원본·가이드·의상 순서의 base64 JSON, 최대10입력(의상8개), b64_json PNG1장, 현재 출력크기 유지, watermark=false(제공사 표시 워터마크 끔, 크레팬스 aiGenerated 표시 유지). 생성 키가 없으면 두 모드 모두 비활성화한다.
 - 기존 마스크 필수·원본소유권·동의·8종 복합요청·성별·신체 보정·1장·2000자·입출력 안전 검사·횟수 정책은 유지. 선택한 코디 사진은 costumeIds JSON 배열(1~14개)로 지정한 서버 고정 카탈로그에서 읽어 원본·가이드 다음에 첨부한다. 긴 의상 설명은 참조 순번의 짧은 지시로 대체하고 다른 프리셋·직접입력은 유지한다. 참조 이미지도 입력 안전검사에 포함한다. Moderation API는 요청당 이미지 1장만 받으므로 원본과 각 참조를 같은 요청 문구와 함께 개별 검사하고, 모두 통과해야 생성한다. 임의 URL/파일 경로는 받지 않는다.
 - 근거: https://developers.openai.com/api/docs/guides/image-generation (확인2026-11-13). 공급사 마스크는 지침이며 경계나 보존을 보장하지 않으므로 실제 결과 품질 검증과 요청 대역 검사를 구분한다. 검사 tests/platform-ai-photo.test.cjs.
 
@@ -663,7 +665,7 @@ GET/POST는 `claimedAt`, 원본 promotion 로트의 `expiresAt`을 ISO로 반환
 - `/studio/shop/orders/:id` GET, `/payment-window` POST, `/confirm` POST(orderId,amount,paymentKey), `/refund` POST. 소유권 확인, 금액/통화/PG키 일치, 단1회 지급, 잔여 횟수 구매단가 환불. 생성 예약과 환불 직렬화.
 - `/admin/shop/products` GET/POST, `/:id` PUT/DELETE: shop view/create/update/delete. 버전 충돌409·소프트삭제. `/admin/shop/orders` GET(page,status), `/:id` GET(조건스냅샷·사용 이력100건). 키·카드정보 비노출.
 - `/shop/webhook` POST: 비인증 IP분당30회, 데이터로 지급하지 않고 worker PG조회 예약.
-- quota.remaining은 무료+하트보상+유료 사용 가능 총횟수, paidRemaining은 그 중 유료. limit은 기존 무료 일일한도. 기존 리셋권과 분리. 유료 실패는 복구. 상세 `docs/ai-ticket-shop.md`, 검증 `tests/platform-ai-shop.test.cjs` 및 `platform-ai-photo.test.cjs`.
+- quota.remaining은 무료·하트 보상·유료 잔액의 합이며 paidRemaining은 그 중 유료분이다. 두 값은 0.5회 단위다. 주문별 사용 내역에는 request_id, units가 포함된다. limit은 기존 무료 일일한도. 기존 리셋권과 분리. 유료 실패는 복구. 상세 `docs/ai-ticket-shop.md`, 검증 `tests/platform-ai-shop.test.cjs` 및 `platform-ai-photo.test.cjs`.
 
 | Method | 경로 | 동작 |
 | --- | --- | --- |

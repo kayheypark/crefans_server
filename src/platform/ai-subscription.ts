@@ -2,7 +2,7 @@ import {Injectable} from '@nestjs/common';
 import {PlatformService} from './service';
 import {appendAudit} from './audit';
 import {reject} from './http';
-import {AI_SHOP_MIN_UNIT_KRW,AI_SHOP_TERMS,shopTerms} from './ai-shop';
+import {AI_SHOP_MIN_UNIT_KRW,AI_SHOP_TERMS,shopTerms,remainingRefund} from './ai-shop';
 import {aiPhotoAllowed} from './ai-photo-grants';
 import {enqueueOperation} from './operations-events';
 import {ConfigService} from '@nestjs/config';
@@ -101,7 +101,7 @@ export class AiSubscriptionService{
   const charge=await this.db.aiSubscriptionCharge.findFirst({where:{subscription_id:id,status:'paid'},orderBy:{period_start:'desc'}});if(!charge?.order_id)reject(409,'NO_REFUNDABLE_USES','환불할 남은 횟수가 없어요.');
   const reserved=await this.db.$transaction(async(tx:any)=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${member} FOR UPDATE`;await tx.$queryRaw`SELECT id FROM ai_shop_orders WHERE id=${charge!.order_id} FOR UPDATE`;const o=await tx.aiShopOrder.findUniqueOrThrow({where:{id:charge!.order_id}});
    if(o.status!=='paid'||o.remaining<=0||o.expires_at<=new Date())reject(409,'NO_REFUNDABLE_USES','환불할 남은 횟수가 없어요.');if(await tx.aiShopUse.count({where:{order_id:o.id,status:'reserved'}}))reject(409,'GENERATION_IN_PROGRESS','사진 생성이 끝난 뒤 환불해 주세요.');
-   const amount=Math.floor(o.amount/o.quantity)*o.remaining;await tx.aiShopOrder.update({where:{id:o.id},data:{status:'refunding',refund_quantity:o.remaining,refund_amount:amount}});return{o,amount};});
+   const amount=remainingRefund(o.amount,o.quantity,o.remaining);await tx.aiShopOrder.update({where:{id:o.id},data:{status:'refunding',refund_quantity:o.remaining,refund_amount:amount}});return{o,amount};});
   try{await provider.cancel({tid:charge!.provider_tid!,amount:reserved.amount,remainingAmount:charge!.amount-reserved.amount,reason:'AI 이용권 구독 남은 횟수 환불',moid:charge!.moid});}
   catch(error){await this.db.aiShopOrder.updateMany({where:{id:reserved.o.id,status:'refunding'},data:{status:'paid',refund_quantity:null,refund_amount:null}});throw error;}
   await this.db.$transaction(async(tx:any)=>{await tx.aiShopOrder.update({where:{id:reserved.o.id},data:{status:'refunded',remaining:0,refunded_at:new Date()}});await tx.aiSubscriptionCharge.update({where:{id:charge!.id},data:{refund_amount:reserved.amount}});await tx.aiSubscription.update({where:{id},data:{status:'refunded',ended_at:new Date(),next_charge_at:null}});

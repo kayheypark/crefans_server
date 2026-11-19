@@ -11,9 +11,9 @@ async function makeCreator(handle){const id=crypto.randomUUID();members.push(id)
 async function media(owner,w=600,h=900){const id=crypto.randomUUID();fs.writeFileSync(path.join(mediaRoot,id),await sharp(await png(w,h)).webp().toBuffer());await db.media.create({data:{id,user_sub:owner,type:'IMAGE',original_name:'s.webp',file_name:id,file_size:1,mime_type:'image/webp',original_url:`/api/v1/media/${id}/file`,s3_upload_key:`local/${id}`,processing_status:'COMPLETED',processed_at:new Date()}});return id;}
 // Provider stub: records calls; moderation verdicts come from `flags` (input first, then each output), edits return `outputs` PNGs.
 let calls=[],flags=[],editStatus=200,outputs=2,moderationDown=false,providerError=null,warnings=[];
-async function stub(url,init){
+async function stub(url,init,expectedModel=photos.settings.model){
  if(url.endsWith('/moderations')){const body=JSON.parse(init.body);calls.push({kind:'moderation',body});if(body.input.filter(i=>i.type==='image_url').length>1)return new Response(JSON.stringify({error:{code:'too_many_images'}}),{status:400});if(moderationDown)return new Response('{}',{status:503});const f=flags.length?flags.shift():false;return new Response(JSON.stringify({results:[{flagged:f}]}),{status:200});}
- if(url.endsWith('/images/generations')){const fields=JSON.parse(init.body),entry={kind:'edit',fields,images:fields.image.map(value=>({type:value.slice(5,value.indexOf(';')),bytes:Buffer.from(value.split(',')[1],'base64')}))};assert.equal(fields.model,'dola-seedream-5-5-261028');calls.push(entry);
+ if(url.endsWith('/images/generations')){const fields=JSON.parse(init.body),entry={kind:'edit',fields,images:fields.image.map(value=>({type:value.slice(5,value.indexOf(';')),bytes:Buffer.from(value.split(',')[1],'base64')}))};assert.equal(fields.model,expectedModel);calls.push(entry);
   if(editStatus!==200)return new Response(JSON.stringify({error:providerError||{code:editStatus===400?'moderation_blocked':'server_error'}}),{status:editStatus,headers:{'x-request-id':'req_ai_photo_test'}});
   const data=[];for(let i=0;i<outputs;i++)data.push({b64_json:(await png(1024,1536,{r:10*i,g:80,b:200})).toString('base64')});return new Response(JSON.stringify({data}),{status:200});}
  throw new Error('unexpected '+url);
@@ -771,4 +771,122 @@ test('2026-11-18: estimated cost alerts fire once when crossing $30 and once whe
   const warn=await db.platformOperationalEvent.findMany({where:{dedupe_key:`ai-photo.cost_warning:${day}`}}),crit=await db.platformOperationalEvent.findMany({where:{dedupe_key:`ai-photo.cost_critical:${day}`}});
   assert.equal(warn.length,1);assert.equal(crit.length,1);assert.deepEqual([warn[0].data.thresholdUsd,crit[0].data.thresholdUsd,crit[0].data.estimatedUsd],[30,60,'60.03']);assert.equal(warn[0].ip,null);
  }finally{photos.costDay=prev;photos.operations.record=record;}
+});
+
+test('Flash configuration reaches generation, saved media and the estimated budget',async t=>{
+ const {ConfigService}=require('@nestjs/config'),{aiPhotoConfig}=require('../dist/src/platform/ai-photo');
+ const {digest}=require('../dist/src/auth/local/credentials'),{estimateMilliUsd}=require('../dist/src/platform/ai-photo-cost');
+ const flash='dola-seedream-5-0-flash-260915',settings=photos.settings,day=photos.costDay;
+ const dayKey='flash-'+tag;
+ t.after(()=>{photos.settings=settings;photos.costDay=day;});
+ assert.equal(aiPhotoConfig(new ConfigService({AI_PHOTO_BYTEPLUS_MODEL:''})).model,'dola-seedream-5-5-261028');
+ assert.throws(()=>aiPhotoConfig(new ConfigService({AI_PHOTO_BYTEPLUS_MODEL:'typo'})),/Unsupported AI_PHOTO_BYTEPLUS_MODEL/);
+ photos.settings=aiPhotoConfig(new ConfigService({AI_PHOTO_BYTEPLUS_MODEL:flash}));
+ photos.costDay=()=>dayKey;
+ const user=await makeCreator('aiflash_'+tag);
+ reset();outputs=1;
+ const result=await photos.edit(user,base({sourceId:await media(user),kind:'outfit',style:'cosplay',mode:'cosplay',costumeIds:['80bdd0']}));
+ const sent=calls.find(c=>c.kind==='edit').fields;
+ assert.equal(sent.model,flash);assert.equal(sent.image.length,2);
+ assert.equal((await db.media.findUniqueOrThrow({where:{id:result.images[0].id}})).metadata.aiModel,flash);
+ assert.equal((await db.authRateBucket.findUniqueOrThrow({where:{id:digest('ai-photo:provider-cost-milli:'+dayKey)}})).count,18);
+ assert.equal(estimateMilliUsd(1,flash),18);
+ assert.equal(estimateMilliUsd(10,flash),18);
+});
+
+
+test('generationMethod selects the server model, usage and actual budget for both editors',async t=>{
+ const {digest}=require('../dist/src/auth/local/credentials');
+ const {estimateMilliUsd,resolveAiPhotoMethod}=require('../dist/src/platform/ai-photo-cost');
+ const previousDay=photos.costDay,day='method-'+tag,cost=digest('ai-photo:provider-cost-milli:'+day);
+ const user=await makeCreator('aimethod_'+tag),visitor='guest:'+crypto.randomBytes(20).toString('hex');
+ photos.costDay=()=>day;
+ t.after(async()=>{photos.fetcher=stub;photos.costDay=previousDay;await db.media.deleteMany({where:{user_sub:visitor}});});
+ const methods=[
+  ['fast','dola-seedream-5-0-flash-260915',0.5,18],
+  ['standard','dola-seedream-5-5-261028',1,36],
+  ['precise','dola-seedream-5-0-pro-260628',2,48]
+ ];
+ const legacyDefault=photos.settings.model;
+ assert.deepEqual(resolveAiPhotoMethod(undefined,legacyDefault),{model:legacyDefault,units:1});
+ assert.equal(estimateMilliUsd(1,methods[2][1]),45);
+ assert.equal(estimateMilliUsd(10,methods[2][1]),72);
+ let spent=0;
+ for(const [owner,guest] of [[user,undefined],[visitor,{ipHash:'method-'+tag}]]){
+  const id=await media(owner);
+  let remaining=10;
+  reset();
+  for(const invalid of ['',[],null,'constructor',methods[2][1]]){
+   await assert.rejects(photos.edit(owner,base({sourceId:id,generationMethod:invalid}),undefined,guest),code('INVALID_GENERATION_METHOD'));
+  }
+  assert.equal(calls.length,0);
+  for(const [method,model,units,price] of methods){
+   reset();outputs=1;
+   photos.fetcher=(url,init)=>stub(url,init,model);
+   const result=await photos.edit(owner,base({sourceId:id,kind:'outfit',style:'cosplay',costumeIds:['80bdd0'],generationMethod:method}),undefined,guest);
+   const sent=calls.find(call=>call.kind==='edit').fields;
+   assert.equal(sent.image.length,2);
+   assert.equal(sent.model,model);
+   assert.equal((await db.media.findUniqueOrThrow({where:{id:result.images[0].id}})).metadata.aiModel,model);
+   remaining-=units;
+   spent+=price;
+   assert.equal(result.remaining,remaining);
+   assert.equal((await db.authRateBucket.findUniqueOrThrow({where:{id:cost}})).count,spent);
+   assert.equal(photos.settings.model,legacyDefault);
+  }
+ }
+});
+
+test('fractional credits combine daily, reward and two expiring orders atomically and restore exact amounts on failure',async()=>{
+ const {reserveMemberUsage,finishPhotoUsage}=require('../dist/src/platform/ai-photo-usage');
+ const {remainingRefund}=require('../dist/src/platform/ai-shop');
+ const user=await makeCreator('aihalf_'+tag),day={key:'ai-photo:creator-day:'+user,seconds:86400,max:10},pool={key:'ai-photo:test-pool:'+user,seconds:86400,max:10};
+ await photos.limiter.limit(day.key,10,86400);
+ const {aiPhotoUsageId}=require('../dist/src/platform/ai-photo-grants');
+ await db.authRateBucket.update({where:{id:aiPhotoUsageId(user)},data:{count:9.5}});
+ await db.aiHeartWallet.create({data:{user_id:user,credits:.5}});
+ const orders=await Promise.all([paidOrder(user,1),paidOrder(user,1)]);
+ await db.aiShopOrder.updateMany({where:{id:{in:orders.map(o=>o.id)}},data:{remaining:.5}});
+ const reserve=()=>reserveMemberUsage(db,user,crypto.randomUUID(),2,day,pool);
+ const balances=async()=>[(await photos.quota(user)).remaining,await photos.used(day.key),await photos.used(pool.key),(await db.aiHeartWallet.findUnique({where:{user_id:user}})).credits,...(await db.aiShopOrder.findMany({where:{creator_id:user},orderBy:{id:'asc'}})).map(o=>o.remaining)];
+ assert.deepEqual(await balances(),[2,9.5,0,.5,.5,.5]);
+ const failure=await reserve();
+ assert.deepEqual(await balances(),[0,10,1,0,0,0]);
+ await assert.rejects(reserve(),code('DAILY_LIMIT'));
+ assert.equal(await db.aiShopUse.count({where:{request_id:failure.id,status:'reserved',units:.5}}),2);
+ await finishPhotoUsage(db,failure,false,true);
+ assert.deepEqual(await balances(),[2,9.5,0,.5,.5,.5]);
+ const results=await Promise.allSettled([reserve(),reserve()]);
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+ assert.equal(results.find(r=>r.status==='rejected').reason.getResponse().code,'DAILY_LIMIT');
+ const success=results.find(r=>r.status==='fulfilled').value;
+ await finishPhotoUsage(db,success,true,false);
+ assert.deepEqual(await balances(),[0,10,1,0,0,0]);
+ assert.equal(await db.aiShopUse.count({where:{request_id:success.id,status:'consumed',units:.5}}),2);
+ const audit=await db.platformAuditLog.findFirstOrThrow({where:{action:'shop.use_consumed',entity_id:orders[0].id}});
+ assert.equal(audit.metadata.count,.5);
+ const {safeAuditData}=require('../dist/src/platform/audit');
+ assert.deepEqual(safeAuditData({amount:.5,count:.25}),{});
+ assert.equal(remainingRefund(990,10,9.5),940);
+});
+
+test('fractional credits respect shared guest request caps under concurrency and do not restore a reset member bucket',async()=>{
+ const {reserveGuestUsage,reserveMemberUsage,finishPhotoUsage}=require('../dist/src/platform/ai-photo-usage');
+ const limits=user=>['visitor-'+user,'ip','total'].map((name,i)=>({key:'ai-test:'+tag+':'+name,max:i===0?2:1,seconds:86400,code:i===0?'GUEST_AI_LIMIT':'GUEST_IP_LIMIT',message:'limit'}));
+ const reserve=(user,n)=>reserveGuestUsage(db,user,crypto.randomUUID(),n,limits(user));
+ const results=await Promise.allSettled([reserve('a',.5),reserve('b',2)]);
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+ assert.equal(results.find(r=>r.status==='rejected').reason.getResponse().code,'GUEST_IP_LIMIT');
+ const success=results.find(r=>r.status==='fulfilled').value;
+ assert.equal(await photos.used(limits('a')[1].key),1);
+ await finishPhotoUsage(db,success,false,true);
+ assert.equal(await photos.used(limits('a')[1].key),0);
+ for(const user of ['a','b'])assert.equal(await photos.used(limits(user)[0].key),0);
+ const user=await makeCreator('aireset_'+tag),day={key:'ai-photo:creator-day:'+user,max:10,seconds:86400},pool={...day,key:'ai-photo:test-pool:'+user};
+ const first=await reserveMemberUsage(db,user,crypto.randomUUID(),.5,day,pool);
+ await db.authRateBucket.delete({where:{id:first.buckets.find(b=>b.units===.5).id}});
+ await reserveMemberUsage(db,user,crypto.randomUUID(),1,day,pool);
+ await finishPhotoUsage(db,first,false,true);
+ assert.equal(await photos.used(day.key),1);
+ assert.equal(await photos.used(pool.key),1);
 });

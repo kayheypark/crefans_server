@@ -27,5 +27,22 @@ export async function settleHeartGame(db:any,user:string,id:string){return db.$t
  // generations cannot keep refilling themselves. A settled game's score is the hearts actually credited.
  const day=new Date(Date.now()+9*3600000).toISOString().slice(0,10),used=(await tx.aiHeartGame.aggregate({_sum:{score:true},where:{user_id:user,status:'settled',created_at:{gte:new Date(`${day}T00:00:00+09:00`)}}}))._sum.score||0,earned=Math.max(0,Math.min(g.score,AI_HEART_DAILY_CAP-used));
  const before=await heartBalance(tx,user),next=heartConversion(before.hearts+earned);await tx.aiHeartWallet.upsert({where:{user_id:user},create:{user_id:user,hearts:next.hearts,credits:next.credits},update:{hearts:next.hearts,credits:{increment:next.credits}}});await tx.aiHeartGame.update({where:{id},data:{status:'settled',score:earned,converted:next.credits}});await appendAudit(tx,{category:'business',action:'ai-photo.hearts_settled',entityId:user,data:{targetId:id,count:earned,played:g.score,dailyCap:AI_HEART_DAILY_CAP,after:{hearts:next.hearts,credits:next.credits}}});return{...await heartBalance(tx,user),earned,capped:earned<g.score,converted:next.credits};});}
-export async function reserveHeartCredit(db:any,user:string,id:string){return db.$transaction(async(tx:any)=>{await lock(tx,user);const w=await heartBalance(tx,user);if(w.credits<=0)return null;await tx.aiHeartWallet.update({where:{user_id:user},data:{credits:{decrement:1}}});return tx.aiHeartUse.create({data:{id,user_id:user}});});}
-export async function finishHeartCredit(db:any,id:string,success:boolean){await db.$transaction(async(tx:any)=>{const use=await tx.aiHeartUse.findUnique({where:{id}});if(!use)return;await lock(tx,use.user_id);const changed=await tx.aiHeartUse.updateMany({where:{id,status:'reserved'},data:{status:success?'consumed':'released'}});if(changed.count&&!success)await tx.aiHeartWallet.update({where:{user_id:use.user_id},data:{credits:{increment:1}}});});}
+export async function reserveHeartUnits(tx:any,user:string,id:string,needed:number){
+ const wallet=await heartBalance(tx,user),units=Math.min(wallet.credits,needed);
+ if(!units)return null;
+ await tx.aiHeartWallet.update({where:{user_id:user},data:{credits:{decrement:units}}});
+ return tx.aiHeartUse.create({data:{id,user_id:user,units}});
+}
+export async function reserveHeartCredit(db:any,user:string,id:string){
+ return db.$transaction(async(tx:any)=>{await lock(tx,user);return reserveHeartUnits(tx,user,id,1);});
+}
+export async function finishHeartUnits(tx:any,id:string,success:boolean){
+ const use=await tx.aiHeartUse.findUnique({where:{id}});
+ if(!use)return;
+ const changed=await tx.aiHeartUse.updateMany({where:{id,status:'reserved'},data:{status:success?'consumed':'released'}});
+ if(changed.count&&!success)await tx.aiHeartWallet.update({where:{user_id:use.user_id},data:{credits:{increment:use.units}}});
+}
+export async function finishHeartCredit(db:any,id:string,success:boolean){
+ const use=await db.aiHeartUse.findUnique({where:{id}});if(!use)return;
+ await db.$transaction(async(tx:any)=>{await lock(tx,use.user_id);await finishHeartUnits(tx,id,success);});
+}

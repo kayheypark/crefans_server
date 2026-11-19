@@ -1,3 +1,16 @@
+## 2026-11-19 AI 사진 생성 방식 바로 선택
+
+- 회원·비회원이 편집 요청에 빠르게(`fast`, 0.5개), 표준(`standard`, 1개), 정밀하게(`precise`, 2개)를 지정한다. 서버는 선택한 방식으로 Seedream 생성 요청·미디어 기록·원가 집계를 일치시킨다. 생성 방식을 생략한 기존 앱은 이전 서버 설정으로 1개를 사용한다. [API 계약 및 단가](docs/platform-api.md)
+- 12:48 KST, macOS 개발 PC에서 `6047074` 기준 변경본을 격리 MySQL과 공급사 대역으로 검사했다. `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-ai-photo.test.cjs tests/platform-openapi.test.cjs`가 종료 코드 0으로 69/69건 통과했다. 회원·비회원 각각 3개 방식의 모델·잔액·저장 모델·원가, 잘못된 값 5종의 차감 전 거절을 포함한다. 공급사 실호출은 수행하지 않았다.
+- 12:51 KST, 회원·비회원 잔액 응답 6개 경로의 OpenAPI를 0.5 배수로 명시했다. `npm run build`와 `node --test tests/platform-openapi.test.cjs`는 종료 코드 0(15/15)이며, 9.5를 허용하고 0.25·음수·문자열을 거절하는 JSON Schema 검사를 포함한다.
+- 12:53 KST, macOS `6047074` 기준 변경본에서 `npm run build` 및 `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-ai-photo.test.cjs tests/platform-ai-shop.test.cjs tests/platform-ai-subscription.test.cjs tests/platform-ai-photo-grants.test.cjs` 종료 코드 0, 77/77 통과. 격리 MySQL과 공급사 대역에서 기존 정수 잔액, 0.5개 단위 혼합 차감·복구, 동시 요청, 초기화 후 복구, 감사기록, 카드·구독 부분 환불을 확인했다. 잔액 부족·음수·허용 단위 밖의 입력은 해당 회귀 검사의 대조군이다. 실제 유료 생성과 결제사 환불은 실행하지 않았다.
+
+## 2026-11-19 개발 AI 사진 편집 Flash 선택
+
+- 운영 기준 `e93d149`에서 회원·비회원 공통 사진 편집 모델을 `AI_PHOTO_BYTEPLUS_MODEL`로 선택하도록 변경했다. 기본값은 기존 5.5이며 선택 가능한 Flash ID는 `dola-seedream-5-0-flash-260915`다. 오타는 서비스 시작 시 검출한다. 환경 예시는 `infra/platform/runtime.env.example`, API 계약은 `docs/platform-api.md`에 있다.
+- Flash의 입력료는 0달러, 한 장 출력료는 0.018달러다. 하루 예산 예약과 성공 알림은 같은 모델별 추정액을 사용하며, 호출 전에 한 장 출력을 가정하는 기존 방식이다. [BytePlus 공식 요금표](https://docs.byteplus.com/en/docs/modelark/model-pricing)와 [모델 안내](https://docs.byteplus.com/en/docs/modelark/seedream-5-0-pro)를 11월 19일 확인했다.
+- 12:17 KST macOS에서 `npm run build`와 격리 E2E DB·공급사 대역의 `CREFANS_E2E=true node --test --test-concurrency=1 tests/platform-ai-photo.test.cjs` 종료 0, 54/54 통과. Flash 요청 본문·미디어 모델·예산 18 milli-USD·잘못된 모델 거부를 검증했다. 프런트 `npm run check:docs`는 기존 운영 기준과 변경본 모두 같은 미검토 문서 6건과 계약 스냅샷 만료로 종료 1. 유료 호출 및 환경 변경은 이 로컬 검증 범위 밖이다.
+
 ## 2026-11-19 AI 사진 텔레그램 의상 이름
 
 - 회원·비회원 생성 성공과 실패 알림을 표시할 때 서버가 검증한 의상의 ID를 영문 캐릭터명으로 바꾼다. 이전 버전에서 대기 중인 성공 알림도 같은 방식으로 표시한다. 일반 의상은 의상명으로 표시한다. 공급사 요청 생성 코드와 프리셋 사용량 집계는 그대로다.
