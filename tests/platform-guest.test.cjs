@@ -1,6 +1,6 @@
 require('reflect-metadata');require('dotenv').config({path:'.local/platform.env',override:true});
 // 2026-11-15 user decision: signed-out visitors try AI photos and post the result. The post is public in the feed for 24 hours,
-// then private; signing in on the same browser moves it to the account. AI: 10 per visitor, 10 per IP a day, 200 per day overall,
+// then private; signing in on the same browser moves it to the account. AI: three credits plus a first-post reward, 10 per IP a day, 200 per day overall,
 // no hearts. Providers are stubs (no network).
 const {test,before,after}=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 assert.equal(process.env.CREFANS_E2E,'true');const source=process.env.DATABASE_URL;assert.match(source||'',/@127\.0\.0\.1:3307\/crefans_platform_dev$/);const url=new URL(source);url.pathname='/crefans_platform_e2e';process.env.DATABASE_URL=url.toString();
@@ -57,17 +57,34 @@ test('signing in on the same browser moves guest posts and photos to the account
  assert.equal((await db.media.findUnique({where:{id:photo}})).user_sub,member);assert.equal(await db.posting.count({where:{user_sub:g.id}}),0);
 });
 
-test('guest AI: no allow-list needed, no library or hearts, 10 per visitor and then a clear refusal',async()=>{
+test('three trial credits, a single transactional publishing reward and the shared network cap',async()=>{
  const g=await startGuest(),photo=await upload(g.id),ip={ipHash:'iphash'+tag};
  await assert.rejects(photos.edit(g.id,edit(photo,{libraryIds:'["x"]'}),undefined,ip),code('GUEST_FEATURE_UNAVAILABLE'));
  await assert.rejects(photos.edit(g.id,edit(photo,{heartGameId:'game'}),undefined,ip),code('GUEST_FEATURE_UNAVAILABLE'));
- assert.equal(await photos.guestRemaining(g.id),10);
- const first=await requestContext.run({ip:'198.51.100.7',peerIp:'198.51.100.7',requestId:crypto.randomUUID()},()=>photos.edit(g.id,edit(photo),undefined,ip));
- assert.equal(first.images.length,1);assert.equal(first.remaining,9);assert.equal((await db.media.findUnique({where:{id:first.images[0].id}})).user_sub,g.id,'the result belongs to the guest');
- for(let i=0;i<9;i++)await photos.edit(g.id,edit(photo),undefined,{ipHash:'other'+i+tag});
- assert.equal(await photos.guestRemaining(g.id),0);await assert.rejects(photos.edit(g.id,edit(photo),undefined,{ipHash:'fresh'+tag}),code('GUEST_AI_LIMIT'));
- const h=await startGuest(),hp=await upload(h.id);for(let i=0;i<9;i++)await photos.edit(h.id,edit(hp),undefined,ip);
- await assert.rejects(photos.edit(h.id,edit(hp),undefined,ip),code('GUEST_IP_LIMIT'),'the same IP stops at 10 a day');assert.equal(await photos.guestRemaining(h.id),1,'a refused try is given back');
+ assert.equal((await guestsService.status(g.req,id=>photos.guestQuota(id))).postRewardClaimed,false);
+ assert.equal(await photos.guestRemaining(g.id),3);
+ const first=await requestContext.run({ip:'198.51.100.7',peerIp:'198.51.100.7',requestId:crypto.randomUUID()},()=>photos.edit(g.id,edit(photo,{generationMethod:'fast'}),undefined,ip));
+ assert.equal(first.remaining,2.5);
+ assert.equal((await db.media.findUnique({where:{id:first.images[0].id}})).user_sub,g.id);
+ await photos.edit(g.id,edit(photo,{generationMethod:'precise'}),undefined,ip);
+ await photos.edit(g.id,edit(photo,{generationMethod:'fast'}),undefined,ip);
+ await assert.rejects(photos.edit(g.id,edit(photo),undefined,ip),code('GUEST_AI_LIMIT'));
+ await assert.rejects(studio.saveContent(g.id,post({media:[{id:photo}]}),{guest:true}),code('GUEST_AI_RESULT_ONLY'));
+ assert.equal(await photos.guestRemaining(g.id),0,'refused publication does not grant credits');
+ const published=await Promise.all([
+   studio.saveContent(g.id,post({media:[{id:first.images[0].id}]}),{guest:true}),
+   studio.saveContent(g.id,post({title:'후속 체험 글 '+tag}),{guest:true}),
+ ]);
+ assert.deepEqual(published.map(result=>result.rewardGranted).sort(),[0,3]);
+ const status=await guestsService.status(g.req,id=>photos.guestQuota(id));
+ assert.equal(status.remaining,3);
+ assert.equal(status.limit,6);
+ assert.equal(status.postRewardClaimed,true);
+ for(let n=0;n<6;n++)await photos.edit(g.id,edit(photo,{generationMethod:'fast'}),undefined,ip);
+ const h=await startGuest(),hp=await upload(h.id);
+ assert.equal((await photos.edit(h.id,edit(hp),undefined,ip)).remaining,2);
+ await assert.rejects(photos.edit(h.id,edit(hp),undefined,ip),code('GUEST_IP_LIMIT'));
+ assert.equal(await photos.guestRemaining(h.id),2,'network refusal does not debit the other visitor');
 });
 
 test('spam guard: 10 trial posts per visitor a day',async()=>{

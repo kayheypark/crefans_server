@@ -23,7 +23,7 @@ import {reject} from './http';
 import {contentDigest} from './audit';
 import {requestContext} from './request-context';
 import {PlatformOperationsService} from './operations.service';
-import {GUEST_AI_LIMIT,GUEST_DAILY_TOTAL,GUEST_IP_DAILY,guestQuotaEpoch,guestQuotaKey} from './guest-policy';
+import {GUEST_AI_LIMIT,GUEST_POST_REWARD,GUEST_DAILY_TOTAL,GUEST_IP_DAILY,guestPostRewardClaimed,guestQuotaEpoch,guestQuotaKey} from './guest-policy';
 const GUEST_LIFETIME=3650*86400;
 import {aiFailureTrace,diagnosticId,recordAiFailure,recordAiRequest,traceAiEvent,AiFailureTrace} from './ai-photo-failures';
 import {aiPhotoAllowed} from './ai-photo-grants';
@@ -97,11 +97,18 @@ export class AiPhotoService{
  readonly settings:ReturnType<typeof aiPhotoConfig>;
  fetcher:typeof fetch=fetch;
  constructor(private configService:ConfigService,private service:PlatformService,private storage:PlatformMediaStorage,private limiter:LocalMemberService,private operations:PlatformOperationsService){this.settings=aiPhotoConfig(configService);}
- // Guest trial (2026-11-15): 10 per visitor for good, 10 per IP per day, 200 for all visitors per day. No hearts, tickets or library.
- private guestKeys(sub:string,guest:{ipHash:string},epoch=0){return[{key:guestQuotaKey('ai-photo:guest:',sub,epoch),max:GUEST_AI_LIMIT,seconds:GUEST_LIFETIME,code:'GUEST_AI_LIMIT',message:'선택한 생성 방식에 필요한 체험 잔여 횟수가 부족해요. 다른 방식을 선택하거나 회원가입 후 이용해 주세요.'},{key:guestQuotaKey('ai-photo:guest-ip:',guest.ipHash,epoch),max:GUEST_IP_DAILY,seconds:DAY,code:'GUEST_IP_LIMIT',message:'이 네트워크에서는 오늘 체험 횟수를 모두 썼어요. 회원가입하면 계속 이용할 수 있어요.'},{key:'ai-photo:guest-total',max:GUEST_DAILY_TOTAL,seconds:DAY,code:'GUEST_DAILY_CLOSED',message:'오늘 비회원 체험이 마감됐어요. 회원가입 후 이용해 주세요.'}];}
+ // Guest trial (2026-11-15): 3 credits plus a publishing reward, 10 requests per IP per day, 200 for all visitors per day. No hearts, tickets or library.
+ private guestKeys(sub:string,guest:{ipHash:string},epoch:number,limit:number){return[{key:guestQuotaKey('ai-photo:guest:',sub,epoch),max:limit,seconds:GUEST_LIFETIME,code:'GUEST_AI_LIMIT',message:'선택한 생성 방식에 필요한 체험 잔여 횟수가 부족해요. 다른 방식을 선택하거나 회원가입 후 이용해 주세요.'},{key:guestQuotaKey('ai-photo:guest-ip:',guest.ipHash,epoch),max:GUEST_IP_DAILY,seconds:DAY,code:'GUEST_IP_LIMIT',message:'이 네트워크에서는 오늘 체험 횟수를 모두 썼어요. 회원가입하면 계속 이용할 수 있어요.'},{key:'ai-photo:guest-total',max:GUEST_DAILY_TOTAL,seconds:DAY,code:'GUEST_DAILY_CLOSED',message:'오늘 비회원 체험이 마감됐어요. 회원가입 후 이용해 주세요.'}];}
  private bucket(key:string,seconds:number){return digest(`${key}:${Math.floor(Date.now()/(seconds*1000))}`);}
  private async usedIn(key:string,seconds:number){const row=await this.service.db.authRateBucket.findUnique({where:{id:this.bucket(key,seconds)}});return row?.count??0;}
- async guestRemaining(id:string){return Math.max(0,GUEST_AI_LIMIT-await this.usedIn(guestQuotaKey('ai-photo:guest:',id,await guestQuotaEpoch(this.service.db)),GUEST_LIFETIME));}
+ async guestQuota(id:string){
+  const db=this.service.db;
+  const [epoch,postRewardClaimed]=await Promise.all([guestQuotaEpoch(db),guestPostRewardClaimed(db,id)]);
+  const limit=GUEST_AI_LIMIT+(postRewardClaimed?GUEST_POST_REWARD:0);
+  const used=await this.usedIn(guestQuotaKey('ai-photo:guest:',id,epoch),GUEST_LIFETIME);
+  return{limit,remaining:Math.max(0,limit-used),postRewardClaimed,epoch};
+ }
+ async guestRemaining(id:string){return (await this.guestQuota(id)).remaining;}
  // 2026-11-16 user decision: every AI photo failure goes to Telegram (operations alert queue), user-caused ones included.
  // Codes and stage plus the client IP (2026-11-18 user decision): no prompt, photo or member id leaves the service; operators find the request by its record/request id.
  private async failureAlert(sub:string,error:any,trace:AiFailureTrace,started:number,guest:boolean){try{
@@ -290,7 +297,7 @@ export class AiPhotoService{
   const {selectedUnits=1,requestId}=aiFailureTrace.getStore();
   let usage:Awaited<ReturnType<typeof reserveMemberUsage>>;
   if(guest){
-   try{usage=await reserveGuestUsage(this.service.db,sub,requestId,selectedUnits,this.guestKeys(sub,guest,await guestQuotaEpoch(this.service.db)));}
+   try{const {epoch,limit}=await this.guestQuota(sub);usage=await reserveGuestUsage(this.service.db,sub,requestId,selectedUnits,this.guestKeys(sub,guest,epoch,limit));}
    catch(error){if(error?.getResponse?.()?.code==='GUEST_DAILY_CLOSED')await this.guestUsageAlert(true);throw error;}
   }else{
    usage=await reserveMemberUsage(this.service.db,sub,requestId,selectedUnits,{key,seconds:DAY,max:this.settings.perDay},{key:'ai-photo:total',seconds:DAY,max:this.settings.dailyTotal});

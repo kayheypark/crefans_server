@@ -14,7 +14,7 @@ import {reject} from './http';
 import {requestContext} from './request-context';
 import {LocalMemberService} from '../auth/local/local-member.service';
 
-import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash} from './guest-policy';
+import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash} from './guest-policy';
 export * from './guest-policy';
 const COOKIE_DAYS=30;
 
@@ -27,7 +27,11 @@ export class GuestService{
  private cookieOptions(){const cookie=this.config.get('app.cookie')||{};return{httpOnly:true,secure:!!cookie.secure,sameSite:'lax' as const,path:'/',maxAge:COOKIE_DAYS*86400000,...(cookie.domain?{domain:cookie.domain}:{})};}
  require(req:any){const id=guestFromRequest(req);if(!id)reject(401,'GUEST_SESSION_REQUIRED','체험을 시작하려면 안내에 동의해 주세요.');return id;}
  ipHash(){return guestIpHash(this.config,requestContext.getStore()?.ip);}
- async status(req:any,remaining:(id:string)=>Promise<number>){const id=guestFromRequest(req);return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,limit:GUEST_AI_LIMIT,postHours:GUEST_POST_HOURS,remaining:id?await remaining(id):GUEST_AI_LIMIT};}
+ async status(req:any,quota:(id:string)=>Promise<{limit:number;remaining:number;postRewardClaimed:boolean}>){
+  const id=guestFromRequest(req);
+  const {limit,remaining,postRewardClaimed}=id?await quota(id):{limit:GUEST_AI_LIMIT,remaining:GUEST_AI_LIMIT,postRewardClaimed:false};
+  return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,postHours:GUEST_POST_HOURS,limit,remaining,postRewardClaimed,postReward:GUEST_POST_REWARD};
+ }
  async start(req:any,res:any,input:any){
   if(input?.consent!==true||input?.version!==GUEST_CONSENT_VERSION)reject(400,'GUEST_CONSENT_REQUIRED','체험 안내를 확인하고 동의해 주세요.');
   let id=guestFromRequest(req);
@@ -56,7 +60,7 @@ export class GuestService{
 @Controller('guest')
 export class GuestController{
  constructor(private guests:GuestService,private studio:PlatformStudioService,private photos:AiPhotoService,private captions:GuestCaptionService){}
- @Get('session') session(@Req() req:any){return this.guests.status(req,id=>this.photos.guestRemaining(id));}
+ @Get('session') session(@Req() req:any){return this.guests.status(req,id=>this.photos.guestQuota(id));}
  @Post('session') start(@Req() req:any,@Res({passthrough:true}) res:any,@Body() body:any){return this.guests.start(req,res,body);}
  @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);const saved=await this.studio.saveContent(id,body,{guest:true});await recordFunnelStep(this.studio.db,'post_published_guest');return saved;}
  // Writes the empty title/body at publish time; the visitor confirms before posting (2026-11-16).

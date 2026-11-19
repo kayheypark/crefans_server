@@ -708,11 +708,11 @@ test('console reset gives every visitor a fresh 10 tries and keeps the guests da
  const visitor='guest:'+crypto.randomBytes(20).toString('hex'),{guestQuotaEpoch,guestQuotaKey}=require('../dist/src/platform/guest-policy');
  try{
   const epoch=await guestQuotaEpoch(db);for(let n=0;n<3;n++)await photos.limiter.limit(guestQuotaKey('ai-photo:guest:',visitor,epoch),10,3650*86400);
-  assert.equal(await photos.guestRemaining(visitor),7);
+  assert.equal(await photos.guestRemaining(visitor),0);
   await assert.rejects(resetGuestAiQuota(db,admin,{reason:'테스트 초기화',confirm:'틀림'}),code('CONFIRMATION_REQUIRED'));
   await assert.rejects(resetGuestAiQuota(db,viewer,{reason:'테스트 초기화',confirm:'전체 초기화'}));
   const r=await resetGuestAiQuota(db,admin,{reason:'테스트 초기화',confirm:'전체 초기화'});assert.equal(r.epoch,epoch+1);
-  assert.equal(await photos.guestRemaining(visitor),10,'fresh tries after the reset');assert.equal((await guestAiQuotaStatus(db,admin)).epoch,epoch+1);
+  assert.equal(await photos.guestRemaining(visitor),3,'fresh credits after the reset');assert.equal((await guestAiQuotaStatus(db,admin)).epoch,epoch+1);
  }finally{if(prior)await db.platformSetting.update({where:{key:GUEST_QUOTA_EPOCH_SETTING},data:{value:prior.value}});else await db.platformSetting.deleteMany({where:{key:GUEST_QUOTA_EPOCH_SETTING}});}
 });
 
@@ -814,7 +814,8 @@ test('generationMethod selects the server model, usage and actual budget for bot
  let spent=0;
  for(const [owner,guest] of [[user,undefined],[visitor,{ipHash:'method-'+tag}]]){
   const id=await media(owner);
-  let remaining=10;
+  if(guest)await require('../dist/src/platform/guest-policy').grantGuestPostReward(db,owner);
+  let remaining=guest?6:10;
   reset();
   for(const invalid of ['',[],null,'constructor',methods[2][1]]){
    await assert.rejects(photos.edit(owner,base({sourceId:id,generationMethod:invalid}),undefined,guest),code('INVALID_GENERATION_METHOD'));
