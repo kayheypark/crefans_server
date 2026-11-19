@@ -6,7 +6,7 @@ import {PaymentProvider} from './payment-provider';
 import {can} from './admin-permissions';
 import {CostumeReviewTarget,queueCostumeFailure} from './ai-costume-review';
 
-export type AiFailureTrace={requestId:string;actorId?:string;selectedModel?:string;selectedProvider?:string;sequence?:number;stage:string;provider:string;providerCode?:string;providerRequestId?:string;providerStatus?:number;referenceImages?:number;estimatedMilliUsd?:number;costumeReview?:CostumeReviewTarget;approvedCostumeSha256?:string};
+export type AiFailureTrace={requestId:string;actorId?:string;selectedModel?:string;selectedProvider?:string;sequence?:number;stage:string;provider:string;providerCode?:string;providerRequestId?:string;providerStatus?:number;referenceImages?:number;costumeIds?:string[];estimatedMilliUsd?:number;costumeReview?:CostumeReviewTarget;approvedCostumeSha256?:string};
 export const aiFailureTrace=new AsyncLocalStorage<AiFailureTrace>();
 export const diagnosticId=(v:unknown)=>typeof v==='string'&&/^[a-zA-Z0-9_.:-]{1,191}$/.test(v)?v:undefined;
 // Do not retain obvious credentials/contact details even in the encrypted diagnostic store.

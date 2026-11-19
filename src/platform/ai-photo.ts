@@ -107,13 +107,13 @@ export class AiPhotoService{
  private async failureAlert(sub:string,error:any,trace:AiFailureTrace,started:number,guest:boolean){try{
   const code=diagnosticId(error?.getResponse?.()?.code||error?.code||error?.cause?.code)||'INTERNAL_ERROR';
   if(code==='AI_PROVIDER_DAILY_CAP')return;// Alerted once per day by providerCall instead of on every refused request.
-  await this.operations.record('ai-photo.failed',{errorCode:code,status:error?.getStatus?.()||500,stage:diagnosticId(trace.stage)||'unknown',provider:diagnosticId(trace.provider)||'unknown',errorType:diagnosticId(trace.providerCode)||'none',actor:guest||sub.startsWith('guest:')?'guest':'member',durationMs:Date.now()-started});
+  await this.operations.record('ai-photo.failed',{...(trace.costumeIds?.length?{costumeIds:trace.costumeIds.join(',')}:{}),errorCode:code,status:error?.getStatus?.()||500,stage:diagnosticId(trace.stage)||'unknown',provider:diagnosticId(trace.provider)||'unknown',errorType:diagnosticId(trace.providerCode)||'none',actor:guest||sub.startsWith('guest:')?'guest':'member',durationMs:Date.now()-started});
  }catch{this.logger.warn({event:'ai-photo.failure_alert_failed',requestId:trace.requestId});}}
  // 2026-11-18 user decision: early stage, so every successful generation is also sent at once (never deduped or digested).
  // Categories, preset keys and counts only: no prompt, photo, member id, email or IP leaves the service.
  private async successAlert(sub:string,input:any,trace:AiFailureTrace,started:number,guest:boolean){try{
-  const kind=String(input?.kind||''),kinds=kind==='combined'?editKinds(kind,input?.editKinds):[kind],presets=presetUsageKeys(input).map(p=>`${p.kind}:${p.key}`).join(', ');
-  await this.operations.record('ai-photo.succeeded',{actor:guest||sub.startsWith('guest:')?'guest':'member',mode:diagnosticId(input?.mode)||'general',style:diagnosticId(input?.style)||'photo',kinds:kinds.join(','),presets:presets||'없음',references:trace.referenceImages??0,durationMs:Date.now()-started,...(trace.estimatedMilliUsd?{estimatedUsd:(trace.estimatedMilliUsd/1000).toFixed(3)}:{})},undefined,{omitIp:true});
+  const kind=String(input?.kind||''),kinds=kind==='combined'?editKinds(kind,input?.editKinds):[kind],presets=presetUsageKeys(input).filter(p=>p.kind!=='outfit').map(p=>`${p.kind}:${p.key}`).join(', ');
+  await this.operations.record('ai-photo.succeeded',{actor:guest||sub.startsWith('guest:')?'guest':'member',mode:diagnosticId(input?.mode)||'general',style:diagnosticId(input?.style)||'photo',kinds:kinds.join(','),...(trace.costumeIds?.length?{costumeIds:trace.costumeIds.join(',')}:{}),presets:presets||'없음',references:trace.referenceImages??0,durationMs:Date.now()-started,...(trace.estimatedMilliUsd?{estimatedUsd:(trace.estimatedMilliUsd/1000).toFixed(3)}:{})},undefined,{omitIp:true});
  }catch{this.logger.warn({event:'ai-photo.success_alert_failed',requestId:trace.requestId});}}
  // Telegram: every 50 guest generations a day and when the daily cap closes (operations alert queue, one message per milestone).
  private async guestUsageAlert(closed=false){try{const used=await this.usedIn('ai-photo:guest-total',DAY);if(closed)await this.operations.record('guest.ai_closed',{used:Math.min(used,GUEST_DAILY_TOTAL),limit:GUEST_DAILY_TOTAL},`guest-ai-closed:${this.window()}`);else if(used>0&&(used%50===0||used===GUEST_DAILY_TOTAL))await this.operations.record('guest.ai_usage',{used,limit:GUEST_DAILY_TOTAL},`guest-ai:${this.window()}:${used}`);}catch{}}
@@ -248,6 +248,8 @@ export class AiPhotoService{
   if(!kinds.includes('outfit')&&mask)reject(400,'INVALID_MASK','옷을 바꿀 때만 옷 영역을 칠해 주세요.');
   if(mask&&(mask.mimetype!=='image/png'||mask.size>5*1024*1024))reject(400,'INVALID_MASK','칠한 영역을 다시 만들어 주세요.');
   const referenceIds=costumeReferenceIds(input?.costumeIds,kinds,style);
+  const trace=aiFailureTrace.getStore();
+  if(trace && referenceIds.length)trace.costumeIds=referenceIds;
   const backgroundId=backgroundReferenceId(input?.backgroundId,kinds);
   const library=await photoLibraryReferences(this.service.db,sub,input?.libraryIds,kinds);
   const inherited=(await this.service.db.media.findMany({where:{id:{in:[String(input?.sourceId),...library.map(item=>item.id)]},user_sub:sub},select:{metadata:true}})).map(row=>franchiseFields(row.metadata)).find(fields=>fields.aiFranchiseCostume);
@@ -259,7 +261,6 @@ export class AiPhotoService{
    && referenceIds.length===1 && !mask && !library.length;
   const hasPose=kinds.includes('pose');
   const reviewTarget=canUseCompositeBase ? costumeReviewTarget(referenceIds[0],prompt,hasPose) : undefined;
-  const trace=aiFailureTrace.getStore();
   if(trace)trace.costumeReview=reviewTarget;
   const compositeBase=reviewTarget ? await readCostumeCompositeBase(reviewTarget.costumeId,prompt,hasPose) : null;
   if(trace && compositeBase)trace.approvedCostumeSha256=createHash('sha256').update(compositeBase).digest('hex');

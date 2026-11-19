@@ -1,6 +1,6 @@
 import {readFile} from 'fs/promises';
 import {join} from 'path';
-import {reject} from './http';
+import {reject} from './http-error';
 // Fixed local catalog only: never fetch a client-supplied URL or path.
 // Stable six-character catalog IDs; filenames remain independent of public IDs.
 const COSTUME_ASSETS:Record<string,string>={
@@ -365,6 +365,87 @@ function canonicalId(id:string):string|undefined{
  return AI_PHOTO_COSTUME_IDS.find(key=>COSTUME_ASSETS[key]===id);
 }
 export const HIDDEN_COSTUME_IDS=new Set<string>();
+
+// Most asset names use the English character name after the franchise prefix.
+// These entries restore localized names, punctuation, and names of original outfits.
+const COSTUME_ENGLISH_NAMES:Record<string,string>={
+ maid:'Ribbon Maid',
+ sailor:'Sailor Costume',
+ gothic:'Gothic Off-Shoulder Dress',
+ mage:'Fantasy Mage',
+ cyber:'Cyber Suit',
+ idol:'Idol Stage Outfit',
+ cheer:'Cheer Costume',
+ beach:'Beach Two-Piece',
+ 'aot-scout':'Scout Regiment Uniform',
+ 'aot-captain':"Regiment Commander's Cloak",
+ 'aot-police':'Military Police Regiment Uniform',
+ 'aot-final':'Black Combat Uniform',
+ 'aot-gabi':'Gabi Braun',
+ 'nikke-avista':'Avistar',
+ 'nikke-eh':'E.H.',
+ 'nikke-sora':'Sky',
+ 'nikke-shiratsuru':'Snow Crane',
+ 'nikke-moli':'Mori',
+ 'nikke-rai':'Rei',
+ 'nikke-soldier-eg':'Soldier EG',
+ 'nikke-soldier-fa':'Soldier FA',
+ 'nikke-soldier-ow':'Soldier OW',
+ 'nikke-idoll-sun':'iDoll Sun',
+ 'nikke-idoll-ocean':'iDoll Ocean',
+ 'nikke-idoll-flower':'iDoll Flower',
+ 'overwatch-dva':'D.Va',
+ 'overwatch-dmon':'D.Mon',
+ 'overwatch-widow':'Widowmaker',
+ 'overwatch-soldier-76':'Soldier: 76',
+ 'overwatch-lucio':'Lúcio',
+ 'overwatch-torbjorn':'Torbjörn',
+ 'genshin-raiden':'Raiden Shogun',
+ 'genshin-kokomi':'Sangonomiya Kokomi',
+ 'demon-giyu':'Giyu Tomioka',
+ 'demon-shinobu':'Shinobu Kocho',
+ 'demon-rengoku':'Kyojuro Rengoku',
+ 'demon-mitsuri':'Mitsuri Kanroji',
+ 'demon-shigeru':'Shigeru Kamado',
+ 'demon-takeo':'Takeo Kamado',
+ 'demon-hanako':'Hanako Kamado',
+ 'demon-tanjuro':'Tanjuro Kamado',
+ 'demon-kiyo':'Kiyo Terauchi',
+ 'demon-sumi':'Sumi Nakahara',
+ 'demon-naho':'Naho Takada',
+ 'demon-kanae':'Kanae Kocho',
+ 'demon-kanamori':'Kozo Kanamori',
+ 'demon-mother-spider':'Spider Demon (Mother)',
+ 'demon-sister-spider':'Spider Demon (Elder Sister)',
+ 'demon-ruka':'Ruka Rengoku',
+ 'demon-tetsutin':'Tecchin Tecchikawahara',
+ 'demon-yuichiro':'Yuichiro Tokito',
+ 'demon-amane':'Amane Ubuyashiki',
+ 'jjk-gojo':'Satoru Gojo',
+ 'jjk-nanami':'Kento Nanami',
+ 'jjk-geto':'Suguru Geto',
+ 'jjk-toji':'Toji Fushiguro',
+ 'jjk-ijichi':'Kiyotaka Ijichi',
+ 'jjk-shoko':'Shoko Ieiri',
+ 'jjk-momo':'Momo Nishimiya',
+ 'jjk-junpei':'Junpei Yoshino',
+ 'jjk-kuroi':'Misato Kuroi',
+ 'jjk-shiu':'Shiu Kong',
+ 'jjk-yuki':'Yuki Tsukumo',
+ 'jjk-uiui':'Ui Ui',
+ 'jjk-kirara':'Kirara Hoshi',
+ 'jjk-higuruma':'Hiromi Higuruma',
+ 'jjk-reggie':'Reggie Star',
+};
+
+export function costumeEnglishName(id:string):string|undefined{
+ const canonical=canonicalId(id);
+ if(!canonical)return undefined;
+ const asset=COSTUME_ASSETS[canonical];
+ return COSTUME_ENGLISH_NAMES[asset] ?? asset.slice(asset.indexOf('-')+1)
+  .split('-').map(word=>word[0].toUpperCase()+word.slice(1)).join(' ');
+}
+
 export function costumeReferenceIds(value:unknown,kinds:string[],style:string):string[]{
  if(value===undefined)return [];
  let ids:unknown=value;try{if(typeof ids==='string')ids=JSON.parse(ids);}catch{reject(400,'INVALID_COSTUME_REFERENCES','의상을 다시 선택해 주세요.');}

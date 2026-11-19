@@ -3,6 +3,7 @@ import {Injectable,OnModuleInit,OnModuleDestroy} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {PrismaService} from '../prisma/prisma.service';
 import {requestContext} from './request-context';
+import {costumeEnglishName} from './ai-photo-costume-references';
 import {createHmac,randomUUID} from 'crypto';
 import {DEDUPE_TYPES,DIGEST_TYPE,digestOnly,digestText,runDailyDigest,throttleError} from './operations-alert-policy';
 
@@ -24,7 +25,7 @@ const labels:Record<string,string>={'creator.partner_requested':'파트너 계�
  'admin.inquiry_replied':'운영자 문의 답변','admin.report_resolved':'운영자 신고 처리','admin.document_saved':'운영자 공지·FAQ 저장','operations.daily_digest':'운영 일일 요약',
  'funnel.landing_view':'랜딩 방문','share.clicked':'공유 버튼','share.cap':'오늘 공유 알림 상한 도달(200건) — 오늘 남은 공유는 알림 안 보냄','funnel.landing_test':'랜딩 방문','funnel.landing_cap':'오늘 랜딩 알림 상한 도달(100건) — 오늘 남은 방문은 집계만 하고 알림 안 보냄',
 };
-const allowed=new Set(['limit','calls','estimatedUsd','thresholdUsd','ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','mode','style','kinds','presets','references','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각','방문 시각(KST)','랜딩','유입','기기','오늘 랜딩 방문','사유','시각(KST)','위치','방식','결과','게시물','오늘 공유']);
+const allowed=new Set(['limit','calls','estimatedUsd','thresholdUsd','ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','mode','style','kinds','presets','costumeIds','references','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각','방문 시각(KST)','랜딩','유입','기기','오늘 랜딩 방문','사유','시각(KST)','위치','방식','결과','게시물','오늘 공유']);
 function metadata(data:Record<string,unknown>){
  const result:Record<string,any>={};
  for(const [key,value] of Object.entries(data)){
@@ -48,12 +49,27 @@ const NO_IP_TYPES=new Set(['share.cap','ai-photo.succeeded','ai-photo.provider_c
 // 2026-11-19: 공유 버튼 알림도 랜딩 알림처럼 접속 IP만 표시한다(같은 방문자를 랜딩 알림과 맞춰 보기 위해).
 const CLIENT_IP_TYPES=new Set(['funnel.landing_view','funnel.landing_test','ai-photo.failed','share.clicked']);
 const KIND_LABELS:Record<string,string>={bean:'콩 충전','ai-shop':'AI 이용권',ad:'광고상품'};
+function photoAlertData(data:Record<string,unknown>):Record<string,unknown>{
+ const {costumeIds,presets,...rest}=data;
+ const ids=typeof costumeIds==='string'?costumeIds.split(','):[];
+ const otherPresets=typeof presets==='string'?presets.split(', '):[];
+ // Older queued success events stored outfits at the beginning of the presets string.
+ if(costumeIds===undefined){
+  while(otherPresets[0]?.startsWith('outfit:'))ids.push(otherPresets.shift()!.slice('outfit:'.length));
+ }
+ const names=ids.map(costumeEnglishName).filter(Boolean);
+ if(names.length)rest['의상']=names.join(', ');
+ const remaining=otherPresets.join(', ');
+ if(typeof presets==='string' && (!names.length || (remaining && remaining!=='없음')))rest.presets=remaining||'없음';
+ return rest;
+}
 export function operationsAlertText(row:{type:string;ip:string|null;peer_ip:string|null;created_at:Date;id:string;request_id:string|null;data:unknown},env:string,secret?:string,homeIps=''){
  const hidden=(value:unknown)=>secret?'h:'+createHmac('sha256',secret).update(`operations-alert:${String(value)}`).digest('hex').slice(0,12):'(숨김)';
  const home=!!row.ip&&homeIps.split(',').map(s=>s.trim()).includes(row.ip),data=row.data as Record<string,unknown>,reason=typeof data?.['사유']==='string'?data['사유']:'';
  const ipLines=CLIENT_IP_TYPES.has(row.type)?[`접속 IP: ${row.ip||'알 수 없음'}${home?' (집)':''}`]:noIp(row.type)?['접속 IP: 보내지 않음']:[`접속 IP: ${row.ip||'시스템 작업'}`,`연결 IP: ${row.peer_ip||'해당 없음'}`];
  const lines=[...(reason?[`사유: ${reason}`]:[]),`[crefans] ${labels[row.type]||row.type}`,`환경: ${env}`,...ipLines,`시각: ${row.created_at.toISOString()}`,`기록 ID: ${row.id}`,`요청 ID: ${row.request_id||'시스템 작업'}`];
- for(const [key,value] of Object.entries(data))if(key!=='사유')lines.push(`${key==='productName'?'상품':key}: ${key==='kind'&&typeof value==='string'&&KIND_LABELS[value]?KIND_LABELS[value]:key==='amount'&&typeof value==='number'?`${value.toLocaleString('ko-KR')}원`:['memberId','creatorId'].includes(key)?hidden(value):typeof value==='object'?JSON.stringify(value):String(value)}`);
+ const display=row.type==='ai-photo.succeeded'||row.type==='ai-photo.failed'?photoAlertData(data):data;
+ for(const [key,value] of Object.entries(display))if(key!=='사유')lines.push(`${key==='productName'?'상품':key}: ${key==='kind'&&typeof value==='string'&&KIND_LABELS[value]?KIND_LABELS[value]:key==='amount'&&typeof value==='number'?`${value.toLocaleString('ko-KR')}원`:['memberId','creatorId'].includes(key)?hidden(value):typeof value==='object'?JSON.stringify(value):String(value)}`);
  return lines.join('\n').slice(0,3800);
 }
 @Injectable()

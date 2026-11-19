@@ -654,25 +654,50 @@ test('preset usage is counted per day and preset only after a successful generat
 });
 
 // 2026-11-18 user decision: every successful generation sends an immediate ai-photo.succeeded alert (categories and counts only).
-test('every successful generation queues one immediate success alert without prompt, member id, email or IP; failures do not',async()=>{
+test('member and guest generation alerts display the catalog character and protect private request details',async t=>{
  const {requestContext}=require('../dist/src/platform/request-context');
- const saved={...photos.settings},previous=photos.fetcher,user=await makeCreator('aisuccess_'+tag),id=await media(user),ok=crypto.randomUUID(),bad=crypto.randomUUID();
+ const {operationsAlertText}=require('../dist/src/platform/operations.service');
+ const user=await makeCreator('aisuccess_'+tag),visitor='guest:'+crypto.randomBytes(20).toString('hex');
+ t.after(()=>db.media.deleteMany({where:{user_sub:visitor}}));
  const prompt='성공알림프롬프트표식 벚꽃 아래 포즈';
- try{
-  Object.assign(photos.settings,{seedreamKey:'seedream-test-key'});const request=base({sourceId:id,mode:'cosplay',kind:'outfit',style:'cosplay',prompt,costumeIds:['80bdd0'],presetKeys:JSON.stringify([{kind:'pose',key:'의자에 앉기'}])});
-  photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response(JSON.stringify({error:{code:'InternalServiceError'}}),{status:500});
-  reset();await assert.rejects(requestContext.run({requestId:bad,ip:'203.0.113.7',peerIp:'10.0.0.7'},async()=>photos.edit(user,request,await mask())));
+ const providerBodies=[];
+ function checkSeedreamRequest(owner,sourceId){
+  const [{fields}]=calls.filter(call=>call.kind==='edit');
+  const {image,...options}=fields;
+  assert.equal(image.length,3);assert.ok(image.every(value=>/^data:image\/(png|webp);base64,/.test(value)));
+  assert.ok(options.prompt.includes(prompt));
+  assert.doesNotMatch(JSON.stringify(options),/Shiroko|80bdd0|costumeIds|blue-shiroko/i);
+  assert.ok(!JSON.stringify(options).includes(owner)&&!JSON.stringify(options).includes(sourceId));
+  providerBodies.push(crypto.createHash('sha256').update(JSON.stringify(fields)).digest('hex'));
+ }
+ for(const [owner,actor,guest,id] of [[user,'member',undefined,'80bdd0'],[visitor,'guest',{ipHash:'costume-alert-'+tag},'blue-shiroko']]){
+  const ok=crypto.randomUUID(),bad=crypto.randomUUID(),invalid=crypto.randomUUID();
+  t.after(()=>db.platformOperationalEvent.deleteMany({where:{request_id:{in:[ok,bad,invalid]}}}));
+  const request=base({sourceId:await media(owner),mode:'cosplay',kind:'outfit',style:'cosplay',prompt,costumeIds:JSON.stringify([id]),presetKeys:JSON.stringify([{kind:'pose',key:'의자에 앉기'}])});
+  const run=requestId=>requestContext.run({requestId,ip:'203.0.113.7',peerIp:'10.0.0.7'},async()=>photos.edit(owner,request,await mask(),guest));
+  reset();editStatus=500;await assert.rejects(run(bad));
+  checkSeedreamRequest(owner,request.sourceId);
   assert.equal(await db.platformOperationalEvent.count({where:{request_id:bad,type:'ai-photo.succeeded'}}),0,'a failure is not a success alert');
-  photos.fetcher=async(url,init)=>url.endsWith('/moderations')?stub(url,init):new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));
-  reset();await requestContext.run({requestId:ok,ip:'203.0.113.7',peerIp:'10.0.0.7'},async()=>photos.edit(user,request,await mask()));
+  const failed=await db.platformOperationalEvent.findFirstOrThrow({where:{request_id:bad,type:'ai-photo.failed'}});
+  assert.equal(failed.data.costumeIds,'80bdd0');assert.equal(failed.data.actor,actor);
+  const failedText=operationsAlertText(failed,'synthetic','secret');
+  assert.match(failedText,/^의상: Shiroko$/m);assert.match(failedText,/접속 IP: 203\.0\.113\.7/);
+  assert.doesNotMatch(failedText,new RegExp(['80bdd0','blue-shiroko','성공알림프롬프트표식',owner,'10\\.0\\.0\\.7'].join('|')));
+  reset();outputs=1;await run(ok);
+  checkSeedreamRequest(owner,request.sourceId);
   const rows=await db.platformOperationalEvent.findMany({where:{request_id:ok,type:'ai-photo.succeeded'}});assert.equal(rows.length,1);const [row]=rows;
   assert.equal(row.delivered_at,null,'queued for Telegram now (not deduped or digested)');assert.equal(row.last_error_code,null);assert.equal(row.ip,null);assert.equal(row.peer_ip,null);
-  assert.deepEqual(Object.keys(row.data).sort(),['actor','durationMs','estimatedUsd','kinds','mode','presets','references','style']);
   // estimatedUsd (dev integration with feat/ai-cost-caps): original + clothing guide + 1 costume reference = 3 input images, 3×$0.008+$0.020.
-  assert.deepEqual({...row.data,durationMs:0},{actor:'member',mode:'cosplay',style:'cosplay',kinds:'outfit',presets:'outfit:80bdd0, pose:의자에 앉기',references:1,estimatedUsd:'0.044',durationMs:0});
-  const text=require('../dist/src/platform/operations.service').operationsAlertText(row,'synthetic','secret');assert.match(text,/^\[crefans\] AI 사진 생성 성공/);assert.match(text,/접속 IP: 보내지 않음/);
-  assert.doesNotMatch(JSON.stringify(row)+text,new RegExp(['성공알림프롬프트표식','@','203\\.0\\.113','10\\.0\\.0\\.7',user,'aisuccess_','base64'].join('|')));
- }finally{Object.assign(photos.settings,saved);photos.fetcher=previous;await db.platformOperationalEvent.deleteMany({where:{request_id:{in:[ok,bad]}}});}
+  assert.deepEqual({...row.data,durationMs:0},{actor,mode:'cosplay',style:'cosplay',kinds:'outfit',costumeIds:'80bdd0',presets:'pose:의자에 앉기',references:1,estimatedUsd:'0.044',durationMs:0});
+  const text=operationsAlertText(row,'synthetic','secret');assert.match(text,/^\[crefans\] AI 사진 생성 성공/);assert.match(text,/접속 IP: 보내지 않음/);
+  assert.match(text,/^의상: Shiroko$/m);assert.match(text,/^presets: pose:의자에 앉기$/m);assert.doesNotMatch(text,/80bdd0|blue-shiroko/);
+  assert.doesNotMatch(JSON.stringify(row)+text,new RegExp(['성공알림프롬프트표식','@','203\\.0\\.113','10\\.0\\.0\\.7',owner,'aisuccess_','base64'].join('|')));
+  request.costumeIds=JSON.stringify(['private-costume-input']);
+  await assert.rejects(run(invalid),code('INVALID_COSTUME_REFERENCES'));
+  const rejected=await db.platformOperationalEvent.findFirstOrThrow({where:{request_id:invalid,type:'ai-photo.failed'}});
+  assert.doesNotMatch(operationsAlertText(rejected,'synthetic','secret'),/private-costume-input|의상:/);
+ }
+ assert.equal(new Set(providerBodies).size,1,'both catalog ID formats send identical Seedream requests, including reference images');
 });
 
 // 2026-11-17 user decision: operators reset every signed-out visitor's AI tries at once (guest quota epoch).

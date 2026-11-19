@@ -1,3 +1,9 @@
+## 2026-11-19 AI 사진 텔레그램 의상 이름
+
+- 회원·비회원 생성 성공과 실패 알림을 표시할 때 서버가 검증한 의상의 ID를 영문 캐릭터명으로 바꾼다. 이전 버전에서 대기 중인 성공 알림도 같은 방식으로 표시한다. 일반 의상은 의상명으로 표시한다. 공급사 요청 생성 코드와 프리셋 사용량 집계는 그대로다.
+- 11:04 KST, 운영 기준 `a6769a4`에서 `npm run build` 종료 0. 격리 MySQL과 공급사 대역에서 AI 편집·비회원·텔레그램·의상 검사 73/73 통과. [테스트](tests/ai-photo-costume-alert.test.cjs)로 현재 ID 353개·이전 식별자 353개·대기 알림·14종 복수 선택을 확인했다. [생성 통합 검사](tests/platform-ai-photo.test.cjs)에서 시로코 의상을 선택한 회원·비회원의 성공·실패 네 요청 본문이 일치하고, 공급사 프롬프트·옵션에 영문명·해시·이전 코드가 들어가지 않음을 확인했다. 종전 운영 빌드에서 새 단위 검사 3개는 모두 실패했다. 명령은 `CREFANS_E2E=true node --test --test-concurrency=1 tests/ai-photo-costume-alert.test.cjs tests/platform-ai-photo.test.cjs tests/platform-guest.test.cjs tests/platform-operations-alerts.test.cjs`이다. 실제 생성·메시지 발송은 각 0회. 전역 문서 검사에서는 변경 전후 모두 동일하게 기존 생성 계약 스냅샷이 만료되어 종료 1이었다.
+- 영문 표기는 서버 카탈로그를 기준으로 하고 공식 표기의 약칭·대소문자·기호를 보완했다. 확인한 1차 자료는 [Overwatch](https://overwatch.blizzard.com/en-us/heroes/), [Demon Slayer](https://demonslayer-anime.com/risshihen/character/), [Blue Archive](https://forum.nexon.com/bluearchive-en/board_view?allBoard=1&board=3223&thread=3541760), [NIKKE](https://www.levelinfinite.com/news/goddess-of-victory-nikke-3-5th-anniversary/)다.
+
 ## 2026-11-19 의상 실패 검수와 합성 베이스 재사용
 
 - 10:40 KST macOS arm64, Node 22.7.0에서 서버 빌드 종료 0. 격리 MySQL과 공급사 대역으로 80개 검사 통과. 실패 두 번 → 다른 회원의 마네킹 성공·출력 차단 → 승인된 베이스로 생성·안전검사·저장 성공 순서에서 마지막 경우에만 실제 베이스 해시를 검수 행에 남겼다. 기존 운영 코드로 신규 합성 검사 두 건이 실패하는 대조 및 일반 프롬프트 144조합의 바이트 일치도 확인했다. 증거는 작업본의 `.local/fit-route-release.log`, `.local/fit-release/offline-replay.json`에 보관했다.

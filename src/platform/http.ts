@@ -1,9 +1,10 @@
 import { ArgumentsHost, CallHandler, Catch, ExceptionFilter, ExecutionContext, HttpException, Injectable, NestInterceptor } from '@nestjs/common';
 import {PlatformOperationsService} from './operations.service';
+import {reject} from './http-error';
+export {reject} from './http-error';
 import { map } from 'rxjs/operators';
 export const ok = <T>(data:T) => ({success:true,data,errorMessage:null,errorCode:null});
 export const fail = (message:string,code:string) => ({success:false,data:null,errorMessage:message,errorCode:code});
-export function reject(status:number,code:string,message:string):never {throw new HttpException({code,message},status);}
 @Injectable()
 export class EnvelopeInterceptor implements NestInterceptor {
   intercept(_context:ExecutionContext,next:CallHandler){return next.handle().pipe(map(data=>ok(data??{})));}
