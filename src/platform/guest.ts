@@ -20,6 +20,9 @@ export * from './guest-policy';
 const COOKIE_DAYS=30;
 const SHARE_LIFETIME=7*86400000;
 const SHARE_PURPOSE='guest-ai-result-share:';
+// 2026-11-19 user request: short links. 8 base62 characters (≈2×10^14) from crypto randomness.
+const SHARE_CODE=/^[A-Za-z0-9]{8}$/,BASE62='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const shareCode=()=>{let code='';while(code.length<8){for(const byte of randomBytes(16))if(byte<248&&code.length<8)code+=BASE62[byte%62];}return code;};
 
 @Injectable()
 export class GuestService{
@@ -65,19 +68,29 @@ export class GuestService{
   if(!media)reject(404,'GUEST_SHARE_NOT_FOUND','공유할 결과 사진을 찾을 수 없어요.');
   const ip=this.ipHash();
   const expiresAt=Date.now()+SHARE_LIFETIME;
-  return{token:new PaymentProvider(this.config).encrypt(SHARE_PURPOSE+JSON.stringify([id,ip,expiresAt]))};
+  const db=this.service.db;await db.guestShareLink.deleteMany({where:{expires_at:{lte:new Date()}}});
+  for(let attempt=0;;attempt++){const code=shareCode();
+   try{await db.guestShareLink.create({data:{code,guest_id:id,ip_hash:ip,expires_at:new Date(expiresAt)}});return{token:code};}
+   catch(error:any){if(error?.code!=='P2002'||attempt>=4)throw error;}}
  }
  async shareVisit(req:any,token:unknown){
   const ip=this.ipHash();
-  if(isBotAgent(req.headers?.['user-agent'])||guestFromRequest(req)||!requestContext.getStore()?.ip||typeof token!=='string'||!/^[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{1,200}$/.test(token))return{accepted:false};
+  if(isBotAgent(req.headers?.['user-agent'])||guestFromRequest(req)||!requestContext.getStore()?.ip||typeof token!=='string')return{accepted:false};
   let share:[string,string,number];
-  try{
+  if(SHARE_CODE.test(token)){
+   await this.limiter.limit('guest-result-share-visit:'+ip,30,3600);// before the lookup, so codes cannot be enumerated quickly
+   const row=await this.service.db.guestShareLink.findUnique({where:{code:token}});
+   if(!row||row.expires_at.getTime()<=Date.now()||row.ip_hash===ip)return{accepted:false};
+   share=[row.guest_id,row.ip_hash,row.expires_at.getTime()];
+  }else if(!/^[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{1,200}$/.test(token))return{accepted:false};
+  // Long encrypted tokens issued before 2026-11-19 stay valid until they expire (7 days); this branch can go after 2026-11-27.
+  else try{
    const value=new PaymentProvider(this.config).decrypt(token);
    if(!value.startsWith(SHARE_PURPOSE))return{accepted:false};
    share=JSON.parse(value.slice(SHARE_PURPOSE.length));
    if(!Array.isArray(share)||!/^guest:[a-f0-9]{40}$/.test(share[0])||typeof share[1]!=='string'||!Number.isSafeInteger(share[2])||share[2]<=Date.now()||share[1]===ip)return{accepted:false};
   }catch{return{accepted:false};}
-  await this.limiter.limit('guest-result-share-visit:'+ip,30,3600);
+  if(!SHARE_CODE.test(token))await this.limiter.limit('guest-result-share-visit:'+ip,30,3600);
   const accepted=await this.service.db.$transaction(async tx=>{
    const granted=await grantGuestShareReward(tx,share[0]);
    if(granted)await appendAudit(tx,{category:'business',action:'guest.ai_result_share_reward',entityId:share[0],data:{amount:GUEST_SHARE_REWARD}});

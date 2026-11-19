@@ -65,8 +65,13 @@ test('AI result share grants three credits once on a new visitor network',async(
  assert.equal((await photos.guestQuota(owner.id)).remaining,3);
  assert.equal((await visit(token,'192.0.2.44')).accepted,false);
  assert.equal((await visit(token,'198.51.100.31',owner.req)).accepted,false);
- const tampered=token.slice(0,40)+(token[40]==='A'?'B':'A')+token.slice(41);
+ // 2026-11-19: an 8-character code stored on the server; an unknown or expired code is refused.
+ assert.match(token,/^[A-Za-z0-9]{8}$/);
+ const tampered=(token[0]==='A'?'B':'A')+token.slice(1);
  assert.equal((await visit(tampered)).accepted,false);
+ const expired=await send(result);await db.guestShareLink.update({where:{code:expired.token},data:{expires_at:new Date(Date.now()-1000)}});
+ assert.equal((await visit(expired.token,'198.51.100.39')).accepted,false);
+ await send(result);assert.equal(await db.guestShareLink.count({where:{code:expired.token}}),0,'expired codes are deleted when new links are made');
  const visits=await Promise.all([visit(token),visit(token,'198.51.100.32')]);
  assert.equal(visits.filter(row=>row.accepted).length,1);
  const {token:second}=await send(result);
