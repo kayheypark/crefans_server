@@ -213,9 +213,9 @@ test('Seedream uses its own key, JSON reference order and one base64 output; mod
   assert.equal((await photos.quota(user)).remaining,before,'still not used up after both blocks');
   reset();prompts=[];photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);prompts.push(JSON.parse(init.body).prompt);return prompts.length===1?blocked():new Response(JSON.stringify({data:[{b64_json:(await png(1024,1536)).toString('base64')}]}));};
   const ok=await photos.edit(user,stocking,await mask());assert.equal(ok.images.length,1,'the rewritten retry result reaches the member');assert.equal(prompts.length,2);
-  // wardrobe picks send only the costume ID: catalog stocking costumes are recognised by ID (0069c9, a catalog stocking costume; 6ee320 미츠리 is hidden since 2026-11-17)
+  // Wardrobe picks send only the costume ID, including the restored Mitsuri preset.
   reset();prompts=[];photos.fetcher=async(url,init)=>{if(url.endsWith('/moderations'))return stub(url,init);prompts.push(JSON.parse(init.body).prompt);return blocked();};
-  await assert.rejects(photos.edit(user,{...request,prompt:'의상 참조 사진 1의 코디를 적용해줘.',costumeIds:['0069c9']},await mask()),code('OUTPUT_MATERIAL_BLOCKED'));assert.equal(prompts.length,2);assert.ok(prompts[1].includes(STOCKING_CLAUSE));
+  await assert.rejects(photos.edit(user,{...request,prompt:'의상 참조 사진 1의 코디를 적용해줘.',costumeIds:['6ee320']},await mask()),code('OUTPUT_MATERIAL_BLOCKED'));assert.equal(prompts.length,2);assert.ok(prompts[1].includes(STOCKING_CLAUSE));
   // 네 after a refusal: one request, already with the improved wording (and the stocking clause when it applies)
   const {IMPROVED_PHOTO_CLAUSE}=require('../dist/src/platform/ai-photo');reset();prompts=[];
   await assert.rejects(photos.edit(user,{...request,retryImproved:'true'},await mask()),code('PROVIDER_OUTPUT_BLOCKED'));assert.equal(prompts.length,1,'no extra automatic retry');assert.ok(prompts[0].includes(IMPROVED_PHOTO_CLAUSE));assert.ok(!prompts[0].includes(STOCKING_CLAUSE));
@@ -477,11 +477,15 @@ test('two concurrent paid reservations by a non-creator member use one remaining
  assert.equal((await db.aiShopOrder.findUniqueOrThrow({where:{id:order.id}})).remaining,0,'the balance never goes below zero');
 });
 
-// 2026-11-17 user decision: the hidden 미츠리 하오리 is refused before any provider or moderation call.
-test('hidden costume IDs are refused without calling the provider',async()=>{
- const {costumeReferenceIds,HIDDEN_COSTUME_IDS}=require('../dist/src/platform/ai-photo-costume-references');
- assert.ok(HIDDEN_COSTUME_IDS.has('6ee320'));assert.throws(()=>costumeReferenceIds(['6ee320'],['outfit'],'cosplay'),code('COSTUME_UNAVAILABLE'));
- assert.deepEqual(costumeReferenceIds(['0069c9'],['outfit'],'cosplay'),['0069c9']);
+test('Mitsuri haori accepts its public ID and legacy name with the same costume reference',async()=>{
+ const {costumeReferenceIds,readCostumeReference,franchiseCostumeMeta}=require('../dist/src/platform/ai-photo-costume-references');
+ const reference=fs.readFileSync(path.join(__dirname,'../src/platform/ai-photo-costumes/demon-mitsuri-v2.webp'));
+ for(const key of ['6ee320','demon-mitsuri']){
+  const ids=costumeReferenceIds([key],['outfit','pose'],'cosplay');
+  assert.deepEqual(ids,['6ee320']);
+  assert.deepEqual(await readCostumeReference(ids[0]),reference);
+  assert.deepEqual(franchiseCostumeMeta(ids),{aiFranchiseCostume:true,aiCostumeCategory:'demon-slayer'});
+ }
 });
 
 // 2026-11-17 user decision: successful requests add one to an aggregate per KST day, kind and preset (no person is stored).
