@@ -22,9 +22,11 @@ function requireView(admin:any){if(!can(admin,'members','view'))reject(403,'ADMI
 export async function listAiTrials(db:any,admin:any,query:any){
  requireView(admin);
  const page=Math.max(1,Math.min(1000,Number.parseInt(String(query?.page??'1'),10)||1));
- const groups=await db.platformAuditLog.groupBy({by:['entity_id'],where:{action:'guest.consented',entity_id:{startsWith:GUEST_PREFIX}},_min:{occurred_at:true},orderBy:{_min:{occurred_at:'desc'}},skip:(page-1)*PAGE,take:PAGE+1});
- const rows=groups.slice(0,PAGE),ids:string[]=rows.map((g:any)=>g.entity_id);
- if(!ids.length)return{items:[],page,hasMore:false};
+ const groups=await db.platformAuditLog.groupBy({by:['entity_id'],where:{action:'guest.consented',entity_id:{startsWith:GUEST_PREFIX}},_min:{occurred_at:true},orderBy:{_min:{occurred_at:'desc'}},skip:(page-1)*PAGE,take:PAGE});
+ const rows=groups,ids:string[]=rows.map((g:any)=>g.entity_id);
+ const [{n}]=await db.$queryRaw`SELECT COUNT(DISTINCT entity_id) AS n FROM platform_audit_logs WHERE action='guest.consented' AND entity_id LIKE 'guest:%'`;
+ const total=Number(n);
+ if(!ids.length)return{items:[],total,page,pageSize:PAGE};
  const byUser=(model:'media'|'posting',where:any)=>db[model].groupBy({by:['user_sub'],where:{user_sub:{in:ids},...where},_count:{_all:true}});
  const byActor=(action:string)=>db.platformAuditLog.groupBy({by:['actor_id'],where:{actor_id:{in:ids},action},_count:{_all:true}});
  const [media,ai,samples,ok,failed,posts,last]=await Promise.all([
@@ -36,7 +38,7 @@ export async function listAiTrials(db:any,admin:any,query:any){
  const [mediaN,aiN,sampleN,okN,failedN,postN]=[counts(media,'user_sub'),counts(ai,'user_sub'),counts(samples,'user_sub'),counts(ok,'actor_id'),counts(failed,'actor_id'),counts(posts,'user_sub')];
  const lastAt=new Map(last.map((r:any)=>[r.actor_id,r._max.occurred_at]));
  const claimed=new Set((await db.platformAuditLog.findMany({where:{action:'guest.claimed',OR:ids.map(id=>({metadata:{path:'$.guest',equals:id}}))},select:{metadata:true}})).map((r:any)=>r.metadata?.guest));
- return{page,hasMore:groups.length>PAGE,items:rows.map((g:any)=>{const id=g.entity_id,generated=aiN.get(id)||0,total=mediaN.get(id)||0;return{
+ return{total,page,pageSize:PAGE,items:rows.map((g:any)=>{const id=g.entity_id,generated=aiN.get(id)||0,total=mediaN.get(id)||0;return{
   id,startedAt:g._min.occurred_at,lastActivityAt:lastAt.get(id)||g._min.occurred_at,
   uploads:total-generated,sampleUploads:sampleN.get(id)||0,generated,succeeded:okN.get(id)||0,failed:failedN.get(id)||0,posts:postN.get(id)||0,claimed:claimed.has(id)};})};
 }

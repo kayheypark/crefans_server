@@ -218,7 +218,7 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  const published=await studio.saveContent(g.id,post({media:[{id:result}]}),{guest:true});
 
  const list=await listAiTrials(db,admin,{});const item=list.items.find(i=>i.id===g.id);
- assert.ok(item,'the trial is listed');
+ assert.ok(item,'the trial is listed');assert.equal(list.pageSize,30);assert.ok(list.total>=2);
  assert.deepEqual({uploads:item.uploads,sampleUploads:item.sampleUploads,generated:item.generated,succeeded:item.succeeded,failed:item.failed,posts:item.posts,claimed:item.claimed},{uploads:2,sampleUploads:1,generated:1,succeeded:1,failed:1,posts:1,claimed:false});
  assert.ok(list.items.findIndex(i=>i.id===other.id)<list.items.findIndex(i=>i.id===g.id),'newest trial first');
 
