@@ -216,6 +216,11 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  await db.platformAuditLog.createMany({data:[row('ai-photo.succeeded',requestId,{targetId:result}),row('ai-photo.failed',failedId,{errorCode:'moderation_blocked'})]});
  await recordAiRequest(db,config,{prompt:'벤치에 앉은 포즈',costumeIds:'["313a28"]',backgroundId:'b7a101',presetKeys:'[{"kind":"pose","key":"의자에 앉기"}]',generationMethod:'fast'},{requestId,actorId:g.id,stage:'done',provider:'seedream'},{count:1,targetId:result});
  const published=await studio.saveContent(g.id,post({media:[{id:result}]}),{guest:true});
+ const session='0190f3a2-7c1d-7e2a-9b3c-4d5e6f708192';
+ await assert.rejects(guestsService.replaySession(g.req,'not-a-uuid'),code('GUEST_REPLAY_SESSION_INVALID'));
+ assert.deepEqual(await guestsService.replaySession(g.req,session),{recorded:true});
+ assert.deepEqual(await guestsService.replaySession(g.req,session.toUpperCase()),{recorded:true});
+ assert.equal(await db.platformAuditLog.count({where:{action:'guest.replay_session',entity_id:g.id}}),1,'the same session is stored once');
 
  const list=await listAiTrials(db,admin,{});const item=list.items.find(i=>i.id===g.id);
  assert.ok(item,'the trial is listed');assert.equal(list.pageSize,30);assert.ok(list.total>=2);
@@ -226,11 +231,12 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  assert.deepEqual(detail.uploads.map(u=>[u.id,u.sample]),[[sample,true],[own,false]]);
  assert.deepEqual(detail.uploads[0].results,[result],'the result is linked to its source photo');
  assert.deepEqual(detail.results.map(r=>r.id),[result]);
- const [ok,bad]=detail.generations;
+ const ok=detail.generations.find(x=>x.outcome==='succeeded'),bad=detail.generations.find(x=>x.outcome==='failed');assert.equal(detail.generations.length,2);
  assert.equal(ok.outcome,'succeeded');assert.equal(ok.resultId,result);assert.equal(ok.prompt,'벤치에 앉은 포즈');
  assert.deepEqual(ok.options.costumes,[{id:'313a28',name:'nikke-rapi'}]);assert.equal(ok.options.backgroundId,'b7a101');
  assert.deepEqual(ok.options.presets.find(p=>p.kind==='pose'),{kind:'pose',key:'의자에 앉기'});
  assert.equal(bad.outcome,'failed');assert.equal(bad.errorCode,'moderation_blocked');assert.equal(bad.detail,'expired','no stored request → shown as expired');
+ assert.deepEqual(detail.replays.map(r=>[r.sessionId,r.url]),[[session,'https://us.posthog.com/replay/'+session]]);
  assert.equal(detail.posts.length,1);assert.equal(detail.posts[0].id,published.id);assert.deepEqual(detail.posts[0].mediaIds,[result]);
  assert.ok(await db.platformAuditLog.findFirst({where:{action:'admin.ai_trial_viewed',entity_id:g.id}}),'detail view is audited');
 
