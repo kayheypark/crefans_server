@@ -56,6 +56,8 @@ export function landingSource(input:any):LandingSource{
 }
 // Readable names for the sources the operator uses in links (2026-11-18). Unknown sources show the raw value only.
 const SOURCE_NAMES:Record<string,string>={daangn:'당근',x:'X',instagram:'인스타그램'};
+/** 2026-11-20 (AI 사진 체험 관리 유입 경로): the first page of the visit as a key, e.g. /service/landing-x → service:landing-x. */
+export function landingPathKey(value:unknown){return typeof value==='string'&&/^\/[a-z0-9/_-]{0,120}$/.test(value)?value.replace(/^\/+|\/+$/g,'').replace(/\//g,':')||'root':undefined;}
 export function landingFrom(source:LandingSource){
  const name=source.utmSource?SOURCE_NAMES[source.utmSource.toLowerCase()]:undefined;
  return[name,source.referrerHost,...(['utmSource','utmMedium','utmCampaign','utmContent'] as const).map(key=>source[key]?`utm_${key.slice(3).toLowerCase()}=${source[key]}`:undefined)].filter(Boolean).join(' · ')||'직접 방문 또는 알 수 없음';

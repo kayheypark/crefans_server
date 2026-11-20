@@ -208,7 +208,9 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  const {listAiTrials,aiTrialDetail,aiTrialMedia,SAMPLE_PHOTO_NAME}=require('../dist/src/platform/admin-ai-trials');
  const {recordAiRequest}=require('../dist/src/platform/ai-photo-failures'),{ConfigService}=require('@nestjs/config'),config=app.get(ConfigService);
  const admin={id:'admin-'+tag,role:'SUPER_ADMIN',is_active:true},viewer={id:'viewer-'+tag,role:'SUB_ADMIN',is_active:true,permissions:{members:{view:false}}};
- const g=await startGuest(),other=await startGuest();
+ const g=browser();await guestsService.start(g.req,g.res,{consent:true,version:GUEST_CONSENT_VERSION,source:{utmSource:'daangn',utmCampaign:'ai_photo',referrerHost:'Bad Host!',landingPath:'/service/landing-ai-image-generation'}});g.id=guestFromRequest(g.req);guests.push(g.id);
+ await guestsService.start(g.req,g.res,{consent:true,version:GUEST_CONSENT_VERSION,source:{utmSource:'x'}});
+ const other=await startGuest();
  const sample=await upload(g.id),own=await upload(g.id);await db.media.update({where:{id:sample},data:{original_name:SAMPLE_PHOTO_NAME}});
  const result=await upload(g.id,{aiGenerated:true,aiSourceId:sample}),foreign=await upload(other.id);
  const requestId=crypto.randomUUID(),failedId=crypto.randomUUID();
@@ -234,8 +236,11 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  assert.ok(item,'the trial is listed');assert.equal(list.pageSize,30);assert.ok(list.total>=2);
  assert.deepEqual({uploads:item.uploads,sampleUploads:item.sampleUploads,generated:item.generated,succeeded:item.succeeded,failed:item.failed,posts:item.posts,claimed:item.claimed},{uploads:2,sampleUploads:1,generated:1,succeeded:1,failed:1,posts:1,claimed:false});
  assert.ok(list.items.findIndex(i=>i.id===other.id)<list.items.findIndex(i=>i.id===g.id),'newest trial first');
+ assert.equal(item.entry,'당근 · utm_source=daangn · utm_campaign=ai_photo','first entry kept, invalid referrer dropped');
+ assert.equal(list.items.find(i=>i.id===other.id).entry,null,'no source → no entry');
 
  const detail=await aiTrialDetail(db,admin,g.id,config);
+ assert.equal(detail.entry.landingPath,'service:landing-ai-image-generation');assert.equal(detail.entry.referrerHost,undefined);
  assert.deepEqual(detail.uploads.map(u=>[u.id,u.sample]),[[sample,true],[own,false]]);
  assert.deepEqual(detail.uploads[0].results,[result],'the result is linked to its source photo');
  assert.deepEqual(detail.results.map(r=>r.id),[result]);

@@ -5,6 +5,7 @@ import {can} from './admin-permissions';
 import {reject} from './http';
 import {GUEST_PREFIX} from './guest-policy';
 import {costumeSlug} from './ai-photo-costume-references';
+import {landingFrom} from './funnel-stats';
 
 // 2026-11-20 user request: an "AI 체험관리" console view of each signed-out trial — the photos the visitor uploaded (the
 // built-in sample shows as the sample), every generation with the presets used and its result, and whether a post followed.
@@ -46,13 +47,19 @@ export async function listAiTrials(db:any,admin:any,query:any){
  ]);
  const counts=(rows:any[],key:string)=>new Map<string,number>(rows.map(r=>[r[key],r._count._all]));
  const [mediaN,aiN,sampleN,okN,failedN,postN]=[counts(media,'user_sub'),counts(ai,'user_sub'),counts(samples,'user_sub'),counts(ok,'actor_id'),counts(failed,'actor_id'),counts(posts,'user_sub')];
+ const entries=new Map<string,ReturnType<typeof entryOf>>((await db.platformAuditLog.findMany({where:{action:'guest.entry_source',entity_id:{in:ids}},select:{entity_id:true,metadata:true}})).map((r:any)=>[r.entity_id,entryOf(r.metadata)]));
  const lastAt=new Map(last.map((r:any)=>[r.actor_id,r._max.occurred_at]));
  const claimed=new Set((await db.platformAuditLog.findMany({where:{action:'guest.claimed',OR:ids.map(id=>({metadata:{path:'$.guest',equals:id}}))},select:{metadata:true}})).map((r:any)=>r.metadata?.guest));
  return{total,page,pageSize:PAGE,items:rows.map((g:any)=>{const id=g.entity_id,generated=aiN.get(id)||0,total=mediaN.get(id)||0;return{
   id,startedAt:g._min.occurred_at,lastActivityAt:lastAt.get(id)||g._min.occurred_at,
-  uploads:total-generated,sampleUploads:sampleN.get(id)||0,generated,succeeded:okN.get(id)||0,failed:failedN.get(id)||0,posts:postN.get(id)||0,claimed:claimed.has(id)};})};
+  uploads:total-generated,sampleUploads:sampleN.get(id)||0,generated,succeeded:okN.get(id)||0,failed:failedN.get(id)||0,posts:postN.get(id)||0,claimed:claimed.has(id),entry:entries.get(id)?.label??null};})};
 }
 
+/** The first entry of a trial (guest.entry_source) with a readable label, e.g. '당근 · utm_campaign=…'. */
+function entryOf(metadata:any){
+ const m=metadata||{},source={referrerHost:m.referrerHost,utmSource:m.utmSource,utmMedium:m.utmMedium,utmCampaign:m.utmCampaign,utmContent:m.utmContent};
+ return{...source,landingPath:m.landingPath??null,label:landingFrom(source)};
+}
 function decrypt(config:ConfigService,row:any){try{return JSON.parse(new PaymentProvider(config).decrypt(row.payload_encrypted));}catch{return null;}}
 /** Multipart requests store list fields as JSON strings (e.g. editKinds '["outfit","pose"]'); the console expects arrays. */
 function list(value:unknown):string[]{let v=value;if(typeof v==='string'){try{v=JSON.parse(v);}catch{v=v?[v]:[];}}return Array.isArray(v)?v.filter((x):x is string=>typeof x==='string'):[];}
@@ -72,6 +79,7 @@ export async function aiTrialDetail(db:any,admin:any,id:string,config:ConfigServ
  const trialMedia=media.filter((m:any)=>m.user_sub===id||(claim&&m.created_at<=claim.occurred_at));
  const events=await db.platformAuditLog.findMany({where:{actor_id:id,action:{in:['ai-photo.succeeded','ai-photo.failed']}},orderBy:{occurred_at:'asc'},select:{occurred_at:true,action:true,request_id:true,metadata:true}});
  const details=new Map((await db.aiPhotoFailureDetail.findMany({where:{request_id:{in:events.map((e:any)=>e.request_id).filter(Boolean)},expires_at:{gt:new Date()}}})).map((r:any)=>[r.request_id,r]));
+ const entryRow=await db.platformAuditLog.findFirst({where:{action:'guest.entry_source',entity_id:id},select:{metadata:true,occurred_at:true}});
  const replays=await db.platformAuditLog.findMany({where:{action:'guest.replay_session',entity_id:id},orderBy:{occurred_at:'asc'},select:{occurred_at:true,source_id:true}});
  const showPrompt=can(admin,'logs','view');
  const resultsBySource=new Map<string,string[]>();
@@ -89,6 +97,7 @@ export async function aiTrialDetail(db:any,admin:any,id:string,config:ConfigServ
  return{
   id,startedAt:consents[0].occurred_at,consents:consents.map((c:any)=>({at:c.occurred_at,version:c.metadata?.version??null})),
   claimed:claim?{at:claim.occurred_at}:null,promptVisible:showPrompt,
+  entry:entryRow?{...entryOf(entryRow.metadata),at:entryRow.occurred_at}:null,
   // The session UUID lives in source_id (guest-replay:<trial>:<uuid>); audit metadata keeps only allow-listed keys.
   replays:replays.map((r:any)=>{const sessionId=String(r.source_id||'').split(':').pop()||'';return{sessionId,at:r.occurred_at,url:REPLAY_URL+encodeURIComponent(sessionId)};}).filter((r:any)=>/^[0-9a-f-]{36}$/.test(r.sessionId)),
   uploads:trialMedia.filter((m:any)=>(m.metadata as any)?.aiGenerated!==true).map((m:any)=>({id:m.id,at:m.created_at,sample:m.original_name===SAMPLE_PHOTO_NAME,deleted:m.is_deleted,ready:m.processing_status==='COMPLETED',results:resultsBySource.get(m.id)||[]})),
