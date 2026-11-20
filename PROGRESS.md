@@ -1,3 +1,9 @@
+## 2026-11-21 랜딩 방문 알림 하루 상한 콘솔 설정 (feat/landing-alert-cap-setting) — 개발
+
+- 사용자 지시(02:2x KST): 랜딩 방문 텔레그램 알림 하루 상한을 운영 콘솔에서 숫자로 설정, 입력란과 함께 100·200·…·1000 프리셋 버튼.
+- 서버: `funnel-stats.ts` landingAlertCap(db)(platform_settings `alerts.landing_daily_cap`, 1~10000 정수가 아니거나 없으면 500), landingVisitAlert가 매 알림마다 읽음. 상한 알림 data `하루 상한: N건`, 라벨에서 고정 숫자 제거. `updateLandingAlertCap`: 행 잠금·upsert·감사 `admin.landing_alert_cap_updated` 한 트랜잭션. `PUT /admin/funnel-stats/landing-alert-cap` @Permit settings.update, `GET /admin/funnel-stats`에 landingAlertCap{value,default,min,max,presets}. openapi 293개(콘솔 131).
+- 검증(맥, 격리 DB): platform-funnel 13/13(새 테스트: 저장값 200이면 199 알림·200 상한, 잘못된 저장값 5종은 500, 잘못된 입력 5종 400, 300 저장·updated_by·감사·funnelStats 반영), operations-alerts 8/8, openapi 15/15(개수 292→293, 콘솔 130→131).
+
 ## 2026-11-20 랜딩 방문 텔레그램 알림 하루 상한 100→500 (feat/landing-alert-cap-500)
 
 - 사용자 지시(23:4x KST): "랜딩페이지 하루에 500건까지 계속 텔레그램으로 받고 그 이후부터는 받지 않도록". X 광고(캠페인 po12l) 23:45 게재 시작에 맞춘 변경.

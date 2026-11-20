@@ -4,6 +4,7 @@
 import {createHash} from 'node:crypto';
 import {kstDay} from './ai-preset-usage';
 import {reject} from './http';
+import {appendAudit,auditChange} from './audit';
 import {requestContext} from './request-context';
 
 export const FUNNEL_STEPS=[
@@ -62,8 +63,13 @@ export function landingFrom(source:LandingSource){
 }
 
 // Alert limits (2026-11-18 user decision "같은 아이피알림도 계속 알려줘": no per-IP quiet window):
-// at most 500 landing alerts per KST day (2026-11-20 user decision, was 100); the 500th is followed by one cap alert and then counting only. Obvious bots are skipped.
-const ALERT_DAILY_CAP=500;
+// at most N landing alerts per KST day; the Nth is followed by one cap alert and then counting only. Obvious bots are skipped.
+// 2026-11-21 user decision: N is set in the operations console (platform_settings key below, presets 100…1000 plus free input);
+// without a stored value it stays 500 (2026-11-20 decision, was 100).
+export const LANDING_ALERT_CAP_SETTING='alerts.landing_daily_cap',LANDING_ALERT_CAP_DEFAULT=500,LANDING_ALERT_CAP_MIN=1,LANDING_ALERT_CAP_MAX=10000;
+export const LANDING_ALERT_CAP_PRESETS=[100,200,300,400,500,600,700,800,900,1000];
+const validCap=(value:unknown)=>typeof value==='number'&&Number.isInteger(value)&&value>=LANDING_ALERT_CAP_MIN&&value<=LANDING_ALERT_CAP_MAX;
+export async function landingAlertCap(db:any):Promise<number>{const row=await db.platformSetting?.findUnique({where:{key:LANDING_ALERT_CAP_SETTING}});return validCap(row?.value)?row.value:LANDING_ALERT_CAP_DEFAULT;}
 const BOT=/^node$|undici|bot|crawl|spider|slurp|headless|lighthouse|preview|facebookexternalhit|embedly|curl|wget|python|httpclient|okhttp|go-http|axios|node-fetch|java\/|monitor|scan/i;
 export const isBotAgent=(ua:unknown)=>typeof ua!=='string'||!ua.trim()||BOT.test(ua);
 const device=(ua:string)=>/Mobi|Android|iPhone|iPad|iPod/i.test(ua)?'모바일':'데스크톱';
@@ -80,7 +86,8 @@ export async function landingVisitAlert(db:any,operations:{record:Function},sour
   if(isBotAgent(userAgent))return'skipped';
   const day=kstDay(now),start=new Date(+day-9*3600000),test=isDeployTest(source);
   const sent=await db.platformOperationalEvent.count({where:{type:'funnel.landing_view',created_at:{gte:start}}});
-  if(!test&&sent>=ALERT_DAILY_CAP){await operations.record('funnel.landing_cap',{limit:ALERT_DAILY_CAP},`funnel.landing_cap:${day.toISOString().slice(0,10)}`,{omitIp:true});return'capped';}
+  const cap=test?0:await landingAlertCap(db);
+  if(!test&&sent>=cap){await operations.record('funnel.landing_cap',{'하루 상한':`${cap}건`},`funnel.landing_cap:${day.toISOString().slice(0,10)}`,{omitIp:true});return'capped';}
   const today=(await db.funnelStepDaily.findUnique({where:{day_step:{day,step:'landing_view'}}}))?.count||0;
   const from=landingFrom(source);
   await operations.record(test?'funnel.landing_test':'funnel.landing_view',{...(test?{'사유':'배포 후 테스트'}:{}),'방문 시각(KST)':kstTime(now),'랜딩':'AI 사진 랜딩','유입':from,'기기':device(String(userAgent)),'오늘 랜딩 방문':today});
@@ -113,5 +120,19 @@ export async function funnelStats(db:any,days=14,now=new Date()){
  for(const row of rows)if(counts[row.step])counts[row.step][dateOnly(row.day)]=row.count;
  return{timeZone:'Asia/Seoul',dates,
   steps:FUNNEL_STEPS.map(([key,label])=>({key,label,source:CLIENT_FUNNEL_STEPS.has(key)?'browser':'server',daily:dates.map(d=>counts[key][d]),total:dates.reduce((sum,d)=>sum+counts[key][d],0)})),
+  landingAlertCap:{value:await landingAlertCap(db),default:LANDING_ALERT_CAP_DEFAULT,min:LANDING_ALERT_CAP_MIN,max:LANDING_ALERT_CAP_MAX,presets:LANDING_ALERT_CAP_PRESETS},
   notice:'날짜는 한국 시간 기준이에요. 화면 방문 3단계는 브라우저가 탭(세션)당 한 번만 보내는 대략값이고, 나머지는 서버에서 센 값이에요. 개인을 구분하지 않아 같은 사람이 여러 번 셀 수 있어요.'};
+}
+
+/** 2026-11-21: console sets the daily landing alert cap (settings.update). Row lock, upsert and audit in one transaction. */
+export async function updateLandingAlertCap(db:any,admin:any,input:any){
+ const value=input?.cap;
+ if(!validCap(value))reject(400,'INVALID_INPUT',`하루 알림 상한은 ${LANDING_ALERT_CAP_MIN}~${LANDING_ALERT_CAP_MAX.toLocaleString('ko-KR')} 사이 정수로 입력해주세요.`);
+ return db.$transaction(async(tx:any)=>{
+  await tx.$queryRaw`SELECT 1 FROM platform_settings WHERE \`key\`=${LANDING_ALERT_CAP_SETTING} FOR UPDATE`;
+  const before=await landingAlertCap(tx);
+  await tx.platformSetting.upsert({where:{key:LANDING_ALERT_CAP_SETTING},create:{key:LANDING_ALERT_CAP_SETTING,value,updated_by:admin.id},update:{value,updated_by:admin.id}});
+  await appendAudit(tx,{category:'admin',action:'admin.landing_alert_cap_updated',entityId:LANDING_ALERT_CAP_SETTING,data:{adminId:admin.id,...auditChange({daily_cap:before},{daily_cap:value})}});
+  return{value,message:`랜딩 방문 알림을 하루 ${value.toLocaleString('ko-KR')}건까지 받도록 바꿨습니다.`};
+ });
 }

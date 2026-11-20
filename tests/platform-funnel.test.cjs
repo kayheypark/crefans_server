@@ -156,3 +156,24 @@ test('deploy_test visit: alerted with 사유 first line and the client IP, not c
  assert.equal(await funnel.landingVisitAlert(capDb,ops,{utmSource:'insta_bio'},IPHONE),'capped');assert.equal(where.type,'funnel.landing_view');
  ops=fakeOps();assert.equal(await funnel.landingVisitAlert(capDb,ops,{utmSource:'deploy_test_ip'},IPHONE),'queued');assert.equal(ops.calls[0][0],'funnel.landing_test');assert.equal(ops.calls[0][1]['사유'],'배포 후 테스트');
 });
+
+// 2026-11-21 user decision: the daily landing alert cap is set in the operations console (presets 100…1000 plus free input).
+test('landing alert cap: console setting drives the cap, invalid input is refused, change is audited, missing value falls back to 500',async()=>{
+ const key=funnel.LANDING_ALERT_CAP_SETTING,prior=await db.platformSetting.findUnique({where:{key}});
+ const withCap=(value,sent)=>({...fakeDb(sent),platformSetting:{findUnique:async()=>value===undefined?null:{value}}});
+ try{
+  assert.deepEqual(funnel.LANDING_ALERT_CAP_PRESETS,[100,200,300,400,500,600,700,800,900,1000]);
+  assert.equal(await funnel.landingVisitAlert(withCap(200,199),fakeOps(),{},IPHONE),'queued');
+  const ops=fakeOps();assert.equal(await funnel.landingVisitAlert(withCap(200,200),ops,{},IPHONE),'capped','the stored cap (200) applies, not 500');
+  assert.deepEqual(ops.calls[0][1],{'하루 상한':'200건'});
+  for(const bad of [0,10001,2.5,'300',null])assert.equal(await funnel.landingAlertCap({platformSetting:{findUnique:async()=>({value:bad})}}),500,`stored ${JSON.stringify(bad)} falls back to 500`);
+  assert.equal(await funnel.landingVisitAlert(withCap(undefined,499),fakeOps(),{},IPHONE),'queued');assert.equal(await funnel.landingVisitAlert(withCap(undefined,500),fakeOps(),{},IPHONE),'capped');
+  const admin={id:'test-admin-'+crypto.randomUUID()};
+  for(const bad of [0,10001,1.5,'300',undefined])await assert.rejects(funnel.updateLandingAlertCap(db,admin,{cap:bad}),e=>e.getStatus?.()===400||e.status===400,String(bad));
+  const res=await funnel.updateLandingAlertCap(db,admin,{cap:300});assert.equal(res.value,300);assert.match(res.message,/300건/);
+  assert.equal(await funnel.landingAlertCap(db),300);const row=await db.platformSetting.findUnique({where:{key}});assert.equal(row.updated_by,admin.id);
+  const audit=await db.platformAuditLog.findFirst({where:{action:'admin.landing_alert_cap_updated',entity_id:key}});assert.ok(audit,'audited');
+  assert.equal((await funnel.funnelStats(db)).landingAlertCap.value,300);
+  await db.platformAuditLog.deleteMany({where:{action:'admin.landing_alert_cap_updated',entity_id:key}});
+ }finally{if(prior)await db.platformSetting.update({where:{key},data:{value:prior.value,updated_by:prior.updated_by}});else await db.platformSetting.deleteMany({where:{key}});}
+});
