@@ -3434,3 +3434,6 @@
 
 ### 2026-11-20 06:2x 운영 배포: 공유 즉시 보상·처리방침/약관 11-20 개정 (api share-reward-20261120)
 - prod `bbac3d6`(5c54d21 공유 즉시 보상+guest_share_links 삭제, 2e355d2·bbac3d6 신체 보정 목선·쇄골 지시문). 마이그레이션 적용, 운영 검사 privacy 2026-11-20.guest-share.1·terms 2026-11-20.share-reward.1, share-done 401(쿠키 없음), share-visit 404. 복구본 /Users/ethan/crefans-recovery/20261120/share-reward-20261120-api. 참고 사진 기능(feat/body-references)은 되돌린 상태라 운영 미포함.
+
+### 2026-11-20 09:1x 비회원 체험 이용권 매일 충전 (운영 api guest-daily-20261120)
+- prod `1a040b1`(= bbac3d6 + 4c227dd). 비회원 사용량을 하루 창(09:00 KST)으로, 게시·공유 보상은 하루 한 번·다음 충전 때 만료(보상 ID에 날짜). 처리방침·약관 `2026-11-20.guest-daily.1`. 운영 검사 약관 판·share-done 401. 복구본 /Users/ethan/crefans-recovery/20261120/guest-daily-20261120-api. 배포 시점에 기존 비회원은 모두 3장부터 다시 시작.
