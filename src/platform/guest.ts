@@ -9,7 +9,7 @@ import {AiPhotoService} from './ai-photo';
 import {GuestCaptionService} from './guest-caption';
 import {PlatformAuthGuard} from './platform-auth.guard';
 import {appendAudit} from './audit';
-import {recordFunnelStep} from './funnel-stats';
+import {landingPathKey,landingSource,recordFunnelStep} from './funnel-stats';
 import {reject} from './http';
 import {requestContext} from './request-context';
 import {LocalMemberService} from '../auth/local/local-member.service';
@@ -50,6 +50,10 @@ export class GuestService{
   await this.service.db.$transaction(async tx=>{
    await appendAudit(tx,{category:'business',action:'guest.consented',entityId:id,data:{version:GUEST_CONSENT_VERSION}});
    if(replay)await appendAudit(tx,{category:'business',action:'guest.replay_consented',entityId:id,data:{policyVersion:replayVersion}});
+   // 2026-11-20 user request: the console trial history shows where the visit came from. Same rules as the landing alert (external
+   // referrer host and utm_* values only, invalid values dropped) plus the first page as a key. The first record of a trial is kept.
+   const entry={...landingSource(input?.source),landingPath:landingPathKey(input?.source?.landingPath)};
+   if(Object.values(entry).some(Boolean))await appendAudit(tx,{category:'business',action:'guest.entry_source',entityId:id,sourceId:`guest-entry:${id}`,data:entry});
   });
   if(token)res.cookie(GUEST_COOKIE,token,this.cookieOptions());
   await recordFunnelStep(this.service.db,'guest_consent_agreed');
