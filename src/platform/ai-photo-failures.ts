@@ -4,6 +4,7 @@ import {auditRow,appendAudit,observeAudit} from './audit';
 import {requestContext} from './request-context';
 import {PaymentProvider} from './payment-provider';
 import {can} from './admin-permissions';
+import {presetUsageKeys} from './ai-preset-usage';
 import {CostumeReviewTarget,queueCostumeFailure} from './ai-costume-review';
 
 export type AiFailureTrace={requestId:string;actorId?:string;selectedModel?:string;selectedUnits?:0.5|1|2;selectedProvider?:string;sequence?:number;stage:string;provider:string;providerCode?:string;providerRequestId?:string;providerStatus?:number;referenceImages?:number;costumeIds?:string[];estimatedMilliUsd?:number;costumeReview?:CostumeReviewTarget;approvedCostumeSha256?:string};
@@ -15,7 +16,7 @@ export function diagnosticPrompt(value:unknown){
  return value.slice(0,2000).replace(/\b(?:sk-|ark-)[a-zA-Z0-9_-]+/g,'[키 숨김]').replace(/Bearer\s+\S+/gi,'Bearer [숨김]').replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi,'[이메일 숨김]').replace(/\b01[016789][- .]?\d{3,4}[- .]?\d{4}\b/g,'[전화번호 숨김]').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g,'');
 }
 /** The chosen options of one AI photo request, masked like the prompt (shared by failure and success records). */
-function requestOptions(input:any){const options:Record<string,unknown>={};for(const k of ['mode','style','kind','editKinds','targetGender','costumeIds','libraryIds','backgroundId','aspectRatio','generationMethod']){const v=input?.[k];if(typeof v==='string')options[k]=diagnosticPrompt(v).slice(0,300);else if(Array.isArray(v))options[k]=v.filter(x=>typeof x==='string').map(x=>diagnosticPrompt(x).slice(0,80)).slice(0,14);}return options;}
+function requestOptions(input:any){const options:Record<string,unknown>={};for(const k of ['mode','style','kind','editKinds','targetGender','costumeIds','libraryIds','backgroundId','aspectRatio','generationMethod']){const v=input?.[k];if(typeof v==='string')options[k]=diagnosticPrompt(v).slice(0,300);else if(Array.isArray(v))options[k]=v.filter(x=>typeof x==='string').map(x=>diagnosticPrompt(x).slice(0,80)).slice(0,14);}const presets=presetUsageKeys(input);if(presets.length)options.presets=presets;return options;}
 /** 2026-11-16 user decision: successful requests are kept too (prompt + options, encrypted, 30 days, same table and console view as
  * failures) so operators can review what members and guests asked for. Never blocks or changes the successful response. */
 export async function recordAiRequest(db:any,config:ConfigService,input:any,trace:AiFailureTrace,result:{count:number;targetId?:string}){

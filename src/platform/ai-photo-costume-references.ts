@@ -359,6 +359,8 @@ const COSTUME_ASSETS:Record<string,string>={
  "a1dd79": "genshin-vodyanitsa",
 };
 export const AI_PHOTO_COSTUME_IDS=Object.keys(COSTUME_ASSETS);
+/** Catalog file name of a costume ID (e.g. 'nikke-rapi'), for the admin trial history (2026-11-20). */
+export const costumeSlug=(id:string)=>Object.prototype.hasOwnProperty.call(COSTUME_ASSETS,id)?COSTUME_ASSETS[id]:null;
 function canonicalId(id:string):string|undefined{
  if(Object.prototype.hasOwnProperty.call(COSTUME_ASSETS,id))return id;
  // Already-open clients may still send the previous catalog names.
