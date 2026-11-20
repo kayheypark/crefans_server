@@ -201,3 +201,43 @@ test('2026-11-16: before linking, the signed-in browser can count its trial post
  assert.equal(await db.posting.count({where:{user_sub:g.id}}),1,'counting moves nothing');
  assert.deepEqual(await guestsService.claimable(member,browser().req),{posts:0},'a browser without a trial has nothing');
 });
+
+// 2026-11-20 user request: console "AI 체험관리" — uploads (the sample shown as the sample), each generation with presets and
+// result, and the post, for one trial. Generations are recorded the way AiPhotoService records them (audit row + encrypted request).
+test('admin AI trial history: list counts, detail with sample/presets/results/posts, photo access limited to the trial and audited',async()=>{
+ const {listAiTrials,aiTrialDetail,aiTrialMedia,SAMPLE_PHOTO_NAME}=require('../dist/src/platform/admin-ai-trials');
+ const {recordAiRequest}=require('../dist/src/platform/ai-photo-failures'),{ConfigService}=require('@nestjs/config'),config=app.get(ConfigService);
+ const admin={id:'admin-'+tag,role:'SUPER_ADMIN',is_active:true},viewer={id:'viewer-'+tag,role:'SUB_ADMIN',is_active:true,permissions:{members:{view:false}}};
+ const g=await startGuest(),other=await startGuest();
+ const sample=await upload(g.id),own=await upload(g.id);await db.media.update({where:{id:sample},data:{original_name:SAMPLE_PHOTO_NAME}});
+ const result=await upload(g.id,{aiGenerated:true,aiSourceId:sample}),foreign=await upload(other.id);
+ const requestId=crypto.randomUUID(),failedId=crypto.randomUUID();
+ const row=(action,request_id,metadata={})=>({category:'business',action,level:'info',actor_id:g.id,request_id,release:'test',environment:'test',metadata});
+ await db.platformAuditLog.createMany({data:[row('ai-photo.succeeded',requestId,{targetId:result}),row('ai-photo.failed',failedId,{errorCode:'moderation_blocked'})]});
+ await recordAiRequest(db,config,{prompt:'벤치에 앉은 포즈',costumeIds:'["313a28"]',backgroundId:'b7a101',presetKeys:'[{"kind":"pose","key":"의자에 앉기"}]',generationMethod:'fast'},{requestId,actorId:g.id,stage:'done',provider:'seedream'},{count:1,targetId:result});
+ const published=await studio.saveContent(g.id,post({media:[{id:result}]}),{guest:true});
+
+ const list=await listAiTrials(db,admin,{});const item=list.items.find(i=>i.id===g.id);
+ assert.ok(item,'the trial is listed');
+ assert.deepEqual({uploads:item.uploads,sampleUploads:item.sampleUploads,generated:item.generated,succeeded:item.succeeded,failed:item.failed,posts:item.posts,claimed:item.claimed},{uploads:2,sampleUploads:1,generated:1,succeeded:1,failed:1,posts:1,claimed:false});
+ assert.ok(list.items.findIndex(i=>i.id===other.id)<list.items.findIndex(i=>i.id===g.id),'newest trial first');
+
+ const detail=await aiTrialDetail(db,admin,g.id,config);
+ assert.deepEqual(detail.uploads.map(u=>[u.id,u.sample]),[[sample,true],[own,false]]);
+ assert.deepEqual(detail.uploads[0].results,[result],'the result is linked to its source photo');
+ assert.deepEqual(detail.results.map(r=>r.id),[result]);
+ const [ok,bad]=detail.generations;
+ assert.equal(ok.outcome,'succeeded');assert.equal(ok.resultId,result);assert.equal(ok.prompt,'벤치에 앉은 포즈');
+ assert.deepEqual(ok.options.costumes,[{id:'313a28',name:'nikke-rapi'}]);assert.equal(ok.options.backgroundId,'b7a101');
+ assert.deepEqual(ok.options.presets.find(p=>p.kind==='pose'),{kind:'pose',key:'의자에 앉기'});
+ assert.equal(bad.outcome,'failed');assert.equal(bad.errorCode,'moderation_blocked');assert.equal(bad.detail,'expired','no stored request → shown as expired');
+ assert.equal(detail.posts.length,1);assert.equal(detail.posts[0].id,published.id);assert.deepEqual(detail.posts[0].mediaIds,[result]);
+ assert.ok(await db.platformAuditLog.findFirst({where:{action:'admin.ai_trial_viewed',entity_id:g.id}}),'detail view is audited');
+
+ assert.equal((await aiTrialMedia(db,admin,g.id,sample)).id,sample);
+ assert.ok(await db.platformAuditLog.findFirst({where:{action:'admin.ai_trial_media_viewed',entity_id:g.id}}),'photo view is audited');
+ await assert.rejects(aiTrialMedia(db,admin,g.id,foreign),code('MEDIA_NOT_FOUND'),'another trial’s photo is refused');
+ await assert.rejects(aiTrialDetail(db,admin,'guest:'+'0'.repeat(40),config),code('AI_TRIAL_NOT_FOUND'));
+ await assert.rejects(listAiTrials(db,viewer,{}),code('ADMIN_FORBIDDEN'));
+ await assert.rejects(aiTrialMedia(db,viewer,g.id,sample),code('ADMIN_FORBIDDEN'));
+});
