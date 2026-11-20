@@ -46,6 +46,8 @@ export async function listAiTrials(db:any,admin:any,query:any){
 }
 
 function decrypt(config:ConfigService,row:any){try{return JSON.parse(new PaymentProvider(config).decrypt(row.payload_encrypted));}catch{return null;}}
+/** Multipart requests store list fields as JSON strings (e.g. editKinds '["outfit","pose"]'); the console expects arrays. */
+function list(value:unknown):string[]{let v=value;if(typeof v==='string'){try{v=JSON.parse(v);}catch{v=v?[v]:[];}}return Array.isArray(v)?v.filter((x):x is string=>typeof x==='string'):[];}
 function costumes(options:any){let ids:unknown=options?.costumeIds;if(typeof ids==='string'){try{ids=JSON.parse(ids);}catch{ids=[];}}
  return Array.isArray(ids)?ids.filter((id):id is string=>typeof id==='string').map(id=>({id,name:costumeSlug(id)||id})):[];}
 
@@ -71,7 +73,7 @@ export async function aiTrialDetail(db:any,admin:any,id:string,config:ConfigServ
   return{at:e.occurred_at,outcome:e.action==='ai-photo.succeeded'?'succeeded':'failed',requestId:e.request_id,
    errorCode:e.action==='ai-photo.failed'?(e.metadata?.errorCode||payload?.errorCode||null):null,
    resultId:payload?.targetId||e.metadata?.targetId||null,detail:payload?'available':'expired',
-   options:payload?{mode:options.mode??null,kind:options.kind??null,editKinds:options.editKinds??null,targetGender:options.targetGender??null,costumes:costumes(options),backgroundId:options.backgroundId??null,presets:Array.isArray(options.presets)?options.presets:[],aspectRatio:options.aspectRatio??null,generationMethod:options.generationMethod??null}:null,
+   options:payload?{mode:options.mode??null,kind:options.kind??null,editKinds:list(options.editKinds),targetGender:options.targetGender??null,costumes:costumes(options),backgroundId:options.backgroundId??null,presets:Array.isArray(options.presets)?options.presets:[],aspectRatio:options.aspectRatio??null,generationMethod:options.generationMethod??null}:null,
    prompt:payload&&showPrompt?payload.prompt??null:undefined};
  });
  const posts=await db.posting.findMany({where:{user_sub:{in:owners},created_at:{gte:consents[0].occurred_at,...(claim?{lte:claim.occurred_at}:{})}},orderBy:{created_at:'asc'},select:{id:true,title:true,content:true,status:true,is_public:true,is_deleted:true,published_at:true,created_at:true,hidden_at:true,medias:{select:{media_id:true},orderBy:{sort_order:'asc'}}}});

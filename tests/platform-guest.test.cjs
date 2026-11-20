@@ -214,7 +214,7 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  const requestId=crypto.randomUUID(),failedId=crypto.randomUUID();
  const row=(action,request_id,metadata={})=>({category:'business',action,level:'info',actor_id:g.id,request_id,release:'test',environment:'test',metadata});
  await db.platformAuditLog.createMany({data:[row('ai-photo.succeeded',requestId,{targetId:result}),row('ai-photo.failed',failedId,{errorCode:'moderation_blocked'})]});
- await recordAiRequest(db,config,{prompt:'벤치에 앉은 포즈',costumeIds:'["313a28"]',backgroundId:'b7a101',presetKeys:'[{"kind":"pose","key":"의자에 앉기"}]',generationMethod:'fast'},{requestId,actorId:g.id,stage:'done',provider:'seedream'},{count:1,targetId:result});
+ await recordAiRequest(db,config,{prompt:'벤치에 앉은 포즈',costumeIds:'["313a28"]',backgroundId:'b7a101',presetKeys:'[{"kind":"pose","key":"의자에 앉기"}]',editKinds:'["outfit","pose"]',generationMethod:'fast'},{requestId,actorId:g.id,stage:'done',provider:'seedream'},{count:1,targetId:result});
  const published=await studio.saveContent(g.id,post({media:[{id:result}]}),{guest:true});
  const session='0190f3a2-7c1d-7e2a-9b3c-4d5e6f708192';
  await assert.rejects(guestsService.replaySession(g.req,'not-a-uuid'),code('GUEST_REPLAY_SESSION_INVALID'));
@@ -233,7 +233,8 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  assert.deepEqual(detail.results.map(r=>r.id),[result]);
  const ok=detail.generations.find(x=>x.outcome==='succeeded'),bad=detail.generations.find(x=>x.outcome==='failed');assert.equal(detail.generations.length,2);
  assert.equal(ok.outcome,'succeeded');assert.equal(ok.resultId,result);assert.equal(ok.prompt,'벤치에 앉은 포즈');
- assert.deepEqual(ok.options.costumes,[{id:'313a28',name:'nikke-rapi'}]);assert.equal(ok.options.backgroundId,'b7a101');
+ assert.deepEqual(ok.options.costumes,[{id:'313a28',name:'nikke-rapi'}]);
+ assert.deepEqual(ok.options.editKinds,['outfit','pose'],'multipart JSON string becomes an array (production console crash 2026-11-20)');assert.equal(ok.options.backgroundId,'b7a101');
  assert.deepEqual(ok.options.presets.find(p=>p.kind==='pose'),{kind:'pose',key:'의자에 앉기'});
  assert.equal(bad.outcome,'failed');assert.equal(bad.errorCode,'moderation_blocked');assert.equal(bad.detail,'expired','no stored request → shown as expired');
  assert.deepEqual(detail.replays.map(r=>[r.sessionId,r.url]),[[session,'https://us.posthog.com/replay/'+session]]);
