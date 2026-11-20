@@ -3414,3 +3414,6 @@
 - 사용자 지시 "운영배포해": api ai-trials-20261120(07:01Z), front replay-link-20261120(07:09Z), admin ai-trials-20261120(07:11Z). 점검: health·try·landing 200, 무쿠키 guest/replay-session 401, admin /login 200, 무인증 admin/ai-trials 401. 복구본 /Users/ethan/crefans-recovery/20261120/{ai-trials-20261120-api,replay-link-20261120-front,ai-trials-20261120-admin} 검증 OK.
 - 운영 실동작: 새 Playwright 브라우저(iPhone13)로 체험 동의 → guest/replay-session 201 recorded:true(운영 체험 1건 생김). 콘솔 화면·PostHog 링크 이동은 사용자 로그인 필요라 미확인.
 - 과거분: 사진·게시·생성 횟수는 보관 기간 내 표시, 의상·배경·요청 문장은 30일, 프리셋 이름과 리플레이 링크는 이번 배포 이후분만.
+
+### 2026-11-20 16:5x 콘솔 히스토리 화면 오류 수정 운영 배포 (api editkinds-20261120)
+- 사용자 제보: 운영 콘솔 히스토리에서 "화면을 불러오지 못했어요". 감사로그상 상세 API는 정상(admin.ai_trial_viewed 7회), 운영 요청 기록 options 형식을 값 없이 집계해 보니 editKinds가 문자열(JSON) → 콘솔 .join 오류. 서버에서 배열로 변환(list()). 테스트에 문자열 editKinds 추가, 되돌리면 실패 확인. dev c9dcc51, prod 1e334bb. 점검 health·try 200, replay-session 무쿠키 401, 복구본 /Users/ethan/crefans-recovery/20261120/editkinds-20261120-api 검증 OK. 콘솔 화면 재확인은 사용자 몫.
