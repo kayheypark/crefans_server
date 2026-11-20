@@ -3437,3 +3437,12 @@
 
 ### 2026-11-20 09:1x 비회원 체험 이용권 매일 충전 (운영 api guest-daily-20261120)
 - prod `1a040b1`(= bbac3d6 + 4c227dd). 비회원 사용량을 하루 창(09:00 KST)으로, 게시·공유 보상은 하루 한 번·다음 충전 때 만료(보상 ID에 날짜). 처리방침·약관 `2026-11-20.guest-daily.1`. 운영 검사 약관 판·share-done 401. 복구본 /Users/ethan/crefans-recovery/20261120/guest-daily-20261120-api. 배포 시점에 기존 비회원은 모두 3장부터 다시 시작.
+## 2026-11-20 운영콘솔 AI 사진 체험 관리 API (dev만, 운영 미배포)
+- 사용자 요청: 비회원 체험별 올린 사진(샘플 원본은 샘플로), 고른 프리셋·생성 횟수·결과 사진, 게시 여부 히스토리.
+- 구현: `src/platform/admin-ai-trials.ts`, `admin-ai-trials.controller.ts`. GET admin/ai-trials(쪽 30), admin/ai-trials/:id, admin/ai-trials/:id/media/:mediaId. members.view, 요청 문장은 logs.view까지. 상세·사진 열람마다 감사로그(admin.ai_trial_viewed / admin.ai_trial_media_viewed). 데이터 출처: 동의 감사로그(guest.consented), media(user_sub, metadata.aiGenerated·aiSourceId, 샘플은 original_name), ai-photo.succeeded/failed 감사로그 + 암호화 요청 기록(30일), posting. 가입 연결(guest.claimed) 후엔 연결 시각 이전 것만.
+- 성공 요청 기록 options에 presets(presetUsageKeys) 추가 → 이제부터 포즈·메이크업 등 프리셋 이름도 남음(이전 기록은 의상·배경 ID만).
+- 사용자 결정: 처리방침 개정 없이 진행, 이전 체험도 모두 표시. 운영자가 체험 사진을 모아 보는 것은 기존 고지 목적(횟수 제한·부정 이용 방지·게시·연결)에 명시되지 않아 법적 근거가 약하다는 점을 보고함(초안은 보고만, 미반영).
+- 검사: platform-guest 신규 테스트 통과(권한 검사 제거 시 실패 대조), 전체 13/14(실패 7번은 기존 200회 한도), platform-openapi 15/15(경로 291·콘솔 130). 1차 dev 배포는 OpenAPI 계약 누락으로 API 기동 실패 → 계약 추가로 수정.
+- 개발 운영콘솔 외부 주소: https://admin-dev.crefans.com (Route53 A 121.140.82.62 TTL60, 변경 C0855574IFM9E000M5HQ INSYNC; devbox Caddyfile 블록 추가, 백업 Caddyfile.bak-admin-dev-20261120; runtime.env ADMIN_ORIGINS 추가, 백업 runtime.env.bak-admin-dev-20261120). 보호는 콘솔 로그인·2차 인증뿐(IP 제한 없음).
+- 같은 날 추가(사용자 요청 "PostHog 리플레이 고유번호도 연동"): POST guest/replay-session {sessionId(UUID)} — 감사로그 guest.replay_session, source_id `guest-replay:<체험>:<세션>`으로 같은 번호 1회, 체험당 하루 50개. 감사 metadata는 허용 키만 남겨서 세션 번호는 source_id에서 읽음. 상세 응답 replays[{sessionId,at,url=https://us.posthog.com/replay/<id>}]. OpenAPI 292·user 문서 112.
+- 개발 실데이터 확인(api 컨테이너에서 함수 직접 실행, 가짜 SUPER_ADMIN): 목록 47건/30개, 샘플 원본→결과 연결, 생성 성공/요청 기록 있음/결과 있음. 이전 기록은 프리셋 이름 없음(이번부터 저장).

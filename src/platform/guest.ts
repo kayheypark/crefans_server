@@ -69,6 +69,17 @@ export class GuestService{
   });
   return{granted};
  }
+ // 2026-11-20 user request: the console trial history links to the PostHog replay of the visit. The browser reports the PostHog
+ // session ID (a random UUID, no content) once per ID; the same ID is stored once (source_id), at most 50 per trial a day.
+ async replaySession(req:any,sessionId:unknown){
+  const id=this.require(req);
+  if(typeof sessionId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId))reject(400,'GUEST_REPLAY_SESSION_INVALID','세션 번호를 확인해 주세요.');
+  const session=(sessionId as string).toLowerCase();
+  if(await this.service.db.platformAuditLog.findUnique({where:{source_id:`guest-replay:${id}:${session}`},select:{id:true}}))return{recorded:true};
+  try{await this.limiter.limit('guest-replay:'+id,50,86400);}catch(error:any){if(error?.getStatus?.()!==429)throw error;return{recorded:false};}
+  await appendAudit(this.service.db,{category:'business',action:'guest.replay_session',entityId:id,sourceId:`guest-replay:${id}:${session}`});
+  return{recorded:true};
+ }
  // 2026-11-16 user decision: signing in no longer links trial posts by itself; the browser first asks. This counts what would move.
  async claimable(member:string,req:any){await this.service.member(member);const id=guestFromRequest(req);if(!id)return{posts:0};return{posts:await this.service.db.posting.count({where:{user_sub:id,is_deleted:false}})};}
  // Moves this browser's guest posts and photos to the signed-in account. Posts already past 24 hours stay private (is_public=false).
@@ -91,6 +102,7 @@ export class GuestController{
  constructor(private guests:GuestService,private studio:PlatformStudioService,private photos:AiPhotoService,private captions:GuestCaptionService){}
  @Get('session') session(@Req() req:any){return this.guests.status(req,id=>this.photos.guestQuota(id));}
  @Post('session') start(@Req() req:any,@Res({passthrough:true}) res:any,@Body() body:any){return this.guests.start(req,res,body);}
+ @Post('replay-session') replaySession(@Req() req:any,@Body() body:any){return this.guests.replaySession(req,body?.sessionId);}
  @Post('ai-photo/share-done') shareDone(@Req() req:any,@Body() body:any){return this.guests.shareDone(req,body?.mediaId);}
  @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);const saved=await this.studio.saveContent(id,body,{guest:true});await recordFunnelStep(this.studio.db,'post_published_guest');return saved;}
  // Writes the empty title/body at publish time; the visitor confirms before posting (2026-11-16).

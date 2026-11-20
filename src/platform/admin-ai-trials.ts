@@ -13,6 +13,8 @@ import {costumeSlug} from './ai-photo-costume-references';
 // own retention (unused photos 7 days, posts 30 days, request records 30 days).
 export const SAMPLE_PHOTO_NAME='crefans-sample-virtual-person.webp';
 const PAGE=30;
+// PostHog redirects a project-less replay path to the operator's current project (US cloud, same as the service's ui_host).
+const REPLAY_URL='https://us.posthog.com/replay/';
 const isTrialId=(id:unknown):id is string=>typeof id==='string'&&id.startsWith(GUEST_PREFIX)&&/^guest:[0-9a-f]{40}$/.test(id);
 const aiFlag={path:'$.aiGenerated',equals:true};
 
@@ -60,6 +62,7 @@ export async function aiTrialDetail(db:any,admin:any,id:string,config:ConfigServ
  const trialMedia=media.filter((m:any)=>m.user_sub===id||(claim&&m.created_at<=claim.occurred_at));
  const events=await db.platformAuditLog.findMany({where:{actor_id:id,action:{in:['ai-photo.succeeded','ai-photo.failed']}},orderBy:{occurred_at:'asc'},select:{occurred_at:true,action:true,request_id:true,metadata:true}});
  const details=new Map((await db.aiPhotoFailureDetail.findMany({where:{request_id:{in:events.map((e:any)=>e.request_id).filter(Boolean)},expires_at:{gt:new Date()}}})).map((r:any)=>[r.request_id,r]));
+ const replays=await db.platformAuditLog.findMany({where:{action:'guest.replay_session',entity_id:id},orderBy:{occurred_at:'asc'},select:{occurred_at:true,source_id:true}});
  const showPrompt=can(admin,'logs','view');
  const resultsBySource=new Map<string,string[]>();
  for(const m of trialMedia){const meta=m.metadata as any;if(meta?.aiGenerated===true&&typeof meta.aiSourceId==='string')resultsBySource.set(meta.aiSourceId,[...(resultsBySource.get(meta.aiSourceId)||[]),m.id]);}
@@ -76,6 +79,8 @@ export async function aiTrialDetail(db:any,admin:any,id:string,config:ConfigServ
  return{
   id,startedAt:consents[0].occurred_at,consents:consents.map((c:any)=>({at:c.occurred_at,version:c.metadata?.version??null})),
   claimed:claim?{at:claim.occurred_at}:null,promptVisible:showPrompt,
+  // The session UUID lives in source_id (guest-replay:<trial>:<uuid>); audit metadata keeps only allow-listed keys.
+  replays:replays.map((r:any)=>{const sessionId=String(r.source_id||'').split(':').pop()||'';return{sessionId,at:r.occurred_at,url:REPLAY_URL+encodeURIComponent(sessionId)};}).filter((r:any)=>/^[0-9a-f-]{36}$/.test(r.sessionId)),
   uploads:trialMedia.filter((m:any)=>(m.metadata as any)?.aiGenerated!==true).map((m:any)=>({id:m.id,at:m.created_at,sample:m.original_name===SAMPLE_PHOTO_NAME,deleted:m.is_deleted,ready:m.processing_status==='COMPLETED',results:resultsBySource.get(m.id)||[]})),
   results:trialMedia.filter((m:any)=>(m.metadata as any)?.aiGenerated===true).map((m:any)=>{const meta=m.metadata as any;return{id:m.id,at:m.created_at,sourceId:meta?.aiSourceId??null,croppedFrom:meta?.croppedFrom??null,deleted:m.is_deleted,ready:m.processing_status==='COMPLETED'};}),
   generations,
