@@ -60,8 +60,8 @@ export function landingFrom(source:LandingSource){
 }
 
 // Alert limits (2026-11-18 user decision "같은 아이피알림도 계속 알려줘": no per-IP quiet window):
-// at most 100 landing alerts per KST day; the 100th is followed by one cap alert and then counting only. Obvious bots are skipped.
-const ALERT_DAILY_CAP=100;
+// at most 500 landing alerts per KST day (2026-11-20 user decision, was 100); the 500th is followed by one cap alert and then counting only. Obvious bots are skipped.
+const ALERT_DAILY_CAP=500;
 const BOT=/^node$|undici|bot|crawl|spider|slurp|headless|lighthouse|preview|facebookexternalhit|embedly|curl|wget|python|httpclient|okhttp|go-http|axios|node-fetch|java\/|monitor|scan/i;
 export const isBotAgent=(ua:unknown)=>typeof ua!=='string'||!ua.trim()||BOT.test(ua);
 const device=(ua:string)=>/Mobi|Android|iPhone|iPad|iPod/i.test(ua)?'모바일':'데스크톱';

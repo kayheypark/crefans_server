@@ -798,7 +798,7 @@ start는1회용 game id와서버결정 조각종류, edit는 선택적heartGameI
 - 입력 검사: referrerHost `^[a-z0-9.-]{1,253}$`, utmSource `^[A-Za-z0-9_.-]{1,40}$`. 다르면 버린다. 프론트(`lib/api/funnel.ts`)는 외부 referrer일 때 `new URL(document.referrer).hostname`만 보낸다.
 - 배포 후 테스트(2026-11-18): utmSource가 대소문자 무관 `deploy_test`로 시작하면 `funnel.landing_test`(라벨 '랜딩 방문') 알림 첫 줄에 `사유: 배포 후 테스트`를 넣고, `funnel_step_daily`와 오늘 누적·하루 100건 상한에서 제외한다(응답 `recorded:false`).
 - 콘텐츠 등록(`content.created`)은 즉시 텔레그램 큐에 넣고 건별로 전송한다. 콘텐츠 수정·삭제는 09:00 KST 일일 요약에 포함한다. 랜딩 방문 하루 100건 기준은 랜딩 알림에만 적용한다.
-- 남용 방지: 같은 접속 IP도 방문마다 알림(2026-11-18 사용자 지시 "같은 아이피알림도 계속 알려줘"로 IP당 30분 1회 제한 제거), KST 하루 100건. 100건이 넘으면 `funnel.landing_cap`(오늘 랜딩 알림 상한 도달) 1회만 보내고 이후는 집계만. 봇·자동화 User-Agent(빈 값, bot·crawl·headless·curl 등)는 알림 제외(집계는 함).
+- 남용 방지: 같은 접속 IP도 방문마다 알림(2026-11-18 사용자 지시 "같은 아이피알림도 계속 알려줘"로 IP당 30분 1회 제한 제거), KST 하루 500건(2026-11-20 사용자 지시로 100→500). 500건이 넘으면 `funnel.landing_cap`(오늘 랜딩 알림 상한 도달) 1회만 보내고 이후는 집계만. 봇·자동화 User-Agent(빈 값, bot·crawl·headless·curl 등)는 알림 제외(집계는 함).
 - 검증: `tests/platform-funnel.test.cjs` 랜딩 알림 5개 테스트(격리 e2e DB).
 
 
