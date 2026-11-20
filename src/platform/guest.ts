@@ -14,7 +14,7 @@ import {reject} from './http';
 import {requestContext} from './request-context';
 import {LocalMemberService} from '../auth/local/local-member.service';
 
-import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,GUEST_REPLAY_CONSENT_VERSION,GUEST_SHARE_REWARD,grantGuestShareReward,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash} from './guest-policy';
+import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,GUEST_REPLAY_CONSENT_VERSION,GUEST_SHARE_REWARD,grantGuestShareReward,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash,GUEST_HEART_DAILY_MAX,GUEST_HEART_REWARD} from './guest-policy';
 export * from './guest-policy';
 const COOKIE_DAYS=30;
 
@@ -31,13 +31,13 @@ export class GuestService{
   // 2026-11-19 user decision: part of the single required trial consent (privacy 17항, 2026-11-19.guest-replay.1), always offered.
   return GUEST_REPLAY_CONSENT_VERSION;
  }
- async status(req:any,quota:(id:string)=>Promise<{limit:number;remaining:number;postRewardClaimed:boolean;shareRewardClaimed:boolean}>){
+ async status(req:any,quota:(id:string)=>Promise<{limit:number;remaining:number;postRewardClaimed:boolean;shareRewardClaimed:boolean;heartReward?:number;heartRewardMax?:number}>){
   const id=guestFromRequest(req);
   const replayConsentVersion=this.replayConsentVersion();
-  const {limit,remaining,postRewardClaimed,shareRewardClaimed}=id?await quota(id):{limit:GUEST_AI_LIMIT,remaining:GUEST_AI_LIMIT,postRewardClaimed:false,shareRewardClaimed:false};
+  const {limit,remaining,postRewardClaimed,shareRewardClaimed,heartReward=0}=id?await quota(id):{limit:GUEST_AI_LIMIT,remaining:GUEST_AI_LIMIT,postRewardClaimed:false,shareRewardClaimed:false,heartReward:0};
   // 2026-11-19 user decision: replay unmasking on the trial screens only for a browser that recorded the replay consent (privacy 17항).
   const replayConsented=id?(await this.service.db.platformAuditLog.count({where:{entity_id:id,action:'guest.replay_consented'}}))>0:false;
-  return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,postHours:GUEST_POST_HOURS,limit,remaining,postRewardClaimed,postReward:GUEST_POST_REWARD,shareRewardClaimed,replayConsented,...(replayConsentVersion?{replayConsentVersion}:{})};
+  return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,postHours:GUEST_POST_HOURS,limit,remaining,postRewardClaimed,postReward:GUEST_POST_REWARD,shareRewardClaimed,heartReward,heartRewardMax:GUEST_HEART_DAILY_MAX,heartRewardEach:GUEST_HEART_REWARD,replayConsented,...(replayConsentVersion?{replayConsentVersion}:{})};
  }
  async start(req:any,res:any,input:any){
   if(input?.consent!==true||input?.version!==GUEST_CONSENT_VERSION)reject(400,'GUEST_CONSENT_REQUIRED','체험 안내를 확인하고 동의해 주세요.');
@@ -104,6 +104,8 @@ export class GuestController{
  @Post('session') start(@Req() req:any,@Res({passthrough:true}) res:any,@Body() body:any){return this.guests.start(req,res,body);}
  @Post('replay-session') replaySession(@Req() req:any,@Body() body:any){return this.guests.replaySession(req,body?.sessionId);}
  @Post('ai-photo/share-done') shareDone(@Req() req:any,@Body() body:any){return this.guests.shareDone(req,body?.mediaId);}
+ // 2026-11-21: server-verified waiting game for visitors (30 hearts → 0.5 credit, 3 a day per browser and per network).
+ @Post('ai-photo/hearts') hearts(@Req() req:any,@Body() body:any){return this.photos.guestHearts(this.guests.require(req),body);}
  @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);const saved=await this.studio.saveContent(id,body,{guest:true});await recordFunnelStep(this.studio.db,'post_published_guest');return saved;}
  // Writes the empty title/body at publish time; the visitor confirms before posting (2026-11-16).
  @Post('content/caption') async caption(@Req() req:any,@Body() body:any){const result=await this.captions.caption(this.guests.require(req),body,this.guests.ipHash());await recordFunnelStep(this.studio.db,'caption_written');return result;}

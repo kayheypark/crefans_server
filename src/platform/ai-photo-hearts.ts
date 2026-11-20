@@ -1,11 +1,14 @@
 import {randomInt,randomUUID} from 'crypto';
 import {reject} from './http';
 import {appendAudit} from './audit';
+import {isGuestId,guestHeartLock,grantGuestHeartReward,guestIpHashFromEnv,GUEST_HEART_SCORE} from './guest-policy';
+import {requestContext} from './request-context';
 export const AI_HEART_DAILY_CAP=100;
 export const heartConversion=(hearts:number)=>hearts>=100?{hearts:hearts%10,credits:Math.floor(hearts/10)}:{hearts,credits:0};
 export const heartBalance=async(db:any,user:string)=>await db.aiHeartWallet.findUnique({where:{user_id:user}})||{hearts:0,credits:0};
 // 2026-11-17: member row, not creators — non-creator members also use AI photo (see ai-photo-grants).
-const lock=async(tx:any,user:string)=>{await tx.$queryRaw`SELECT id FROM members WHERE id=${user} FOR UPDATE`;};
+// 2026-11-21: guests (no members row) lock their own bucket row.
+const lock=async(tx:any,user:string)=>{if(isGuestId(user)){await guestHeartLock(tx,user);return;}await tx.$queryRaw`SELECT id FROM members WHERE id=${user} FOR UPDATE`;};
 export async function createHeartGame(db:any,user:string){const unfinished=await db.aiHeartGame.findMany({where:{user_id:user,OR:[{status:'ended'},{status:{in:['ready','active']},created_at:{lt:new Date(Date.now()-600000)}}]},take:100});for(const game of unfinished)await settleHeartGame(db,user,game.id);return db.$transaction(async(tx:any)=>{await lock(tx,user);const active=await tx.aiHeartGame.findFirst({where:{user_id:user,status:{in:['ready','active']},created_at:{gt:new Date(Date.now()-600000)}}});if(active)reject(409,'GAME_ACTIVE','이미 진행 중인 하트 게임이 있어요.');const kinds=['heart','candy','heart','moon','heart',...Array.from({length:460},()=>{const r=randomInt(100);return r<70?'heart':r<85?'candy':'moon';})];const g=await tx.aiHeartGame.create({data:{id:randomUUID(),user_id:user,kinds,clicks:[]}});return{id:g.id,kinds};});}
 export async function startHeartGame(db:any,user:string,id:unknown){if(id===undefined)return;if(typeof id!=='string')reject(400,'INVALID_GAME','하트 게임을 다시 시작해 주세요.');const r=await db.aiHeartGame.updateMany({where:{id,user_id:user,status:'ready',created_at:{gt:new Date(Date.now()-60000)}},data:{status:'active',started_at:new Date()}});if(r.count!==1)reject(409,'INVALID_GAME','하트 게임을 다시 시작해 주세요.');}
 export async function closeHeartGame(db:any,user:string,id:unknown){if(typeof id!=='string')return;await db.aiHeartGame.updateMany({where:{id,user_id:user,status:{in:['ready','active']}},data:{status:'ended',ended_at:new Date()}});}
@@ -23,6 +26,14 @@ export async function clickHeart(db:any,user:string,id:string,piece:unknown,even
 }
 export async function settleHeartGame(db:any,user:string,id:string){return db.$transaction(async(tx:any)=>{await lock(tx,user);const g=await tx.aiHeartGame.findFirst({where:{id,user_id:user}});if(!g)reject(404,'GAME_NOT_FOUND','하트 게임을 찾지 못했어요.');if(g.status==='active'&&g.started_at&&Date.now()-g.started_at.getTime()>600000)await tx.aiHeartGame.update({where:{id},data:{status:'ended'}});else if(!['ready','ended','settled'].includes(g.status))reject(409,'GAME_RUNNING','사진 생성이 끝나면 하트가 적립돼요.');
  if(g.status==='settled')return{...await heartBalance(tx,user),earned:g.score,converted:g.converted};
+ // 2026-11-21 user decision: guests earn GUEST_HEART_REWARD credit for a full game (30 hearts), capped per browser and per IP a
+ // day (guest-policy). No heart wallet; converted stores 1 when the credit was paid.
+ if(isGuestId(user)){
+  const ticket=g.score>=GUEST_HEART_SCORE?await grantGuestHeartReward(tx,user,guestIpHashFromEnv(requestContext.getStore()?.ip)):0;
+  await tx.aiHeartGame.update({where:{id},data:{status:'settled',converted:ticket?1:0}});
+  await appendAudit(tx,{category:'business',action:'guest.heart_reward',entityId:user,data:{targetId:id,played:g.score,credited:ticket}});
+  return{hearts:0,credits:0,earned:g.score,converted:0,ticket,capped:g.score>=GUEST_HEART_SCORE&&!ticket};
+ }
  // 2026-11-15 user decision (night-work /ask-me): at most AI_HEART_DAILY_CAP hearts per member per KST day, so rewarded
  // generations cannot keep refilling themselves. A settled game's score is the hearts actually credited.
  const day=new Date(Date.now()+9*3600000).toISOString().slice(0,10),used=(await tx.aiHeartGame.aggregate({_sum:{score:true},where:{user_id:user,status:'settled',created_at:{gte:new Date(`${day}T00:00:00+09:00`)}}}))._sum.score||0,earned=Math.max(0,Math.min(g.score,AI_HEART_DAILY_CAP-used));

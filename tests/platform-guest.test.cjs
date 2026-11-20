@@ -115,7 +115,7 @@ test('signing in on the same browser moves guest posts and photos to the account
 test('three trial credits, a single transactional publishing reward and the shared network cap',async()=>{
  const g=await startGuest(),photo=await upload(g.id),ip={ipHash:'iphash'+tag};
  await assert.rejects(photos.edit(g.id,edit(photo,{libraryIds:'["x"]'}),undefined,ip),code('GUEST_FEATURE_UNAVAILABLE'));
- await assert.rejects(photos.edit(g.id,edit(photo,{heartGameId:'game'}),undefined,ip),code('GUEST_FEATURE_UNAVAILABLE'));
+ await assert.rejects(photos.edit(g.id,edit(photo,{heartGameId:'game'}),undefined,ip),code('INVALID_GAME'));// 2026-11-21: guests play the server-verified heart game; an unknown game id is refused
  assert.equal((await guestsService.status(g.req,id=>photos.guestQuota(id))).postRewardClaimed,false);
  assert.equal(await photos.guestRemaining(g.id),3);
  const first=await requestContext.run({ip:'198.51.100.7',peerIp:'198.51.100.7',requestId:crypto.randomUUID()},()=>photos.edit(g.id,edit(photo,{generationMethod:'fast'}),undefined,ip));

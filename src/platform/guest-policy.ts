@@ -60,3 +60,36 @@ export async function grantGuestShareReward(tx:any,id:string,now=Date.now()):Pro
    VALUES (${shareRewardId(id,now)},${GUEST_SHARE_REWARD},${expires})`;
  return inserted===1;
 }
+
+
+// 2026-11-21 user decision: a signed-out visitor who collects 30 hearts in the server-verified waiting game gets 0.5 credit,
+// at most 3 credits a day per browser (guest id) and per network (IP HMAC) — whichever fills first. Same 09:00 KST day as the
+// other guest rewards; the credit expires at the next refill. Buckets hold the credited sum (float).
+export const GUEST_HEART_REWARD=0.5,GUEST_HEART_DAILY_MAX=3,GUEST_HEART_SCORE=30;
+const heartRewardId=(id:string,now=Date.now())=>digest('ai-photo:guest-heart-reward:'+guestRewardDay(now)+':'+id);
+const heartRewardIpId=(ipHash:string,now=Date.now())=>digest('ai-photo:guest-heart-reward-ip:'+guestRewardDay(now)+':'+ipHash);
+export async function guestHeartRewardTotal(db:any,id:string,now=Date.now()):Promise<number>{
+ const row=await db.authRateBucket.findUnique({where:{id:heartRewardId(id,now)},select:{count:true}});
+ return Math.min(GUEST_HEART_DAILY_MAX,Number(row?.count||0));
+}
+/** Server-secret IP HMAC for code paths without the Nest ConfigService (same value as guestIpHash). */
+export const guestIpHashFromEnv=(ip?:string|null)=>guestIpHash({get:(key:string)=>process.env[key]} as any,ip);
+// A guest has no members row to lock; the heart game serializes on its own bucket row instead.
+export async function guestHeartLock(tx:any,id:string){
+ const lockId=digest('ai-photo:guest-heart-lock:'+id),expires=new Date(Date.now()+86400000);
+ await tx.$executeRaw`INSERT INTO auth_rate_buckets (id,count,expires_at) VALUES (${lockId},0,${expires}) ON DUPLICATE KEY UPDATE id=id`;
+ await tx.$queryRaw`SELECT id FROM auth_rate_buckets WHERE id=${lockId} FOR UPDATE`;
+}
+/** Credits GUEST_HEART_REWARD if both the browser and the network are under GUEST_HEART_DAILY_MAX today; returns the amount. */
+export async function grantGuestHeartReward(tx:any,id:string,ipHash:string,now=Date.now()):Promise<number>{
+ const expires=nextRefill(now),keys=[heartRewardId(id,now),heartRewardIpId(ipHash,now)];
+ let full=false;
+ for(const key of keys){
+  await tx.$executeRaw`INSERT INTO auth_rate_buckets (id,count,expires_at) VALUES (${key},0,${expires}) ON DUPLICATE KEY UPDATE id=id`;
+  const [row]=await tx.$queryRaw`SELECT count FROM auth_rate_buckets WHERE id=${key} FOR UPDATE` as {count:number}[];
+  if(Number(row?.count||0)+GUEST_HEART_REWARD>GUEST_HEART_DAILY_MAX+1e-9)full=true;
+ }
+ if(full)return 0;
+ for(const key of keys)await tx.$executeRaw`UPDATE auth_rate_buckets SET count=count+${GUEST_HEART_REWARD} WHERE id=${key}`;
+ return GUEST_HEART_REWARD;
+}
