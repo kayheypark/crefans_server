@@ -3409,3 +3409,8 @@
 - 개발 운영콘솔 외부 주소: https://admin-dev.crefans.com (Route53 A 121.140.82.62 TTL60, 변경 C0855574IFM9E000M5HQ INSYNC; devbox Caddyfile 블록 추가, 백업 Caddyfile.bak-admin-dev-20261120; runtime.env ADMIN_ORIGINS 추가, 백업 runtime.env.bak-admin-dev-20261120). 보호는 콘솔 로그인·2차 인증뿐(IP 제한 없음).
 - 같은 날 추가(사용자 요청 "PostHog 리플레이 고유번호도 연동"): POST guest/replay-session {sessionId(UUID)} — 감사로그 guest.replay_session, source_id `guest-replay:<체험>:<세션>`으로 같은 번호 1회, 체험당 하루 50개. 감사 metadata는 허용 키만 남겨서 세션 번호는 source_id에서 읽음. 상세 응답 replays[{sessionId,at,url=https://us.posthog.com/replay/<id>}]. OpenAPI 292·user 문서 112.
 - 개발 실데이터 확인(api 컨테이너에서 함수 직접 실행, 가짜 SUPER_ADMIN): 목록 47건/30개, 샘플 원본→결과 연결, 생성 성공/요청 기록 있음/결과 있음. 이전 기록은 프리셋 이름 없음(이번부터 저장).
+
+### 2026-11-20 16:1x AI 사진 체험 관리·리플레이 연동 운영 배포
+- 사용자 지시 "운영배포해": api ai-trials-20261120(07:01Z), front replay-link-20261120(07:09Z), admin ai-trials-20261120(07:11Z). 점검: health·try·landing 200, 무쿠키 guest/replay-session 401, admin /login 200, 무인증 admin/ai-trials 401. 복구본 /Users/ethan/crefans-recovery/20261120/{ai-trials-20261120-api,replay-link-20261120-front,ai-trials-20261120-admin} 검증 OK.
+- 운영 실동작: 새 Playwright 브라우저(iPhone13)로 체험 동의 → guest/replay-session 201 recorded:true(운영 체험 1건 생김). 콘솔 화면·PostHog 링크 이동은 사용자 로그인 필요라 미확인.
+- 과거분: 사진·게시·생성 횟수는 보관 기간 내 표시, 의상·배경·요청 문장은 30일, 프리셋 이름과 리플레이 링크는 이번 배포 이후분만.
