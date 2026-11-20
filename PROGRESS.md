@@ -1,3 +1,10 @@
+## 2026-11-20 랜딩 방문 텔레그램 알림 하루 상한 100→500 (feat/landing-alert-cap-500)
+
+- 사용자 지시(23:4x KST): "랜딩페이지 하루에 500건까지 계속 텔레그램으로 받고 그 이후부터는 받지 않도록". X 광고(캠페인 po12l) 23:45 게재 시작에 맞춘 변경.
+- 변경: `funnel-stats.ts` ALERT_DAILY_CAP 100→500(KST 자정 기준 `funnel.landing_view` 행 수로 셈, 500건째 이후 `funnel.landing_cap` 1회 후 집계만 — 기존 동작 유지), `operations.service.ts` 상한 라벨 (500건), `docs/platform-api.md` 남용 방지 문구, `tests/platform-funnel.test.cjs` 경계값 499→queued·500→capped.
+- 검증(2026-11-20 23:48~ KST, 맥 로컬, 격리 DB 127.0.0.1:3307, `npm ci`·`npm run build` 종료 0): `CREFANS_E2E=true node --test tests/platform-funnel.test.cjs` 12/12 통과, `tests/platform-operations-alerts.test.cjs` 8/8 통과. 대조: 상한 테스트의 count 100 값을 그대로 두었을 때 새 코드가 `queued`를 반환해 1건 실패 → 상한 변경이 실제로 반영됨을 확인 후 테스트 값 500으로 갱신.
+- 미실행: dev 통합·개발 서버·운영 배포(사용자 "배포" 지시 대기). 실제 텔레그램 수신은 확인 안 함(테스트는 outbox 기록까지).
+
 ## 2026-11-19 콘텐츠 등록 텔레그램 즉시 알림
 
 - 15:12 KST 운영 알림 큐 읽기 전용 확인. 오늘 등록 2건(08:51, 15:08)은 일일 요약 상태 `DIGESTED`이며 전송 시도 0회. 랜딩 개별 100건과 상한 안내 1건, AI 사진 성공 15건은 전달 상태이며 대기 0건. 비로그인 이용권 운영 배포와 무관한 11-18 일일 요약 정책이 원인이다.

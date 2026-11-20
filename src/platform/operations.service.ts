@@ -23,7 +23,7 @@ const labels:Record<string,string>={'creator.partner_requested':'파트너 계�
  'media.watermark_failed':'워터마크 변환 실패 건 남아 있음','media.watermark_stuck':'워터마크 변환 멈춤','media.watermark_skipped':'워터마크 건너뜀(핸들 형식 확인 필요)','media.transcode_stuck':'아이폰 영상 변환 30분 넘게 대기','media.transcode_failed':'아이폰 영상 변환 실패(최근 1시간)',
  'audit.retention_lagging':'요청 감사 로그 보관기한 파기 지연','alerts.backlog':'운영 알림 15분 넘게 미전송','worker.stalled':'배치 15분 넘게 멈춤 — 프로세스 재시작',
  'admin.inquiry_replied':'운영자 문의 답변','admin.report_resolved':'운영자 신고 처리','admin.document_saved':'운영자 공지·FAQ 저장','operations.daily_digest':'운영 일일 요약',
- 'funnel.landing_view':'랜딩 방문','share.clicked':'공유 버튼','share.cap':'오늘 공유 알림 상한 도달(200건) — 오늘 남은 공유는 알림 안 보냄','funnel.landing_test':'랜딩 방문','funnel.landing_cap':'오늘 랜딩 알림 상한 도달(100건) — 오늘 남은 방문은 집계만 하고 알림 안 보냄',
+ 'funnel.landing_view':'랜딩 방문','share.clicked':'공유 버튼','share.cap':'오늘 공유 알림 상한 도달(200건) — 오늘 남은 공유는 알림 안 보냄','funnel.landing_test':'랜딩 방문','funnel.landing_cap':'오늘 랜딩 알림 상한 도달(500건) — 오늘 남은 방문은 집계만 하고 알림 안 보냄',
 };
 const allowed=new Set(['limit','calls','estimatedUsd','thresholdUsd','ip','stage','provider','actor','count','blockedUntil','rule','action','status','method','route','errorType','errorCode','job','runs','failedRuns','processed','durationMs','used','mode','style','kinds','presets','costumeIds','references','failures','activity','fingerprint','release','사용률','여유','전체','기준','검사시각','방문 시각(KST)','랜딩','유입','기기','오늘 랜딩 방문','사유','시각(KST)','위치','방식','결과','게시물','오늘 공유']);
 function metadata(data:Record<string,unknown>){

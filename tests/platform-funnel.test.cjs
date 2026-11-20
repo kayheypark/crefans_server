@@ -92,8 +92,8 @@ test('landing alert: invalid referrer host / utm are dropped, unknown fields sti
  assert.equal(await funnel.landingVisitAlert(fakeDb(0),ops,funnel.landingSource({referrerHost:'nope nope'}),IPHONE),'queued');assert.equal(ops.calls[0][1]['유입'],'직접 방문 또는 알 수 없음');
  for(const ua of ['node','Mozilla/5.0 (compatible; Googlebot/2.1)','curl/8.4.0','HeadlessChrome/120','',undefined])assert.equal(await funnel.landingVisitAlert(fakeDb(0),ops,{},ua),'skipped',String(ua));
  assert.equal(ops.calls.length,1,'bots and missing user agents are not alerted');
- ops=fakeOps();assert.equal(await funnel.landingVisitAlert(fakeDb(99),ops,{},'Mozilla/5.0 (Windows NT 10.0)'),'queued');assert.equal(ops.calls[0][0],'funnel.landing_view');assert.equal(ops.calls[0][1]['기기'],'데스크톱');assert.equal(ops.calls[0][3],undefined,'visit alerts keep the client IP');
- ops=fakeOps();assert.equal(await funnel.landingVisitAlert(fakeDb(100),ops,{},IPHONE),'capped');assert.equal(ops.calls[0][0],'funnel.landing_cap');assert.match(ops.calls[0][2],/^funnel\.landing_cap:\d{4}-\d\d-\d\d$/,'one cap alert per KST day (dedupe key)');assert.deepEqual(ops.calls[0][3],{omitIp:true});
+ ops=fakeOps();assert.equal(await funnel.landingVisitAlert(fakeDb(499),ops,{},'Mozilla/5.0 (Windows NT 10.0)'),'queued');assert.equal(ops.calls[0][0],'funnel.landing_view');assert.equal(ops.calls[0][1]['기기'],'데스크톱');assert.equal(ops.calls[0][3],undefined,'visit alerts keep the client IP');
+ ops=fakeOps();assert.equal(await funnel.landingVisitAlert(fakeDb(500),ops,{},IPHONE),'capped');assert.equal(ops.calls[0][0],'funnel.landing_cap');assert.match(ops.calls[0][2],/^funnel\.landing_cap:\d{4}-\d\d-\d\d$/,'one cap alert per KST day (dedupe key)');assert.deepEqual(ops.calls[0][3],{omitIp:true});
  // The cap alert really is stored once per day on the real outbox.
  const real=app.get(PlatformOperationsService),since=new Date(Date.now()-1000),key='funnel.landing_cap:test-'+crypto.randomUUID();
  await real.record('funnel.landing_cap',{limit:100},key,{omitIp:true});await real.record('funnel.landing_cap',{limit:100},key,{omitIp:true});
@@ -151,8 +151,8 @@ test('deploy_test visit: alerted with 사유 first line and the client IP, not c
  assert.equal(text[0],'사유: 배포 후 테스트');assert.equal(text[1],'[crefans] 랜딩 방문');assert.ok(text.includes('접속 IP: 121.140.82.62 (집)'));assert.equal(text.filter(l=>l.startsWith('사유')).length,1);
  const real=await post({step:'landing_view',utmSource:'insta_bio'});assert.deepEqual(await real.json(),{recorded:true});assert.equal(await count('landing_view'),prior+1,'a real visit still counts');
  const rows=await settle(since,2);assert.equal(rows[1].type,'funnel.landing_view');assert.equal(rows[1].data['사유'],undefined);
- // Cap: 100 real alerts today → a real visit is capped, a deploy_test visit is still alerted; the cap query counts only funnel.landing_view.
- let ops=fakeOps(),where;const capDb={platformOperationalEvent:{count:async q=>{where=q.where;return 100;}},funnelStepDaily:{findUnique:async()=>({count:7})}};
+ // Cap: 500 real alerts today → a real visit is capped, a deploy_test visit is still alerted; the cap query counts only funnel.landing_view.
+ let ops=fakeOps(),where;const capDb={platformOperationalEvent:{count:async q=>{where=q.where;return 500;}},funnelStepDaily:{findUnique:async()=>({count:7})}};
  assert.equal(await funnel.landingVisitAlert(capDb,ops,{utmSource:'insta_bio'},IPHONE),'capped');assert.equal(where.type,'funnel.landing_view');
  ops=fakeOps();assert.equal(await funnel.landingVisitAlert(capDb,ops,{utmSource:'deploy_test_ip'},IPHONE),'queued');assert.equal(ops.calls[0][0],'funnel.landing_test');assert.equal(ops.calls[0][1]['사유'],'배포 후 테스트');
 });
