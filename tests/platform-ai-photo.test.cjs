@@ -891,3 +891,18 @@ test('fractional credits respect shared guest request caps under concurrency and
  assert.equal(await photos.used(day.key),1);
  assert.equal(await photos.used(pool.key),1);
 });
+
+// 2026-11-20 user request: a photo the user uploaded becomes the background (personal background reference, moderated).
+test('own background photo: attached as a personal background reference, checked, and limited to the user\'s own other photo',async()=>{
+ reset();const who=await makeCreator('ownbg_'+tag);await db.aiPhotoGrant.create({data:{creator_user_id:who,reason:'내 배경 QA'}});const id=await media(who),place=await media(who);
+ await photos.edit(who,base({sourceId:id,kind:'background',backgroundMediaId:place}));
+ const request=calls.find(x=>x.kind==='edit');assert.equal(request.images.length,2);assert.match(request.fields.prompt,/Image 2 is a personal background reference/);assert.equal(calls.filter(x=>x.kind==='moderation').length,3,'prompt+source and the background photo are moderated');
+ reset();
+ await assert.rejects(photos.edit(who,base({sourceId:id,kind:'pose',backgroundMediaId:place})),code('INVALID_BACKGROUND_PHOTO'),'needs a background edit');
+ await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundMediaId:id})),code('INVALID_BACKGROUND_PHOTO'),'not the source itself');
+ await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundMediaId:'x'})),code('INVALID_BACKGROUND_PHOTO'));
+ const stranger=await makeCreator('ownbg2_'+tag),theirs=await media(stranger);
+ await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundMediaId:theirs})),code('BACKGROUND_PHOTO_NOT_FOUND'),'another user\'s photo');
+ await assert.rejects(photos.edit(who,base({sourceId:id,kind:'background',backgroundMediaId:place,backgroundId:'b7a101'})),code('INVALID_BACKGROUND_REFERENCE'),'one background only');
+ assert.equal(calls.filter(x=>x.kind==='edit').length,0);
+});

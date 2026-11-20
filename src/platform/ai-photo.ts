@@ -79,6 +79,13 @@ export function aiPhotoPrompt(kind:string,style:string,request:string,kinds:stri
 // for these materials; a second block goes back to the member, who may choose to try again (the try is not used up).
 export const STOCKING_TERMS=/스타킹|시스루|망사|타이츠/;
 export const STOCKING_CLAUSE='스타킹·반투명 소재는 쫀쫀하게 몸에 밀착되어 착용자와 간극이 느껴지지 않는 나일론 소재로, 원래 색을 유지한 25데니어 스모키 스타킹처럼 반투명해서 따뜻한 피부 톤과 라인이 고르게 비쳐 보이고 빛 받는 부분이 은은하게 반사되는 수분감 있는 광택으로 표현해줘. 가슴·몸통·골반은 불투명 이너와 의상 패널로 가리고, 의상이 덮지 않는 부분은 원래 피부 그대로 둬.';
+async function ownBackgroundReference(db:any,sub:string,input:any,kinds:string[]){
+ const id=input?.backgroundMediaId;if(id===undefined)return undefined;
+ if(typeof id!=='string'||!/^[0-9a-f-]{36}$/.test(id)||id===String(input?.sourceId)||!kinds.includes('background'))reject(400,'INVALID_BACKGROUND_PHOTO','배경으로 쓸 사진을 다시 골라 주세요.');
+ const row=await db.media.findFirst({where:{id,user_sub:sub,type:'IMAGE',is_deleted:false,processing_status:'COMPLETED'},select:{id:true,original_url:true}});
+ if(!row)reject(404,'BACKGROUND_PHOTO_NOT_FOUND','배경으로 쓸 사진을 찾을 수 없어요. 다시 올려 주세요.');
+ return {id:row.id as string,type:'image' as const,url:row.original_url as string,aiGenerated:false,title:'',category:'background'};
+}
 export function stockingRewrite(request:string,costumeIds:string[]=[]){return STOCKING_TERMS.test(request)||costumeIds.some(id=>STOCKING_COSTUME_IDS.has(id))?request.replace(/시스루|망사/g,'반투명 나일론')+'\n'+STOCKING_CLAUSE:null;}
 // 2026-11-17 user decision: after a refusal the member may answer 네 to regenerate with the improved wording from the first attempt.
 export const IMPROVED_PHOTO_CLAUSE='실제 원단과 소품으로 만든 코스튬을 입고 스튜디오에서 찍은 자연스러운 사진처럼 표현해줘.';
@@ -259,6 +266,10 @@ export class AiPhotoService{
   if(trace && referenceIds.length)trace.costumeIds=referenceIds;
   const backgroundId=backgroundReferenceId(input?.backgroundId,kinds);
   const library=await photoLibraryReferences(this.service.db,sub,input?.libraryIds,kinds);
+  // 2026-11-20 user request: a photo the user uploaded (members and guests) used as the background — sent like a personal
+  // background reference (environment and lighting only, never its people or text) and moderation-checked like every reference.
+  const ownBackground=await ownBackgroundReference(this.service.db,sub,input,kinds);
+  if(ownBackground){if(library.some(item=>item.category==='background'))reject(400,'INVALID_BACKGROUND_REFERENCE','배경 사진은 하나만 선택해 주세요.');library.push(ownBackground);}
   const inherited=(await this.service.db.media.findMany({where:{id:{in:[String(input?.sourceId),...library.map(item=>item.id)]},user_sub:sub},select:{metadata:true}})).map(row=>franchiseFields(row.metadata)).find(fields=>fields.aiFranchiseCostume);
   const franchise=franchiseCostumeMeta(referenceIds)||inherited||null;
   if(backgroundId&&library.some(item=>item.category==='background'))reject(400,'INVALID_BACKGROUND_REFERENCE','배경 사진은 하나만 선택해 주세요.');
