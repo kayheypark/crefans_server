@@ -114,3 +114,15 @@ test('comment likes reject inaccessible posts, hidden/deleted comments, hidden p
  await db.memberBlock.create({data:{member_id:ids.creator,target_id:ids.fan}});assert.equal((await send()).errorCode,'COMMENT_BLOCKED');await db.memberBlock.deleteMany({where:{member_id:ids.creator,target_id:ids.fan}});
  assert.equal((await send()).status,200);
 });
+
+// 2026-11-21 bug: a post by a member without a creator profile rejected every comment as closed.
+test('a member without a creator profile gets comments on their post; the post switch still closes them',async()=>{
+ const own=(await db.posting.create({data:{user_sub:ids.fan,title:'팬 글 '+tag,content:'팬 본문',status:'PUBLISHED',is_public:true,allow_comments:true,published_at:new Date()}})).id;
+ try{
+  assert.equal(await db.creator.count({where:{user_id:ids.fan}}),0);
+  const sent=await api(`/posts/${own}/comments`,'other',{body:'팬 글 댓글'});assert.equal(sent.status,201,sent.errorMessage);
+  const list=await api(`/posts/${own}/comments`,'fan');assert.ok(JSON.stringify(list.data).includes('팬 글 댓글'),'listed');
+  await db.posting.update({where:{id:own},data:{allow_comments:false}});
+  assert.equal((await api(`/posts/${own}/comments`,'other',{body:'닫힌 뒤'})).errorCode,'COMMENTS_DISABLED');
+ }finally{const cs=(await db.comment.findMany({where:{posting_id:own},select:{id:true}})).map(c=>c.id);await db.memberNotification.deleteMany({where:{member_id:ids.fan}});await db.comment.deleteMany({where:{id:{in:cs}}});await db.posting.delete({where:{id:own}});}
+});
