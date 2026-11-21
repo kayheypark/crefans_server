@@ -2142,6 +2142,22 @@ model AiHeartGame {
  @@index([user_id,status])
  @@map("ai_heart_games")
 }
+/// 2026-11-21 user request: review shown instead of the heart game on a repeat generation (see ai-photo-reviews.ts).
+model AiPhotoReview {
+ id String @id @default(uuid())
+ user_id String @db.VarChar(191)
+ guest Boolean @default(false)
+ rating Int @db.TinyInt
+ sentiment String @db.VarChar(10)
+ comment String? @db.Text
+ reward_hearts Int @default(0)
+ reward_tickets Float @default(0)
+ guest_day DateTime? @db.Date
+ created_at DateTime @default(now())
+ @@unique([user_id,guest_day])
+ @@index([created_at])
+ @@map("ai_photo_reviews")
+}
 model AiHeartUse {
  id String @id
  units Float @default(1)

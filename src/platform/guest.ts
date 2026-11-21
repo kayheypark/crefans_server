@@ -106,6 +106,9 @@ export class GuestController{
  @Post('ai-photo/share-done') shareDone(@Req() req:any,@Body() body:any){return this.guests.shareDone(req,body?.mediaId);}
  // 2026-11-21: server-verified waiting game for visitors (30 hearts → 0.5 credit, 3 a day per browser and per network).
  @Post('ai-photo/hearts') hearts(@Req() req:any,@Body() body:any){return this.photos.guestHearts(this.guests.require(req),body);}
+ // 2026-11-21: a review instead of the game, once a KST day after a first successful photo.
+ @Get('ai-photo/review') reviewStatus(@Req() req:any){return this.photos.guestReviewStatus(this.guests.require(req));}
+ @Post('ai-photo/review') review(@Req() req:any,@Body() body:any){return this.photos.guestReview(this.guests.require(req),body);}
  @Post('content') async content(@Req() req:any,@Body() body:any){const id=this.guests.require(req);await this.guests.guard('post',id);const saved=await this.studio.saveContent(id,body,{guest:true});await recordFunnelStep(this.studio.db,'post_published_guest');return saved;}
  // Writes the empty title/body at publish time; the visitor confirms before posting (2026-11-16).
  @Post('content/caption') async caption(@Req() req:any,@Body() body:any){const result=await this.captions.caption(this.guests.require(req),body,this.guests.ipHash());await recordFunnelStep(this.studio.db,'caption_written');return result;}

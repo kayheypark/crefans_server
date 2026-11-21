@@ -37,6 +37,7 @@ import {WATERMARK_VERSION,watermarkText} from './media-watermark-render';
 import {presetUsageKeys,recordPresetUsage} from './ai-preset-usage';
 import {AI_COST_ALERTS,AI_PROVIDER_DAILY_CALLS,configuredSeedreamModel,kstDay,reserveProviderCall,resolveAiPhotoMethod,SeedreamModel} from './ai-photo-cost';
 import {recordFunnelStep} from './funnel-stats';
+import {reviewStatus,submitReview} from './ai-photo-reviews';
 
 export const AI_PHOTO_DAILY_LIMIT=10,AI_PHOTO_IMAGES=1,AI_PHOTO_PROMPT_MAX=2000;
 const MODERATION_URL='https://api.openai.com/v1/moderations',MODERATION_MODEL='omni-moderation-latest';
@@ -148,6 +149,11 @@ export class AiPhotoService{
   if(input.action==='finish'){const reward=await settleHeartGame(this.service.db,sub,input.id);return{...reward,remaining:(await this.quota(sub)).remaining};}
   reject(400,'INVALID_GAME','잘못된 게임 요청이에요.');
  }
+ /** 2026-11-21 user request: review instead of the heart game on a repeat generation (ai-photo-reviews). */
+ async reviewStatus(sub:string){await this.service.member(sub);return reviewStatus(this.service.db,sub);}
+ async review(sub:string,input:any){await this.service.member(sub);if(!await aiPhotoAllowed(this.service.db,sub))reject(403,'AI_PHOTO_NOT_ALLOWED','AI 사진 편집 권한이 필요해요.');return submitReview(this.service.db,sub,input);}
+ async guestReviewStatus(id:string){return reviewStatus(this.service.db,id);}
+ async guestReview(id:string,input:any){if(!this.configured())reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');return submitReview(this.service.db,id,input);}
  /** 2026-11-21: the same heart game for a signed-out visitor (cookie id). Rewards: guest-policy grantGuestHeartReward. */
  async guestHearts(id:string,input:any){if(!this.configured())reject(503,'AI_PHOTO_UNAVAILABLE','지금은 AI 사진 편집을 사용할 수 없어요.');
   if(input?.action==='start')return createHeartGame(this.service.db,id);
@@ -388,6 +394,8 @@ export class AiPhotoController{
  @Post('library') saveLibrary(@Req() req:any,@Body() body:any){return this.photos.saveLibrary(req.user.sub,body);}
  @Post('crop') crop(@Req() req:any,@Body() body:any){return this.photos.crop(req.user.sub,body);}
  @Post('hearts') hearts(@Req() req:any,@Body() body:any){return this.photos.hearts(req.user.sub,body);}
+ @Get('review') reviewStatus(@Req() req:any){return this.photos.reviewStatus(req.user.sub);}
+ @Post('review') review(@Req() req:any,@Body() body:any){return this.photos.review(req.user.sub,body);}
  @Get('quota') quota(@Req() req:any){return this.photos.quota(req.user.sub);}
  @Post('reset-ticket') useResetTicket(@Req() req:any){return this.photos.useResetTicket(req.user.sub);}
  @Post('edit') @UseInterceptors(FileInterceptor('mask',{storage:memoryStorage(),limits:{fileSize:5*1024*1024,files:1}}))
