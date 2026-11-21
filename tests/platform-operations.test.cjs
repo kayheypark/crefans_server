@@ -91,7 +91,7 @@ test('Telegram alerts carry member identifiers only as a keyed hash; 기록 ID s
  assert.match(none,/^memberId: \(숨김\)$/m);
 });
 
-// 2026-11-18 user decision: bank transfer alerts leave out the buyer's IP (like ai-photo.succeeded) but keep amount and product.
+// 2026-11-18 user decision: bank transfer alerts leave out the buyer's IP but keep amount and product.
 test('bank transfer alerts omit IP while other types keep it',()=>{
  const {operationsAlertText}=require('../dist/src/platform/operations.service');
  const base={id:randomUUID(),ip:'203.0.113.7',peer_ip:'198.51.100.8',request_id:randomUUID(),created_at:new Date()};
@@ -100,8 +100,8 @@ test('bank transfer alerts omit IP while other types keep it',()=>{
   assert.match(text,/접속 IP: 보내지 않음/,type);assert.doesNotMatch(text,/203\.0\.113\.7|198\.51\.100\.8|연결 IP/,type);
   assert.match(text,/amount: 5,000원/,type);assert.match(text,/상품: AI 이용권 10회/,type);
  }
- // 2026-11-18 user decision: AI photo failures now show the client IP (only), success alerts still none.
- assert.match(operationsAlertText({...base,type:'ai-photo.failed',data:{errorCode:'X'}},'synthetic','secret'),/접속 IP: 203\.0\.113\.7\n/);assert.match(operationsAlertText({...base,type:'ai-photo.succeeded',data:{}},'synthetic','secret'),/접속 IP: 보내지 않음/);
+ // 2026-11-18 user decision: AI photo failures show the client IP (only); 2026-11-21 user request: successes too.
+ for(const type of ['ai-photo.failed','ai-photo.succeeded']){const text=operationsAlertText({...base,type,data:{errorCode:'X'}},'synthetic','secret');assert.match(text,/접속 IP: 203\.0\.113\.7\n/,type);assert.doesNotMatch(text,/연결 IP|198\.51\.100\.8/,type);}
  const other=operationsAlertText({...base,type:'beans.charge_created',data:{amount:5000}},'synthetic','secret');
  assert.match(other,/접속 IP: 203\.0\.113\.7/);assert.match(other,/연결 IP: 198\.51\.100\.8/);
 });

@@ -42,12 +42,13 @@ function metadata(data:Record<string,unknown>){
  * Operators find the raw value through 기록 ID in the console log. */
 // 2026-11-18 user decision: bank transfer alerts (bank_transfer.*) do not carry the buyer's IP either; the console log keeps it.
 // 2026-11-18 랜딩 방문 알림 상한 알림은 IP 없음. 방문 알림 자체는 같은 날 사용자 지시로 접속 IP 포함(아래 LANDING_TYPES).
-const NO_IP_TYPES=new Set(['share.cap','ai-photo.succeeded','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical','funnel.landing_cap']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
+const NO_IP_TYPES=new Set(['share.cap','ai-photo.provider_cap','ai-photo.cost_warning','ai-photo.cost_critical','funnel.landing_cap']),noIp=(type:string)=>NO_IP_TYPES.has(type)||type.startsWith('bank_transfer.');
 // 2026-11-18 user decision: landing alerts show only the trusted client IP, marked (집) when it is in OWNER_HOME_IPS (comma-separated).
 // 2026-11-18 user decision ("이미지 생성 실패 모두 아이피를 텔레그램으로"): every ai-photo.failed shows the client IP the same way
-// (privacy policy 9조: 운영 오류 알림에 접속 IP 포함). Success and cost alerts still carry none.
+// (privacy policy 9조: 운영 오류 알림에 접속 IP 포함). Cost alerts still carry none.
+// 2026-11-21 user request: ai-photo.succeeded shows the client IP the same way as failures.
 // 2026-11-19: 공유 버튼 알림도 랜딩 알림처럼 접속 IP만 표시한다(같은 방문자를 랜딩 알림과 맞춰 보기 위해).
-const CLIENT_IP_TYPES=new Set(['funnel.landing_view','funnel.landing_test','ai-photo.failed','share.clicked']);
+const CLIENT_IP_TYPES=new Set(['funnel.landing_view','funnel.landing_test','ai-photo.failed','ai-photo.succeeded','share.clicked']);
 const KIND_LABELS:Record<string,string>={bean:'콩 충전','ai-shop':'AI 이용권',ad:'광고상품'};
 function photoAlertData(data:Record<string,unknown>):Record<string,unknown>{
  const {costumeIds,presets,...rest}=data;

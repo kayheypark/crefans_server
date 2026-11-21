@@ -686,12 +686,12 @@ test('member and guest generation alerts display the catalog character and prote
   reset();outputs=1;await run(ok);
   checkSeedreamRequest(owner,request.sourceId);
   const rows=await db.platformOperationalEvent.findMany({where:{request_id:ok,type:'ai-photo.succeeded'}});assert.equal(rows.length,1);const [row]=rows;
-  assert.equal(row.delivered_at,null,'queued for Telegram now (not deduped or digested)');assert.equal(row.last_error_code,null);assert.equal(row.ip,null);assert.equal(row.peer_ip,null);
+  assert.equal(row.delivered_at,null,'queued for Telegram now (not deduped or digested)');assert.equal(row.last_error_code,null);assert.equal(row.ip,'203.0.113.7');
   // estimatedUsd (dev integration with feat/ai-cost-caps): original + clothing guide + 1 costume reference = 3 input images, 3×$0.008+$0.020.
   assert.deepEqual({...row.data,durationMs:0},{actor,mode:'cosplay',style:'cosplay',kinds:'outfit',costumeIds:'80bdd0',presets:'pose:의자에 앉기',references:1,estimatedUsd:'0.044',durationMs:0});
-  const text=operationsAlertText(row,'synthetic','secret');assert.match(text,/^\[crefans\] AI 사진 생성 성공/);assert.match(text,/접속 IP: 보내지 않음/);
+  const text=operationsAlertText(row,'synthetic','secret');assert.match(text,/^\[crefans\] AI 사진 생성 성공/);assert.match(text,/접속 IP: 203\.0\.113\.7\n/);assert.doesNotMatch(text,/연결 IP/);
   assert.match(text,/^의상: Shiroko$/m);assert.match(text,/^presets: pose:의자에 앉기$/m);assert.doesNotMatch(text,/80bdd0|blue-shiroko/);
-  assert.doesNotMatch(JSON.stringify(row)+text,new RegExp(['성공알림프롬프트표식','@','203\\.0\\.113','10\\.0\\.0\\.7',owner,'aisuccess_','base64'].join('|')));
+  assert.doesNotMatch(JSON.stringify(row.data)+text,new RegExp(['성공알림프롬프트표식','@','10\\.0\\.0\\.7',owner,'aisuccess_','base64'].join('|')));
   request.costumeIds=JSON.stringify(['private-costume-input']);
   await assert.rejects(run(invalid),code('INVALID_COSTUME_REFERENCES'));
   const rejected=await db.platformOperationalEvent.findFirstOrThrow({where:{request_id:invalid,type:'ai-photo.failed'}});
