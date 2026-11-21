@@ -3,6 +3,8 @@ import {createHash} from 'node:crypto';
 // 2026-11-21 user request: server-side X Conversion API for pixel rjls2. Called only from server code where the conversion
 // is confirmed. No token (X_PIXEL_TOKEN) or no identifier → nothing is sent. Failures never break the caller.
 export const X_PIXEL_ID='rjls2';
+// Events created in X Events Manager on 2026-11-21 (Define with code): 회원가입 (Sign up), 이용권 결제 (Purchase).
+export const X_EVENT_SIGNUP='tw-rjls2-rjohy',X_EVENT_PURCHASE='tw-rjls2-rjoi0';
 const ENDPOINT=`https://ads-api.x.com/12/measurement/conversions/${X_PIXEL_ID}`;
 
 export type XConversionInput={eventId:string;conversionId?:string;eventSourceUrl?:string;time?:Date;twclid?:string;email?:string;phone?:string;ipAddress?:string;userAgent?:string};

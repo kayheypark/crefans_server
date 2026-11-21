@@ -24,6 +24,22 @@ test('half-use balance is frozen and refunded at the purchased unit price in who
  assert.equal(result.status,'refunded');
  assert.equal((await shop.order(member,order.id)).refund_quantity,9.5);
 });
+// 2026-11-21 user request: a paid order sends one X purchase conversion (hashed email, order id); a repeat confirm does not resend.
+test('paid order sends the X purchase conversion once with a hashed email',async()=>{
+ const realFetch=globalThis.fetch,sent=[];process.env.X_PIXEL_TOKEN='test-token';
+ globalThis.fetch=async(url,init)=>{if(String(url).includes('ads-api.x.com')){sent.push({url,init});return {ok:true,status:200};}return realFetch(url,init);};
+ try{
+  const o=await paid();await new Promise(r=>setImmediate(r));
+  assert.equal(sent.length,1);const body=JSON.parse(sent[0].init.body).conversions[0];
+  assert.equal(sent[0].url,'https://ads-api.x.com/12/measurement/conversions/rjls2');assert.equal(sent[0].init.headers['X-Pixel-Token'],'test-token');
+  assert.equal(body.event_id,'tw-rjls2-rjoi0');assert.equal(body.conversion_id,'shop-'+o.id);
+  const email=(await db.member.findUnique({where:{id:member}})).email;
+  assert.equal(body.identifiers[0].hashed_email,require('node:crypto').createHash('sha256').update(email.trim().toLowerCase()).digest('hex'));
+  await shop.confirm(member,o.id,{orderId:o.id,amount:o.amount,paymentKey:'key-'+o.id});await new Promise(r=>setImmediate(r));
+  assert.equal(sent.length,1,'already paid: no second conversion');
+ }finally{globalThis.fetch=realFetch;delete process.env.X_PIXEL_TOKEN;}
+});
+
 test('archival keeps paid snapshots, blocks new sale, and permissions are independent',async()=>{const before=await db.aiShopOrder.findFirst({where:{creator_id:member,status:'paid'}});await admin.remove(product.id,{version:product.version});await assert.rejects(create(),code('PRODUCT_UNAVAILABLE'));assert.equal((await shop.order(member,before.id)).name,'검증용 10회');const {can}=require('../dist/src/platform/admin-permissions');assert.equal(can({role:'ADMIN',permissions:{advertising:{view:true,update:true}}},'shop','update'),false);assert.equal(can({role:'SUPER_ADMIN'},'shop','update'),true);});
 // 2026-11-17 user decision: signed-out visitors browse the shop. The public list is the visible catalog only, without any member check.
 test('public catalog lists only visible products and needs no member; the route has no session guard',async()=>{
@@ -34,3 +50,4 @@ test('public catalog lists only visible products and needs no member; the route 
   const c=new AiShopWebhookController(service,{limit:async()=>{}},shop,{available:()=>false}),r=await c.publicCatalog();assert.equal(r.subscriptionsAvailable,false);assert.deepEqual(r.products.map(p=>p.id),list.map(p=>p.id));
  }finally{await db.aiShopProduct.delete({where:{id:hidden.id}});}
 });
+
