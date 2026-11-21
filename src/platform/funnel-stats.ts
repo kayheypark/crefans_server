@@ -6,6 +6,7 @@ import {kstDay} from './ai-preset-usage';
 import {reject} from './http';
 import {appendAudit,auditChange} from './audit';
 import {requestContext} from './request-context';
+import {recordLandingUtm} from './landing-utm';
 
 export const FUNNEL_STEPS=[
  ['landing_view','AI 사진 랜딩 방문'],
@@ -102,6 +103,8 @@ export async function reportFunnelStep(db:any,input:any,alert?:{operations:{reco
  const recorded=await recordFunnelStep(db,step as FunnelStep);
  if(recorded&&step==='landing_view'){
   const source=landingSource(input);
+  // 2026-11-21 (유입 분석): the same accepted visit is also counted per UTM combination (aggregate only, never throws).
+  await recordLandingUtm(db,source);
   if(source.utmSource==='crefans_share'&&source.utmCampaign==='ai_photo'&&source.utmContent==='result')await recordFunnelStep(db,'landing_view_result_share');
   if(alert)void landingVisitAlert(db,alert.operations,source,alert.userAgent);
  }

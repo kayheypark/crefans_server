@@ -2320,3 +2320,37 @@ model FunnelStepDaily {
   @@id([day, step])
   @@map("funnel_step_daily")
 }
+
+/// 2026-11-21: daily AI photo landing visits per UTM combination ('' = absent). Aggregate only, no person, IP or cookie.
+/// Written and read with raw SQL (landing-utm.ts); utm/host columns are ascii_bin in the migration.
+model LandingUtmDaily {
+  day           DateTime @db.Date
+  source        String   @default("") @db.VarChar(40)
+  medium        String   @default("") @db.VarChar(40)
+  campaign      String   @default("") @db.VarChar(40)
+  content       String   @default("") @db.VarChar(40)
+  referrer_host String   @default("") @db.VarChar(253)
+  count         Int      @default(0)
+  updated_at    DateTime @default(now()) @updatedAt
+  @@id([day, source, medium, campaign, content, referrer_host])
+  @@map("landing_utm_daily")
+}
+
+/// 2026-11-21: operator-made landing links with fixed UTM values. active_key is NULL once archived.
+model LandingLink {
+  id           String    @id @default(uuid())
+  name         String    @db.VarChar(80)
+  landing_path String    @db.VarChar(64)
+  utm_source   String    @db.VarChar(40)
+  utm_medium   String    @db.VarChar(40)
+  utm_campaign String    @db.VarChar(40)
+  utm_content  String    @default("") @db.VarChar(40)
+  memo         String    @default("") @db.VarChar(500)
+  created_by   String    @db.VarChar(191)
+  active_key   String?   @unique @db.VarChar(170)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now()) @updatedAt
+  archived_at  DateTime?
+  @@index([created_at])
+  @@map("landing_links")
+}

@@ -16,6 +16,7 @@ import {confirmSettlementReceipt} from './settlement-receipts';
 import {LocalMemberService} from '../auth/local/local-member.service';
 import {reportClientError} from './client-errors';
 import {funnelStats,updateLandingAlertCap} from './funnel-stats';
+import {archiveLandingLink,createLandingLink,landingUtmStats,listLandingLinks,updateLandingLink} from './landing-utm';
 import {adminLogs,adminLogDetail} from './admin-logs';
 import {actorContext,auditChange,contentDigest,appendAudit} from './audit';
 import {Body,CanActivate,Controller,Delete,ExecutionContext,Get,Header,HttpCode,Injectable,Param,Post,Put,Query,Req,UseGuards} from '@nestjs/common';
@@ -85,6 +86,12 @@ export class PlatformAdminController{
  @Get('overview') @Permit(['overview','view']) overview(){return adminOverview(this.service.db);}
  @Get('funnel-stats') @Permit(['overview','view']) funnel(){return funnelStats(this.service.db);}
  @Put('funnel-stats/landing-alert-cap') @Permit(['settings','update']) landingAlertCap(@Body() body:any,@Req() req:any){return updateLandingAlertCap(this.service.db,req.admin,body);}
+ // 2026-11-21 유입 분석 (same view permission as funnel-stats) and 랜딩 링크 관리 (changes need settings.update, like the alert cap).
+ @Get('landing-utm-stats') @Permit(['overview','view']) landingUtm(@Query() query:any){return landingUtmStats(this.service.db,query);}
+ @Get('landing-links') @Permit(['overview','view']) landingLinks(){return listLandingLinks(this.service.db);}
+ @Post('landing-links') @Permit(['settings','update']) createLandingLink(@Body() body:any,@Req() req:any){return createLandingLink(this.service.db,req.admin,body);}
+ @Put('landing-links/:id') @Permit(['settings','update']) updateLandingLink(@Param('id') id:string,@Body() body:any,@Req() req:any){return updateLandingLink(this.service.db,req.admin,id,body);}
+ @Post('landing-links/:id/archive') @Permit(['settings','update']) archiveLandingLink(@Param('id') id:string,@Req() req:any){return archiveLandingLink(this.service.db,req.admin,id);}
  @Get('revenue') @Permit(['revenue','view']) revenue(@Query() query:any,@Req() req:any){return adminRevenue(this.service.db,req.admin,query);}
  @Get('reserved-handles') @Permit(['reserved-handles','view']) reservedHandles(@Query() query:any,@Req() req:any){return listReservedHandles(this.service.db,req.admin,query);}
  @Get('reserved-handles/:id/history') @Permit(['reserved-handles','view']) reservedHistory(@Param('id') id:string,@Query() query:any,@Req() req:any){return reservedHandleHistory(this.service.db,req.admin,id,query);}
