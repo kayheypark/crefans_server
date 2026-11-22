@@ -519,12 +519,31 @@ export const GUEST_DAILY_TERMS:LegalDocument={...SHARE_REWARD_TERMS,version:'202
  notice:'2026년 11월 20일부터 적용합니다. 제13조의 비회원 체험 이용권을 매일 오전 9시(한국 시간)에 3장으로 다시 채우고, 첫 게시·첫 공유 보상을 하루 한 번씩 받을 수 있도록 바꾸었습니다. 그 밖의 조항은 바뀌지 않았습니다. 이전 개정 내역은 이전 버전에서 볼 수 있습니다.',
  sections:SHARE_REWARD_TERMS.sections.map(sec=>sec.title.startsWith('13. ')?{...sec,body:swapIn(sec.title,sec.body,DAILY_T13_FROM,DAILY_T13_TO)}:sec)};
 const guestDailyCatalog:LegalCatalog={...shareRewardCatalog,documents:{...shareRewardCatalog.documents,privacy:GUEST_DAILY_PRIVACY,terms:GUEST_DAILY_TERMS}};
+// 2026-11-22 user decisions (/ask-me): the X ads pixel (rjls2, every page since 2026-11-21) and the X Conversion API (hashed email at
+// signup and AI ticket payment, x-conversions.ts) contradicted 10항 "광고 추적용 쿠키 … 도입하지 않았습니다". Revise the privacy policy
+// right away (notice + refusal methods, no consent UI — the user chose "약관에 추가하고 UI변경금지"), also covering the funnel events
+// planned next (trial start · AI photo · checkout start). X facts from x.com/en/privacy (effective 2026-01-15, read 2026-11-22):
+// controller outside EU/EFTA/UK = X Corp., 800 W Cesar Chavez St., Austin, TX 78701; inquiries help.x.com/forms/privacy; cookies and
+// cookie data up to 13 months; ad interactions and partner-shared data up to 12 months; setting "Data sharing with business partners".
+export const X_ADS_DATE='2026-11-22';
+const X_ADS_P8_FROM='이용자의 정보를 광고사업자에게 판매하거나 광고 목적으로 제공하는 기능은 현재 사용하지 않습니다.';
+const X_ADS_P8_TO='이용자의 정보를 광고사업자에게 판매하지 않습니다. 다만 광고 성과 측정과 광고 대상 설정을 위해 X Corp.(미국)의 광고 픽셀과 전환 전송 기능을 사용하며, 보내는 항목·국외 이전·거부 방법은 9조 ⑤와 10조를 확인하세요.';
+const X_ADS_P9_AFTER='이용 분석 기록은 최대 1년, 화면 이용 기록은 최대 30일 보관한 뒤 PostHog에서 삭제됩니다.';
+const X_ADS_P9='⑤ X Corp.(미국, 800 W Cesar Chavez St., Austin, TX 78701, 개인정보 문의 https://help.x.com/forms/privacy): X 광고의 성과를 측정하고 광고를 보여 줄 대상과 제외할 대상(사이트 방문자·회원가입자·결제자)을 정하기 위해 다음 정보가 HTTPS로 X에 전송됩니다. 서비스 화면을 이용할 때마다 X 광고 픽셀이 X 쿠키의 식별자, 방문한 화면 주소와 이전 화면 주소, 브라우저·기기 정보, 접속 IP, AI 사진 체험 시작·AI 사진 만들기·결제 시작 같은 이용 단계 도달 기록을 보냅니다. 회원가입과 AI 이용권 결제가 끝나면 서버가 회원 이메일 주소를 되돌릴 수 없게 변환한 값(SHA-256)과 가입·결제 구분, 주문 식별번호, 발생 시각을 보냅니다. 이메일 원문, 이름, 전화번호, 결제 금액, 카드·계좌 정보, 게시물·사진, 고른 의상·프리셋은 보내지 않습니다. X는 이 정보를 자신의 광고 서비스에 이용하며, X 개인정보처리방침에 따라 쿠키와 쿠키로 수집한 정보는 최대 13개월, 광고 이용 기록과 광고주가 보낸 정보는 최대 12개월 보관합니다. 이 처리는 서비스 이용에 꼭 필요하지 않으므로 거부해도 서비스 이용에 제한이 없으며, 거부 방법은 10조를 확인하세요.';
+const X_ADS_P10_FROM='현재 신규 서비스에는 광고 추적용 쿠키나 외부 광고 맞춤화 스크립트를 도입하지 않았습니다. 도입 시 실제 사용 목적과 항목, 보유기간, 동의·거부 방법을 먼저 검토하고 안내합니다.';
+const X_ADS_P10_TO='광고 성과 측정과 광고 대상 설정(9조 ⑤)을 위해 X Corp.의 광고 픽셀(static.ads-twitter.com, analytics.twitter.com)을 사용하며, X가 정한 이름의 쿠키에 식별자를 최대 13개월 저장합니다. 브라우저 설정에서 제3자 쿠키를 차단하거나 삭제하고, 추적 방지·콘텐츠 차단 기능으로 위 주소 연결을 막으면 픽셀 정보를 보내지 않습니다. X 계정이 있으면 X의 개인정보 및 안전 설정에서 \'비즈니스 파트너와 데이터 공유(Data sharing with business partners)\'와 광고 맞춤 설정을 끌 수 있습니다. 거부해도 서비스 이용에 제한이 없습니다.';
+export const X_ADS_PRIVACY:LegalDocument={...GUEST_DAILY_PRIVACY,version:'2026-11-22.x-ads.1',updatedAt:X_ADS_DATE,publishedAt:X_ADS_DATE,effectiveAt:X_ADS_DATE,status:'published',
+ notice:GUEST_DAILY_PRIVACY.notice+' 2026-11-22 개정: 8·9·10항 — 광고 성과 측정과 광고 대상 설정을 위한 X Corp.(미국)의 광고 픽셀·전환 전송(보내는 항목, 국외 이전, X의 보관 기간, 거부 방법)을 적었습니다.',
+ sections:GUEST_DAILY_PRIVACY.sections.map(sec=>sec.title.startsWith('8. ')?{...sec,body:swapIn(sec.title,sec.body,X_ADS_P8_FROM,X_ADS_P8_TO)}
+  :sec.title.startsWith('9. ')?{...sec,body:swapIn(sec.title,sec.body,X_ADS_P9_AFTER,X_ADS_P9_AFTER+'\n'+X_ADS_P9),links:[...(sec.links||[]),{label:'X 개인정보처리방침',href:'https://x.com/en/privacy'}]}
+  :sec.title.startsWith('10. ')?{...sec,body:swapIn(sec.title,sec.body,X_ADS_P10_FROM,X_ADS_P10_TO)}:sec)};
+const xAdsCatalog:LegalCatalog={...guestDailyCatalog,documents:{...guestDailyCatalog.documents,privacy:X_ADS_PRIVACY}};
 const kstDate=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 
 @Injectable()
 export class LegalDocumentsService {
  // The revision replaces the current terms on its effective date (KST); before that it is published as the upcoming version.
- catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=GUEST_DAILY_DATE?guestDailyCatalog:day>=SHARE_REWARD_DATE?shareRewardCatalog:day>=GUEST_LIMITS_DATE?guestLimitsCatalog:day>=GUEST_REPLAY_PRIVACY_DATE?guestReplayCatalog:day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
+ catalog(now=new Date()):LegalCatalog{const day=kstDate(now);return structuredClone(day>=X_ADS_DATE?xAdsCatalog:day>=GUEST_DAILY_DATE?guestDailyCatalog:day>=SHARE_REWARD_DATE?shareRewardCatalog:day>=GUEST_LIMITS_DATE?guestLimitsCatalog:day>=GUEST_REPLAY_PRIVACY_DATE?guestReplayCatalog:day>=POSTHOG_ERRORS_DATE?posthogErrorsCatalog:day>=BEAN_TERMS_DATE?beanTermsCatalog:day>=FRANCHISE_POLICY_DATE?franchiseCatalog:day>=MARKETING_REWARD_DATE?rewardCatalog:day>=POSTHOG_PRIVACY_DATE?posthogCatalog:day>=PHONE_STORE_DATE?adultCatalog:day>=AI_POSITION_DATE?aiCatalog:day>=BANK_TRANSFER_DATE?phoneCatalog2:day>=GUEST_CAPTION_DATE?captionCatalog:day>=MEMBERSHIP_PARTNER_DATE?membershipCatalog2:day>=OPEN_LEGAL_DATE?openCatalog:day>=TERMS_SYNC_DATE?syncCatalog:day>=PARTNER_TERMS_DATE?payoutCatalog:day>=PAYOUT_TERMS_DATE?payoutOnlyCatalog:day>=NEXT_TERMS_EFFECTIVE?nextCatalog:{...catalog,upcoming:{effectiveAt:NEXT_TERMS_EFFECTIVE,documents:{terms:nextTerms,policy:nextPolicy}}});}
  signup(){
   const c=this.catalog(),documents={terms:c.documents.terms,privacy:c.documents.privacy,marketing:c.marketing};
   const published=c.blockers.length===0&&Object.values({...documents,collection:c.collection}).every(d=>d.status==='published'&&!!d.effectiveAt&&d.effectiveAt<=kstDate());// KST like catalog(): a UTC day kept a KST-midnight revision unpublished until 09:00 (2026-11-13)
