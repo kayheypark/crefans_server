@@ -221,6 +221,14 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  assert.deepEqual(await guestsService.replaySession(g.req,session),{recorded:true});
  assert.deepEqual(await guestsService.replaySession(g.req,session.toUpperCase()),{recorded:true});
  assert.equal(await db.platformAuditLog.count({where:{action:'guest.replay_session',entity_id:g.id}}),1,'the same session is stored once');
+ // 2026-11-22: the PostHog visitor number (distinct_id) is stored once and only when it is a UUID; the console searches by either number.
+ const visitor=crypto.randomUUID(),session2=crypto.randomUUID();
+ assert.deepEqual(await guestsService.replaySession(g.req,session2,visitor.toUpperCase()),{recorded:true});
+ await guestsService.replaySession(g.req,session2,visitor);await guestsService.replaySession(g.req,session,'not-a-uuid');
+ assert.equal(await db.platformAuditLog.count({where:{action:'guest.replay_visitor',entity_id:g.id}}),1,'the visitor number is stored once, a non-UUID is ignored');
+ for(const q of [visitor,' '+session2.toUpperCase()+' ',g.id]){const found=await listAiTrials(db,admin,{q});assert.deepEqual(found.items.map(i=>i.id),[g.id],q);assert.equal(found.total,1);}
+ assert.deepEqual((await listAiTrials(db,admin,{q:crypto.randomUUID()})).items,[],'an unknown number finds nothing');
+ await assert.rejects(listAiTrials(db,admin,{q:'hello'}),code('AI_TRIAL_QUERY_INVALID'));
 
  const list=await listAiTrials(db,admin,{});const item=list.items.find(i=>i.id===g.id);
  assert.ok(item,'the trial is listed');assert.equal(list.pageSize,30);assert.ok(list.total>=2);
@@ -237,7 +245,7 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  assert.deepEqual(ok.options.editKinds,['outfit','pose'],'multipart JSON string becomes an array (production console crash 2026-11-20)');assert.equal(ok.options.backgroundId,'b7a101');
  assert.deepEqual(ok.options.presets.find(p=>p.kind==='pose'),{kind:'pose',key:'의자에 앉기'});
  assert.equal(bad.outcome,'failed');assert.equal(bad.errorCode,'moderation_blocked');assert.equal(bad.detail,'expired','no stored request → shown as expired');
- assert.deepEqual(detail.replays.map(r=>[r.sessionId,r.url]),[[session,'https://us.posthog.com/replay/'+session]]);
+ assert.deepEqual(detail.replays.map(r=>[r.sessionId,r.url]),[[session,'https://us.posthog.com/replay/'+session],[session2,'https://us.posthog.com/replay/'+session2]],'visitor numbers are not replay links');
  assert.equal(detail.posts.length,1);assert.equal(detail.posts[0].id,published.id);assert.deepEqual(detail.posts[0].mediaIds,[result]);
  assert.ok(await db.platformAuditLog.findFirst({where:{action:'admin.ai_trial_viewed',entity_id:g.id}}),'detail view is audited');
 

@@ -24,10 +24,18 @@ function requireView(admin:any){if(!can(admin,'members','view'))reject(403,'ADMI
 export async function listAiTrials(db:any,admin:any,query:any){
  requireView(admin);
  const page=Math.max(1,Math.min(1000,Number.parseInt(String(query?.page??'1'),10)||1));
- const groups=await db.platformAuditLog.groupBy({by:['entity_id'],where:{action:'guest.consented',entity_id:{startsWith:GUEST_PREFIX}},_min:{occurred_at:true},orderBy:{_min:{occurred_at:'desc'}},skip:(page-1)*PAGE,take:PAGE});
+ // 2026-11-22 user request: search by the trial id or a PostHog number — a replay session number or the visitor number (distinct_id)
+ // the browser reported (guest.replay_session / guest.replay_visitor keep it at the end of source_id).
+ const q=String(query?.q??'').trim().toLowerCase();let only:string[]|null=null;
+ if(q){
+  if(isTrialId(q))only=[q];
+  else if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(q))only=[...new Set<string>((await db.platformAuditLog.findMany({where:{action:{in:['guest.replay_session','guest.replay_visitor']},source_id:{endsWith:':'+q}},select:{entity_id:true},take:50})).map((r:any)=>r.entity_id))];
+  else reject(400,'AI_TRIAL_QUERY_INVALID','체험 번호(guest:…)나 PostHog 세션·방문자 번호를 입력해 주세요.');
+ }
+ const where={action:'guest.consented',entity_id:only?{in:only}:{startsWith:GUEST_PREFIX}};
+ const groups=await db.platformAuditLog.groupBy({by:['entity_id'],where,_min:{occurred_at:true},orderBy:{_min:{occurred_at:'desc'}},skip:(page-1)*PAGE,take:PAGE});
  const rows=groups,ids:string[]=rows.map((g:any)=>g.entity_id);
- const [{n}]=await db.$queryRaw`SELECT COUNT(DISTINCT entity_id) AS n FROM platform_audit_logs WHERE action='guest.consented' AND entity_id LIKE 'guest:%'`;
- const total=Number(n);
+ const total=only?(await db.platformAuditLog.groupBy({by:['entity_id'],where})).length:Number((await db.$queryRaw`SELECT COUNT(DISTINCT entity_id) AS n FROM platform_audit_logs WHERE action='guest.consented' AND entity_id LIKE 'guest:%'`)[0].n);
  if(!ids.length)return{items:[],total,page,pageSize:PAGE};
  const byUser=(model:'media'|'posting',where:any)=>db[model].groupBy({by:['user_sub'],where:{user_sub:{in:ids},...where},_count:{_all:true}});
  const byActor=(action:string)=>db.platformAuditLog.groupBy({by:['actor_id'],where:{actor_id:{in:ids},action},_count:{_all:true}});

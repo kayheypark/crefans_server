@@ -15,6 +15,7 @@ import {requestContext} from './request-context';
 import {LocalMemberService} from '../auth/local/local-member.service';
 
 import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,GUEST_REPLAY_CONSENT_VERSION,GUEST_SHARE_REWARD,grantGuestShareReward,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash,GUEST_HEART_DAILY_MAX,GUEST_HEART_REWARD} from './guest-policy';
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export * from './guest-policy';
 const COOKIE_DAYS=30;
 
@@ -71,13 +72,18 @@ export class GuestService{
  }
  // 2026-11-20 user request: the console trial history links to the PostHog replay of the visit. The browser reports the PostHog
  // session ID (a random UUID, no content) once per ID; the same ID is stored once (source_id), at most 50 per trial a day.
- async replaySession(req:any,sessionId:unknown){
+ async replaySession(req:any,sessionId:unknown,distinctId?:unknown){
   const id=this.require(req);
-  if(typeof sessionId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId))reject(400,'GUEST_REPLAY_SESSION_INVALID','세션 번호를 확인해 주세요.');
+  if(typeof sessionId!=='string'||!UUID.test(sessionId))reject(400,'GUEST_REPLAY_SESSION_INVALID','세션 번호를 확인해 주세요.');
   const session=(sessionId as string).toLowerCase();
   if(await this.service.db.platformAuditLog.findUnique({where:{source_id:`guest-replay:${id}:${session}`},select:{id:true}}))return{recorded:true};
   try{await this.limiter.limit('guest-replay:'+id,50,86400);}catch(error:any){if(error?.getStatus?.()!==429)throw error;return{recorded:false};}
   await appendAudit(this.service.db,{category:'business',action:'guest.replay_session',entityId:id,sourceId:`guest-replay:${id}:${session}`});
+  // 2026-11-22 user request: the console also finds a trial by the PostHog visitor number (distinct_id, shown on the person page).
+  // Optional and UUID-only (an anonymous PostHog visitor); stored once per trial like the session number, anything else is ignored.
+  const visitor=typeof distinctId==='string'&&UUID.test(distinctId)?distinctId.toLowerCase():'';
+  if(visitor&&!await this.service.db.platformAuditLog.findUnique({where:{source_id:`guest-visitor:${id}:${visitor}`},select:{id:true}}))
+   await appendAudit(this.service.db,{category:'business',action:'guest.replay_visitor',entityId:id,sourceId:`guest-visitor:${id}:${visitor}`});
   return{recorded:true};
  }
  // 2026-11-16 user decision: signing in no longer links trial posts by itself; the browser first asks. This counts what would move.
@@ -102,7 +108,7 @@ export class GuestController{
  constructor(private guests:GuestService,private studio:PlatformStudioService,private photos:AiPhotoService,private captions:GuestCaptionService){}
  @Get('session') session(@Req() req:any){return this.guests.status(req,id=>this.photos.guestQuota(id));}
  @Post('session') start(@Req() req:any,@Res({passthrough:true}) res:any,@Body() body:any){return this.guests.start(req,res,body);}
- @Post('replay-session') replaySession(@Req() req:any,@Body() body:any){return this.guests.replaySession(req,body?.sessionId);}
+ @Post('replay-session') replaySession(@Req() req:any,@Body() body:any){return this.guests.replaySession(req,body?.sessionId,body?.distinctId);}
  @Post('ai-photo/share-done') shareDone(@Req() req:any,@Body() body:any){return this.guests.shareDone(req,body?.mediaId);}
  // 2026-11-21: server-verified waiting game for visitors (30 hearts → 0.5 credit, 3 a day per browser and per network).
  @Post('ai-photo/hearts') hearts(@Req() req:any,@Body() body:any){return this.photos.guestHearts(this.guests.require(req),body);}
