@@ -55,7 +55,8 @@ export function landingSource(input:any):LandingSource{
  return{referrerHost:typeof input?.referrerHost==='string'&&HOST.test(input.referrerHost)?input.referrerHost:undefined,utmSource:utm(input?.utmSource),utmMedium:utm(input?.utmMedium),utmCampaign:utm(input?.utmCampaign),utmContent:utm(input?.utmContent)};
 }
 // Readable names for the sources the operator uses in links (2026-11-18). Unknown sources show the raw value only.
-const SOURCE_NAMES:Record<string,string>={daangn:'당근',x:'X',instagram:'인스타그램'};
+// 2026-11-22 user request: visits through a shared AI result link (/s adds utm_source=crefans_share) are named in the alert.
+const SOURCE_NAMES:Record<string,string>={daangn:'당근',x:'X',instagram:'인스타그램',crefans_share:'공유받은 링크'};
 /** 2026-11-20 (AI 사진 체험 관리 유입 경로): the first page of the visit as a key, e.g. /service/landing-x → service:landing-x. */
 export function landingPathKey(value:unknown){return typeof value==='string'&&/^\/[a-z0-9/_-]{0,120}$/.test(value)?value.replace(/^\/+|\/+$/g,'').replace(/\//g,':')||'root':undefined;}
 export function landingFrom(source:LandingSource){

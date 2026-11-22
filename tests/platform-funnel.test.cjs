@@ -106,6 +106,8 @@ test('landing alert: utm_medium and utm_campaign reach the alert; known sources 
  assert.equal(funnel.landingFrom({utmSource:'daangn',utmMedium:'cpc',utmCampaign:'daangn_202611'}),'당근 · utm_source=daangn · utm_medium=cpc · utm_campaign=daangn_202611');
  assert.equal(funnel.landingFrom({referrerHost:'t.co',utmSource:'x',utmMedium:'social'}),'X · t.co · utm_source=x · utm_medium=social');
  assert.equal(funnel.landingFrom({utmSource:'insta_bio'}),'utm_source=insta_bio','unknown source: raw value only');
+ // 2026-11-22: a shared AI result link (/s → utm_source=crefans_share) is named so the alert shows it came from a share.
+ assert.equal(funnel.landingFrom({referrerHost:'talk.kakao.com',utmSource:'crefans_share',utmMedium:'share',utmCampaign:'ai_photo',utmContent:'result'}),'공유받은 링크 · talk.kakao.com · utm_source=crefans_share · utm_medium=share · utm_campaign=ai_photo · utm_content=result');
  const since=new Date(Date.now()-1000),res=await fetch(base+'/api/v1/telemetry/funnel',{method:'POST',headers:{'content-type':'application/json','user-agent':IPHONE,'x-crefans-client-ip':'198.51.100.24'},body:JSON.stringify({step:'landing_view',utmSource:'daangn',utmMedium:'cpc',utmCampaign:'daangn_202611'})});
  assert.equal(res.status,201);assert.deepEqual(await res.json(),{recorded:true});
  let row;for(let i=0;i<40&&!row;i++){row=(await landingRows(since)).find(r=>r.ip==='198.51.100.24'&&r.data['유입']?.startsWith('당근'));if(!row)await new Promise(r=>setTimeout(r,50));}assert.ok(row,'alert queued');assert.equal(row.data['유입'],'당근 · utm_source=daangn · utm_medium=cpc · utm_campaign=daangn_202611');
