@@ -1,7 +1,7 @@
 import {randomInt,randomUUID} from 'crypto';
 import {reject} from './http';
 import {appendAudit} from './audit';
-import {isGuestId,guestHeartLock,grantGuestHeartReward,guestIpHashFromEnv,GUEST_HEART_SCORE} from './guest-policy';
+import {isGuestId,guestHeartLock,grantGuestHeartReward,guestIpHashFromEnv,GUEST_HEART_SCORE,GUEST_HEART_REWARD} from './guest-policy';
 import {requestContext} from './request-context';
 export const AI_HEART_DAILY_CAP=100;
 export const heartConversion=(hearts:number)=>hearts>=100?{hearts:hearts%10,credits:Math.floor(hearts/10)}:{hearts,credits:0};
@@ -25,7 +25,9 @@ export async function clickHeart(db:any,user:string,id:string,piece:unknown,even
  });
 }
 export async function settleHeartGame(db:any,user:string,id:string){return db.$transaction(async(tx:any)=>{await lockHeartUser(tx,user);const g=await tx.aiHeartGame.findFirst({where:{id,user_id:user}});if(!g)reject(404,'GAME_NOT_FOUND','하트 게임을 찾지 못했어요.');if(g.status==='active'&&g.started_at&&Date.now()-g.started_at.getTime()>600000)await tx.aiHeartGame.update({where:{id},data:{status:'ended'}});else if(!['ready','ended','settled'].includes(g.status))reject(409,'GAME_RUNNING','사진 생성이 끝나면 하트가 적립돼요.');
- if(g.status==='settled')return{...await heartBalance(tx,user),earned:g.score,converted:g.converted};
+ // 2026-11-22 user report: the edit request settles the guest game first, so the client's finish lands here; answer in the guest
+ // shape (ticket/capped) or the screen shows the member line '하트 10개를 이용권 1개로 바꿨어요'. converted=1 means the credit was paid.
+ if(g.status==='settled')return isGuestId(user)?{hearts:0,credits:0,earned:g.score,converted:0,ticket:g.converted?GUEST_HEART_REWARD:0,capped:g.score>=GUEST_HEART_SCORE&&!g.converted}:{...await heartBalance(tx,user),earned:g.score,converted:g.converted};
  // 2026-11-21 user decision: guests earn GUEST_HEART_REWARD credit for a full game (30 hearts), capped per browser and per IP a
  // day (guest-policy). No heart wallet; converted stores 1 when the credit was paid.
  if(isGuestId(user)){

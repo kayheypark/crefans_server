@@ -26,7 +26,10 @@ test('30 hearts → 0.5 credit, 29 → none; at most 3 credits a day per browser
  const b=newGuest();const sameNet=await play(b,ip);assert.equal(sameNet.ticket,0,'a new browser on the same network is capped too');assert.equal(await policy.guestHeartRewardTotal(db,b),0);
  const otherNet=await play(b,ipOf());assert.equal(otherNet.ticket,0.5,'the same browser on another network is under both caps');
  const g=(await db.aiHeartGame.findMany({where:{user_id:a,status:'settled'},orderBy:{created_at:'desc'},take:1}))[0];
- const again=await requestContext.run({ip,peerIp:ip,requestId:'x'},()=>hearts.settleHeartGame(db,a,g.id));assert.equal(await policy.guestHeartRewardTotal(db,a),3,'re-settling pays nothing');void again;
+ const again=await requestContext.run({ip,peerIp:ip,requestId:'x'},()=>hearts.settleHeartGame(db,a,g.id));assert.equal(await policy.guestHeartRewardTotal(db,a),3,'re-settling pays nothing');assert.equal(again.ticket,0);assert.equal(again.capped,true);assert.equal(again.converted,0);
+ // 2026-11-22: the edit request settles first, so the client's finish re-settles; it must report the guest reward, not a member conversion.
+ const paid=(await db.aiHeartGame.findMany({where:{user_id:a,status:'settled',converted:1},take:1}))[0];const finish=await hearts.settleHeartGame(db,a,paid.id);
+ assert.equal(finish.ticket,0.5,'already-paid game reports its 0.5 credit');assert.equal(finish.converted,0,'no member heart conversion');assert.equal(finish.capped,false);assert.equal(await policy.guestHeartRewardTotal(db,a),3);
  const audits=await db.platformAuditLog.count({where:{entity_id:a,action:'guest.heart_reward'}});assert.equal(audits,8);
 });
 test('guest clicks are verified by the server: hearts +1, others −1, empty −1, a client score is never accepted',async()=>{
