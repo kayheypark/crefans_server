@@ -71,6 +71,26 @@ test('AI result share grants three credits at the first share of the guest\'s ow
  assert.equal(typeof guestsService.shareVisit,'undefined','visits no longer pay');
 });
 
+// 2026-11-22 user decision: opening the Coupang costume link pays three credits once per browser a day, independent of the share reward.
+test('Coupang costume link click grants three credits once a day; it stacks with the share reward and resets at 09:00 KST',async()=>{
+ const owner=await startGuest(),result=await upload(owner.id,{aiGenerated:true});
+ const realNow=Date.now,day=Math.floor(realNow()/86400000);
+ try{
+  Date.now=()=>day*86400000+3600000;
+  assert.equal((await guestsService.status(owner.req,id=>photos.guestQuota(id))).shopRewardClaimed,false);
+  const twice=await Promise.all([guestsService.shopClick(owner.req),guestsService.shopClick(owner.req)]);
+  assert.equal(twice.filter(r=>r.granted).length,1,'concurrent clicks pay once');
+  let q=await photos.guestQuota(owner.id);assert.equal(q.remaining,6);assert.equal(q.shopRewardClaimed,true);
+  const s=await guestsService.status(owner.req,id=>photos.guestQuota(id));assert.equal(s.shopRewardClaimed,true);assert.equal(s.shopReward,3);
+  assert.deepEqual(await guestsService.shareDone(owner.req,result),{granted:true});assert.equal((await photos.guestQuota(owner.id)).remaining,9,'stacks with share');
+  assert.equal(await db.platformAuditLog.count({where:{entity_id:owner.id,action:'guest.costume_shop_reward'}}),1);
+  Date.now=()=>(day+1)*86400000+60000;
+  q=await photos.guestQuota(owner.id);assert.equal(q.shopRewardClaimed,false);assert.equal(q.remaining,3);
+  assert.deepEqual(await guestsService.shopClick(owner.req),{granted:true},'again the next day');
+ }finally{Date.now=realNow;}
+ await assert.rejects(guestsService.shopClick({headers:{},cookies:{}}),e=>e.getStatus?.()>=400);
+});
+
 // 2026-11-20 user decisions: guest credits refill to 3 every day at 09:00 KST (00:00 UTC) and the share reward can be earned
 // again the next day; yesterday's leftovers do not carry over.
 test('guest credits and the share reward reset at the next 09:00 KST',async()=>{

@@ -23,7 +23,7 @@ import {reject} from './http';
 import {contentDigest} from './audit';
 import {requestContext} from './request-context';
 import {PlatformOperationsService} from './operations.service';
-import {GUEST_AI_LIMIT,GUEST_POST_REWARD,GUEST_SHARE_REWARD,GUEST_DAILY_TOTAL,GUEST_IP_DAILY,guestPostRewardClaimed,guestShareRewardClaimed,guestQuotaEpoch,guestQuotaKey,guestHeartRewardTotal,GUEST_HEART_DAILY_MAX} from './guest-policy';
+import {GUEST_AI_LIMIT,GUEST_POST_REWARD,GUEST_SHARE_REWARD,GUEST_SHOP_REWARD,guestShopRewardClaimed,GUEST_DAILY_TOTAL,GUEST_IP_DAILY,guestPostRewardClaimed,guestShareRewardClaimed,guestQuotaEpoch,guestQuotaKey,guestHeartRewardTotal,GUEST_HEART_DAILY_MAX} from './guest-policy';
 import {aiFailureTrace,diagnosticId,recordAiFailure,recordAiRequest,traceAiEvent,AiFailureTrace} from './ai-photo-failures';
 import {aiPhotoAllowed} from './ai-photo-grants';
 import {backgroundReferenceId,readBackgroundReference} from './ai-photo-background-references';
@@ -103,11 +103,11 @@ export class AiPhotoService{
  private async usedIn(key:string,seconds:number){const row=await this.service.db.authRateBucket.findUnique({where:{id:this.bucket(key,seconds)}});return row?.count??0;}
  async guestQuota(id:string){
   const db=this.service.db;
-  const [epoch,postRewardClaimed,shareRewardClaimed,heartReward]=await Promise.all([guestQuotaEpoch(db),guestPostRewardClaimed(db,id),guestShareRewardClaimed(db,id),guestHeartRewardTotal(db,id)]);
-  const limit=GUEST_AI_LIMIT+(postRewardClaimed?GUEST_POST_REWARD:0)+(shareRewardClaimed?GUEST_SHARE_REWARD:0)+heartReward;
+  const [epoch,postRewardClaimed,shareRewardClaimed,heartReward,shopRewardClaimed]=await Promise.all([guestQuotaEpoch(db),guestPostRewardClaimed(db,id),guestShareRewardClaimed(db,id),guestHeartRewardTotal(db,id),guestShopRewardClaimed(db,id)]);
+  const limit=GUEST_AI_LIMIT+(postRewardClaimed?GUEST_POST_REWARD:0)+(shareRewardClaimed?GUEST_SHARE_REWARD:0)+(shopRewardClaimed?GUEST_SHOP_REWARD:0)+heartReward;
   // 2026-11-20 user decision: the guest allowance is daily (same 09:00 KST window as members).
   const used=await this.usedIn(guestQuotaKey('ai-photo:guest:',id,epoch),DAY);
-  return{limit,remaining:Math.max(0,limit-used),postRewardClaimed,shareRewardClaimed,heartReward,heartRewardMax:GUEST_HEART_DAILY_MAX,epoch};
+  return{limit,remaining:Math.max(0,limit-used),postRewardClaimed,shareRewardClaimed,shopRewardClaimed,heartReward,heartRewardMax:GUEST_HEART_DAILY_MAX,epoch};
  }
  async guestRemaining(id:string){return (await this.guestQuota(id)).remaining;}
  // 2026-11-16 user decision: every AI photo failure goes to Telegram (operations alert queue), user-caused ones included.

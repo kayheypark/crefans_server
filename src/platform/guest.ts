@@ -14,7 +14,7 @@ import {reject} from './http';
 import {requestContext} from './request-context';
 import {LocalMemberService} from '../auth/local/local-member.service';
 
-import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,GUEST_REPLAY_CONSENT_VERSION,GUEST_SHARE_REWARD,grantGuestShareReward,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash,GUEST_HEART_DAILY_MAX,GUEST_HEART_REWARD} from './guest-policy';
+import {GUEST_AI_LIMIT,GUEST_CONSENT_VERSION,GUEST_COOKIE,GUEST_POST_HOURS,GUEST_POST_REWARD,GUEST_REPLAY_CONSENT_VERSION,GUEST_SHARE_REWARD,grantGuestShareReward,GUEST_SHOP_REWARD,grantGuestShopReward,guestCutoff,guestFromRequest,guestIdFromToken,guestIpHash,GUEST_HEART_DAILY_MAX,GUEST_HEART_REWARD} from './guest-policy';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export * from './guest-policy';
 const COOKIE_DAYS=30;
@@ -32,13 +32,13 @@ export class GuestService{
   // 2026-11-19 user decision: part of the single required trial consent (privacy 17항, 2026-11-19.guest-replay.1), always offered.
   return GUEST_REPLAY_CONSENT_VERSION;
  }
- async status(req:any,quota:(id:string)=>Promise<{limit:number;remaining:number;postRewardClaimed:boolean;shareRewardClaimed:boolean;heartReward?:number;heartRewardMax?:number}>){
+ async status(req:any,quota:(id:string)=>Promise<{limit:number;remaining:number;postRewardClaimed:boolean;shareRewardClaimed:boolean;shopRewardClaimed?:boolean;heartReward?:number;heartRewardMax?:number}>){
   const id=guestFromRequest(req);
   const replayConsentVersion=this.replayConsentVersion();
-  const {limit,remaining,postRewardClaimed,shareRewardClaimed,heartReward=0}=id?await quota(id):{limit:GUEST_AI_LIMIT,remaining:GUEST_AI_LIMIT,postRewardClaimed:false,shareRewardClaimed:false,heartReward:0};
+  const {limit,remaining,postRewardClaimed,shareRewardClaimed,shopRewardClaimed=false,heartReward=0}=id?await quota(id):{limit:GUEST_AI_LIMIT,remaining:GUEST_AI_LIMIT,postRewardClaimed:false,shareRewardClaimed:false,heartReward:0};
   // 2026-11-19 user decision: replay unmasking on the trial screens only for a browser that recorded the replay consent (privacy 17항).
   const replayConsented=id?(await this.service.db.platformAuditLog.count({where:{entity_id:id,action:'guest.replay_consented'}}))>0:false;
-  return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,postHours:GUEST_POST_HOURS,limit,remaining,postRewardClaimed,postReward:GUEST_POST_REWARD,shareRewardClaimed,heartReward,heartRewardMax:GUEST_HEART_DAILY_MAX,heartRewardEach:GUEST_HEART_REWARD,replayConsented,...(replayConsentVersion?{replayConsentVersion}:{})};
+  return{active:!!id,...(id?{authorId:id}:{}),consentVersion:GUEST_CONSENT_VERSION,postHours:GUEST_POST_HOURS,limit,remaining,postRewardClaimed,postReward:GUEST_POST_REWARD,shareRewardClaimed,shopRewardClaimed,shopReward:GUEST_SHOP_REWARD,heartReward,heartRewardMax:GUEST_HEART_DAILY_MAX,heartRewardEach:GUEST_HEART_REWARD,replayConsented,...(replayConsentVersion?{replayConsentVersion}:{})};
  }
  async start(req:any,res:any,input:any){
   if(input?.consent!==true||input?.version!==GUEST_CONSENT_VERSION)reject(400,'GUEST_CONSENT_REQUIRED','체험 안내를 확인하고 동의해 주세요.');
@@ -59,6 +59,16 @@ export class GuestService{
   if(token)res.cookie(GUEST_COOKIE,token,this.cookieOptions());
   await recordFunnelStep(this.service.db,'guest_consent_agreed');
   return{active:true,consentVersion:GUEST_CONSENT_VERSION};
+ }
+ // 2026-11-22 user decision: opening the Coupang costume link on a trial result pays GUEST_SHOP_REWARD once a day (guest-policy).
+ async shopClick(req:any){
+  const id=this.require(req);
+  const granted=await this.service.db.$transaction(async tx=>{
+   const done=await grantGuestShopReward(tx,id);
+   if(done)await appendAudit(tx,{category:'business',action:'guest.costume_shop_reward',entityId:id,data:{amount:GUEST_SHOP_REWARD}});
+   return done;
+  });
+  return{granted};
  }
  // 2026-11-20 user decision: the trial reward is paid at the first share (share sheet finished or link copied), once per
  // browser, for the guest's own completed AI result. Nothing about the share is stored besides the reward bucket.
@@ -114,6 +124,7 @@ export class GuestController{
  @Post('session') start(@Req() req:any,@Res({passthrough:true}) res:any,@Body() body:any){return this.guests.start(req,res,body);}
  @Post('replay-session') replaySession(@Req() req:any,@Body() body:any){return this.guests.replaySession(req,body?.sessionId,body?.distinctId);}
  @Post('ai-photo/share-done') shareDone(@Req() req:any,@Body() body:any){return this.guests.shareDone(req,body?.mediaId);}
+ @Post('ai-photo/shop-click') shopClick(@Req() req:any){return this.guests.shopClick(req);}
  // 2026-11-21: server-verified waiting game for visitors (30 hearts → 0.5 credit, 3 a day per browser and per network).
  @Post('ai-photo/hearts') hearts(@Req() req:any,@Body() body:any){return this.photos.guestHearts(this.guests.require(req),body);}
  // 2026-11-21: a review instead of the game, once a KST day after a first successful photo.

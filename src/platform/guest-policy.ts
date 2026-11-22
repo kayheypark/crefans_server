@@ -7,7 +7,7 @@ import {createHash,createHmac} from 'node:crypto';
 // - Guest posts show in the whole feed for 24 hours, then nobody but the same browser can open them.
 // - Signing in (or signing up) on the same browser moves the guest posts and photos to that account.
 // - AI credits: three per visitor plus a one-time publishing reward. Network and service caps count requests.
-export const GUEST_COOKIE='cf_guest',GUEST_PREFIX='guest:',GUEST_POST_HOURS=24,GUEST_AI_LIMIT=3,GUEST_POST_REWARD=3,GUEST_SHARE_REWARD=3,GUEST_IP_DAILY=10,GUEST_DAILY_TOTAL=200;
+export const GUEST_COOKIE='cf_guest',GUEST_PREFIX='guest:',GUEST_POST_HOURS=24,GUEST_AI_LIMIT=3,GUEST_POST_REWARD=3,GUEST_SHARE_REWARD=3,GUEST_SHOP_REWARD=3,GUEST_IP_DAILY=10,GUEST_DAILY_TOTAL=200;
 export const GUEST_CONSENT_VERSION='2026-11-16.guest.5';
 export const GUEST_REPLAY_CONSENT_VERSION='2026-11-19.replay.1';
 export const GUEST_RETENTION_DAYS=30;
@@ -61,6 +61,17 @@ export async function grantGuestShareReward(tx:any,id:string,now=Date.now()):Pro
  return inserted===1;
 }
 
+// 2026-11-22 user decision: Coupang clicks were too few, so opening the costume shop link on a trial result pays 3 credits,
+// once per browser a day (same day/expiry as the share reward). The user accepted the Coupang Partners incentive-click risk.
+const shopRewardId=(id:string,now=Date.now())=>digest('ai-photo:guest-shop-reward:'+guestRewardDay(now)+':'+id);
+export async function guestShopRewardClaimed(db:any,id:string,now=Date.now()):Promise<boolean>{
+ return !!await db.authRateBucket.findUnique({where:{id:shopRewardId(id,now)},select:{id:true}});
+}
+export async function grantGuestShopReward(tx:any,id:string,now=Date.now()):Promise<boolean>{
+ const inserted=await tx.$executeRaw`INSERT IGNORE INTO auth_rate_buckets (id,count,expires_at)
+   VALUES (${shopRewardId(id,now)},${GUEST_SHOP_REWARD},${nextRefill(now)})`;
+ return inserted===1;
+}
 
 // 2026-11-21 user decision: a signed-out visitor who collects 30 hearts in the server-verified waiting game gets 0.5 credit,
 // at most 3 credits a day per browser (guest id) and per network (IP HMAC) — whichever fills first. Same 09:00 KST day as the
