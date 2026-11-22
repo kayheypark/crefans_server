@@ -281,3 +281,27 @@ test('admin AI trial history: list counts, detail with sample/presets/results/po
  await assert.rejects(listAiTrials(db,viewer,{}),code('ADMIN_FORBIDDEN'));
  await assert.rejects(aiTrialMedia(db,viewer,g.id,sample),code('ADMIN_FORBIDDEN'));
 });
+
+// 2026-11-22 user request: each signed-in operator stars trials and lists only their own stars.
+test('admin AI trial favorites are per operator, filter the list, and combine with search',async()=>{
+ const {listAiTrials,aiTrialDetail,setTrialFavorite}=require('../dist/src/platform/admin-ai-trials');
+ const config=app.get(require('@nestjs/config').ConfigService);
+ const tag=crypto.randomBytes(4).toString('hex'),a={id:'fav-a-'+tag,role:'SUPER_ADMIN',is_active:true},b={id:'fav-b-'+tag,role:'SUPER_ADMIN',is_active:true};
+ const viewer={id:'fav-v-'+tag,role:'SUB_ADMIN',is_active:true,permissions:{members:{view:false}}};
+ const g1=await startGuest(),g2=await startGuest();
+ try{
+  assert.deepEqual((await listAiTrials(db,a,{favorites:'1'})).items,[],'no stars yet');
+  assert.deepEqual(await setTrialFavorite(db,a,g1.id,true),{id:g1.id,favorite:true,count:1});
+  await Promise.all([setTrialFavorite(db,a,g2.id,true),setTrialFavorite(db,a,g2.id,true)]);
+  const mine=await listAiTrials(db,a,{favorites:'1'});assert.deepEqual(mine.items.map(i=>i.id).sort(),[g1.id,g2.id].sort());assert.equal(mine.total,2);assert.ok(mine.items.every(i=>i.favorite));
+  assert.deepEqual((await listAiTrials(db,b,{favorites:'1'})).items,[],'another operator sees no stars');
+  assert.equal((await listAiTrials(db,b,{})).items.find(i=>i.id===g1.id)?.favorite,false);
+  assert.deepEqual((await listAiTrials(db,a,{favorites:'1',q:g2.id})).items.map(i=>i.id),[g2.id],'search within stars');
+  assert.equal((await aiTrialDetail(db,a,g1.id,config)).favorite,true);assert.equal((await aiTrialDetail(db,b,g1.id,config)).favorite,false);
+  assert.deepEqual(await setTrialFavorite(db,a,g1.id,false),{id:g1.id,favorite:false,count:1});
+  assert.deepEqual((await listAiTrials(db,a,{favorites:'1'})).items.map(i=>i.id),[g2.id]);
+  await assert.rejects(setTrialFavorite(db,a,'guest:'+'0'.repeat(40),true),code('AI_TRIAL_NOT_FOUND'));
+  await assert.rejects(setTrialFavorite(db,a,g1.id,'yes'),code('AI_TRIAL_FAVORITE_INVALID'));
+  await assert.rejects(setTrialFavorite(db,viewer,g1.id,true),e=>e.getStatus?.()===403);
+ }finally{await db.platformSetting.deleteMany({where:{key:{in:['admin-fav:ai-trial:'+a.id,'admin-fav:ai-trial:'+b.id]}}});}
+});

@@ -1,4 +1,4 @@
-import {Controller,Get,Header,Param,Query,Req,Res,UseGuards} from '@nestjs/common';
+import {Body,Controller,Get,Header,Param,Post,Query,Req,Res,UseGuards} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {join,resolve} from 'node:path';
 import {pipeline} from 'node:stream/promises';
@@ -8,7 +8,7 @@ import {Permit} from './admin-permissions';
 import {PlatformService} from './service';
 import {PlatformMediaStorage,managedMediaKey} from './media-storage';
 import {reject} from './http';
-import {aiTrialDetail,aiTrialMedia,listAiTrials} from './admin-ai-trials';
+import {aiTrialDetail,aiTrialMedia,listAiTrials,setTrialFavorite} from './admin-ai-trials';
 import {listReviews} from './ai-photo-reviews';
 
 // 2026-11-20 user request: console "AI 체험관리" (members.view). Photos are streamed only through this route, never as public URLs.
@@ -18,6 +18,8 @@ export class AiTrialsAdminController {
 // 2026-11-21 user request: AI photo reviews in the same console menu.
  @Get('ai-photo-reviews') @Header('Cache-Control','private, no-store') @Permit(['members','view']) reviews(@Query() query:any){return listReviews(this.service.db,query);}
  @Get('ai-trials') @Header('Cache-Control','private, no-store') @Permit(['members','view']) list(@Query() query:any,@Req() req:any){return listAiTrials(this.service.db,req.admin,query);}
+ // 2026-11-22: per-operator star (members.view; personal, not a business change).
+ @Post('ai-trials/:id/favorite') @Permit(['members','view']) favorite(@Param('id') id:string,@Body() body:any,@Req() req:any){return setTrialFavorite(this.service.db,req.admin,id,body?.favorite);}
  @Get('ai-trials/:id') @Header('Cache-Control','private, no-store') @Permit(['members','view']) detail(@Param('id') id:string,@Req() req:any){return aiTrialDetail(this.service.db,req.admin,id,this.config);}
  @Get('ai-trials/:id/media/:mediaId') @Permit(['members','view'])
  async media(@Param('id') id:string,@Param('mediaId') mediaId:string,@Req() req:any,@Res() res:any){

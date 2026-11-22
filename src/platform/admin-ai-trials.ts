@@ -19,6 +19,30 @@ const REPLAY_URL='https://us.posthog.com/replay/';
 const isTrialId=(id:unknown):id is string=>typeof id==='string'&&id.startsWith(GUEST_PREFIX)&&/^guest:[0-9a-f]{40}$/.test(id);
 const aiFlag={path:'$.aiGenerated',equals:true};
 
+// 2026-11-22 user request: each signed-in operator can star trials and list only their stars. Stored per admin in
+// platform_settings (key admin-fav:ai-trial:<admin id>, newest first, at most FAVORITE_MAX), no schema change.
+export const FAVORITE_MAX=1000;
+const favoriteKey=(admin:any)=>`admin-fav:ai-trial:${String(admin?.id||'')}`.slice(0,64);
+export async function trialFavorites(db:any,admin:any):Promise<string[]>{
+ const row=await db.platformSetting.findUnique({where:{key:favoriteKey(admin)}});const ids=(row?.value as any)?.ids;
+ return Array.isArray(ids)?ids.filter(isTrialId):[];
+}
+/** Stars or unstars one trial for this operator; returns the new state. */
+export async function setTrialFavorite(db:any,admin:any,id:string,favorite:unknown){
+ requireView(admin);
+ if(!isTrialId(id))reject(404,'AI_TRIAL_NOT_FOUND','체험을 찾을 수 없어요.');
+ if(typeof favorite!=='boolean')reject(400,'AI_TRIAL_FAVORITE_INVALID','즐겨찾기 값을 확인해 주세요.');
+ if(favorite&&!await db.platformAuditLog.findFirst({where:{action:'guest.consented',entity_id:id},select:{id:true}}))reject(404,'AI_TRIAL_NOT_FOUND','체험을 찾을 수 없어요.');
+ return db.$transaction(async(tx:any)=>{
+  const key=favoriteKey(admin);
+  await tx.$executeRaw`INSERT IGNORE INTO platform_settings (\`key\`,value,updated_by,updated_at) VALUES (${key},${JSON.stringify({ids:[]})},${admin.id},NOW(3))`;
+  await tx.$queryRaw`SELECT \`key\` FROM platform_settings WHERE \`key\`=${key} FOR UPDATE`;
+  const rest=(await trialFavorites(tx,admin)).filter(x=>x!==id),ids=(favorite?[id,...rest]:rest).slice(0,FAVORITE_MAX);
+  await tx.platformSetting.update({where:{key},data:{value:{ids},updated_by:admin.id}});
+  return{id,favorite,count:ids.length};
+ });
+}
+
 function requireView(admin:any){if(!can(admin,'members','view'))reject(403,'ADMIN_FORBIDDEN','회원 조회 권한이 필요합니다.');}
 
 /** Newest trials first (by first consent), with counts for the list. */
@@ -28,9 +52,11 @@ export async function listAiTrials(db:any,admin:any,query:any){
  // 2026-11-22 user request: search by the trial id or a PostHog number — a replay session number or the visitor number (distinct_id)
  // the browser reported (guest.replay_session / guest.replay_visitor keep it at the end of source_id).
  const q=String(query?.q??'').trim().toLowerCase();let only:string[]|null=null;
+ const favorites=new Set(await trialFavorites(db,admin));
+ if(query?.favorites==='1'||query?.favorites===true)only=[...favorites];
  if(q){
-  if(isTrialId(q))only=[q];
-  else if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(q))only=[...new Set<string>((await db.platformAuditLog.findMany({where:{action:{in:['guest.replay_session','guest.replay_visitor']},source_id:{endsWith:':'+q}},select:{entity_id:true},take:50})).map((r:any)=>r.entity_id))];
+  if(isTrialId(q))only=only?only.filter(x=>x===q):[q];
+  else if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(q))only=[...new Set<string>((await db.platformAuditLog.findMany({where:{action:{in:['guest.replay_session','guest.replay_visitor']},source_id:{endsWith:':'+q}},select:{entity_id:true},take:50})).map((r:any)=>r.entity_id))].filter(x=>!only||only.includes(x));
   else reject(400,'AI_TRIAL_QUERY_INVALID','체험 번호(guest:…)나 PostHog 세션·방문자 번호를 입력해 주세요.');
  }
  const where={action:'guest.consented',entity_id:only?{in:only}:{startsWith:GUEST_PREFIX}};
@@ -52,7 +78,7 @@ export async function listAiTrials(db:any,admin:any,query:any){
  const claimed=new Set((await db.platformAuditLog.findMany({where:{action:'guest.claimed',OR:ids.map(id=>({metadata:{path:'$.guest',equals:id}}))},select:{metadata:true}})).map((r:any)=>r.metadata?.guest));
  return{total,page,pageSize:PAGE,items:rows.map((g:any)=>{const id=g.entity_id,generated=aiN.get(id)||0,total=mediaN.get(id)||0;return{
   id,startedAt:g._min.occurred_at,lastActivityAt:lastAt.get(id)||g._min.occurred_at,
-  uploads:total-generated,sampleUploads:sampleN.get(id)||0,generated,succeeded:okN.get(id)||0,failed:failedN.get(id)||0,posts:postN.get(id)||0,claimed:claimed.has(id),entry:entries.get(id)?.label??null};})};
+  uploads:total-generated,sampleUploads:sampleN.get(id)||0,generated,succeeded:okN.get(id)||0,failed:failedN.get(id)||0,posts:postN.get(id)||0,claimed:claimed.has(id),favorite:favorites.has(id),entry:entries.get(id)?.label??null};})};
 }
 
 /** The first entry of a trial (guest.entry_source) with a readable label, e.g. '당근 · utm_campaign=…'. */
@@ -95,7 +121,7 @@ export async function aiTrialDetail(db:any,admin:any,id:string,config:ConfigServ
  const posts=await db.posting.findMany({where:{user_sub:{in:owners},created_at:{gte:consents[0].occurred_at,...(claim?{lte:claim.occurred_at}:{})}},orderBy:{created_at:'asc'},select:{id:true,title:true,content:true,status:true,is_public:true,is_deleted:true,published_at:true,created_at:true,hidden_at:true,medias:{select:{media_id:true},orderBy:{sort_order:'asc'}}}});
  await appendAudit(db,{category:'admin',action:'admin.ai_trial_viewed',entityId:id,data:{changedBy:admin.id}});
  return{
-  id,startedAt:consents[0].occurred_at,consents:consents.map((c:any)=>({at:c.occurred_at,version:c.metadata?.version??null})),
+  id,favorite:(await trialFavorites(db,admin)).includes(id),startedAt:consents[0].occurred_at,consents:consents.map((c:any)=>({at:c.occurred_at,version:c.metadata?.version??null})),
   claimed:claim?{at:claim.occurred_at}:null,promptVisible:showPrompt,
   entry:entryRow?{...entryOf(entryRow.metadata),at:entryRow.occurred_at}:null,
   // The session UUID lives in source_id (guest-replay:<trial>:<uuid>); audit metadata keeps only allow-listed keys.
